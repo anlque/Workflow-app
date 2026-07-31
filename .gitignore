@@ -26,6 +26,7 @@ yarn-error.log*
 .DS_Store
 .idea/
 .vscode/
+/AGENTS.md
 
 # Prisma and database
 *.db
@@ -34,6 +35,3 @@ yarn-error.log*
 # Temporary files
 tmp/
 temp/
-
-#docs
-docs
