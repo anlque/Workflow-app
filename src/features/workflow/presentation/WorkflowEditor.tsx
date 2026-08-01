@@ -153,18 +153,18 @@ export function WorkflowEditor({
                   <option value="break">Break</option>
                 </Select>
                 <Field
-                  label={`Phase ${String(index + 1)} duration in seconds`}
+                  label={`Phase ${String(index + 1)} duration in minutes`}
                   error={errors[`phase:${phase.key}:duration`]}
                 >
                   <input
-                    inputMode="numeric"
+                    inputMode="decimal"
                     type="number"
-                    min="1"
-                    step="1"
-                    value={phase.durationSeconds}
+                    min="0.5"
+                    step="0.5"
+                    value={phase.durationMinutes}
                     onChange={(event) => {
                       editor.updatePhase(phase.key, {
-                        durationSeconds: event.target.value,
+                        durationMinutes: event.target.value,
                       });
                     }}
                   />

@@ -1,11 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { AssetId } from '@/features/assets';
 import type { Environment } from '@/features/workflow';
+import { Button } from '@/shared';
+
+import { useAmbientAudio } from './useAmbientAudio';
 
 export type FocusEnvironmentProps = Readonly<{
   environment: Environment;
   reducedMotion: boolean;
+  playing: boolean;
   loadAssetUrl(id: AssetId): Promise<string | null>;
   releaseAssetUrl(url: string): void;
 }>;
@@ -50,6 +54,7 @@ function useAssetUrl(
 export function FocusEnvironment({
   environment,
   reducedMotion,
+  playing,
   loadAssetUrl,
   releaseAssetUrl,
 }: FocusEnvironmentProps) {
@@ -63,15 +68,7 @@ export function FocusEnvironment({
     loadAssetUrl,
     releaseAssetUrl,
   );
-  const audioRef = useRef<HTMLAudioElement>(null);
-
-  useEffect(
-    () => () => {
-      const element = audioRef.current;
-      if (element !== null && !element.paused) element.pause();
-    },
-    [audio.url],
-  );
+  const ambientAudio = useAmbientAudio({ sourceUrl: audio.url, playing });
 
   return (
     <div
@@ -81,15 +78,24 @@ export function FocusEnvironment({
       style={{ backgroundColor: environment.backgroundColor }}
     >
       {image.url === null ? null : <img src={image.url} alt="" />}
-      {audio.url === null ? null : (
+      {ambientAudio.sourceUrl === null ? null : (
         <audio
-          ref={audioRef}
-          src={audio.url}
-          controls
+          ref={ambientAudio.audioRef}
+          src={ambientAudio.sourceUrl}
           loop
-          aria-label="Ambient audio"
+          hidden
+          aria-hidden="true"
         />
       )}
+      {ambientAudio.state === 'blocked' ? (
+        <Button
+          className="focus-environment__audio-action"
+          variant="secondary"
+          onClick={() => void ambientAudio.enable()}
+        >
+          Enable audio
+        </Button>
+      ) : null}
       {image.unavailable || audio.unavailable ? (
         <p className="focus-environment__status" role="status">
           A focus environment asset is unavailable.

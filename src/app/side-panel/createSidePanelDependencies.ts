@@ -25,8 +25,10 @@ import {
   type SessionRuntime,
 } from '../session/ChromeSessionClient';
 import type { SidePanelDependencies } from './SidePanelApp';
+import { createChromeFocusTabController } from '../focus/createChromeFocusTabController';
 
 export function createSidePanelDependencies(): SidePanelDependencies {
+  const focusTabs = createChromeFocusTabController(browser);
   const database = new FlowariumDatabase({
     schemas: [
       ...workflowDatabaseSchemas,
@@ -54,7 +56,7 @@ export function createSidePanelDependencies(): SidePanelDependencies {
     resumeSession: (id) => sessions.resume(id),
     stopSession: (id) => sessions.stop(id),
     async openFocusView() {
-      await browser.tabs.create({ url: browser.runtime.getURL('/focus.html') });
+      await focusTabs.openOrActivate();
     },
     listWorkflows: () => listWorkflowsUseCase(workflows),
     async createWorkflow() {

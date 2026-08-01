@@ -24,4 +24,46 @@ describe('RewardDiceEditor', () => {
     await user.click(screen.getByLabelText('Enable Reward Dice'));
     expect(onEnabledChange).toHaveBeenCalledWith(true);
   });
+
+  test('disables side removal when two sides remain', () => {
+    render(
+      <RewardDiceEditor
+        draft={{
+          enabled: true,
+          frequency: '1',
+          sides: [
+            {
+              key: 'tea',
+              icon: '☕',
+              title: 'Tea',
+              description: '',
+              weight: '',
+            },
+            {
+              key: 'walk',
+              icon: '🚶',
+              title: 'Walk',
+              description: '',
+              weight: '',
+            },
+          ],
+        }}
+        errors={{}}
+        onEnabledChange={() => undefined}
+        onFrequencyChange={() => undefined}
+        onSideChange={() => undefined}
+        onAddSide={() => undefined}
+        onRemoveSide={() => undefined}
+      />,
+    );
+
+    const removeButtons = screen.getAllByRole('button', {
+      name: /Remove reward side/,
+    });
+    expect(removeButtons).toHaveLength(2);
+    for (const button of removeButtons) expect(button).toBeDisabled();
+    expect(
+      screen.getByText('A Reward Dice needs at least two sides.'),
+    ).toBeVisible();
+  });
 });

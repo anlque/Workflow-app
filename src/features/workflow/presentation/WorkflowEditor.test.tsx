@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
 import { createAsset } from '@/features/assets';
 
 import type { CreateWorkflowInput } from '../domain/Workflow';
+import { useWorkflowEditor } from './useWorkflowEditor';
 import { WorkflowEditor } from './WorkflowEditor';
 
 const image = createAsset({
@@ -31,16 +32,53 @@ describe('WorkflowEditor', () => {
     );
 
     await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
-    const duration = screen.getByLabelText('Phase 1 duration in seconds');
+    const duration = screen.getByLabelText('Phase 1 duration in minutes');
     await user.clear(duration);
-    await user.type(duration, '0');
+    await user.type(duration, '0.25');
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
 
-    expect(duration).toHaveValue(0);
+    expect(duration).toHaveValue(0.25);
     expect(
-      screen.getByText('Duration must be a positive whole number.'),
+      screen.getByText(
+        'Duration must be at least 0.5 minutes in 0.5-minute increments.',
+      ),
     ).toBeVisible();
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  test('shows minutes and saves them as whole seconds', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    render(
+      <WorkflowEditor workflowId="workflow-1" assets={[]} onSave={onSave} />,
+    );
+
+    await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
+    const duration = screen.getByLabelText('Phase 1 duration in minutes');
+    expect(duration).toHaveValue(25);
+    await user.clear(duration);
+    await user.type(duration, '0.5');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phases: [expect.objectContaining({ durationSeconds: 30 })],
+      }),
+    );
+  });
+
+  test('keeps at least two Reward Dice sides in editor state', () => {
+    const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
+    const side = result.current.draft.rewardDice.sides[0];
+    expect(side).toBeDefined();
+
+    act(() => {
+      result.current.removeRewardSide(side?.key ?? 'missing');
+    });
+
+    expect(result.current.draft.rewardDice.sides).toHaveLength(2);
   });
 
   test('adds, reorders and saves ordered Phases with Asset references', async () => {
@@ -74,7 +112,7 @@ describe('WorkflowEditor', () => {
     expect(saved?.phases[1]?.environment.backgroundAssetId).toBe(image.id);
   });
 
-  test('validates enabled Reward Dice frequency and side minimum', async () => {
+  test('validates enabled Reward Dice frequency', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
       Promise.resolve(),
@@ -87,16 +125,10 @@ describe('WorkflowEditor', () => {
     await user.click(screen.getByLabelText('Enable Reward Dice'));
     await user.clear(screen.getByLabelText('Reward frequency'));
     await user.type(screen.getByLabelText('Reward frequency'), '0');
-    await user.click(
-      screen.getByRole('button', { name: 'Remove reward side 2' }),
-    );
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
 
     expect(
       screen.getByText('Frequency must be a positive whole number.'),
-    ).toBeVisible();
-    expect(
-      screen.getByText('Reward Dice needs at least two sides.'),
     ).toBeVisible();
     expect(onSave).not.toHaveBeenCalled();
   });

@@ -9,9 +9,11 @@ import {
   type SessionProjectionClient,
 } from '@/features/session';
 import type { AssetId } from '@/features/assets';
+import type { Workflow, WorkflowId } from '@/features/workflow';
 import { Button } from '@/shared';
 
 import { FocusEnvironment } from './FocusEnvironment';
+import { FocusLauncher } from './FocusLauncher';
 
 export type FocusDependencies = Readonly<{
   sessions: SessionProjectionClient;
@@ -24,6 +26,9 @@ export type FocusDependencies = Readonly<{
   closeSidePanel(): Promise<void>;
   openSidePanel(): Promise<void>;
   subscribeSidePanelState(listener: (open: boolean) => void): () => void;
+  listWorkflows(): Promise<readonly Workflow[]>;
+  start(id: WorkflowId): Promise<void>;
+  openOptions(): Promise<void>;
 }>;
 
 export function FocusApp({
@@ -34,6 +39,9 @@ export function FocusApp({
   const [reducedMotion, setReducedMotion] = useState(false);
   const [sidePanelOpen, setSidePanelOpen] = useState(true);
   const [panelPending, setPanelPending] = useState(false);
+  const [workflows, setWorkflows] = useState<readonly Workflow[] | null>(null);
+  const [launcherError, setLauncherError] = useState<string | null>(null);
+  const [pendingWorkflowId, setPendingWorkflowId] = useState<WorkflowId>();
 
   function togglePanel(): void {
     if (panelPending) return;
@@ -71,6 +79,29 @@ export function FocusApp({
     [dependencies],
   );
 
+  useEffect(() => {
+    if (projection.connection !== 'connected' || projection.session !== null) {
+      return;
+    }
+    let active = true;
+    void dependencies.listWorkflows().then(
+      (values) => {
+        if (active) setWorkflows(values);
+      },
+      (cause: unknown) => {
+        if (active) {
+          setWorkflows([]);
+          setLauncherError(
+            cause instanceof Error ? cause.message : 'Loading failed.',
+          );
+        }
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [dependencies, projection.connection, projection.session]);
+
   if (projection.connection === 'connecting') {
     return <p role="status">Connecting to your session…</p>;
   }
@@ -80,9 +111,8 @@ export function FocusApp({
   if (projection.session === null) {
     return (
       <main className="focus-app focus-app--empty">
-        <h1>No active session</h1>
-        <p>Start a Workflow from the Flowarium side panel.</p>
         <Button
+          className="focus-app__close-panel"
           variant="quiet"
           disabled={panelPending}
           aria-busy={panelPending || undefined}
@@ -90,6 +120,25 @@ export function FocusApp({
         >
           {sidePanelOpen ? 'Close side panel' : 'Open side panel'}
         </Button>
+        <FocusLauncher
+          workflows={workflows}
+          error={launcherError}
+          pendingWorkflowId={pendingWorkflowId}
+          onOpenOptions={dependencies.openOptions}
+          onStart={async (id) => {
+            setLauncherError(null);
+            setPendingWorkflowId(id);
+            try {
+              await dependencies.start(id);
+            } catch (cause) {
+              setLauncherError(
+                cause instanceof Error ? cause.message : 'Starting failed.',
+              );
+            } finally {
+              setPendingWorkflowId(undefined);
+            }
+          }}
+        />
       </main>
     );
   }
@@ -112,12 +161,14 @@ export function FocusApp({
       <FocusEnvironment
         environment={phase.environment}
         reducedMotion={reducedMotion}
+        playing={session.status === 'running'}
         loadAssetUrl={dependencies.loadAssetUrl}
         releaseAssetUrl={dependencies.releaseAssetUrl}
       />
       <div className="focus-app__content">
         <ActiveSessionView
           session={session}
+          reducedMotion={reducedMotion}
           onPause={dependencies.pause}
           onResume={dependencies.resume}
           onStop={dependencies.stop}

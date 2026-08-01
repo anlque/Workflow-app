@@ -25,6 +25,9 @@ export function RewardDiceEditor({
   onAddSide,
   onRemoveSide,
 }: RewardDiceEditorProps) {
+  const removalDisabled = draft.sides.length <= 2;
+  const removalHintId = 'reward-dice-side-removal-hint';
+
   return (
     <section className="reward-editor">
       <label className="check-control">
@@ -117,6 +120,10 @@ export function RewardDiceEditor({
                   <Button
                     variant="quiet"
                     aria-label={`Remove reward side ${String(index + 1)}`}
+                    aria-describedby={
+                      removalDisabled ? removalHintId : undefined
+                    }
+                    disabled={removalDisabled}
                     onClick={() => {
                       onRemoveSide(side.key);
                     }}
@@ -126,6 +133,11 @@ export function RewardDiceEditor({
                 </li>
               ))}
             </ol>
+            {removalDisabled ? (
+              <p className="field__hint" id={removalHintId}>
+                A Reward Dice needs at least two sides.
+              </p>
+            ) : null}
             <Button variant="secondary" onClick={onAddSide}>
               Add reward side
             </Button>

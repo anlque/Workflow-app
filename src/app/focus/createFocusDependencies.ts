@@ -10,7 +10,11 @@ import {
   getSettingsUseCase,
 } from '@/features/settings';
 import { sessionDatabaseSchemas } from '@/features/session';
-import { workflowDatabaseSchemas } from '@/features/workflow';
+import {
+  DexieWorkflowRepository,
+  listWorkflowsUseCase,
+  workflowDatabaseSchemas,
+} from '@/features/workflow';
 import { FlowariumDatabase } from '@/platform/storage';
 
 import {
@@ -33,6 +37,7 @@ export function createFocusDependencies(): FocusDependencies {
     ],
   });
   const assets = new DexieAssetRepository(database);
+  const workflows = new DexieWorkflowRepository(database);
   const urls = new BrowserAssetUrlService();
   const runtime: SessionRuntime = {
     sendMessage: (message) => browser.runtime.sendMessage(message),
@@ -49,6 +54,9 @@ export function createFocusDependencies(): FocusDependencies {
     closeSidePanel,
     openSidePanel,
     subscribeSidePanelState,
+    listWorkflows: () => listWorkflowsUseCase(workflows),
+    start: (id) => sessions.start(id),
+    openOptions: () => browser.runtime.openOptionsPage(),
     sessions,
     pause: (id) => sessions.pause(id),
     resume: (id) => sessions.resume(id),

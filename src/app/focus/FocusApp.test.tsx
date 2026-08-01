@@ -27,14 +27,20 @@ function dependencies(
     closeSidePanel: vi.fn(() => Promise.resolve()),
     openSidePanel: vi.fn(() => Promise.resolve()),
     subscribeSidePanelState: vi.fn(() => vi.fn()),
+    listWorkflows: vi.fn(() => Promise.resolve([])),
+    start: vi.fn(() => Promise.resolve()),
+    openOptions: vi.fn(() => Promise.resolve()),
   } satisfies FocusDependencies & { sessions: SessionProjectionClient };
 }
 
 describe('FocusApp', () => {
-  test('shows an instructive empty state without an active Session', async () => {
+  test('shows the Workflow launcher without an active Session', async () => {
     const deps = dependencies(null);
     render(<FocusApp dependencies={deps} />);
-    expect(await screen.findByText('No active session')).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { name: 'Choose a Workflow' }),
+    ).toBeVisible();
+    expect(deps.listWorkflows).toHaveBeenCalledOnce();
     expect(deps.closeSidePanel).not.toHaveBeenCalled();
   });
 
@@ -68,7 +74,7 @@ describe('FocusApp', () => {
     const user = userEvent.setup();
     const deps = dependencies(null);
     render(<FocusApp dependencies={deps} />);
-    await screen.findByText('No active session');
+    await screen.findByRole('heading', { name: 'Choose a Workflow' });
 
     await user.click(screen.getByRole('button', { name: 'Close side panel' }));
     expect(deps.closeSidePanel).toHaveBeenCalledOnce();
@@ -93,7 +99,7 @@ describe('FocusApp', () => {
         }),
     );
     render(<FocusApp dependencies={deps} />);
-    await screen.findByText('No active session');
+    await screen.findByRole('heading', { name: 'Choose a Workflow' });
 
     await user.click(screen.getByRole('button', { name: 'Close side panel' }));
 
@@ -110,7 +116,7 @@ describe('FocusApp', () => {
       new Error('Panel operation failed.'),
     );
     render(<FocusApp dependencies={deps} />);
-    await screen.findByText('No active session');
+    await screen.findByRole('heading', { name: 'Choose a Workflow' });
 
     await user.click(screen.getByRole('button', { name: 'Close side panel' }));
 

@@ -5,7 +5,7 @@ import type { CreateWorkflowInput, Workflow } from '../domain/Workflow';
 export type PhaseDraft = Readonly<{
   key: string;
   type: 'focus' | 'break';
-  durationSeconds: string;
+  durationMinutes: string;
   backgroundAssetId: string | undefined;
   audioAssetId: string | undefined;
   backgroundColor: string;
@@ -46,7 +46,7 @@ function newPhase(type: 'focus' | 'break' = 'focus'): PhaseDraft {
   return {
     key: key(),
     type,
-    durationSeconds: type === 'focus' ? '1500' : '300',
+    durationMinutes: type === 'focus' ? '25' : '5',
     backgroundAssetId: undefined,
     audioAssetId: undefined,
     backgroundColor: '',
@@ -70,7 +70,7 @@ function initialDraft(workflowId: string, workflow?: Workflow): WorkflowDraft {
     phases: workflow?.phases.map((phase) => ({
       key: key(),
       type: phase.type,
-      durationSeconds: String(phase.durationSeconds),
+      durationMinutes: String(phase.durationSeconds / 60),
       backgroundAssetId: phase.environment.backgroundAssetId,
       audioAssetId: phase.environment.audioAssetId,
       backgroundColor: phase.environment.backgroundColor ?? '',
@@ -95,16 +95,28 @@ function positiveInteger(value: string): number | null {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function minutesToDurationSeconds(value: string): number | null {
+  if (value.trim().length === 0) return null;
+  const minutes = Number(value);
+  const seconds = minutes * 60;
+  return Number.isFinite(minutes) &&
+    minutes >= 0.5 &&
+    Number.isInteger(minutes * 2) &&
+    Number.isSafeInteger(seconds)
+    ? seconds
+    : null;
+}
+
 export function validateWorkflowDraft(
   draft: WorkflowDraft,
 ): WorkflowDraftValidation {
   const errors: Record<string, string> = {};
   if (draft.name.trim().length === 0) errors['name'] = 'Name is required.';
   const phases = draft.phases.map((phase) => {
-    const durationSeconds = positiveInteger(phase.durationSeconds);
+    const durationSeconds = minutesToDurationSeconds(phase.durationMinutes);
     if (durationSeconds === null) {
       errors[`phase:${phase.key}:duration`] =
-        'Duration must be a positive whole number.';
+        'Duration must be at least 0.5 minutes in 0.5-minute increments.';
     }
     return {
       type: phase.type,
@@ -251,15 +263,18 @@ export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
       }));
     },
     removeRewardSide(sideKey: string): void {
-      setDraft((current) => ({
-        ...current,
-        rewardDice: {
-          ...current.rewardDice,
-          sides: current.rewardDice.sides.filter(
-            ({ key: value }) => value !== sideKey,
-          ),
-        },
-      }));
+      setDraft((current) => {
+        if (current.rewardDice.sides.length <= 2) return current;
+        return {
+          ...current,
+          rewardDice: {
+            ...current.rewardDice,
+            sides: current.rewardDice.sides.filter(
+              ({ key: value }) => value !== sideKey,
+            ),
+          },
+        };
+      });
     },
   };
 }

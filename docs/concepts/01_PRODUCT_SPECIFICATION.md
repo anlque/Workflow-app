@@ -268,10 +268,12 @@ Version 1 includes:
 
 The MVP targets Chrome on Manifest V3 and contains these extension surfaces:
 
-- side panel as the primary Workflow Library and Session surface;
+- side panel as a compact Workflow Library and Session surface;
 - options page for Workflow editing, Asset management and application settings;
 - background service worker for authoritative Session coordination;
-- a full-page focus view opened from the side panel.
+- a full-page focus view opened or activated from the extension toolbar or side
+  panel. When no Session is active, the focus view allows the user to select and
+  start an existing Workflow without opening the side panel.
 
 The MVP does not require a popup or content scripts. Additional browsers and
 extension surfaces remain future work.
@@ -303,7 +305,8 @@ collisions by generating new identifiers.
 
 System notifications and reminders are not part of the MVP. Phase changes are
 communicated inside open extension surfaces. The MVP requests only permissions
-required for the side panel, durable local storage and Session alarms.
+required for the side panel, durable local storage, Session alarms and locating
+Flowarium's existing focus tab.
 
 The initial application settings are theme (`system`, `light` or `dark`), reduced
 motion (`system`, `reduce` or `no-preference`) and last selected Workflow.

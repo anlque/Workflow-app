@@ -14,6 +14,7 @@ describe('Dialog', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Delete Deep work?' });
     expect(dialog).toHaveAttribute('open');
+    expect(dialog).toHaveAttribute('data-position', 'viewport-center');
 
     fireEvent(
       dialog,

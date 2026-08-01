@@ -8,7 +8,8 @@ adding optional Reward Dice rituals.
 
 - Create, edit, duplicate, reorder, import and export Workflows.
 - Compose ordered focus and break Phases with local image/audio environments.
-- Run one durable Session across the side panel and a dedicated focus tab.
+- Open or activate one dedicated focus tab from the extension toolbar, select a
+  Workflow there and run one durable Session across extension surfaces.
 - Pause, resume, stop and restore Sessions using timestamp-derived timing.
 - Configure optional weighted Reward Dice after completed focus Phases.
 - Store local Assets in IndexedDB and preferences in `chrome.storage.local`.
@@ -17,6 +18,10 @@ adding optional Reward Dice rituals.
 Flowarium makes no network requests, requests no host permissions and does not
 include content scripts. MVP data remains in the local Chrome profile unless the
 user explicitly exports it.
+
+Click the Flowarium toolbar action to open the focus tab. With no active Session,
+choose and start an existing Workflow there. The side panel remains available as
+a compact Workflow Library and Session controller.
 
 ## Requirements
 

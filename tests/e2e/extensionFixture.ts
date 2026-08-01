@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 
-import { test as base, type BrowserContext } from '@playwright/test';
+import { test as base, type BrowserContext, type Page } from '@playwright/test';
 
 export type ExtensionUrls = Readonly<{
   options: string;
@@ -15,6 +15,60 @@ type ExtensionFixtures = Readonly<{
 }>;
 
 const extensionPath = resolve(import.meta.dirname, '../../.output/chrome-mv3');
+
+export async function expireActivePhase(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('flowarium');
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        reject(request.error ?? new Error('Opening IndexedDB failed.'));
+      };
+    });
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction('sessions', 'readwrite');
+      const store = transaction.objectStore('sessions');
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const record = request.result.find(
+          (candidate: { active?: unknown }) => candidate.active === 1,
+        ) as
+          | {
+              session: Record<string, unknown>;
+              updatedAt: number;
+            }
+          | undefined;
+        if (record !== undefined) {
+          record.session = {
+            ...record.session,
+            phaseEndsAt: Date.now() - 1,
+          };
+          record.updatedAt = Date.now();
+          store.put(record);
+        }
+      };
+      transaction.oncomplete = () => {
+        resolve();
+      };
+      transaction.onerror = () => {
+        reject(transaction.error ?? new Error('Updating Session failed.'));
+      };
+    });
+    database.close();
+    const extension = globalThis as typeof globalThis & {
+      chrome: {
+        alarms: {
+          create(name: string, alarmInfo: { when: number }): Promise<void>;
+        };
+      };
+    };
+    await extension.chrome.alarms.create('flowarium.session-phase', {
+      when: Date.now() + 1,
+    });
+  });
+}
 
 export const test = base.extend<ExtensionFixtures>({
   context: async ({ playwright }, use) => {

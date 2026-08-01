@@ -27,6 +27,7 @@ export function Dialog({ open, title, children, onCancel }: DialogProps) {
     <dialog
       ref={dialogRef}
       className="dialog"
+      data-position="viewport-center"
       aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();

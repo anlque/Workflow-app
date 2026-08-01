@@ -12,6 +12,7 @@ export type ActiveSessionViewProps = Readonly<{
   session: Session;
   now?: () => number;
   random?: () => number;
+  reducedMotion?: boolean;
   onPause(id: SessionId): Promise<void>;
   onResume(id: SessionId): Promise<void>;
   onStop(id: SessionId): Promise<void>;
@@ -24,6 +25,7 @@ export function ActiveSessionView({
   session,
   now = systemNow,
   random = systemRandom,
+  reducedMotion = false,
   onPause,
   onResume,
   onStop,
@@ -61,6 +63,7 @@ export function ActiveSessionView({
     rewardDialog === undefined ? null : (
       <RewardResultDialog
         reward={rewardDialog}
+        reducedMotion={reducedMotion}
         onDismiss={() => {
           setRewards((current) => current.slice(1));
         }}

@@ -80,7 +80,15 @@ test('generated manifest contains only approved permissions and no hosts', async
     string,
     unknown
   >;
-  expect(manifest['permissions']).toEqual(['sidePanel', 'storage', 'alarms']);
+  expect(manifest['permissions']).toEqual([
+    'sidePanel',
+    'storage',
+    'alarms',
+    'tabs',
+  ]);
+  expect(manifest['action']).toEqual({
+    default_title: 'Open Flowarium focus view',
+  });
   expect(manifest['host_permissions']).toBeUndefined();
   expect(manifest['content_scripts']).toBeUndefined();
 });

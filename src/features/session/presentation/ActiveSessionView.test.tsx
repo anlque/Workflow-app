@@ -74,6 +74,7 @@ describe('ActiveSessionView', () => {
         session={initial}
         now={() => 1_500}
         random={() => 0}
+        reducedMotion
         {...actions}
       />,
     );
@@ -86,6 +87,7 @@ describe('ActiveSessionView', () => {
         session={deriveSessionState(initial, 2_000)}
         now={() => 2_000}
         random={() => 0}
+        reducedMotion
         {...actions}
       />,
     );

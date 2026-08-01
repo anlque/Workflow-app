@@ -1,29 +1,46 @@
+import { useCallback, useState } from 'react';
+
 import type { DiceSide } from '@/features/workflow';
 import { Button, Dialog } from '@/shared';
 
+import { RewardCube } from './RewardCube';
+
 export type RewardResultDialogProps = Readonly<{
   reward: DiceSide;
+  reducedMotion: boolean;
   onDismiss(): void;
 }>;
 
 export function RewardResultDialog({
   reward,
+  reducedMotion,
   onDismiss,
 }: RewardResultDialogProps) {
+  const [settled, setSettled] = useState(reducedMotion);
+  const settle = useCallback(() => {
+    setSettled(true);
+  }, []);
+
   return (
     <Dialog open title="Reward unlocked" onCancel={onDismiss}>
-      <div className="reward-result">
-        <span className="reward-result__icon" aria-hidden="true">
-          {reward.icon}
-        </span>
-        <h3>{reward.title}</h3>
-        {reward.description === undefined ? null : <p>{reward.description}</p>}
-      </div>
-      <div className="dialog__actions">
-        <Button variant="primary" onClick={onDismiss}>
-          Continue
-        </Button>
-      </div>
+      <RewardCube
+        icon={reward.icon}
+        reducedMotion={reducedMotion}
+        onSettled={settle}
+      />
+      {settled ? (
+        <div className="reward-result">
+          <h3>{reward.title}</h3>
+          {reward.description === undefined ? null : (
+            <p>{reward.description}</p>
+          )}
+          <div className="dialog__actions">
+            <Button variant="primary" onClick={onDismiss}>
+              Continue
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </Dialog>
   );
 }

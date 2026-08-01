@@ -1,17 +1,22 @@
 import type { BrowserContext, Page } from '@playwright/test';
 
-import { expect, test, type ExtensionUrls } from './extensionFixture';
+import {
+  expect,
+  expireActivePhase,
+  test,
+  type ExtensionUrls,
+} from './extensionFixture';
 
 async function createWorkflow(
   options: Page,
   name: string,
-  durationSeconds: number,
+  durationMinutes: number,
 ): Promise<void> {
   await options.getByRole('button', { name: 'Create workflow' }).click();
   await options.getByLabel('Workflow name').fill(name);
   await options
-    .getByLabel('Phase 1 duration in seconds')
-    .fill(String(durationSeconds));
+    .getByLabel('Phase 1 duration in minutes')
+    .fill(String(durationMinutes));
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(
     options.getByRole('button', { name: `Open ${name}` }),
@@ -34,11 +39,11 @@ async function configuredSurfaces(
   context: BrowserContext,
   extensionUrls: ExtensionUrls,
   name: string,
-  durationSeconds: number,
+  durationMinutes: number,
 ): Promise<Readonly<{ options: Page; sidePanel: Page }>> {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await createWorkflow(options, name, durationSeconds);
+  await createWorkflow(options, name, durationMinutes);
   const sidePanel = await context.newPage();
   await sidePanel.goto(extensionUrls.sidePanel);
   return { options, sidePanel };
@@ -52,7 +57,7 @@ test('restores a running Session after every Session surface closes', async ({
     context,
     extensionUrls,
     'Restored focus',
-    8,
+    0.5,
   );
   const focus = await startWorkflow(context, sidePanel, 'Restored focus');
   await expect(
@@ -71,7 +76,7 @@ test('restores a running Session after every Session surface closes', async ({
   expect(countdown).not.toBeNull();
   const remaining = Number(countdown?.split(':')[1]);
   expect(remaining).toBeGreaterThan(0);
-  expect(remaining).toBeLessThan(8);
+  expect(remaining).toBeLessThan(30);
 });
 
 test('shows terminal completion from the authoritative alarm transition', async ({
@@ -82,12 +87,14 @@ test('shows terminal completion from the authoritative alarm transition', async 
     context,
     extensionUrls,
     'Short focus',
-    10,
+    0.5,
   );
   const focus = await startWorkflow(context, sidePanel, 'Short focus');
   await expect(
     focus.getByRole('heading', { name: 'Short focus' }),
   ).toBeVisible();
+
+  await expireActivePhase(focus);
 
   await expect(focus.getByText('Session complete')).toBeVisible({
     timeout: 15_000,

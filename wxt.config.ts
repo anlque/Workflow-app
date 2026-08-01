@@ -12,6 +12,9 @@ export default defineConfig({
     name: 'Flowarium',
     description:
       'Build personalized focus workflows, environments and reward rituals.',
-    permissions: ['sidePanel', 'storage', 'alarms'],
+    permissions: ['sidePanel', 'storage', 'alarms', 'tabs'],
+    action: {
+      default_title: 'Open Flowarium focus view',
+    },
   },
 });
