@@ -12,6 +12,13 @@ export function bootstrapFocus(container: HTMLElement | null): void {
   }
 
   const dependencies = createFocusDependencies();
+  window.addEventListener(
+    'pagehide',
+    () => {
+      dependencies.sounds.dispose();
+    },
+    { once: true },
+  );
   createRoot(container).render(
     <StrictMode>
       <FocusApp dependencies={dependencies} />

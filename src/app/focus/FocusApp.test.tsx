@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
+import { StrictMode } from 'react';
 
 import {
   createSession,
@@ -41,6 +42,19 @@ function dependencies(
 }
 
 describe('FocusApp', () => {
+  test('does not dispose document-scoped sounds during StrictMode effect checks', async () => {
+    const deps = dependencies(null);
+
+    render(
+      <StrictMode>
+        <FocusApp dependencies={deps} />
+      </StrictMode>,
+    );
+    await screen.findByRole('heading', { name: 'Choose a Workflow' });
+
+    expect(deps.sounds.dispose).not.toHaveBeenCalled();
+  });
+
   test('shows the Workflow launcher without an active Session', async () => {
     const deps = dependencies(null);
     render(<FocusApp dependencies={deps} />);

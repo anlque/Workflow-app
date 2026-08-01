@@ -84,13 +84,6 @@ export function FocusApp({
   }, [dependencies, store]);
 
   useEffect(
-    () => () => {
-      dependencies.sounds.dispose();
-    },
-    [dependencies.sounds],
-  );
-
-  useEffect(
     () => dependencies.subscribeSidePanelState(setSidePanelOpen),
     [dependencies],
   );
