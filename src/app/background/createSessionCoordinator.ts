@@ -83,7 +83,7 @@ export function createSessionCoordinator({
 
   async function handleAlarm(name: string): Promise<void> {
     if (name !== SESSION_PHASE_ALARM) return;
-    const active = await getActiveSessionUseCase(sessions, clock);
+    const active = await sessions.getActive();
     const reconciled =
       active?.status === 'running'
         ? await advanceSessionUseCase(sessions, clock, active.id)

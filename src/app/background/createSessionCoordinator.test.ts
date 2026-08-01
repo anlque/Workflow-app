@@ -229,6 +229,25 @@ describe('createSessionCoordinator', () => {
     });
   });
 
+  test('broadcasts the completed Session at the final alarm boundary', async () => {
+    const { value, clock, messages, alarms, coordinator } = setup();
+    await coordinator.initialize();
+    await messages.dispatch({
+      type: 'session/start',
+      commandId: 'command-1',
+      workflowId: value.id,
+    });
+
+    clock.set(16_000);
+    await alarms.fire('flowarium.session-phase');
+
+    expect(messages.events.at(-1)?.session).toMatchObject({
+      status: 'completed',
+      completedAt: 16_000,
+    });
+    expect(alarms.scheduled).toBeNull();
+  });
+
   test('restores and broadcasts active state during initialization', async () => {
     const { value, sessions, clock, messages, alarms, coordinator } = setup();
     const existing = createSession('existing', value, 1_000);

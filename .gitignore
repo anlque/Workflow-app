@@ -9,6 +9,8 @@ build/
 .wxt/
 .next/
 coverage/
+playwright-report/
+test-results/
 *.tsbuildinfo
 apps/api/prisma/*.js
 
