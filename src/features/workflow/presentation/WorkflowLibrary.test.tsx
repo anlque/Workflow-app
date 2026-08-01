@@ -21,6 +21,7 @@ function setup(workflows: readonly Workflow[] = []) {
     onDuplicate: vi.fn(() => Promise.resolve()),
     onDelete: vi.fn(() => Promise.resolve()),
     onReorder: vi.fn(() => Promise.resolve()),
+    onStart: vi.fn(() => Promise.resolve()),
   };
   render(<WorkflowLibrary workflows={workflows} {...callbacks} />);
   return callbacks;
@@ -49,6 +50,15 @@ describe('WorkflowLibrary', () => {
 
     expect(onOpen).toHaveBeenCalledWith(deepWork.id);
     expect(onDuplicate).toHaveBeenCalledWith(deepWork.id);
+  });
+
+  test('starts a Workflow when the surface provides a Start action', async () => {
+    const user = userEvent.setup();
+    const deepWork = workflow('workflow-1', 'Deep work');
+    const { onStart } = setup([deepWork]);
+
+    await user.click(screen.getByRole('button', { name: 'Start Deep work' }));
+    expect(onStart).toHaveBeenCalledWith(deepWork.id);
   });
 
   test('confirms deletion and supports cancellation', async () => {

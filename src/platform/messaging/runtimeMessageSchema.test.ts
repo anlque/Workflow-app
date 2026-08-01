@@ -2,8 +2,30 @@ import { describe, expect, test } from 'vitest';
 
 import {
   RuntimeMessageValidationError,
+  parseActiveSessionRequest,
   parseSessionCommand,
 } from './runtimeMessageSchema';
+
+describe('parseActiveSessionRequest', () => {
+  test('accepts an exact active Session request', () => {
+    expect(
+      parseActiveSessionRequest({
+        type: 'session/get-active',
+        requestId: 'request-1',
+      }),
+    ).toEqual({ type: 'session/get-active', requestId: 'request-1' });
+  });
+
+  test.each([
+    null,
+    { type: 'session/get-active', requestId: '' },
+    { type: 'session/get-active', requestId: 'request-1', extra: true },
+  ])('rejects an invalid active Session request %#', (value) => {
+    expect(() => parseActiveSessionRequest(value)).toThrow(
+      RuntimeMessageValidationError,
+    );
+  });
+});
 
 describe('parseSessionCommand', () => {
   test.each([

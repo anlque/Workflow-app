@@ -75,6 +75,131 @@ body {
   background: var(--color-canvas);
 }
 
+.focus-app {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.focus-app--empty {
+  align-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+
+.focus-app__close-panel {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1;
+  background: color-mix(in oklch, var(--color-surface) 82%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.focus-environment {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--color-canvas);
+}
+
+.focus-environment img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.42;
+  transition: opacity 600ms ease;
+}
+
+.focus-environment audio {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  max-width: min(22rem, calc(100% - 2rem));
+}
+
+.focus-environment__status {
+  position: absolute;
+  right: 1rem;
+  bottom: 5rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+}
+
+.focus-app__content {
+  width: min(34rem, calc(100% - 2rem));
+  padding: clamp(1.5rem, 5vw, 3.5rem);
+  text-align: center;
+  background: color-mix(in oklch, var(--color-surface) 88%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-border) 75%, transparent);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(18px);
+}
+
+.active-session h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 5vw, 3rem);
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+.session-phase {
+  margin: 1rem 0 0;
+  color: var(--color-ink-muted);
+  font-weight: 650;
+}
+
+.session-countdown {
+  display: block;
+  margin: 1rem 0 1.5rem;
+  font-size: clamp(3.5rem, 14vw, 7rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+
+.session-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.session-controls [role='alert'] {
+  flex-basis: 100%;
+  color: var(--color-danger);
+}
+
+.session-terminal {
+  margin: 1.25rem 0 0;
+  color: var(--color-ink-muted);
+  font-size: 1.125rem;
+}
+
+.reward-result {
+  text-align: center;
+}
+
+.reward-result__icon {
+  display: block;
+  font-size: 3rem;
+}
+
+[data-reduced-motion='true'] *,
+[data-reduced-motion='true'] *::before,
+[data-reduced-motion='true'] *::after {
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+
 button,
 input,
 select,
@@ -703,6 +828,29 @@ select {
   margin-top: 0.125rem;
   color: var(--color-ink-muted);
   font-size: 0.8125rem;
+}
+
+.side-panel-session {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+}
+
+.side-panel-session .active-session h1 {
+  font-size: 1.5rem;
+}
+
+.side-panel-session .session-countdown {
+  margin: 0.75rem 0 1rem;
+  font-size: clamp(3rem, 20vw, 4.5rem);
+}
+
+.side-panel-session > .button {
+  width: 100%;
 }
 
 .brand-mark {

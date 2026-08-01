@@ -1,6 +1,9 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { createFocusDependencies } from './createFocusDependencies';
+import { FocusApp } from './FocusApp';
+
 export function bootstrapFocus(container: HTMLElement | null): void {
   if (container === null) {
     throw new Error(
@@ -8,11 +11,10 @@ export function bootstrapFocus(container: HTMLElement | null): void {
     );
   }
 
+  const dependencies = createFocusDependencies();
   createRoot(container).render(
     <StrictMode>
-      <main>
-        <h1>Focus session</h1>
-      </main>
+      <FocusApp dependencies={dependencies} />
     </StrictMode>,
   );
 }

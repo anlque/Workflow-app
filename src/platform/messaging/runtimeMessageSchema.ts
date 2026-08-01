@@ -1,4 +1,4 @@
-import type { SessionCommand } from './RuntimeMessage';
+import type { ActiveSessionRequest, SessionCommand } from './RuntimeMessage';
 
 export class RuntimeMessageValidationError extends Error {
   public constructor() {
@@ -63,4 +63,20 @@ export function parseSessionCommand(value: unknown): SessionCommand {
   }
 
   throw new RuntimeMessageValidationError();
+}
+
+export function parseActiveSessionRequest(
+  value: unknown,
+): ActiveSessionRequest {
+  const record = messageRecord(value);
+  if (
+    record['type'] !== 'session/get-active' ||
+    !hasExactKeys(record, ['type', 'requestId'])
+  ) {
+    throw new RuntimeMessageValidationError();
+  }
+  return Object.freeze({
+    type: 'session/get-active',
+    requestId: nonEmptyString(record['requestId']),
+  });
 }

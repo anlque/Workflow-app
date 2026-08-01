@@ -32,3 +32,18 @@ export type { SessionSnapshot } from './domain/SessionSnapshot';
 export { deriveSessionState } from './domain/deriveSessionState';
 export { DexieSessionRepository } from './infrastructure/DexieSessionRepository';
 export { sessionDatabaseSchemas } from './infrastructure/SessionRecord';
+export {
+  createActiveSessionStore,
+  type ActiveSessionState,
+  type ActiveSessionStore,
+} from './presentation/ActiveSessionStore';
+export {
+  ActiveSessionView,
+  type ActiveSessionViewProps,
+} from './presentation/ActiveSessionView';
+export {
+  connectSessionMessages,
+  type SessionMessageConnection,
+  type SessionProjectionClient,
+} from './presentation/connectSessionMessages';
+export { parseSessionProjection } from './presentation/parseSessionProjection';

@@ -8,3 +8,8 @@ export type SessionChangedMessage = Readonly<{
   type: 'session/changed';
   session: unknown;
 }>;
+
+export type ActiveSessionRequest = Readonly<{
+  type: 'session/get-active';
+  requestId: string;
+}>;

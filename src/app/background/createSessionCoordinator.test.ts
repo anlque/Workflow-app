@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import type { AlarmScheduler } from '@/platform/alarms';
 import type {
   RuntimeMessageBus,
+  ActiveSessionRequest,
   SessionChangedMessage,
   SessionCommand,
 } from '@/platform/messaging';
@@ -62,6 +63,8 @@ class InMemorySessionRepository implements SessionRepository {
 class FakeMessageBus implements RuntimeMessageBus {
   readonly events: SessionChangedMessage[] = [];
   #listener: ((command: SessionCommand) => Promise<unknown>) | undefined;
+  #requestListener:
+    ((request: ActiveSessionRequest) => Promise<unknown>) | undefined;
 
   public onSessionCommand(
     listener: (command: SessionCommand) => Promise<unknown>,
@@ -75,6 +78,24 @@ class FakeMessageBus implements RuntimeMessageBus {
   public publishSessionChanged(message: SessionChangedMessage): Promise<void> {
     this.events.push(message);
     return Promise.resolve();
+  }
+
+  public onActiveSessionRequest(
+    listener: (request: ActiveSessionRequest) => Promise<unknown>,
+  ): () => void {
+    this.#requestListener = listener;
+    return () => {
+      this.#requestListener = undefined;
+    };
+  }
+
+  public requestActiveSession(): Promise<unknown> {
+    if (this.#requestListener === undefined)
+      throw new Error('Request listener is not registered.');
+    return this.#requestListener({
+      type: 'session/get-active',
+      requestId: 'request-1',
+    });
   }
 
   public dispatch(command: SessionCommand): Promise<unknown> {
@@ -223,5 +244,17 @@ describe('createSessionCoordinator', () => {
       name: 'flowarium.session-phase',
       when: 11_000,
     });
+  });
+
+  test('answers late active Session hydration requests', async () => {
+    const { value, messages, coordinator } = setup();
+    await coordinator.initialize();
+    const session = await messages.dispatch({
+      type: 'session/start',
+      commandId: 'command-1',
+      workflowId: value.id,
+    });
+
+    await expect(messages.requestActiveSession()).resolves.toEqual(session);
   });
 });

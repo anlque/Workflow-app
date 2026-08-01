@@ -94,6 +94,9 @@ export function createSessionCoordinator({
   return {
     async initialize(): Promise<void> {
       messages.onSessionCommand(handle);
+      messages.onActiveSessionRequest(() =>
+        getActiveSessionUseCase(sessions, clock),
+      );
       alarms.onFired(handleAlarm);
       await publishAndSchedule(await getActiveSessionUseCase(sessions, clock));
     },

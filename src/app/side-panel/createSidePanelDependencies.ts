@@ -20,6 +20,10 @@ import {
 } from '@/features/workflow';
 import { FlowariumDatabase } from '@/platform/storage';
 
+import {
+  ChromeSessionClient,
+  type SessionRuntime,
+} from '../session/ChromeSessionClient';
 import type { SidePanelDependencies } from './SidePanelApp';
 
 export function createSidePanelDependencies(): SidePanelDependencies {
@@ -32,8 +36,26 @@ export function createSidePanelDependencies(): SidePanelDependencies {
   });
   const workflows = new DexieWorkflowRepository(database);
   const settings = new ChromeSettingsRepository();
+  const runtime: SessionRuntime = {
+    sendMessage: (message) => browser.runtime.sendMessage(message),
+    addMessageListener(listener) {
+      browser.runtime.onMessage.addListener(listener);
+    },
+    removeMessageListener(listener) {
+      browser.runtime.onMessage.removeListener(listener);
+    },
+  };
+  const sessions = new ChromeSessionClient(runtime, () => crypto.randomUUID());
 
   return {
+    sessions,
+    startSession: (id) => sessions.start(id),
+    pauseSession: (id) => sessions.pause(id),
+    resumeSession: (id) => sessions.resume(id),
+    stopSession: (id) => sessions.stop(id),
+    async openFocusView() {
+      await browser.tabs.create({ url: browser.runtime.getURL('/focus.html') });
+    },
     listWorkflows: () => listWorkflowsUseCase(workflows),
     async createWorkflow() {
       await createWorkflowUseCase(

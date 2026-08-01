@@ -13,6 +13,7 @@ export type WorkflowLibraryProps = Readonly<{
   onDuplicate(id: WorkflowId): Promise<void>;
   onDelete(id: WorkflowId): Promise<void>;
   onReorder(ids: readonly WorkflowId[]): Promise<void>;
+  onStart?(id: WorkflowId): Promise<void>;
 }>;
 
 export function WorkflowLibrary({
@@ -24,6 +25,7 @@ export function WorkflowLibrary({
   onDuplicate,
   onDelete,
   onReorder,
+  onStart,
 }: WorkflowLibraryProps) {
   const [deleting, setDeleting] = useState<Workflow | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -132,6 +134,21 @@ export function WorkflowLibrary({
                 </span>
               </button>
               <div className="workflow-list__actions">
+                {onStart === undefined ? null : (
+                  <Button
+                    variant="primary"
+                    aria-label={`Start ${workflow.name}`}
+                    pending={pendingAction === `start:${workflow.id}`}
+                    pendingLabel="Starting…"
+                    onClick={() =>
+                      void perform(`start:${workflow.id}`, () =>
+                        onStart(workflow.id),
+                      )
+                    }
+                  >
+                    Start
+                  </Button>
+                )}
                 <Button
                   variant="quiet"
                   aria-label={`Move ${workflow.name} up`}

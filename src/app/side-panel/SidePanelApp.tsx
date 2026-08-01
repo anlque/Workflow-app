@@ -1,4 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useStore } from 'zustand';
+
+import {
+  ActiveSessionView,
+  connectSessionMessages,
+  createActiveSessionStore,
+  type SessionId,
+  type SessionProjectionClient,
+} from '@/features/session';
+import { Button } from '@/shared';
 
 import {
   WorkflowLibrary,
@@ -13,6 +23,12 @@ export type SidePanelDependencies = Readonly<{
   deleteWorkflow(id: WorkflowId): Promise<void>;
   reorderWorkflows(ids: readonly WorkflowId[]): Promise<void>;
   openWorkflow(id: WorkflowId): Promise<void>;
+  sessions: SessionProjectionClient;
+  startSession(id: WorkflowId): Promise<void>;
+  pauseSession(id: SessionId): Promise<void>;
+  resumeSession(id: SessionId): Promise<void>;
+  stopSession(id: SessionId): Promise<void>;
+  openFocusView(): Promise<void>;
 }>;
 
 export function SidePanelApp({
@@ -20,6 +36,8 @@ export function SidePanelApp({
 }: Readonly<{ dependencies: SidePanelDependencies }>) {
   const [workflows, setWorkflows] = useState<readonly Workflow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const sessionStore = useMemo(createActiveSessionStore, []);
+  const projection = useStore(sessionStore);
 
   async function load(): Promise<void> {
     setWorkflows(await dependencies.listWorkflows());
@@ -42,6 +60,14 @@ export function SidePanelApp({
     };
   }, [dependencies]);
 
+  useEffect(() => {
+    const connection = connectSessionMessages(
+      sessionStore,
+      dependencies.sessions,
+    );
+    return connection.disconnect;
+  }, [dependencies.sessions, sessionStore]);
+
   if (error !== null) {
     return (
       <p className="feedback feedback--error" role="alert">
@@ -50,6 +76,8 @@ export function SidePanelApp({
     );
   }
   if (workflows === null) return <p role="status">Loading Workflows…</p>;
+
+  const activeSession = projection.session;
 
   return (
     <main className="side-panel-app">
@@ -62,32 +90,56 @@ export function SidePanelApp({
           <p>Your focus rhythms</p>
         </div>
       </header>
-      <WorkflowLibrary
-        workflows={workflows}
-        onCreate={async () => {
-          await dependencies.createWorkflow();
-          await load();
-        }}
-        onOpen={(id) => {
-          void dependencies.openWorkflow(id).catch((cause: unknown) => {
-            setError(
-              cause instanceof Error ? cause.message : 'Opening failed.',
-            );
-          });
-        }}
-        onDuplicate={async (id) => {
-          await dependencies.duplicateWorkflow(id);
-          await load();
-        }}
-        onDelete={async (id) => {
-          await dependencies.deleteWorkflow(id);
-          await load();
-        }}
-        onReorder={async (ids) => {
-          await dependencies.reorderWorkflows(ids);
-          await load();
-        }}
-      />
+      {activeSession === null ? null : (
+        <section className="side-panel-session" aria-label="Active session">
+          <ActiveSessionView
+            session={activeSession}
+            onPause={dependencies.pauseSession}
+            onResume={dependencies.resumeSession}
+            onStop={dependencies.stopSession}
+          />
+          <Button
+            variant="primary"
+            onClick={() => {
+              void dependencies.openFocusView();
+            }}
+          >
+            Open focus view
+          </Button>
+        </section>
+      )}
+      {activeSession === null ? (
+        <WorkflowLibrary
+          workflows={workflows}
+          onCreate={async () => {
+            await dependencies.createWorkflow();
+            await load();
+          }}
+          onOpen={(id) => {
+            void dependencies.openWorkflow(id).catch((cause: unknown) => {
+              setError(
+                cause instanceof Error ? cause.message : 'Opening failed.',
+              );
+            });
+          }}
+          onDuplicate={async (id) => {
+            await dependencies.duplicateWorkflow(id);
+            await load();
+          }}
+          onDelete={async (id) => {
+            await dependencies.deleteWorkflow(id);
+            await load();
+          }}
+          onReorder={async (ids) => {
+            await dependencies.reorderWorkflows(ids);
+            await load();
+          }}
+          onStart={async (id) => {
+            await dependencies.startSession(id);
+            await dependencies.openFocusView();
+          }}
+        />
+      ) : null}
     </main>
   );
 }
