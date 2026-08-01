@@ -1,6 +1,7 @@
 import { ChromeAlarmScheduler } from '@/platform/alarms';
 import { ChromeMessageBus } from '@/platform/messaging';
 import { FlowariumDatabase } from '@/platform/storage';
+import { assetDatabaseSchemas } from '@/features/assets';
 import {
   DexieSessionRepository,
   sessionDatabaseSchemas,
@@ -19,7 +20,11 @@ const systemClock: Clock = {
 
 export async function bootstrapBackground(): Promise<void> {
   const database = new FlowariumDatabase({
-    schemas: [...workflowDatabaseSchemas, ...sessionDatabaseSchemas],
+    schemas: [
+      ...workflowDatabaseSchemas,
+      ...sessionDatabaseSchemas,
+      ...assetDatabaseSchemas,
+    ],
   });
   const coordinator = createSessionCoordinator({
     workflows: new DexieWorkflowRepository(database),
