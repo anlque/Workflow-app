@@ -1,0 +1,66 @@
+import type { SessionCommand } from './RuntimeMessage';
+
+export class RuntimeMessageValidationError extends Error {
+  public constructor() {
+    super('Runtime message is invalid.');
+    this.name = 'RuntimeMessageValidationError';
+  }
+}
+
+function messageRecord(value: unknown): Readonly<Record<string, unknown>> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new RuntimeMessageValidationError();
+  }
+  return value as Readonly<Record<string, unknown>>;
+}
+
+function nonEmptyString(value: unknown): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new RuntimeMessageValidationError();
+  }
+  return value;
+}
+
+function hasExactKeys(
+  record: Readonly<Record<string, unknown>>,
+  keys: readonly string[],
+): boolean {
+  const actualKeys = Object.keys(record).sort();
+  const expectedKeys = [...keys].sort();
+  return (
+    actualKeys.length === expectedKeys.length &&
+    actualKeys.every((key, index) => key === expectedKeys[index])
+  );
+}
+
+export function parseSessionCommand(value: unknown): SessionCommand {
+  const record = messageRecord(value);
+  const type = record['type'];
+  const commandId = nonEmptyString(record['commandId']);
+
+  if (
+    type === 'session/start' &&
+    hasExactKeys(record, ['type', 'commandId', 'workflowId'])
+  ) {
+    return Object.freeze({
+      type,
+      commandId,
+      workflowId: nonEmptyString(record['workflowId']),
+    });
+  }
+
+  if (
+    (type === 'session/pause' ||
+      type === 'session/resume' ||
+      type === 'session/stop') &&
+    hasExactKeys(record, ['type', 'commandId', 'sessionId'])
+  ) {
+    return Object.freeze({
+      type,
+      commandId,
+      sessionId: nonEmptyString(record['sessionId']),
+    });
+  }
+
+  throw new RuntimeMessageValidationError();
+}

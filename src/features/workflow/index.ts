@@ -16,6 +16,7 @@ export type {
   Workflow,
   WorkflowId,
 } from './domain/Workflow';
+export { createWorkflowId } from './domain/Workflow';
 export { WorkflowValidationError } from './domain/WorkflowErrors';
 export { createWorkflow } from './domain/createWorkflow';
 export { rollReward } from './domain/rollReward';

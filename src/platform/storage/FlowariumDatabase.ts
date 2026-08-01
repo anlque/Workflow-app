@@ -17,10 +17,12 @@ export class FlowariumDatabase extends Dexie {
   }: FlowariumDatabaseOptions) {
     super(name);
 
+    const cumulativeStores: Record<string, string> = {};
     [...schemas]
       .sort((left, right) => left.version - right.version)
       .forEach(({ version, stores }) => {
-        this.version(version).stores(stores);
+        Object.assign(cumulativeStores, stores);
+        this.version(version).stores({ ...cumulativeStores });
       });
   }
 

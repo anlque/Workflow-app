@@ -14,10 +14,12 @@ export {
   getRemainingSeconds,
   pauseSession,
   resumeSession,
+  restoreSession,
   stopSession,
   type CompletedSession,
   type PausedSession,
   type RunningSession,
+  type RestoreSessionInput,
   type Session,
   type SessionId,
   type StoppedSession,
@@ -28,3 +30,5 @@ export {
 } from './domain/SessionErrors';
 export type { SessionSnapshot } from './domain/SessionSnapshot';
 export { deriveSessionState } from './domain/deriveSessionState';
+export { DexieSessionRepository } from './infrastructure/DexieSessionRepository';
+export { sessionDatabaseSchemas } from './infrastructure/SessionRecord';

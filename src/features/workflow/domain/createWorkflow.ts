@@ -2,16 +2,12 @@ import type { DiceSide, DiceSideInput } from './DiceSide';
 import type { AssetId, Environment, EnvironmentInput } from './Environment';
 import type { DurationSeconds, Phase, PhaseInput, PhaseType } from './Phase';
 import type { RewardDice, RewardDiceInput } from './RewardDice';
-import type { CreateWorkflowInput, Workflow, WorkflowId } from './Workflow';
+import {
+  createWorkflowId,
+  type CreateWorkflowInput,
+  type Workflow,
+} from './Workflow';
 import { WorkflowValidationError } from './WorkflowErrors';
-
-function createWorkflowId(value: string): WorkflowId {
-  if (value.trim().length === 0) {
-    throw new WorkflowValidationError('Workflow identifier must not be empty.');
-  }
-
-  return value as WorkflowId;
-}
 
 function createAssetId(value: string): AssetId {
   if (value.trim().length === 0) {
