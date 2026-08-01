@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { AssetPicker, type Asset } from '@/features/assets';
 import { Button, Field, Select } from '@/shared';
@@ -28,6 +28,29 @@ export function WorkflowEditor({
   const [errors, setErrors] = useState<WorkflowDraftErrors>({});
   const [pending, setPending] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const saveStatusTimer = useRef<number | undefined>(undefined);
+
+  function clearSavedStatus(): void {
+    setSaved(false);
+    if (saveStatusTimer.current !== undefined) {
+      window.clearTimeout(saveStatusTimer.current);
+      saveStatusTimer.current = undefined;
+    }
+  }
+
+  useEffect(() => {
+    clearSavedStatus();
+  }, [editor.draft]);
+
+  useEffect(
+    () => () => {
+      if (saveStatusTimer.current !== undefined) {
+        window.clearTimeout(saveStatusTimer.current);
+      }
+    },
+    [],
+  );
 
   async function save(): Promise<void> {
     const validation = validateWorkflowDraft(editor.draft);
@@ -37,9 +60,15 @@ export function WorkflowEditor({
     }
     setErrors({});
     setSaveError(null);
+    clearSavedStatus();
     setPending(true);
     try {
       await onSave(validation.input);
+      setSaved(true);
+      saveStatusTimer.current = window.setTimeout(() => {
+        setSaved(false);
+        saveStatusTimer.current = undefined;
+      }, 3_000);
     } catch (cause) {
       setSaveError(cause instanceof Error ? cause.message : 'Saving failed.');
     } finally {
@@ -61,9 +90,16 @@ export function WorkflowEditor({
           <h2>{workflow === undefined ? 'New Workflow' : workflow.name}</h2>
           <p>Shape the sequence, atmosphere and optional reward ritual.</p>
         </div>
-        <Button type="submit" variant="primary" pending={pending}>
-          Save workflow
-        </Button>
+        <div className="editor-header__save">
+          {saved ? (
+            <span className="editor-header__save-status" role="status">
+              Workflow saved
+            </span>
+          ) : null}
+          <Button type="submit" variant="primary" pending={pending}>
+            Save workflow
+          </Button>
+        </div>
       </header>
 
       {Object.keys(errors).length === 0 ? null : (

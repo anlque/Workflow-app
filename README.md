@@ -21,7 +21,10 @@ user explicitly exports it.
 
 Click the Flowarium toolbar action to open the focus tab. With no active Session,
 choose and start an existing Workflow there. The side panel remains available as
-a compact Workflow Library and Session controller.
+a compact Workflow Library and Session controller, and configuration opens in a
+regular Options tab. While the focus tab remains open and loaded, Phase changes
+and Reward Dice results provide short, non-blocking audio cues. If Chrome blocks
+audio for a restored Session, use the visible **Enable sounds** control once.
 
 ## Requirements
 

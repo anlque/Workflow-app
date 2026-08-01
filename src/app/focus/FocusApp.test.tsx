@@ -14,6 +14,13 @@ function dependencies(
   session: ReturnType<typeof createSession> | null,
 ): FocusDependencies {
   return {
+    sounds: {
+      unlock: vi.fn(() => Promise.resolve(true)),
+      getState: vi.fn(() => 'ready' as const),
+      playBell: vi.fn(),
+      playDiceRoll: vi.fn(),
+      dispose: vi.fn(),
+    },
     sessions: {
       getActive: () => Promise.resolve(session),
       subscribe: () => vi.fn(),
@@ -70,58 +77,128 @@ describe('FocusApp', () => {
     });
   });
 
-  test('changes the side-panel action after closing and can reopen it', async () => {
+  test('starts with the side panel closed and can open it', async () => {
     const user = userEvent.setup();
     const deps = dependencies(null);
     render(<FocusApp dependencies={deps} />);
     await screen.findByRole('heading', { name: 'Choose a Workflow' });
 
-    await user.click(screen.getByRole('button', { name: 'Close side panel' }));
-    expect(deps.closeSidePanel).toHaveBeenCalledOnce();
     expect(
-      await screen.findByRole('button', { name: 'Open side panel' }),
+      screen.getByRole('button', { name: 'Open side panel' }),
     ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Open side panel' }));
+    expect(deps.sounds.unlock).toHaveBeenCalledOnce();
     expect(deps.openSidePanel).toHaveBeenCalledOnce();
     expect(
       await screen.findByRole('button', { name: 'Close side panel' }),
     ).toBeVisible();
   });
 
-  test('updates the action immediately while Chrome is still closing the panel', async () => {
+  test('unlocks sounds when starting a Workflow', async () => {
     const user = userEvent.setup();
-    let finishClose: (() => void) | undefined;
+    const workflow = createWorkflow({
+      id: 'workflow-1',
+      name: 'Deep work',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
     const deps = dependencies(null);
-    vi.mocked(deps.closeSidePanel).mockImplementationOnce(
+    vi.mocked(deps.listWorkflows).mockResolvedValueOnce([workflow]);
+    render(<FocusApp dependencies={deps} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Start Deep work' }),
+    );
+
+    expect(deps.sounds.unlock).toHaveBeenCalledOnce();
+    expect(deps.start).toHaveBeenCalledWith(workflow.id);
+  });
+
+  test('offers to enable sounds for a restored Session until activation succeeds', async () => {
+    const user = userEvent.setup();
+    const session = createSession(
+      'session-1',
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+      }),
+      Date.now(),
+    );
+    const deps = dependencies(session);
+    let state: 'locked' | 'ready' = 'locked';
+    vi.mocked(deps.sounds.getState).mockImplementation(() => state);
+    vi.mocked(deps.sounds.unlock).mockImplementation(() => {
+      state = 'ready';
+      return Promise.resolve(true);
+    });
+    render(<FocusApp dependencies={deps} />);
+
+    const enable = await screen.findByRole('button', {
+      name: 'Enable sounds',
+    });
+    await user.click(enable);
+
+    expect(deps.sounds.unlock).toHaveBeenCalledOnce();
+    expect(
+      screen.queryByRole('button', { name: 'Enable sounds' }),
+    ).not.toBeInTheDocument();
+  });
+
+  test('updates the action immediately while Chrome is still opening the panel', async () => {
+    const user = userEvent.setup();
+    let finishOpen: (() => void) | undefined;
+    const deps = dependencies(null);
+    vi.mocked(deps.openSidePanel).mockImplementationOnce(
       () =>
         new Promise<void>((resolve) => {
-          finishClose = resolve;
+          finishOpen = resolve;
         }),
     );
     render(<FocusApp dependencies={deps} />);
     await screen.findByRole('heading', { name: 'Choose a Workflow' });
 
-    await user.click(screen.getByRole('button', { name: 'Close side panel' }));
+    await user.click(screen.getByRole('button', { name: 'Open side panel' }));
 
     expect(
-      screen.getByRole('button', { name: 'Open side panel' }),
+      screen.getByRole('button', { name: 'Close side panel' }),
     ).toBeVisible();
-    finishClose?.();
+    finishOpen?.();
   });
 
   test('restores the label when Chrome rejects the panel operation', async () => {
     const user = userEvent.setup();
     const deps = dependencies(null);
-    vi.mocked(deps.closeSidePanel).mockRejectedValueOnce(
+    vi.mocked(deps.openSidePanel).mockRejectedValueOnce(
       new Error('Panel operation failed.'),
     );
     render(<FocusApp dependencies={deps} />);
     await screen.findByRole('heading', { name: 'Choose a Workflow' });
 
-    await user.click(screen.getByRole('button', { name: 'Close side panel' }));
+    await user.click(screen.getByRole('button', { name: 'Open side panel' }));
 
     expect(
+      await screen.findByRole('button', { name: 'Open side panel' }),
+    ).toBeVisible();
+  });
+
+  test('synchronizes the action with Chrome side-panel events', async () => {
+    const deps = dependencies(null);
+    let notifyPanelState: ((open: boolean) => void) | undefined;
+    vi.mocked(deps.subscribeSidePanelState).mockImplementation((listener) => {
+      notifyPanelState = listener;
+      return vi.fn();
+    });
+    render(<FocusApp dependencies={deps} />);
+    await screen.findByRole('heading', { name: 'Choose a Workflow' });
+
+    notifyPanelState?.(true);
+    expect(
       await screen.findByRole('button', { name: 'Close side panel' }),
+    ).toBeVisible();
+
+    notifyPanelState?.(false);
+    expect(
+      await screen.findByRole('button', { name: 'Open side panel' }),
     ).toBeVisible();
   });
 });

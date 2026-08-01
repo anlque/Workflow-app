@@ -80,4 +80,42 @@ describe('RewardResultDialog', () => {
 
     expect(screen.getByText('Tea')).toBeVisible();
   });
+
+  test('requests one roll sound for each newly presented Reward', () => {
+    const onRoll = vi.fn();
+    const reward = {
+      icon: '☕',
+      title: 'Tea',
+      probability: 1,
+    } as const;
+    const { rerender } = render(
+      <RewardResultDialog
+        reward={reward}
+        reducedMotion
+        onDismiss={() => undefined}
+        onRoll={onRoll}
+      />,
+    );
+    expect(onRoll).toHaveBeenCalledOnce();
+
+    rerender(
+      <RewardResultDialog
+        reward={reward}
+        reducedMotion
+        onDismiss={() => undefined}
+        onRoll={onRoll}
+      />,
+    );
+    expect(onRoll).toHaveBeenCalledOnce();
+
+    rerender(
+      <RewardResultDialog
+        reward={{ icon: '🌿', title: 'Fresh air', probability: 1 }}
+        reducedMotion
+        onDismiss={() => undefined}
+        onRoll={onRoll}
+      />,
+    );
+    expect(onRoll).toHaveBeenCalledTimes(2);
+  });
 });

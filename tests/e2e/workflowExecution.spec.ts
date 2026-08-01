@@ -42,6 +42,23 @@ test('loads every MVP extension surface in an isolated profile', async ({
   ).toBeVisible();
 });
 
+test('opens the Options page directly from an empty Focus Tab', async ({
+  context,
+  extensionUrls,
+}) => {
+  const focus = await context.newPage();
+  await focus.goto(extensionUrls.focus);
+
+  const optionsPage = context.waitForEvent('page');
+  await focus.getByRole('button', { name: 'Create a Workflow' }).click();
+  const options = await optionsPage;
+
+  await expect(options).toHaveURL(extensionUrls.options);
+  await expect(
+    options.getByRole('heading', { name: 'Flowarium' }),
+  ).toBeVisible();
+});
+
 test('creates and controls a Workflow across extension contexts', async ({
   context,
   extensionUrls,
@@ -52,6 +69,7 @@ test('creates and controls a Workflow across extension contexts', async ({
   await options.getByLabel('Workflow name').fill('E2E focus');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(options.getByRole('status')).toHaveText('Workflow saved');
   await expect(
     options.getByRole('button', { name: 'Open E2E focus' }),
   ).toBeVisible();

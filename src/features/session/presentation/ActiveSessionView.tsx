@@ -5,6 +5,7 @@ import type { DiceSide } from '@/features/workflow';
 import type { Session, SessionId } from '../domain/Session';
 import { SessionControls } from './SessionControls';
 import { RewardResultDialog } from './RewardResultDialog';
+import { didCrossPhaseBoundary } from './didCrossPhaseBoundary';
 import { rewardsForSessionTransition } from './rewardTransitions';
 import { formatSessionCountdown } from './sessionCountdown';
 
@@ -13,6 +14,8 @@ export type ActiveSessionViewProps = Readonly<{
   now?: () => number;
   random?: () => number;
   reducedMotion?: boolean;
+  onPhaseBoundary?(): void;
+  onRewardRoll?(): void;
   onPause(id: SessionId): Promise<void>;
   onResume(id: SessionId): Promise<void>;
   onStop(id: SessionId): Promise<void>;
@@ -26,6 +29,8 @@ export function ActiveSessionView({
   now = systemNow,
   random = systemRandom,
   reducedMotion = false,
+  onPhaseBoundary,
+  onRewardRoll,
   onPause,
   onResume,
   onStop,
@@ -35,16 +40,16 @@ export function ActiveSessionView({
   const previousSession = useRef(session);
 
   useEffect(() => {
-    const nextRewards = rewardsForSessionTransition(
-      previousSession.current,
-      session,
-      random,
-    );
+    const previous = previousSession.current;
+    const nextRewards = rewardsForSessionTransition(previous, session, random);
     previousSession.current = session;
+    if (didCrossPhaseBoundary(previous, session)) {
+      onPhaseBoundary?.();
+    }
     if (nextRewards.length > 0) {
       setRewards((current) => [...current, ...nextRewards]);
     }
-  }, [random, session]);
+  }, [onPhaseBoundary, random, session]);
 
   useEffect(() => {
     setDisplayNow(now());
@@ -64,6 +69,7 @@ export function ActiveSessionView({
       <RewardResultDialog
         reward={rewardDialog}
         reducedMotion={reducedMotion}
+        {...(onRewardRoll === undefined ? {} : { onRoll: onRewardRoll })}
         onDismiss={() => {
           setRewards((current) => current.slice(1));
         }}

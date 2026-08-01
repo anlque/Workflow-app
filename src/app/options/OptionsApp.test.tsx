@@ -1,8 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
 import { defaultSettings } from '@/features/settings';
+import {
+  createWorkflow,
+  type CreateWorkflowInput,
+  type Workflow,
+} from '@/features/workflow';
 
 import { OptionsApp, type OptionsDependencies } from './OptionsApp';
 
@@ -55,6 +60,48 @@ describe('OptionsApp', () => {
 
     await user.click(await screen.findByRole('tab', { name: 'Settings' }));
     expect(screen.getByRole('tabpanel', { name: 'Settings' })).toBeVisible();
+  });
+
+  test('keeps the editor mounted long enough to announce a successful save', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies();
+    let workflows: readonly Workflow[] = [];
+    let finishReload: (() => void) | undefined;
+    const load = vi
+      .fn(() =>
+        Promise.resolve({ workflows, assets: [], settings: defaultSettings }),
+      )
+      .mockImplementationOnce(() =>
+        Promise.resolve({ workflows, assets: [], settings: defaultSettings }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishReload = () => {
+              resolve({ workflows, assets: [], settings: defaultSettings });
+            };
+          }),
+      );
+    deps.load = load;
+    deps.saveWorkflow = vi.fn((input: CreateWorkflowInput) => {
+      workflows = [createWorkflow(input)];
+      return Promise.resolve();
+    });
+    render(<OptionsApp dependencies={deps} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Create workflow' }),
+    );
+    await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+    await waitFor(() => {
+      expect(load).toHaveBeenCalledTimes(2);
+    });
+    finishReload?.();
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Workflow saved',
+    );
   });
 
   test('announces loading failures', async () => {

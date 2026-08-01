@@ -303,10 +303,21 @@ runtime-validated JSON; Workflow export embeds referenced local Assets, while
 settings export contains settings only. Import is atomic and resolves identifier
 collisions by generating new identifiers.
 
-System notifications and reminders are not part of the MVP. Phase changes are
-communicated inside open extension surfaces. The MVP requests only permissions
+System notifications and reminders are not part of the MVP. While the focus tab
+is open and loaded, a short local bell communicates an observed Phase boundary
+and a short local rolling sound accompanies a Reward Dice result. These sounds
+are non-blocking, require no network request and are not guaranteed after the
+focus tab is closed, discarded or unloaded. The MVP requests only permissions
 required for the side panel, durable local storage, Session alarms and locating
 Flowarium's existing focus tab.
+
+Direct interaction with the focus tab activates UI sounds under Chrome's
+autoplay policy. A restored Session exposes a non-blocking `Enable sounds`
+control while Web Audio remains locked.
+
+Focus controls can open or close the side panel and open the extension Options
+page directly in a regular tab. Successful Workflow saves provide transient,
+accessible confirmation without blocking further editing.
 
 The initial application settings are theme (`system`, `light` or `dark`), reduced
 motion (`system`, `reduce` or `no-preference`) and last selected Workflow.

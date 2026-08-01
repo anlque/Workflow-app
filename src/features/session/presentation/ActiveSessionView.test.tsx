@@ -52,6 +52,40 @@ describe('ActiveSessionView', () => {
     ).not.toBeInTheDocument();
   });
 
+  test('requests one bell for an authoritative Phase transition', () => {
+    const initial = createSession('session-1', workflow, 1_000);
+    const phaseTwo = deriveSessionState(initial, 61_000);
+    const onPhaseBoundary = vi.fn();
+    const { rerender } = render(
+      <ActiveSessionView
+        session={initial}
+        now={() => 1_000}
+        onPhaseBoundary={onPhaseBoundary}
+        {...actions}
+      />,
+    );
+
+    rerender(
+      <ActiveSessionView
+        session={phaseTwo}
+        now={() => 61_000}
+        onPhaseBoundary={onPhaseBoundary}
+        {...actions}
+      />,
+    );
+    expect(onPhaseBoundary).toHaveBeenCalledOnce();
+
+    rerender(
+      <ActiveSessionView
+        session={phaseTwo}
+        now={() => 61_000}
+        onPhaseBoundary={onPhaseBoundary}
+        {...actions}
+      />,
+    );
+    expect(onPhaseBoundary).toHaveBeenCalledOnce();
+  });
+
   test('shows an eligible Reward only after an authoritative transition', () => {
     const rewardedWorkflow = createWorkflow({
       id: 'rewarded',
@@ -69,12 +103,14 @@ describe('ActiveSessionView', () => {
       },
     });
     const initial = createSession('session-reward', rewardedWorkflow, 1_000);
+    const onRewardRoll = vi.fn();
     const { rerender } = render(
       <ActiveSessionView
         session={initial}
         now={() => 1_500}
         random={() => 0}
         reducedMotion
+        onRewardRoll={onRewardRoll}
         {...actions}
       />,
     );
@@ -88,6 +124,7 @@ describe('ActiveSessionView', () => {
         now={() => 2_000}
         random={() => 0}
         reducedMotion
+        onRewardRoll={onRewardRoll}
         {...actions}
       />,
     );
@@ -95,5 +132,6 @@ describe('ActiveSessionView', () => {
     expect(
       screen.getByRole('dialog', { name: 'Reward unlocked' }),
     ).toHaveTextContent('Tea');
+    expect(onRewardRoll).toHaveBeenCalledOnce();
   });
 });

@@ -22,6 +22,7 @@ import {
   type SessionRuntime,
 } from '../session/ChromeSessionClient';
 import type { FocusDependencies } from './FocusApp';
+import { createUiSoundPlayer } from './createUiSoundPlayer';
 import {
   closeSidePanel,
   openSidePanel,
@@ -51,6 +52,7 @@ export function createFocusDependencies(): FocusDependencies {
   const sessions = new ChromeSessionClient(runtime, () => crypto.randomUUID());
   const settings = new ChromeSettingsRepository();
   return {
+    sounds: createUiSoundPlayer(),
     closeSidePanel,
     openSidePanel,
     subscribeSidePanelState,

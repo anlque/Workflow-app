@@ -242,8 +242,8 @@ export function OptionsApp({
                   onSave={async (input) => {
                     await dependencies.saveWorkflow(input);
                     const id = createWorkflowId(input.id);
-                    setNewWorkflowId(null);
                     await load(id);
+                    setNewWorkflowId(null);
                   }}
                 />
               )}

@@ -14,8 +14,10 @@ import { Button } from '@/shared';
 
 import { FocusEnvironment } from './FocusEnvironment';
 import { FocusLauncher } from './FocusLauncher';
+import type { UiSoundPlayer } from './createUiSoundPlayer';
 
 export type FocusDependencies = Readonly<{
+  sounds: UiSoundPlayer;
   sessions: SessionProjectionClient;
   pause(id: SessionId): Promise<void>;
   resume(id: SessionId): Promise<void>;
@@ -36,15 +38,22 @@ export function FocusApp({
 }: Readonly<{ dependencies: FocusDependencies }>) {
   const store = useMemo(createActiveSessionStore, []);
   const projection = useStore(store);
+  const [soundState, setSoundState] = useState(dependencies.sounds.getState);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [sidePanelOpen, setSidePanelOpen] = useState(true);
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [panelPending, setPanelPending] = useState(false);
   const [workflows, setWorkflows] = useState<readonly Workflow[] | null>(null);
   const [launcherError, setLauncherError] = useState<string | null>(null);
   const [pendingWorkflowId, setPendingWorkflowId] = useState<WorkflowId>();
 
+  async function activateSounds(): Promise<void> {
+    await dependencies.sounds.unlock();
+    setSoundState(dependencies.sounds.getState());
+  }
+
   function togglePanel(): void {
     if (panelPending) return;
+    void activateSounds();
     const wasOpen = sidePanelOpen;
     const action = wasOpen
       ? dependencies.closeSidePanel
@@ -73,6 +82,13 @@ export function FocusApp({
       connection.disconnect();
     };
   }, [dependencies, store]);
+
+  useEffect(
+    () => () => {
+      dependencies.sounds.dispose();
+    },
+    [dependencies.sounds],
+  );
 
   useEffect(
     () => dependencies.subscribeSidePanelState(setSidePanelOpen),
@@ -111,21 +127,24 @@ export function FocusApp({
   if (projection.session === null) {
     return (
       <main className="focus-app focus-app--empty">
-        <Button
-          className="focus-app__close-panel"
-          variant="quiet"
-          disabled={panelPending}
-          aria-busy={panelPending || undefined}
-          onClick={togglePanel}
-        >
-          {sidePanelOpen ? 'Close side panel' : 'Open side panel'}
-        </Button>
+        <div className="focus-app__utility-actions">
+          <Button
+            className="focus-app__close-panel"
+            variant="quiet"
+            disabled={panelPending}
+            aria-busy={panelPending || undefined}
+            onClick={togglePanel}
+          >
+            {sidePanelOpen ? 'Close side panel' : 'Open side panel'}
+          </Button>
+        </div>
         <FocusLauncher
           workflows={workflows}
           error={launcherError}
           pendingWorkflowId={pendingWorkflowId}
           onOpenOptions={dependencies.openOptions}
           onStart={async (id) => {
+            void activateSounds();
             setLauncherError(null);
             setPendingWorkflowId(id);
             try {
@@ -149,15 +168,28 @@ export function FocusApp({
     session.snapshot.workflow.phases[0];
   return (
     <main className="focus-app">
-      <Button
-        className="focus-app__close-panel"
-        variant="quiet"
-        disabled={panelPending}
-        aria-busy={panelPending || undefined}
-        onClick={togglePanel}
-      >
-        {sidePanelOpen ? 'Close side panel' : 'Open side panel'}
-      </Button>
+      <div className="focus-app__utility-actions">
+        {soundState === 'locked' ? (
+          <Button
+            className="focus-app__enable-sounds"
+            variant="quiet"
+            onClick={() => {
+              void activateSounds();
+            }}
+          >
+            Enable sounds
+          </Button>
+        ) : null}
+        <Button
+          className="focus-app__close-panel"
+          variant="quiet"
+          disabled={panelPending}
+          aria-busy={panelPending || undefined}
+          onClick={togglePanel}
+        >
+          {sidePanelOpen ? 'Close side panel' : 'Open side panel'}
+        </Button>
+      </div>
       <FocusEnvironment
         environment={phase.environment}
         reducedMotion={reducedMotion}
@@ -169,9 +201,20 @@ export function FocusApp({
         <ActiveSessionView
           session={session}
           reducedMotion={reducedMotion}
-          onPause={dependencies.pause}
-          onResume={dependencies.resume}
-          onStop={dependencies.stop}
+          onPhaseBoundary={dependencies.sounds.playBell}
+          onRewardRoll={dependencies.sounds.playDiceRoll}
+          onPause={async (id) => {
+            void activateSounds();
+            await dependencies.pause(id);
+          }}
+          onResume={async (id) => {
+            void activateSounds();
+            await dependencies.resume(id);
+          }}
+          onStop={async (id) => {
+            void activateSounds();
+            await dependencies.stop(id);
+          }}
         />
       </div>
     </main>

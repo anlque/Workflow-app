@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { DiceSide } from '@/features/workflow';
 import { Button, Dialog } from '@/shared';
@@ -8,18 +8,24 @@ import { RewardCube } from './RewardCube';
 export type RewardResultDialogProps = Readonly<{
   reward: DiceSide;
   reducedMotion: boolean;
+  onRoll?(): void;
   onDismiss(): void;
 }>;
 
 export function RewardResultDialog({
   reward,
   reducedMotion,
+  onRoll,
   onDismiss,
 }: RewardResultDialogProps) {
   const [settled, setSettled] = useState(reducedMotion);
   const settle = useCallback(() => {
     setSettled(true);
   }, []);
+
+  useEffect(() => {
+    onRoll?.();
+  }, [onRoll, reward]);
 
   return (
     <Dialog open title="Reward unlocked" onCancel={onDismiss}>

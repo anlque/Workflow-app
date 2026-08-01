@@ -1,6 +1,12 @@
-import { act, render, renderHook, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { createAsset } from '@/features/assets';
 
@@ -15,6 +21,10 @@ const image = createAsset({
   mimeType: 'image/png',
   byteSize: 10,
   createdAt: 1_000,
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('WorkflowEditor', () => {
@@ -67,6 +77,70 @@ describe('WorkflowEditor', () => {
         phases: [expect.objectContaining({ durationSeconds: 30 })],
       }),
     );
+  });
+
+  test('confirms a successful save and clears stale success after editing', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    render(
+      <WorkflowEditor workflowId="workflow-1" assets={[]} onSave={onSave} />,
+    );
+
+    const name = screen.getByLabelText('Workflow name');
+    await user.type(name, 'Deep work');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Workflow saved',
+    );
+
+    await user.type(name, ' updated');
+    expect(screen.queryByText('Workflow saved')).not.toBeInTheDocument();
+  });
+
+  test('removes successful save feedback after three seconds', async () => {
+    vi.useFakeTimers();
+    render(
+      <WorkflowEditor
+        workflowId="workflow-1"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Workflow name'), {
+      target: { value: 'Deep work' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save workflow' }));
+    await act(() => Promise.resolve());
+    expect(screen.getByRole('status')).toHaveTextContent('Workflow saved');
+
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+    });
+
+    expect(screen.queryByText('Workflow saved')).not.toBeInTheDocument();
+  });
+
+  test('does not show success feedback when saving fails', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflowId="workflow-1"
+        assets={[]}
+        onSave={() => Promise.reject(new Error('Storage unavailable.'))}
+      />,
+    );
+
+    await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Storage unavailable.',
+    );
+    expect(screen.queryByText('Workflow saved')).not.toBeInTheDocument();
   });
 
   test('keeps at least two Reward Dice sides in editor state', () => {
