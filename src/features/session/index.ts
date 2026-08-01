@@ -3,6 +3,7 @@ export { SessionApplicationError } from './application/SessionApplicationError';
 export type { SessionChangedEvent } from './application/SessionEvents';
 export type { SessionRepository } from './application/SessionRepository';
 export { advanceSessionUseCase } from './application/advanceSessionUseCase';
+export { continueRewardSessionUseCase } from './application/continueRewardSessionUseCase';
 export { getActiveSessionUseCase } from './application/getActiveSessionUseCase';
 export { pauseSessionUseCase } from './application/pauseSessionUseCase';
 export { resumeSessionUseCase } from './application/resumeSessionUseCase';
@@ -11,6 +12,7 @@ export { stopSessionUseCase } from './application/stopSessionUseCase';
 export {
   createSession,
   createSessionId,
+  continueRewardSession,
   getRemainingSeconds,
   pauseSession,
   resumeSession,
@@ -23,6 +25,7 @@ export {
   type Session,
   type SessionId,
   type StoppedSession,
+  type TransitioningSession,
 } from './domain/Session';
 export {
   SessionTransitionError,

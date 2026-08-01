@@ -16,7 +16,7 @@ type ExtensionFixtures = Readonly<{
 
 const extensionPath = resolve(import.meta.dirname, '../../.output/chrome-mv3');
 
-export async function expireActivePhase(page: Page): Promise<void> {
+export async function expireActiveSessionDeadline(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('flowarium');
@@ -41,9 +41,24 @@ export async function expireActivePhase(page: Page): Promise<void> {
             }
           | undefined;
         if (record !== undefined) {
+          const status = record.session['status'];
+          const deadline =
+            status === 'running'
+              ? 'phaseEndsAt'
+              : status === 'transitioning'
+                ? 'transitionEndsAt'
+                : null;
+          if (deadline === null) {
+            reject(
+              new Error(
+                `Active Session has no deadline in ${String(status)} state.`,
+              ),
+            );
+            return;
+          }
           record.session = {
             ...record.session,
-            phaseEndsAt: Date.now() - 1,
+            [deadline]: Date.now() - 1,
           };
           record.updatedAt = Date.now();
           store.put(record);

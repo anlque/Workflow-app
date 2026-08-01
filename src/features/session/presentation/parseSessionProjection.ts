@@ -30,6 +30,11 @@ function optionalString(value: unknown): string | undefined {
   return value === undefined ? undefined : string(value);
 }
 
+function pauseReason(value: unknown): 'user' | 'reward' {
+  if (value === 'user' || value === 'reward') return value;
+  return invalid();
+}
+
 function workflow(value: unknown) {
   const input = record(value);
   const phases = input['phases'];
@@ -97,10 +102,17 @@ export function parseSessionProjection(value: unknown): Session | null {
       phaseStartedAt: number(input['phaseStartedAt']),
       phaseEndsAt: number(input['phaseEndsAt']),
     };
+  } else if (status === 'transitioning') {
+    restored = {
+      ...common,
+      status,
+      transitionEndsAt: number(input['transitionEndsAt']),
+    };
   } else if (status === 'paused') {
     restored = {
       ...common,
       status,
+      pauseReason: pauseReason(input['pauseReason']),
       pausedAt: number(input['pausedAt']),
       remainingMilliseconds: number(input['remainingMilliseconds']),
     };

@@ -2,6 +2,7 @@ import type { AlarmScheduler } from '@/platform/alarms';
 import type { RuntimeMessageBus, SessionCommand } from '@/platform/messaging';
 import {
   advanceSessionUseCase,
+  continueRewardSessionUseCase,
   getActiveSessionUseCase,
   pauseSessionUseCase,
   resumeSessionUseCase,
@@ -42,6 +43,8 @@ export function createSessionCoordinator({
     await messages.publishSessionChanged({ type: 'session/changed', session });
     if (session?.status === 'running') {
       await alarms.schedule(SESSION_PHASE_ALARM, session.phaseEndsAt);
+    } else if (session?.status === 'transitioning') {
+      await alarms.schedule(SESSION_PHASE_ALARM, session.transitionEndsAt);
     } else {
       await alarms.clear(SESSION_PHASE_ALARM);
     }
@@ -66,6 +69,12 @@ export function createSessionCoordinator({
       session = await pauseSessionUseCase(sessions, clock, command.sessionId);
     } else if (command.type === 'session/resume') {
       session = await resumeSessionUseCase(sessions, clock, command.sessionId);
+    } else if (command.type === 'session/continue-reward') {
+      session = await continueRewardSessionUseCase(
+        sessions,
+        clock,
+        command.sessionId,
+      );
     } else {
       session = await stopSessionUseCase(sessions, clock, command.sessionId);
     }
@@ -85,7 +94,7 @@ export function createSessionCoordinator({
     if (name !== SESSION_PHASE_ALARM) return;
     const active = await sessions.getActive();
     const reconciled =
-      active?.status === 'running'
+      active?.status === 'running' || active?.status === 'transitioning'
         ? await advanceSessionUseCase(sessions, clock, active.id)
         : active;
     await publishAndSchedule(reconciled);

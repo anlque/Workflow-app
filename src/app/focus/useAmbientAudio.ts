@@ -10,7 +10,7 @@ export type AmbientAudioControls = Readonly<{
   enable(): Promise<void>;
 }>;
 
-const DEFAULT_FADE_DURATION_MS = 3_000;
+const DEFAULT_FADE_DURATION_MS = 1_000;
 const RAMP_INTERVAL_MS = 50;
 
 export function useAmbientAudio({

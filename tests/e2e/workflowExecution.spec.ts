@@ -1,6 +1,6 @@
 import type { Locator } from '@playwright/test';
 
-import { expect, expireActivePhase, test } from './extensionFixture';
+import { expect, expireActiveSessionDeadline, test } from './extensionFixture';
 
 const onePixelPng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII=',
@@ -59,6 +59,37 @@ test('opens the Options page directly from an empty Focus Tab', async ({
   ).toBeVisible();
 });
 
+test('synchronizes an open Workflow Library after Options changes', async ({
+  context,
+  extensionUrls,
+}) => {
+  const sidePanel = await context.newPage();
+  await sidePanel.goto(extensionUrls.sidePanel);
+  await expect(
+    sidePanel.getByText('Build your first focus rhythm.'),
+  ).toBeVisible();
+
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Synced focus');
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+
+  await expect(
+    sidePanel.getByRole('button', { name: 'Open Synced focus' }),
+  ).toBeVisible();
+
+  await options.getByLabel('Workflow name').fill('Renamed focus');
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+
+  await expect(
+    sidePanel.getByRole('button', { name: 'Open Renamed focus' }),
+  ).toBeVisible();
+  await expect(
+    sidePanel.getByRole('button', { name: 'Open Synced focus' }),
+  ).not.toBeVisible();
+});
+
 test('creates and controls a Workflow across extension contexts', async ({
   context,
   extensionUrls,
@@ -114,7 +145,10 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
   await options.getByRole('button', { name: 'Create workflow' }).click();
   await options.getByLabel('Workflow name').fill('Rewarded focus');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
-  await options.getByLabel('Background image').selectOption({
+  await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByLabel('Phase 2 type').selectOption('break');
+  await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
+  await options.getByLabel('Background image').first().selectOption({
     label: 'reward-background.png',
   });
   await options.getByLabel('Enable Reward Dice').check();
@@ -138,12 +172,42 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
     /^blob:/u,
   );
 
-  await expireActivePhase(focus);
+  await expireActiveSessionDeadline(focus);
+
+  await expect(focus.getByText('Transitioning to the next phase…')).toBeVisible(
+    {
+      timeout: 15_000,
+    },
+  );
+  await expect(focus.getByLabel('Time remaining')).toHaveAttribute(
+    'data-transitioning',
+    'true',
+  );
+
+  await expireActiveSessionDeadline(focus);
 
   const reward = focus.getByRole('dialog', { name: 'Reward unlocked' });
   await expect(reward).toBeVisible({ timeout: 15_000 });
+  const sidePanel = await context.newPage();
+  await sidePanel.goto(extensionUrls.sidePanel);
+  await expect(
+    sidePanel.getByText('Reward pending — open focus view'),
+  ).toBeVisible();
+  await expect(sidePanel.getByRole('button', { name: 'Resume' })).toHaveCount(
+    0,
+  );
   await expectViewportCentered(reward);
-  await expect(focus.getByTestId('reward-cube')).toBeVisible();
+  await expect(focus.getByTestId('reward-cube')).toHaveAttribute(
+    'data-state',
+    'ready',
+  );
+  await focus.getByRole('button', { name: 'Roll' }).click();
+  await expect(focus.getByTestId('reward-cube')).toHaveAttribute(
+    'data-state',
+    'mixing',
+  );
   await expect(reward).toContainText(/Tea|Stretch/u);
-  await expect(focus.getByText('Session complete')).toBeVisible();
+  await focus.getByRole('button', { name: 'Continue' }).click();
+  await expect(focus.getByText('Break · Phase 2 of 2')).toBeVisible();
+  await expect(focus.getByLabel('Time remaining')).toHaveText(/00:(29|30)/u);
 });

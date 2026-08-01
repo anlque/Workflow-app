@@ -1,10 +1,10 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
 import { createWorkflow } from '@/features/workflow';
 
 import { createSession } from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
-import { rewardsForSessionTransition } from './rewardTransitions';
+import { rewardOpportunityForSessionTransition } from './rewardTransitions';
 
 const workflow = createWorkflow({
   id: 'workflow-1',
@@ -12,60 +12,75 @@ const workflow = createWorkflow({
   phases: [
     { type: 'focus', durationSeconds: 1, environment: {} },
     { type: 'break', durationSeconds: 1, environment: {} },
-    { type: 'focus', durationSeconds: 1, environment: {} },
-    { type: 'focus', durationSeconds: 1, environment: {} },
   ],
   rewardDice: {
-    frequency: 2,
+    frequency: 1,
     sides: [
-      { icon: '☕', title: 'Tea', weight: 1 },
-      { icon: '🌿', title: 'Fresh air', weight: 1 },
+      { icon: '☕', title: 'Tea' },
+      { icon: '🌿', title: 'Fresh air' },
     ],
   },
 });
 
-describe('rewardsForSessionTransition', () => {
-  test('does not replay a Reward on initial hydration', () => {
-    const current = deriveSessionState(
+describe('rewardOpportunityForSessionTransition', () => {
+  test('restores an initially hydrated Reward pause', () => {
+    const rewardPaused = deriveSessionState(
       createSession('session-1', workflow, 1_000),
-      4_000,
+      3_000,
     );
-    expect(rewardsForSessionTransition(null, current, () => 0)).toEqual([]);
+
+    expect(rewardOpportunityForSessionTransition(null, rewardPaused)).toEqual(
+      workflow.rewardDice,
+    );
   });
 
-  test('counts only completed focus Phases and honors frequency', () => {
+  test('reports one newly observed Reward pause without selecting a side', () => {
     const initial = createSession('session-1', workflow, 1_000);
-    const afterBreak = deriveSessionState(initial, 3_000);
-    const afterSecondFocus = deriveSessionState(initial, 4_000);
-
-    expect(rewardsForSessionTransition(initial, afterBreak, () => 0)).toEqual(
-      [],
-    );
-    expect(
-      rewardsForSessionTransition(afterBreak, afterSecondFocus, () => 0)[0]
-        ?.title,
-    ).toBe('Tea');
-  });
-
-  test('handles late transitions across multiple Phases with injected randomness', () => {
-    const random = vi.fn().mockReturnValueOnce(0.75);
-    const initial = createSession('session-1', workflow, 1_000);
-    const completed = deriveSessionState(initial, 5_000);
+    const rewardPaused = deriveSessionState(initial, 3_000);
 
     expect(
-      rewardsForSessionTransition(initial, completed, random).map(
-        ({ title }) => title,
-      ),
-    ).toEqual(['Fresh air']);
-    expect(random).toHaveBeenCalledOnce();
+      rewardOpportunityForSessionTransition(initial, rewardPaused),
+    ).toEqual(workflow.rewardDice);
+    expect(
+      rewardOpportunityForSessionTransition(rewardPaused, rewardPaused),
+    ).toBeNull();
   });
 
-  test('ignores replacement with a different Session', () => {
-    const first = createSession('session-1', workflow, 1_000);
-    const second = deriveSessionState(
+  test('reports an eligible final completion once', () => {
+    const finalWorkflow = createWorkflow({
+      id: 'workflow-final',
+      name: 'Final focus',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: '☕', title: 'Tea' },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const initial = createSession('session-1', finalWorkflow, 1_000);
+    const completed = deriveSessionState(initial, 3_000);
+
+    expect(rewardOpportunityForSessionTransition(initial, completed)).toEqual(
+      finalWorkflow.rewardDice,
+    );
+    expect(
+      rewardOpportunityForSessionTransition(completed, completed),
+    ).toBeNull();
+  });
+
+  test('ignores unrelated and ineligible transitions', () => {
+    const initial = createSession('session-1', workflow, 1_000);
+    const transitioning = deriveSessionState(initial, 2_000);
+    const another = deriveSessionState(
       createSession('session-2', workflow, 1_000),
-      5_000,
+      3_000,
     );
-    expect(rewardsForSessionTransition(first, second, () => 0)).toEqual([]);
+
+    expect(
+      rewardOpportunityForSessionTransition(initial, transitioning),
+    ).toBeNull();
+    expect(rewardOpportunityForSessionTransition(initial, another)).toBeNull();
   });
 });

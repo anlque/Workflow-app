@@ -7,7 +7,10 @@ export class InMemorySessionRepository implements SessionRepository {
   public getActive(): Promise<Session | null> {
     return Promise.resolve(
       [...this.#sessions.values()].find(
-        ({ status }) => status === 'running' || status === 'paused',
+        ({ status }) =>
+          status === 'running' ||
+          status === 'transitioning' ||
+          status === 'paused',
       ) ?? null,
     );
   }

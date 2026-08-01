@@ -4,7 +4,30 @@ import {
   RuntimeMessageValidationError,
   parseActiveSessionRequest,
   parseSessionCommand,
+  parseWorkflowCatalogChangedMessage,
 } from './runtimeMessageSchema';
+
+describe('parseWorkflowCatalogChangedMessage', () => {
+  test('accepts the exact Workflow catalog invalidation event', () => {
+    expect(
+      parseWorkflowCatalogChangedMessage({
+        type: 'workflow/catalog-changed',
+      }),
+    ).toEqual({ type: 'workflow/catalog-changed' });
+  });
+
+  test.each([
+    null,
+    [],
+    {},
+    { type: 'workflow/catalog-changed', extra: true },
+    { type: 'workflow/catalog-change' },
+  ])('rejects an invalid Workflow catalog event %#', (value) => {
+    expect(() => parseWorkflowCatalogChangedMessage(value)).toThrow(
+      RuntimeMessageValidationError,
+    );
+  });
+});
 
 describe('parseActiveSessionRequest', () => {
   test('accepts an exact active Session request', () => {
@@ -52,6 +75,14 @@ describe('parseSessionCommand', () => {
     [
       { type: 'session/stop', commandId: 'command-4', sessionId: 'session-1' },
       'session/stop',
+    ],
+    [
+      {
+        type: 'session/continue-reward',
+        commandId: 'command-5',
+        sessionId: 'session-1',
+      },
+      'session/continue-reward',
     ],
   ] as const)('accepts a valid %s command', (value, expectedType) => {
     expect(parseSessionCommand(value).type).toBe(expectedType);

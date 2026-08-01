@@ -1,4 +1,8 @@
-import type { ActiveSessionRequest, SessionCommand } from './RuntimeMessage';
+import type {
+  ActiveSessionRequest,
+  SessionCommand,
+  WorkflowCatalogChangedMessage,
+} from './RuntimeMessage';
 
 export class RuntimeMessageValidationError extends Error {
   public constructor() {
@@ -52,6 +56,7 @@ export function parseSessionCommand(value: unknown): SessionCommand {
   if (
     (type === 'session/pause' ||
       type === 'session/resume' ||
+      type === 'session/continue-reward' ||
       type === 'session/stop') &&
     hasExactKeys(record, ['type', 'commandId', 'sessionId'])
   ) {
@@ -79,4 +84,17 @@ export function parseActiveSessionRequest(
     type: 'session/get-active',
     requestId: nonEmptyString(record['requestId']),
   });
+}
+
+export function parseWorkflowCatalogChangedMessage(
+  value: unknown,
+): WorkflowCatalogChangedMessage {
+  const record = messageRecord(value);
+  if (
+    record['type'] !== 'workflow/catalog-changed' ||
+    !hasExactKeys(record, ['type'])
+  ) {
+    throw new RuntimeMessageValidationError();
+  }
+  return Object.freeze({ type: 'workflow/catalog-changed' });
 }

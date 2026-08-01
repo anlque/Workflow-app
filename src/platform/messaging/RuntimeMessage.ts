@@ -2,6 +2,11 @@ export type SessionCommand =
   | Readonly<{ type: 'session/start'; commandId: string; workflowId: string }>
   | Readonly<{ type: 'session/pause'; commandId: string; sessionId: string }>
   | Readonly<{ type: 'session/resume'; commandId: string; sessionId: string }>
+  | Readonly<{
+      type: 'session/continue-reward';
+      commandId: string;
+      sessionId: string;
+    }>
   | Readonly<{ type: 'session/stop'; commandId: string; sessionId: string }>;
 
 export type SessionChangedMessage = Readonly<{
@@ -12,4 +17,8 @@ export type SessionChangedMessage = Readonly<{
 export type ActiveSessionRequest = Readonly<{
   type: 'session/get-active';
   requestId: string;
+}>;
+
+export type WorkflowCatalogChangedMessage = Readonly<{
+  type: 'workflow/catalog-changed';
 }>;

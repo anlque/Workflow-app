@@ -19,12 +19,14 @@ import {
   workflowDatabaseSchemas,
 } from '@/features/workflow';
 import { FlowariumDatabase } from '@/platform/storage';
+import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 
 import {
   ChromeSessionClient,
   type SessionRuntime,
 } from '../session/ChromeSessionClient';
 import type { SidePanelDependencies } from './SidePanelApp';
+import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
 import { createChromeFocusTabController } from '../focus/createChromeFocusTabController';
 
 export function createSidePanelDependencies(): SidePanelDependencies {
@@ -48,6 +50,7 @@ export function createSidePanelDependencies(): SidePanelDependencies {
     },
   };
   const sessions = new ChromeSessionClient(runtime, () => crypto.randomUUID());
+  const catalogEvents = createChromeWorkflowCatalogEvents();
 
   return {
     sessions,
@@ -59,28 +62,46 @@ export function createSidePanelDependencies(): SidePanelDependencies {
       await focusTabs.openOrActivate();
     },
     listWorkflows: () => listWorkflowsUseCase(workflows),
+    subscribeWorkflowChanges: (listener) =>
+      catalogEvents.subscribeChanged(listener),
     async createWorkflow() {
-      await createWorkflowUseCase(
-        workflows,
-        createWorkflow({
-          id: crypto.randomUUID(),
-          name: 'Untitled Workflow',
-          phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
-        }),
+      await runWorkflowCatalogMutation(
+        () =>
+          createWorkflowUseCase(
+            workflows,
+            createWorkflow({
+              id: crypto.randomUUID(),
+              name: 'Untitled Workflow',
+              phases: [
+                { type: 'focus', durationSeconds: 1_500, environment: {} },
+              ],
+            }),
+          ),
+        catalogEvents,
       );
     },
     async duplicateWorkflow(id) {
-      await duplicateWorkflowUseCase(
-        workflows,
-        id,
-        createWorkflowId(crypto.randomUUID()),
+      await runWorkflowCatalogMutation(
+        () =>
+          duplicateWorkflowUseCase(
+            workflows,
+            id,
+            createWorkflowId(crypto.randomUUID()),
+          ),
+        catalogEvents,
       );
     },
     async deleteWorkflow(id) {
-      await deleteWorkflowUseCase(workflows, id);
+      await runWorkflowCatalogMutation(
+        () => deleteWorkflowUseCase(workflows, id),
+        catalogEvents,
+      );
     },
     async reorderWorkflows(ids) {
-      await reorderWorkflowsUseCase(workflows, ids);
+      await runWorkflowCatalogMutation(
+        () => reorderWorkflowsUseCase(workflows, ids),
+        catalogEvents,
+      );
     },
     async openWorkflow(id) {
       const current = await getSettingsUseCase(settings);

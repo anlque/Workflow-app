@@ -17,7 +17,9 @@ export async function getActiveSessionUseCase(
     await repository.save(reconciled);
   }
 
-  return reconciled.status === 'running' || reconciled.status === 'paused'
+  return reconciled.status === 'running' ||
+    reconciled.status === 'transitioning' ||
+    reconciled.status === 'paused'
     ? reconciled
     : null;
 }

@@ -9,7 +9,12 @@ import {
   type SessionProjectionClient,
 } from '@/features/session';
 import type { AssetId } from '@/features/assets';
-import type { Workflow, WorkflowId } from '@/features/workflow';
+import {
+  useWorkflowCatalog,
+  type Workflow,
+  type WorkflowCatalogSource,
+  type WorkflowId,
+} from '@/features/workflow';
 import { Button } from '@/shared';
 
 import { FocusEnvironment } from './FocusEnvironment';
@@ -21,6 +26,7 @@ export type FocusDependencies = Readonly<{
   sessions: SessionProjectionClient;
   pause(id: SessionId): Promise<void>;
   resume(id: SessionId): Promise<void>;
+  continueReward(id: SessionId): Promise<void>;
   stop(id: SessionId): Promise<void>;
   loadAssetUrl(id: AssetId): Promise<string | null>;
   releaseAssetUrl(url: string): void;
@@ -29,9 +35,52 @@ export type FocusDependencies = Readonly<{
   openSidePanel(): Promise<void>;
   subscribeSidePanelState(listener: (open: boolean) => void): () => void;
   listWorkflows(): Promise<readonly Workflow[]>;
+  subscribeWorkflowChanges(listener: () => void): () => void;
   start(id: WorkflowId): Promise<void>;
   openOptions(): Promise<void>;
 }>;
+
+function IdleFocusLauncher({
+  dependencies,
+  activateSounds,
+}: Readonly<{
+  dependencies: FocusDependencies;
+  activateSounds(): Promise<void>;
+}>) {
+  const [launcherError, setLauncherError] = useState<string | null>(null);
+  const [pendingWorkflowId, setPendingWorkflowId] = useState<WorkflowId>();
+  const source = useMemo<WorkflowCatalogSource>(
+    () => ({
+      list: dependencies.listWorkflows,
+      subscribeInvalidation: dependencies.subscribeWorkflowChanges,
+    }),
+    [dependencies],
+  );
+  const { workflows, refreshError } = useWorkflowCatalog(source);
+
+  return (
+    <FocusLauncher
+      workflows={workflows}
+      error={launcherError ?? refreshError}
+      pendingWorkflowId={pendingWorkflowId}
+      onOpenOptions={dependencies.openOptions}
+      onStart={async (id) => {
+        void activateSounds();
+        setLauncherError(null);
+        setPendingWorkflowId(id);
+        try {
+          await dependencies.start(id);
+        } catch (cause) {
+          setLauncherError(
+            cause instanceof Error ? cause.message : 'Starting failed.',
+          );
+        } finally {
+          setPendingWorkflowId(undefined);
+        }
+      }}
+    />
+  );
+}
 
 export function FocusApp({
   dependencies,
@@ -42,9 +91,6 @@ export function FocusApp({
   const [reducedMotion, setReducedMotion] = useState(false);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [panelPending, setPanelPending] = useState(false);
-  const [workflows, setWorkflows] = useState<readonly Workflow[] | null>(null);
-  const [launcherError, setLauncherError] = useState<string | null>(null);
-  const [pendingWorkflowId, setPendingWorkflowId] = useState<WorkflowId>();
 
   async function activateSounds(): Promise<void> {
     await dependencies.sounds.unlock();
@@ -88,29 +134,6 @@ export function FocusApp({
     [dependencies],
   );
 
-  useEffect(() => {
-    if (projection.connection !== 'connected' || projection.session !== null) {
-      return;
-    }
-    let active = true;
-    void dependencies.listWorkflows().then(
-      (values) => {
-        if (active) setWorkflows(values);
-      },
-      (cause: unknown) => {
-        if (active) {
-          setWorkflows([]);
-          setLauncherError(
-            cause instanceof Error ? cause.message : 'Loading failed.',
-          );
-        }
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [dependencies, projection.connection, projection.session]);
-
   if (projection.connection === 'connecting') {
     return <p role="status">Connecting to your session…</p>;
   }
@@ -119,7 +142,10 @@ export function FocusApp({
   }
   if (projection.session === null) {
     return (
-      <main className="focus-app focus-app--empty">
+      <main
+        className="focus-app focus-app--empty"
+        data-reduced-motion={String(reducedMotion)}
+      >
         <div className="focus-app__utility-actions">
           <Button
             className="focus-app__close-panel"
@@ -131,25 +157,9 @@ export function FocusApp({
             {sidePanelOpen ? 'Close side panel' : 'Open side panel'}
           </Button>
         </div>
-        <FocusLauncher
-          workflows={workflows}
-          error={launcherError}
-          pendingWorkflowId={pendingWorkflowId}
-          onOpenOptions={dependencies.openOptions}
-          onStart={async (id) => {
-            void activateSounds();
-            setLauncherError(null);
-            setPendingWorkflowId(id);
-            try {
-              await dependencies.start(id);
-            } catch (cause) {
-              setLauncherError(
-                cause instanceof Error ? cause.message : 'Starting failed.',
-              );
-            } finally {
-              setPendingWorkflowId(undefined);
-            }
-          }}
+        <IdleFocusLauncher
+          dependencies={dependencies}
+          activateSounds={activateSounds}
         />
       </main>
     );
@@ -160,7 +170,7 @@ export function FocusApp({
     session.snapshot.workflow.phases[session.currentPhaseIndex] ??
     session.snapshot.workflow.phases[0];
   return (
-    <main className="focus-app">
+    <main className="focus-app" data-reduced-motion={String(reducedMotion)}>
       <div className="focus-app__utility-actions">
         {soundState === 'locked' ? (
           <Button
@@ -195,7 +205,10 @@ export function FocusApp({
           session={session}
           reducedMotion={reducedMotion}
           onPhaseBoundary={dependencies.sounds.playBell}
-          onRewardRoll={dependencies.sounds.playDiceRoll}
+          rewardInteraction={{
+            onRoll: dependencies.sounds.playDiceRoll,
+            continueReward: dependencies.continueReward,
+          }}
           onPause={async (id) => {
             void activateSounds();
             await dependencies.pause(id);

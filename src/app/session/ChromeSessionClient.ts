@@ -92,6 +92,14 @@ export class ChromeSessionClient implements SessionProjectionClient {
     });
   }
 
+  public continueReward(id: SessionId): Promise<void> {
+    return this.#command({
+      type: 'session/continue-reward',
+      commandId: this.#createId(),
+      sessionId: id,
+    });
+  }
+
   public stop(id: SessionId): Promise<void> {
     return this.#command({
       type: 'session/stop',

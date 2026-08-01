@@ -286,15 +286,30 @@ Phases and editing a running Workflow are outside the MVP.
 
 Starting a Workflow creates a Session from an immutable snapshot of its
 configuration. Later Workflow edits do not affect that Session. One active
-Session may exist at a time. It may be running or paused, can be stopped by the
-user and is durably restorable after extension surfaces or the service worker
-restart. Completed and stopped Sessions are retained as minimal history records.
+Session may exist at a time. It may be running, transitioning between Phases or
+paused, can be stopped by the user and is durably restorable after extension
+surfaces or the service worker restart. Completed and stopped Sessions are
+retained as minimal history records.
+
+Successful Workflow catalog mutations invalidate open side-panel and idle focus
+lists, which reload from IndexedDB automatically. The invalidation carries no
+Workflow data, does not poll and never changes an active Session snapshot.
 
 Reward Dice is optional. When enabled, it is evaluated after each completed
 focus Phase according to an integer frequency of one or more completed focus
 Phases. It contains at least two sides. Side probabilities are positive decimal
 weights normalized by the Domain; equal weights are used when custom weights are
-omitted. Reward Dice Templates are not part of the MVP.
+omitted. After the one-second Phase transition, an eligible non-final Reward
+pauses the full next Phase until the user clicks `Roll`, sees the result and
+clicks `Continue`. Ordinary Resume cannot bypass this pause. Mixing lasts 2.5
+seconds, or 0.6 seconds with reduced motion. Reward Dice Templates are not part
+of the MVP.
+
+Every completed Phase enters an authoritative one-second transition before the
+next Phase or Session completion. During it the timer is softened, controls are
+unavailable, the boundary bell plays and outgoing ambient audio fades out. The
+next Phase then starts with its full configured duration and fades its ambient
+audio in over one second.
 
 MVP Assets are user-provided local images and audio files. Remote providers,
 video and animation are future work. Deleting a referenced Asset is rejected
@@ -305,7 +320,7 @@ collisions by generating new identifiers.
 
 System notifications and reminders are not part of the MVP. While the focus tab
 is open and loaded, a short local bell communicates an observed Phase boundary
-and a short local rolling sound accompanies a Reward Dice result. These sounds
+and a continuous local rolling sound accompanies Reward Dice mixing. These sounds
 are non-blocking, require no network request and are not guaranteed after the
 focus tab is closed, discarded or unloaded. The MVP requests only permissions
 required for the side panel, durable local storage, Session alarms and locating

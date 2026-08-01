@@ -30,6 +30,12 @@ function optionalString(value: unknown): string | undefined {
   return value === undefined ? undefined : string(value);
 }
 
+function storedPauseReason(value: unknown): 'user' | 'reward' {
+  if (value === undefined || value === 'user') return 'user';
+  if (value === 'reward') return 'reward';
+  return invalid();
+}
+
 function parseWorkflow(value: unknown) {
   const input = record(value);
   const phases = input['phases'];
@@ -105,10 +111,17 @@ export function mapSessionRecord(value: unknown): Session {
       phaseStartedAt: number(stored['phaseStartedAt']),
       phaseEndsAt: number(stored['phaseEndsAt']),
     };
+  } else if (status === 'transitioning') {
+    input = {
+      ...common,
+      status,
+      transitionEndsAt: number(stored['transitionEndsAt']),
+    };
   } else if (status === 'paused') {
     input = {
       ...common,
       status,
+      pauseReason: storedPauseReason(stored['pauseReason']),
       pausedAt: number(stored['pausedAt']),
       remainingMilliseconds: number(stored['remainingMilliseconds']),
     };
@@ -121,7 +134,11 @@ export function mapSessionRecord(value: unknown): Session {
   }
   const session = restoreSession(input);
   const expectedActive =
-    session.status === 'running' || session.status === 'paused' ? 1 : 0;
+    session.status === 'running' ||
+    session.status === 'transitioning' ||
+    session.status === 'paused'
+      ? 1
+      : 0;
   if (outer['active'] !== expectedActive || outer['id'] !== session.id)
     return invalid();
   return session;
@@ -129,15 +146,21 @@ export function mapSessionRecord(value: unknown): Session {
 
 export function mapSessionToRecord(session: Session): SessionRecord {
   const active =
-    session.status === 'running' || session.status === 'paused' ? 1 : 0;
+    session.status === 'running' ||
+    session.status === 'transitioning' ||
+    session.status === 'paused'
+      ? 1
+      : 0;
   const updatedAt =
     session.status === 'running'
       ? session.phaseStartedAt
-      : session.status === 'paused'
-        ? session.pausedAt
-        : session.status === 'completed'
-          ? session.completedAt
-          : session.stoppedAt;
+      : session.status === 'transitioning'
+        ? session.transitionEndsAt
+        : session.status === 'paused'
+          ? session.pausedAt
+          : session.status === 'completed'
+            ? session.completedAt
+            : session.stoppedAt;
   return {
     id: session.id,
     schemaVersion: 1,
@@ -153,14 +176,17 @@ export function mapSessionToRecord(session: Session): SessionRecord {
             phaseStartedAt: session.phaseStartedAt,
             phaseEndsAt: session.phaseEndsAt,
           }
-        : session.status === 'paused'
-          ? {
-              pausedAt: session.pausedAt,
-              remainingMilliseconds: session.remainingMilliseconds,
-            }
-          : session.status === 'completed'
-            ? { completedAt: session.completedAt }
-            : { stoppedAt: session.stoppedAt }),
+        : session.status === 'transitioning'
+          ? { transitionEndsAt: session.transitionEndsAt }
+          : session.status === 'paused'
+            ? {
+                pauseReason: session.pauseReason,
+                pausedAt: session.pausedAt,
+                remainingMilliseconds: session.remainingMilliseconds,
+              }
+            : session.status === 'completed'
+              ? { completedAt: session.completedAt }
+              : { stoppedAt: session.stoppedAt }),
     },
   };
 }

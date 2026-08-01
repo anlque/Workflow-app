@@ -16,6 +16,7 @@ import {
   workflowDatabaseSchemas,
 } from '@/features/workflow';
 import { FlowariumDatabase } from '@/platform/storage';
+import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 
 import {
   ChromeSessionClient,
@@ -51,17 +52,21 @@ export function createFocusDependencies(): FocusDependencies {
   };
   const sessions = new ChromeSessionClient(runtime, () => crypto.randomUUID());
   const settings = new ChromeSettingsRepository();
+  const catalogEvents = createChromeWorkflowCatalogEvents();
   return {
     sounds: createUiSoundPlayer(),
     closeSidePanel,
     openSidePanel,
     subscribeSidePanelState,
     listWorkflows: () => listWorkflowsUseCase(workflows),
+    subscribeWorkflowChanges: (listener) =>
+      catalogEvents.subscribeChanged(listener),
     start: (id) => sessions.start(id),
     openOptions: () => browser.runtime.openOptionsPage(),
     sessions,
     pause: (id) => sessions.pause(id),
     resume: (id) => sessions.resume(id),
+    continueReward: (id) => sessions.continueReward(id),
     stop: (id) => sessions.stop(id),
     async loadAssetUrl(id) {
       const blob = await assets.getBlob(id);

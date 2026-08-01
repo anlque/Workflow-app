@@ -10,8 +10,10 @@ adding optional Reward Dice rituals.
 - Compose ordered focus and break Phases with local image/audio environments.
 - Open or activate one dedicated focus tab from the extension toolbar, select a
   Workflow there and run one durable Session across extension surfaces.
-- Pause, resume, stop and restore Sessions using timestamp-derived timing.
-- Configure optional weighted Reward Dice after completed focus Phases.
+- Pause, resume, stop and restore Sessions using timestamp-derived timing and
+  one-second authoritative Phase transitions.
+- Configure optional weighted Reward Dice with click-to-roll mixing and a
+  mandatory Continue step before the next Phase.
 - Store local Assets in IndexedDB and preferences in `chrome.storage.local`.
 - Import and export versioned Workflow and Settings packages.
 
@@ -78,3 +80,7 @@ Session transitions; each UI context holds only an ephemeral validated
 projection. Timing is derived from persisted epoch anchors rather than intervals.
 
 Architectural decisions and concept documentation live in `docs/`.
+
+Open side-panel and idle focus Workflow lists refresh automatically after
+successful catalog changes in another extension surface. Active Sessions remain
+bound to the immutable Workflow snapshot captured when they started.

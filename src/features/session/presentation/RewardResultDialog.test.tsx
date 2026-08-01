@@ -1,121 +1,162 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+
+import { createWorkflow } from '@/features/workflow';
 
 import { RewardResultDialog } from './RewardResultDialog';
 
+const dice = createWorkflow({
+  id: 'workflow-1',
+  name: 'Rewarded work',
+  phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+  rewardDice: {
+    frequency: 1,
+    sides: [
+      { icon: '☕', title: 'Tea', description: 'Make a warm cup.' },
+      { icon: '🌿', title: 'Fresh air' },
+    ],
+  },
+}).rewardDice;
+
+if (dice === undefined) throw new Error('Expected Reward Dice fixture.');
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('RewardResultDialog', () => {
-  test('reveals and dismisses a Reward after the cube settles', () => {
-    vi.useFakeTimers();
-    const onDismiss = vi.fn();
-    render(
-      <RewardResultDialog
-        reward={{
-          icon: '☕',
-          title: 'Tea',
-          description: 'Make a warm cup.',
-          probability: 1,
-        }}
-        reducedMotion={false}
-        onDismiss={onDismiss}
-      />,
-    );
-
-    expect(screen.getByTestId('reward-cube')).toHaveAttribute(
-      'data-state',
-      'rolling',
-    );
-    expect(screen.queryByText('Tea')).not.toBeInTheDocument();
-    act(() => {
-      vi.advanceTimersByTime(1_200);
-    });
-    expect(screen.getByText('Tea')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(onDismiss).toHaveBeenCalledOnce();
-    vi.useRealTimers();
-  });
-
-  test('reveals the Reward immediately with reduced motion', () => {
-    render(
-      <RewardResultDialog
-        reward={{
-          icon: '☕',
-          title: 'Tea',
-          description: 'Make a warm cup.',
-          probability: 1,
-        }}
-        reducedMotion
-        onDismiss={() => undefined}
-      />,
-    );
-
-    expect(screen.getByTestId('reward-cube')).toHaveAttribute(
-      'data-state',
-      'settled',
-    );
-    expect(screen.getByText('Tea')).toBeVisible();
-  });
-
-  test('settles an in-progress cube when reduced motion becomes active', () => {
-    const reward = {
-      icon: '☕',
-      title: 'Tea',
-      probability: 1,
-    } as const;
-    const { rerender } = render(
-      <RewardResultDialog
-        reward={reward}
-        reducedMotion={false}
-        onDismiss={() => undefined}
-      />,
-    );
-    expect(screen.queryByText('Tea')).not.toBeInTheDocument();
-
-    rerender(
-      <RewardResultDialog
-        reward={reward}
-        reducedMotion
-        onDismiss={() => undefined}
-      />,
-    );
-
-    expect(screen.getByText('Tea')).toBeVisible();
-  });
-
-  test('requests one roll sound for each newly presented Reward', () => {
+  test('waits for Roll before selecting a Reward', () => {
+    const random = vi.fn(() => 0);
     const onRoll = vi.fn();
-    const reward = {
-      icon: '☕',
-      title: 'Tea',
-      probability: 1,
-    } as const;
-    const { rerender } = render(
+    render(
       <RewardResultDialog
-        reward={reward}
-        reducedMotion
-        onDismiss={() => undefined}
+        dice={dice}
+        random={random}
+        reducedMotion={false}
         onRoll={onRoll}
+        onContinue={() => Promise.resolve()}
       />,
     );
-    expect(onRoll).toHaveBeenCalledOnce();
 
-    rerender(
-      <RewardResultDialog
-        reward={reward}
-        reducedMotion
-        onDismiss={() => undefined}
-        onRoll={onRoll}
-      />,
+    expect(screen.getByTestId('reward-cube')).toHaveAttribute(
+      'data-state',
+      'ready',
     );
-    expect(onRoll).toHaveBeenCalledOnce();
+    expect(random).not.toHaveBeenCalled();
+    expect(onRoll).not.toHaveBeenCalled();
+    expect(screen.queryByText('Tea')).not.toBeInTheDocument();
+  });
 
-    rerender(
+  test('mixes for 2.5 seconds and reveals the selected Reward', () => {
+    vi.useFakeTimers();
+    const random = vi.fn(() => 0);
+    const onRoll = vi.fn();
+    render(
       <RewardResultDialog
-        reward={{ icon: '🌿', title: 'Fresh air', probability: 1 }}
-        reducedMotion
-        onDismiss={() => undefined}
+        dice={dice}
+        random={random}
+        reducedMotion={false}
         onRoll={onRoll}
+        onContinue={() => Promise.resolve()}
       />,
     );
-    expect(onRoll).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Roll' }));
+
+    expect(random).toHaveBeenCalledOnce();
+    expect(onRoll).toHaveBeenCalledWith(2_500);
+    expect(screen.getByTestId('reward-cube')).toHaveAttribute(
+      'data-state',
+      'mixing',
+    );
+    expect(screen.getByRole('button', { name: 'Roll' })).toBeDisabled();
+    expect(screen.queryByText('Tea')).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(2_500);
+    });
+
+    expect(screen.getByTestId('reward-cube')).toHaveAttribute(
+      'data-state',
+      'result',
+    );
+    expect(screen.getByText('Tea')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+  });
+
+  test('uses a 600 ms sound window and no visual roll with reduced motion', () => {
+    vi.useFakeTimers();
+    const onRoll = vi.fn();
+    render(
+      <RewardResultDialog
+        dice={dice}
+        random={() => 0.75}
+        reducedMotion
+        onRoll={onRoll}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Roll' }));
+
+    expect(onRoll).toHaveBeenCalledWith(600);
+    expect(screen.getByTestId('reward-cube')).toHaveAttribute(
+      'data-state',
+      'mixing-reduced',
+    );
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.getByText('Fresh air')).toBeVisible();
+  });
+
+  test('cannot be dismissed with Escape', () => {
+    render(
+      <RewardResultDialog
+        dice={dice}
+        random={() => 0}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+
+    fireEvent(
+      screen.getByRole('dialog', { name: 'Reward unlocked' }),
+      new Event('cancel', { cancelable: true }),
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: 'Reward unlocked' }),
+    ).toBeVisible();
+  });
+
+  test('keeps the result open and reports a continuation failure', async () => {
+    vi.useFakeTimers();
+    render(
+      <RewardResultDialog
+        dice={dice}
+        random={() => 0}
+        reducedMotion
+        onRoll={vi.fn()}
+        onContinue={() => Promise.reject(new Error('Background unavailable.'))}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Background unavailable.',
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Reward unlocked' }),
+    ).toBeVisible();
   });
 });

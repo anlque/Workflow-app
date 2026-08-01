@@ -28,6 +28,7 @@ function dependencies(
     },
     pause: vi.fn(() => Promise.resolve()),
     resume: vi.fn(() => Promise.resolve()),
+    continueReward: vi.fn(() => Promise.resolve()),
     stop: vi.fn(() => Promise.resolve()),
     loadAssetUrl: vi.fn(() => Promise.resolve(null)),
     releaseAssetUrl: vi.fn(),
@@ -35,6 +36,7 @@ function dependencies(
     closeSidePanel: vi.fn(() => Promise.resolve()),
     openSidePanel: vi.fn(() => Promise.resolve()),
     subscribeSidePanelState: vi.fn(() => vi.fn()),
+    subscribeWorkflowChanges: vi.fn(() => vi.fn()),
     listWorkflows: vi.fn(() => Promise.resolve([])),
     start: vi.fn(() => Promise.resolve()),
     openOptions: vi.fn(() => Promise.resolve()),
@@ -81,7 +83,13 @@ describe('FocusApp', () => {
       }),
       Date.now(),
     );
-    render(<FocusApp dependencies={dependencies(session)} />);
+    const deps = dependencies(session);
+    let invalidate: (() => void) | undefined;
+    vi.mocked(deps.subscribeWorkflowChanges).mockImplementation((listener) => {
+      invalidate = listener;
+      return vi.fn();
+    });
+    render(<FocusApp dependencies={deps} />);
 
     expect(
       await screen.findByRole('heading', { name: 'Deep work' }),
@@ -89,6 +97,40 @@ describe('FocusApp', () => {
     expect(screen.getByTestId('focus-environment')).toHaveStyle({
       backgroundColor: '#123456',
     });
+    invalidate?.();
+    expect(deps.listWorkflows).not.toHaveBeenCalled();
+  });
+
+  test('refreshes the idle launcher after catalog invalidation', async () => {
+    const initial = createWorkflow({
+      id: 'workflow-1',
+      name: 'Deep work',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    const renamed = createWorkflow({
+      id: 'workflow-1',
+      name: 'Renamed work',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    const deps = dependencies(null);
+    let invalidate: (() => void) | undefined;
+    vi.mocked(deps.subscribeWorkflowChanges).mockImplementation((listener) => {
+      invalidate = listener;
+      return vi.fn();
+    });
+    vi.mocked(deps.listWorkflows)
+      .mockResolvedValueOnce([initial])
+      .mockResolvedValueOnce([renamed]);
+    render(<FocusApp dependencies={deps} />);
+    expect(
+      await screen.findByRole('button', { name: 'Start Deep work' }),
+    ).toBeVisible();
+
+    invalidate?.();
+
+    expect(
+      await screen.findByRole('button', { name: 'Start Renamed work' }),
+    ).toBeVisible();
   });
 
   test('starts with the side panel closed and can open it', async () => {

@@ -223,6 +223,14 @@ body {
   line-height: 1;
 }
 
+.session-countdown[data-transitioning='true'] {
+  filter: blur(0.45rem);
+  opacity: 0.62;
+  transition:
+    filter 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .session-controls {
   display: flex;
   flex-wrap: wrap;
@@ -259,8 +267,8 @@ body {
   transform-style: preserve-3d;
 }
 
-.reward-cube-scene[data-state='rolling'] .reward-cube {
-  animation: reward-cube-roll 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.reward-cube-scene[data-state='mixing'] .reward-cube {
+  animation: reward-cube-roll 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .reward-cube__face {
@@ -316,7 +324,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reward-cube-scene[data-state='rolling'] .reward-cube {
+  .reward-cube-scene[data-state='mixing'] .reward-cube {
     animation: none;
   }
 }

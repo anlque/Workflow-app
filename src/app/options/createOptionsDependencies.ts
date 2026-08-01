@@ -30,8 +30,10 @@ import {
   workflowDatabaseSchemas,
 } from '@/features/workflow';
 import { FlowariumDatabase } from '@/platform/storage';
+import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 
 import type { OptionsDependencies } from './OptionsApp';
+import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
 
 const assetPolicy: AssetImportPolicy = {
   image: {
@@ -74,6 +76,7 @@ export function createOptionsDependencies(): OptionsDependencies {
   const settings = new ChromeSettingsRepository();
   const urls = new BrowserAssetUrlService();
   const unitOfWork = new DexieWorkflowPackageUnitOfWork(database);
+  const catalogEvents = createChromeWorkflowCatalogEvents();
   const references: WorkflowAssetReferences = {
     async count(assetId) {
       const values = await workflows.list();
@@ -101,25 +104,37 @@ export function createOptionsDependencies(): OptionsDependencies {
       };
     },
     async saveWorkflow(input) {
-      const id = createWorkflowId(input.id);
-      if ((await workflows.get(id)) === null) {
-        await createWorkflowUseCase(workflows, input);
-      } else {
-        await updateWorkflowUseCase(workflows, input);
-      }
+      await runWorkflowCatalogMutation(async () => {
+        const id = createWorkflowId(input.id);
+        if ((await workflows.get(id)) === null) {
+          await createWorkflowUseCase(workflows, input);
+        } else {
+          await updateWorkflowUseCase(workflows, input);
+        }
+      }, catalogEvents);
     },
     async duplicateWorkflow(id) {
-      await duplicateWorkflowUseCase(
-        workflows,
-        id,
-        createWorkflowId(crypto.randomUUID()),
+      await runWorkflowCatalogMutation(
+        () =>
+          duplicateWorkflowUseCase(
+            workflows,
+            id,
+            createWorkflowId(crypto.randomUUID()),
+          ),
+        catalogEvents,
       );
     },
     async deleteWorkflow(id) {
-      await deleteWorkflowUseCase(workflows, id);
+      await runWorkflowCatalogMutation(
+        () => deleteWorkflowUseCase(workflows, id),
+        catalogEvents,
+      );
     },
     async reorderWorkflows(ids) {
-      await reorderWorkflowsUseCase(workflows, ids);
+      await runWorkflowCatalogMutation(
+        () => reorderWorkflowsUseCase(workflows, ids),
+        catalogEvents,
+      );
     },
     async importAsset(file, kind) {
       await importAssetUseCase(assets, assetPolicy, {
@@ -162,17 +177,22 @@ export function createOptionsDependencies(): OptionsDependencies {
       );
     },
     async importWorkflow(file) {
-      await importWorkflowUseCase(
-        workflows,
-        assets,
-        unitOfWork,
-        await file.text(),
-        { maxFileBytes: workflowPackageMaxBytes, assetPolicy },
-        {
-          createWorkflowId: () => crypto.randomUUID(),
-          createAssetId: () => crypto.randomUUID(),
-          now: () => Date.now(),
-        },
+      const packageJson = await file.text();
+      await runWorkflowCatalogMutation(
+        () =>
+          importWorkflowUseCase(
+            workflows,
+            assets,
+            unitOfWork,
+            packageJson,
+            { maxFileBytes: workflowPackageMaxBytes, assetPolicy },
+            {
+              createWorkflowId: () => crypto.randomUUID(),
+              createAssetId: () => crypto.randomUUID(),
+              now: () => Date.now(),
+            },
+          ),
+        catalogEvents,
       );
     },
     createId: () => crypto.randomUUID(),

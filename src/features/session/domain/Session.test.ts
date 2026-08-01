@@ -4,6 +4,7 @@ import { createWorkflow } from '@/features/workflow';
 
 import {
   createSession,
+  continueRewardSession,
   getRemainingSeconds,
   pauseSession,
   resumeSession,
@@ -48,6 +49,7 @@ describe('Session', () => {
     const paused = pauseSession(running, 4_250);
 
     expect(paused.status).toBe('paused');
+    expect(paused.pauseReason).toBe('user');
     expect(paused.currentPhaseIndex).toBe(0);
     expect(paused.remainingMilliseconds).toBe(6_750);
     expect(paused.pausedAt).toBe(4_250);
@@ -76,18 +78,31 @@ describe('Session', () => {
     expect(stopped.stoppedAt).toBe(2_000);
   });
 
-  test('advances at the exact Phase boundary without drift', () => {
+  test('enters a one-second transition at the exact Phase boundary', () => {
     const running = createSession('session-1', workflow(), 1_000);
 
     const advanced = deriveSessionState(running, 11_000);
+
+    expect(advanced.status).toBe('transitioning');
+    if (advanced.status !== 'transitioning') {
+      throw new Error('Expected Session to be transitioning.');
+    }
+    expect(advanced.currentPhaseIndex).toBe(0);
+    expect(advanced.transitionEndsAt).toBe(12_000);
+  });
+
+  test('starts the next Phase at full duration after the transition', () => {
+    const running = createSession('session-1', workflow(), 1_000);
+
+    const advanced = deriveSessionState(running, 12_000);
 
     expect(advanced.status).toBe('running');
     if (advanced.status !== 'running') {
       throw new Error('Expected Session to remain running.');
     }
     expect(advanced.currentPhaseIndex).toBe(1);
-    expect(advanced.phaseStartedAt).toBe(11_000);
-    expect(advanced.phaseEndsAt).toBe(16_000);
+    expect(advanced.phaseStartedAt).toBe(12_000);
+    expect(advanced.phaseEndsAt).toBe(17_000);
   });
 
   test('advances across multiple elapsed Phases after a late wake-up', () => {
@@ -100,9 +115,9 @@ describe('Session', () => {
       throw new Error('Expected Session to remain running.');
     }
     expect(advanced.currentPhaseIndex).toBe(2);
-    expect(advanced.phaseStartedAt).toBe(16_000);
-    expect(advanced.phaseEndsAt).toBe(36_000);
-    expect(getRemainingSeconds(advanced, 20_000)).toBe(16);
+    expect(advanced.phaseStartedAt).toBe(18_000);
+    expect(advanced.phaseEndsAt).toBe(38_000);
+    expect(getRemainingSeconds(advanced, 20_000)).toBe(18);
   });
 
   test('completes at the scheduled final boundary after a late wake-up', () => {
@@ -114,9 +129,163 @@ describe('Session', () => {
     if (completed.status !== 'completed') {
       throw new Error('Expected Session to be completed.');
     }
-    expect(completed.completedAt).toBe(36_000);
+    expect(completed.completedAt).toBe(39_000);
     expect(completed.currentPhaseIndex).toBe(2);
     expect(getRemainingSeconds(completed, 50_000)).toBe(0);
+  });
+
+  test('pauses the full next Phase when a Reward is due', () => {
+    const rewarded = createWorkflow({
+      id: 'workflow-rewarded',
+      name: 'Rewarded work',
+      phases: [
+        { type: 'focus', durationSeconds: 10, environment: {} },
+        { type: 'break', durationSeconds: 5, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+
+    const paused = deriveSessionState(
+      createSession('session-1', rewarded, 1_000),
+      12_000,
+    );
+
+    expect(paused).toMatchObject({
+      status: 'paused',
+      pauseReason: 'reward',
+      currentPhaseIndex: 1,
+      pausedAt: 12_000,
+      remainingMilliseconds: 5_000,
+    });
+  });
+
+  test('stops late derivation at the first Reward pause', () => {
+    const rewarded = createWorkflow({
+      id: 'workflow-rewarded',
+      name: 'Rewarded work',
+      phases: [
+        { type: 'focus', durationSeconds: 10, environment: {} },
+        { type: 'break', durationSeconds: 5, environment: {} },
+        { type: 'focus', durationSeconds: 20, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+
+    const paused = deriveSessionState(
+      createSession('session-1', rewarded, 1_000),
+      99_000,
+    );
+
+    expect(paused).toMatchObject({
+      status: 'paused',
+      pauseReason: 'reward',
+      currentPhaseIndex: 1,
+      remainingMilliseconds: 5_000,
+    });
+  });
+
+  test('completes a final eligible Phase only after its transition', () => {
+    const rewarded = createWorkflow({
+      id: 'workflow-rewarded',
+      name: 'Rewarded work',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const running = createSession('session-1', rewarded, 1_000);
+
+    expect(deriveSessionState(running, 11_999).status).toBe('transitioning');
+    expect(deriveSessionState(running, 12_000)).toMatchObject({
+      status: 'completed',
+      currentPhaseIndex: 0,
+      completedAt: 12_000,
+    });
+  });
+
+  test('continues only a Reward pause with a fresh full-duration anchor', () => {
+    const rewarded = createWorkflow({
+      id: 'workflow-rewarded',
+      name: 'Rewarded work',
+      phases: [
+        { type: 'focus', durationSeconds: 10, environment: {} },
+        { type: 'break', durationSeconds: 5, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('session-1', rewarded, 1_000),
+      12_000,
+    );
+
+    const continued = continueRewardSession(paused, 20_000);
+
+    expect(continued).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+      phaseStartedAt: 20_000,
+      phaseEndsAt: 25_000,
+    });
+    expect(() =>
+      continueRewardSession(
+        pauseSession(createSession('session-2', workflow(), 1_000), 2_000),
+        3_000,
+      ),
+    ).toThrow('Session transition is not valid for its current state.');
+  });
+
+  test('rejects ordinary commands while transitioning and Resume for a Reward pause', () => {
+    const transitioning = deriveSessionState(
+      createSession('session-1', workflow(), 1_000),
+      11_000,
+    );
+
+    expect(() => pauseSession(transitioning, 11_500)).toThrow();
+    expect(() => resumeSession(transitioning, 11_500)).toThrow();
+    expect(() => stopSession(transitioning, 11_500)).toThrow();
+
+    const rewarded = createWorkflow({
+      id: 'workflow-rewarded',
+      name: 'Rewarded work',
+      phases: [
+        { type: 'focus', durationSeconds: 10, environment: {} },
+        { type: 'break', durationSeconds: 5, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const rewardPaused = deriveSessionState(
+      createSession('session-2', rewarded, 1_000),
+      12_000,
+    );
+    expect(() => resumeSession(rewardPaused, 20_000)).toThrow();
   });
 
   test.each([

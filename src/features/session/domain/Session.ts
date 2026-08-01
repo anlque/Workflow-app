@@ -26,9 +26,16 @@ export type RunningSession = SessionBase &
     phaseEndsAt: number;
   }>;
 
+export type TransitioningSession = SessionBase &
+  Readonly<{
+    status: 'transitioning';
+    transitionEndsAt: number;
+  }>;
+
 export type PausedSession = SessionBase &
   Readonly<{
     status: 'paused';
+    pauseReason: 'user' | 'reward';
     pausedAt: number;
     remainingMilliseconds: number;
   }>;
@@ -46,7 +53,11 @@ export type StoppedSession = SessionBase &
   }>;
 
 export type Session =
-  RunningSession | PausedSession | CompletedSession | StoppedSession;
+  | RunningSession
+  | TransitioningSession
+  | PausedSession
+  | CompletedSession
+  | StoppedSession;
 
 export type RestoreSessionInput =
   | Readonly<{
@@ -61,7 +72,15 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
+      status: 'transitioning';
+      transitionEndsAt: number;
+    }>
+  | Readonly<{
+      id: string;
+      workflow: Workflow;
+      currentPhaseIndex: number;
       status: 'paused';
+      pauseReason?: 'user' | 'reward';
       pausedAt: number;
       remainingMilliseconds: number;
     }>
@@ -152,8 +171,17 @@ export function restoreSession(input: RestoreSessionInput): Session {
     return Object.freeze({
       ...base,
       status: input.status,
+      pauseReason: input.pauseReason ?? 'user',
       pausedAt: input.pausedAt,
       remainingMilliseconds: input.remainingMilliseconds,
+    });
+  }
+  if (input.status === 'transitioning') {
+    validateEpochMilliseconds(input.transitionEndsAt);
+    return Object.freeze({
+      ...base,
+      status: input.status,
+      transitionEndsAt: input.transitionEndsAt,
     });
   }
   if (input.status === 'completed') {
@@ -184,6 +212,7 @@ export function pauseSession(session: Session, now: number): PausedSession {
     snapshot: reconciled.snapshot,
     currentPhaseIndex: reconciled.currentPhaseIndex,
     status: 'paused',
+    pauseReason: 'user',
     pausedAt: now,
     remainingMilliseconds: reconciled.phaseEndsAt - now,
   });
@@ -191,10 +220,29 @@ export function pauseSession(session: Session, now: number): PausedSession {
 
 export function resumeSession(session: Session, now: number): RunningSession {
   validateEpochMilliseconds(now);
-  if (session.status !== 'paused') {
+  if (session.status !== 'paused' || session.pauseReason !== 'user') {
     throw new SessionTransitionError();
   }
 
+  return Object.freeze({
+    id: session.id,
+    sourceWorkflowId: session.sourceWorkflowId,
+    snapshot: session.snapshot,
+    currentPhaseIndex: session.currentPhaseIndex,
+    status: 'running',
+    phaseStartedAt: now,
+    phaseEndsAt: now + session.remainingMilliseconds,
+  });
+}
+
+export function continueRewardSession(
+  session: Session,
+  now: number,
+): RunningSession {
+  validateEpochMilliseconds(now);
+  if (session.status !== 'paused' || session.pauseReason !== 'reward') {
+    throw new SessionTransitionError();
+  }
   return Object.freeze({
     id: session.id,
     sourceWorkflowId: session.sourceWorkflowId,

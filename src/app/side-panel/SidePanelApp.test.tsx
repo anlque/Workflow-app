@@ -15,6 +15,7 @@ function dependencies(
 ): SidePanelDependencies {
   return {
     listWorkflows: () => Promise.resolve(workflows),
+    subscribeWorkflowChanges: vi.fn(() => vi.fn()),
     createWorkflow: () => Promise.resolve(),
     duplicateWorkflow: () => Promise.resolve(),
     deleteWorkflow: () => Promise.resolve(),
@@ -92,5 +93,37 @@ describe('SidePanelApp', () => {
       screen.getByRole('button', { name: 'Open focus view' }),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Pause' })).toBeVisible();
+  });
+
+  test('refreshes the visible Workflow list after catalog invalidation', async () => {
+    const initial = createWorkflow({
+      id: 'workflow-1',
+      name: 'Deep work',
+      phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+    });
+    const renamed = createWorkflow({
+      id: 'workflow-1',
+      name: 'Renamed work',
+      phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+    });
+    const deps = dependencies([initial]);
+    let invalidate: (() => void) | undefined;
+    vi.mocked(deps.subscribeWorkflowChanges).mockImplementation((listener) => {
+      invalidate = listener;
+      return vi.fn();
+    });
+    vi.spyOn(deps, 'listWorkflows')
+      .mockResolvedValueOnce([initial])
+      .mockResolvedValueOnce([renamed]);
+    render(<SidePanelApp dependencies={deps} />);
+    expect(
+      await screen.findByRole('button', { name: 'Open Deep work' }),
+    ).toBeVisible();
+
+    invalidate?.();
+
+    expect(
+      await screen.findByRole('button', { name: 'Open Renamed work' }),
+    ).toBeVisible();
   });
 });

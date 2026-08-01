@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { DiceSide } from '@/features/workflow';
+import type { RewardDice } from '@/features/workflow';
 
 import type { Session, SessionId } from '../domain/Session';
 import { SessionControls } from './SessionControls';
 import { RewardResultDialog } from './RewardResultDialog';
 import { didCrossPhaseBoundary } from './didCrossPhaseBoundary';
-import { rewardsForSessionTransition } from './rewardTransitions';
+import { rewardOpportunityForSessionTransition } from './rewardTransitions';
 import { formatSessionCountdown } from './sessionCountdown';
 
 export type ActiveSessionViewProps = Readonly<{
@@ -15,7 +15,10 @@ export type ActiveSessionViewProps = Readonly<{
   random?: () => number;
   reducedMotion?: boolean;
   onPhaseBoundary?(): void;
-  onRewardRoll?(): void;
+  rewardInteraction?: Readonly<{
+    onRoll(durationMs: 600 | 2500): void;
+    continueReward(id: SessionId): Promise<void>;
+  }>;
   onPause(id: SessionId): Promise<void>;
   onResume(id: SessionId): Promise<void>;
   onStop(id: SessionId): Promise<void>;
@@ -30,26 +33,30 @@ export function ActiveSessionView({
   random = systemRandom,
   reducedMotion = false,
   onPhaseBoundary,
-  onRewardRoll,
+  rewardInteraction,
   onPause,
   onResume,
   onStop,
 }: ActiveSessionViewProps) {
   const [displayNow, setDisplayNow] = useState(now);
-  const [rewards, setRewards] = useState<readonly DiceSide[]>([]);
+  const [rewardDice, setRewardDice] = useState<RewardDice | null>(() =>
+    rewardInteraction === undefined
+      ? null
+      : rewardOpportunityForSessionTransition(null, session),
+  );
   const previousSession = useRef(session);
 
   useEffect(() => {
     const previous = previousSession.current;
-    const nextRewards = rewardsForSessionTransition(previous, session, random);
+    const nextReward = rewardOpportunityForSessionTransition(previous, session);
     previousSession.current = session;
     if (didCrossPhaseBoundary(previous, session)) {
       onPhaseBoundary?.();
     }
-    if (nextRewards.length > 0) {
-      setRewards((current) => [...current, ...nextRewards]);
+    if (nextReward !== null && rewardInteraction !== undefined) {
+      setRewardDice(nextReward);
     }
-  }, [onPhaseBoundary, random, session]);
+  }, [onPhaseBoundary, rewardInteraction, session]);
 
   useEffect(() => {
     setDisplayNow(now());
@@ -63,15 +70,18 @@ export function ActiveSessionView({
   }, [now, session.status]);
 
   const workflow = session.snapshot.workflow;
-  const rewardDialog = rewards[0];
   const rewardResult =
-    rewardDialog === undefined ? null : (
+    rewardDice === null || rewardInteraction === undefined ? null : (
       <RewardResultDialog
-        reward={rewardDialog}
+        dice={rewardDice}
+        random={random}
         reducedMotion={reducedMotion}
-        {...(onRewardRoll === undefined ? {} : { onRoll: onRewardRoll })}
-        onDismiss={() => {
-          setRewards((current) => current.slice(1));
+        onRoll={rewardInteraction.onRoll}
+        onContinue={async () => {
+          if (session.status === 'paused' && session.pauseReason === 'reward') {
+            await rewardInteraction.continueReward(session.id);
+          }
+          setRewardDice(null);
         }}
       />
     );
@@ -96,10 +106,22 @@ export function ActiveSessionView({
     <section className="active-session">
       <h1>{workflow.name}</h1>
       <p className="session-phase">
-        {phase.type === 'focus' ? 'Focus' : 'Break'} · Phase{' '}
-        {session.currentPhaseIndex + 1} of {workflow.phases.length}
+        {session.status === 'transitioning' ? (
+          'Transitioning to the next phase…'
+        ) : (
+          <>
+            {phase.type === 'focus' ? 'Focus' : 'Break'} · Phase{' '}
+            {session.currentPhaseIndex + 1} of {workflow.phases.length}
+          </>
+        )}
       </p>
-      <output className="session-countdown" aria-label="Time remaining">
+      <output
+        className="session-countdown"
+        aria-label="Time remaining"
+        data-transitioning={
+          session.status === 'transitioning' ? 'true' : undefined
+        }
+      >
         {formatSessionCountdown(session, displayNow)}
       </output>
       <SessionControls

@@ -1,36 +1,16 @@
-import { useEffect } from 'react';
+export type RewardCubeStage = 'ready' | 'mixing' | 'mixing-reduced' | 'result';
 
 export type RewardCubeProps = Readonly<{
   icon: string;
-  reducedMotion: boolean;
-  onSettled(): void;
+  stage: RewardCubeStage;
 }>;
 
-const ROLL_DURATION_MS = 1_200;
-
-export function RewardCube({
-  icon,
-  reducedMotion,
-  onSettled,
-}: RewardCubeProps) {
-  const state = reducedMotion ? 'settled' : 'rolling';
-
-  useEffect(() => {
-    if (reducedMotion) {
-      onSettled();
-      return;
-    }
-    const timer = window.setTimeout(onSettled, ROLL_DURATION_MS);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [onSettled, reducedMotion]);
-
+export function RewardCube({ icon, stage }: RewardCubeProps) {
   return (
     <div
       className="reward-cube-scene"
       data-testid="reward-cube"
-      data-state={state}
+      data-state={stage}
       aria-hidden="true"
     >
       <div className="reward-cube">

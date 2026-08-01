@@ -175,9 +175,12 @@ Responsibilities:
 - immutable Workflow snapshot.
 
 A Session is a durable execution record. At most one Session may be active.
-Running and paused Sessions are persisted so execution can be restored after an
-extension surface closes or the background service worker restarts. Completed
-and stopped Sessions are retained as minimal history records.
+Running, transitioning and paused Sessions are persisted so execution can be
+restored after an extension surface closes or the background service worker
+restarts. A transition lasts exactly one second after every Phase and is derived
+from an absolute timestamp. Pauses carry a `user` or `reward` reason; only the
+dedicated Reward continuation may resume a Reward pause. Completed and stopped
+Sessions are retained as minimal history records.
 
 Workflows are permanent.
 

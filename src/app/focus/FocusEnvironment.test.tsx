@@ -120,7 +120,7 @@ describe('FocusEnvironment', () => {
     );
   });
 
-  test('autoplays hidden looping audio and fades in over three seconds', async () => {
+  test('autoplays hidden looping audio and fades in over one second', async () => {
     vi.useFakeTimers();
     const play = vi
       .spyOn(HTMLMediaElement.prototype, 'play')
@@ -138,7 +138,7 @@ describe('FocusEnvironment', () => {
     expect(audio?.volume).toBe(0);
 
     act(() => {
-      vi.advanceTimersByTime(3_000);
+      vi.advanceTimersByTime(1_000);
     });
     expect(audio?.volume).toBe(1);
   });
@@ -187,7 +187,7 @@ describe('FocusEnvironment', () => {
 
     expect(pause).not.toHaveBeenCalled();
     act(() => {
-      vi.advanceTimersByTime(3_000);
+      vi.advanceTimersByTime(1_000);
     });
     await act(async () => {
       await Promise.resolve();

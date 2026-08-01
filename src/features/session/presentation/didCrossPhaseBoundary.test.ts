@@ -29,7 +29,7 @@ describe('didCrossPhaseBoundary', () => {
     const initial = createSession('session-1', workflow, 1_000);
 
     expect(
-      didCrossPhaseBoundary(initial, deriveSessionState(initial, 3_000)),
+      didCrossPhaseBoundary(initial, deriveSessionState(initial, 5_000)),
     ).toBe(true);
   });
 
@@ -37,7 +37,7 @@ describe('didCrossPhaseBoundary', () => {
     const initial = createSession('session-1', workflow, 1_000);
 
     expect(
-      didCrossPhaseBoundary(initial, deriveSessionState(initial, 4_000)),
+      didCrossPhaseBoundary(initial, deriveSessionState(initial, 7_000)),
     ).toBe(true);
   });
 
@@ -51,6 +51,14 @@ describe('didCrossPhaseBoundary', () => {
     expect(didCrossPhaseBoundary(initial, stopSession(initial, 1_500))).toBe(
       false,
     );
+  });
+
+  test('does not ring again when an observed transition finishes', () => {
+    const initial = createSession('session-1', workflow, 1_000);
+    const transitioning = deriveSessionState(initial, 2_000);
+    const nextPhase = deriveSessionState(transitioning, 3_000);
+
+    expect(didCrossPhaseBoundary(transitioning, nextPhase)).toBe(false);
   });
 
   test('ignores projections from another Session', () => {

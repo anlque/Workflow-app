@@ -20,6 +20,7 @@ export { createWorkflowId } from './domain/Workflow';
 export { WorkflowValidationError } from './domain/WorkflowErrors';
 export { createWorkflow } from './domain/createWorkflow';
 export { rollReward } from './domain/rollReward';
+export { isRewardDueAfterPhase } from './domain/isRewardDueAfterPhase';
 export { DexieWorkflowRepository } from './infrastructure/DexieWorkflowRepository';
 export { workflowDatabaseSchemas } from './infrastructure/WorkflowRecord';
 export { WorkflowApplicationError } from './application/WorkflowApplicationError';
@@ -64,3 +65,8 @@ export {
   type WorkflowDraftErrors,
   type WorkflowDraftValidation,
 } from './presentation/useWorkflowEditor';
+export {
+  useWorkflowCatalog,
+  type WorkflowCatalogSource,
+  type WorkflowCatalogState,
+} from './presentation/useWorkflowCatalog';

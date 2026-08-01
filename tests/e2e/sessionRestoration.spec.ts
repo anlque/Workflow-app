@@ -2,7 +2,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 
 import {
   expect,
-  expireActivePhase,
+  expireActiveSessionDeadline,
   test,
   type ExtensionUrls,
 } from './extensionFixture';
@@ -94,7 +94,13 @@ test('shows terminal completion from the authoritative alarm transition', async 
     focus.getByRole('heading', { name: 'Short focus' }),
   ).toBeVisible();
 
-  await expireActivePhase(focus);
+  await expireActiveSessionDeadline(focus);
+  await expect(focus.getByText('Transitioning to the next phase…')).toBeVisible(
+    {
+      timeout: 15_000,
+    },
+  );
+  await expireActiveSessionDeadline(focus);
 
   await expect(focus.getByText('Session complete')).toBeVisible({
     timeout: 15_000,

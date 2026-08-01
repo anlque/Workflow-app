@@ -15,7 +15,7 @@ import {
 import { SessionValidationError } from '../domain/SessionErrors';
 import { deriveSessionState } from '../domain/deriveSessionState';
 import { DexieSessionRepository } from './DexieSessionRepository';
-import { sessionDatabaseSchemas } from './SessionRecord';
+import { sessionDatabaseSchemas, type SessionRecord } from './SessionRecord';
 
 const databaseNames: string[] = [];
 
@@ -49,6 +49,14 @@ afterEach(async () => {
 describe('DexieSessionRepository', () => {
   test.each([
     ['running', () => createSession('running', workflow(), 1_000)],
+    [
+      'transitioning',
+      () =>
+        deriveSessionState(
+          createSession('transitioning', workflow(), 1_000),
+          11_000,
+        ),
+    ],
     [
       'paused',
       () => pauseSession(createSession('paused', workflow(), 1_000), 3_000),
@@ -100,6 +108,44 @@ describe('DexieSessionRepository', () => {
     );
     await expect(repository.get(second.id)).resolves.toBeNull();
     await expect(repository.getActive()).resolves.toEqual(first);
+  });
+
+  test('keeps a transitioning Session active and blocks a second start', async () => {
+    const repository = new DexieSessionRepository(database());
+    const transitioning = deriveSessionState(
+      createSession('session-1', workflow(), 1_000),
+      11_000,
+    );
+    await repository.save(transitioning);
+
+    await expect(repository.getActive()).resolves.toEqual(transitioning);
+    await expect(
+      repository.save(createSession('session-2', workflow(), 12_000)),
+    ).rejects.toThrow('An active Session already exists.');
+  });
+
+  test('maps a legacy paused record without a pause reason to a user pause', async () => {
+    const store = database();
+    const repository = new DexieSessionRepository(store);
+    const paused = pauseSession(
+      createSession('session-1', workflow(), 1_000),
+      3_000,
+    );
+    await repository.save(paused);
+    const table = store.table<SessionRecord, string>('sessions');
+    const stored = await table.get(paused.id);
+    if (stored === undefined || typeof stored !== 'object') {
+      throw new Error('Expected a stored Session record.');
+    }
+    const storedSession = (stored as { session: Record<string, unknown> })
+      .session;
+    delete storedSession['pauseReason'];
+    await table.put(stored);
+
+    await expect(repository.get(paused.id)).resolves.toMatchObject({
+      status: 'paused',
+      pauseReason: 'user',
+    });
   });
 
   test('clears active lookup when a Session becomes terminal', async () => {

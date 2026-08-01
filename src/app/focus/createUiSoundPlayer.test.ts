@@ -2,24 +2,30 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { createUiSoundPlayer } from './createUiSoundPlayer';
 
-type Ramp = Readonly<{ kind: 'set' | 'exponential'; value: number }>;
+type Ramp = Readonly<{
+  kind: 'set' | 'exponential';
+  value: number;
+  at: number;
+}>;
 
 function createFakeAudioContext(state: AudioContextState = 'running') {
   let currentState = state;
   const ramps: Ramp[] = [];
   const oscillatorStarts: number[] = [];
   const bufferSourceStarts: number[] = [];
+  const bufferSourceStops: number[] = [];
+  const bufferLengths: number[] = [];
   const resume = vi.fn(() => {
     currentState = 'running';
     return Promise.resolve();
   });
   const close = vi.fn(() => Promise.resolve());
   const parameter = {
-    setValueAtTime(value: number) {
-      ramps.push({ kind: 'set', value });
+    setValueAtTime(value: number, at: number) {
+      ramps.push({ kind: 'set', value, at });
     },
-    exponentialRampToValueAtTime(value: number) {
-      ramps.push({ kind: 'exponential', value });
+    exponentialRampToValueAtTime(value: number, at: number) {
+      ramps.push({ kind: 'exponential', value, at });
     },
     value: 0,
   };
@@ -41,14 +47,15 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
       stop: vi.fn(),
     }),
     createGain: () => ({ ...connectable, gain: parameter }),
-    createBuffer: (_channels: number, length: number) => ({
-      getChannelData: () => new Float32Array(length),
-    }),
+    createBuffer: (_channels: number, length: number) => {
+      bufferLengths.push(length);
+      return { getChannelData: () => new Float32Array(length) };
+    },
     createBufferSource: () => ({
       ...connectable,
       buffer: null,
       start: (at: number) => bufferSourceStarts.push(at),
-      stop: vi.fn(),
+      stop: (at: number) => bufferSourceStops.push(at),
     }),
     createBiquadFilter: () => ({
       ...connectable,
@@ -62,6 +69,8 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
     ramps,
     oscillatorStarts,
     bufferSourceStarts,
+    bufferSourceStops,
+    bufferLengths,
     resume,
     close,
   };
@@ -79,10 +88,7 @@ describe('createUiSoundPlayer', () => {
 
     expect(createContext).toHaveBeenCalledOnce();
     expect(fake.oscillatorStarts).toHaveLength(2);
-    expect(fake.ramps).toContainEqual({
-      kind: 'exponential',
-      value: 0.0001,
-    });
+    expect(fake.ramps.some(({ value }) => value === 0.24)).toBe(true);
   });
 
   test('synthesizes filtered noise for a dice roll after activation', async () => {
@@ -90,10 +96,14 @@ describe('createUiSoundPlayer', () => {
     const player = createUiSoundPlayer(() => fake.context);
 
     await player.unlock();
-    player.playDiceRoll();
+    player.playDiceRoll(2_500);
 
     expect(fake.bufferSourceStarts).toHaveLength(1);
-    expect(fake.ramps).toContainEqual({ kind: 'exponential', value: 0.0001 });
+    expect(fake.bufferLengths).toEqual([20_000]);
+    expect(fake.bufferSourceStops).toEqual([3.5]);
+    expect(
+      fake.ramps.filter(({ value }) => value === 0.12).length,
+    ).toBeGreaterThan(10);
   });
 
   test('does not consume sounds while locked and unlocks a suspended context', async () => {
@@ -132,7 +142,7 @@ describe('createUiSoundPlayer', () => {
       player.playBell();
     }).not.toThrow();
     expect(() => {
-      player.playDiceRoll();
+      player.playDiceRoll(600);
     }).not.toThrow();
     expect(() => {
       player.dispose();

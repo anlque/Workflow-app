@@ -35,7 +35,11 @@ export class DexieSessionRepository implements SessionRepository {
 
   public async save(session: Session): Promise<void> {
     await this.#database.runReadWrite('sessions', async () => {
-      if (session.status === 'running' || session.status === 'paused') {
+      if (
+        session.status === 'running' ||
+        session.status === 'transitioning' ||
+        session.status === 'paused'
+      ) {
         const active = await this.#sessions.where('active').equals(1).toArray();
         if (active.some(({ id }) => id !== session.id)) {
           throw new SessionApplicationError(

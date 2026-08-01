@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { createWorkflow } from '@/features/workflow';
@@ -40,10 +40,10 @@ describe('ActiveSessionView', () => {
   test('renders a terminal summary without controls', () => {
     const completed = deriveSessionState(
       createSession('session-1', workflow, 1_000),
-      91_000,
+      93_000,
     );
     render(
-      <ActiveSessionView session={completed} now={() => 91_000} {...actions} />,
+      <ActiveSessionView session={completed} now={() => 93_000} {...actions} />,
     );
 
     expect(screen.getByText('Session complete')).toBeVisible();
@@ -86,7 +86,30 @@ describe('ActiveSessionView', () => {
     expect(onPhaseBoundary).toHaveBeenCalledOnce();
   });
 
+  test('softens the timer and removes controls during the transition', () => {
+    const transitioning = deriveSessionState(
+      createSession('session-1', workflow, 1_000),
+      61_000,
+    );
+
+    render(
+      <ActiveSessionView
+        session={transitioning}
+        now={() => 61_000}
+        {...actions}
+      />,
+    );
+
+    expect(screen.getByText('Transitioning to the next phase…')).toBeVisible();
+    expect(screen.getByLabelText('Time remaining')).toHaveAttribute(
+      'data-transitioning',
+      'true',
+    );
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
   test('shows an eligible Reward only after an authoritative transition', () => {
+    vi.useFakeTimers();
     const rewardedWorkflow = createWorkflow({
       id: 'rewarded',
       name: 'Rewarded focus',
@@ -104,13 +127,15 @@ describe('ActiveSessionView', () => {
     });
     const initial = createSession('session-reward', rewardedWorkflow, 1_000);
     const onRewardRoll = vi.fn();
+    const continueReward = vi.fn(() => Promise.resolve());
+    const random = vi.fn(() => 0);
     const { rerender } = render(
       <ActiveSessionView
         session={initial}
         now={() => 1_500}
-        random={() => 0}
+        random={random}
         reducedMotion
-        onRewardRoll={onRewardRoll}
+        rewardInteraction={{ onRoll: onRewardRoll, continueReward }}
         {...actions}
       />,
     );
@@ -120,18 +145,29 @@ describe('ActiveSessionView', () => {
 
     rerender(
       <ActiveSessionView
-        session={deriveSessionState(initial, 2_000)}
-        now={() => 2_000}
-        random={() => 0}
+        session={deriveSessionState(initial, 3_000)}
+        now={() => 3_000}
+        random={random}
         reducedMotion
-        onRewardRoll={onRewardRoll}
+        rewardInteraction={{ onRoll: onRewardRoll, continueReward }}
         {...actions}
       />,
     );
 
     expect(
       screen.getByRole('dialog', { name: 'Reward unlocked' }),
-    ).toHaveTextContent('Tea');
-    expect(onRewardRoll).toHaveBeenCalledOnce();
+    ).toBeVisible();
+    expect(random).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Roll' }));
+    expect(random).toHaveBeenCalledOnce();
+    expect(onRewardRoll).toHaveBeenCalledWith(600);
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.getByText('Tea')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(continueReward).toHaveBeenCalledWith(initial.id);
+    vi.useRealTimers();
   });
 });

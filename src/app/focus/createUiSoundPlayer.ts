@@ -2,7 +2,7 @@ export type UiSoundPlayer = Readonly<{
   unlock(): Promise<boolean>;
   getState(): 'locked' | 'ready' | 'unavailable';
   playBell(): void;
-  playDiceRoll(): void;
+  playDiceRoll(durationMs: 600 | 2500): void;
   dispose(): void;
 }>;
 
@@ -46,7 +46,7 @@ export function createUiSoundPlayer(
       oscillator.type = 'sine';
       oscillator.frequency.setValueAtTime(880, start);
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.16, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.24, start + 0.01);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.7);
       oscillator.connect(gain);
       gain.connect(audio.destination);
@@ -57,12 +57,12 @@ export function createUiSoundPlayer(
     }
   }
 
-  function playDiceRoll(): void {
+  function playDiceRoll(durationMs: 600 | 2500): void {
     try {
       const audio = getReadyContext();
       if (audio === undefined) return;
       const start = audio.currentTime;
-      const duration = 0.45;
+      const duration = durationMs / 1_000;
       const buffer = audio.createBuffer(
         1,
         Math.round(audio.sampleRate * duration),
@@ -74,17 +74,27 @@ export function createUiSoundPlayer(
       }
       const source = audio.createBufferSource();
       const filter = audio.createBiquadFilter();
-      const gain = audio.createGain();
+      const pulseGain = audio.createGain();
+      const masterGain = audio.createGain();
       source.buffer = buffer;
       filter.type = 'bandpass';
       filter.frequency.value = 720;
       filter.Q.value = 0.8;
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.12, start + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      masterGain.gain.setValueAtTime(0.0001, start);
+      masterGain.gain.exponentialRampToValueAtTime(0.65, start + 0.02);
+      masterGain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      for (let offset = 0; offset < duration; offset += 0.12) {
+        const pulseStart = start + offset;
+        const pulsePeak = Math.min(pulseStart + 0.012, start + duration);
+        const pulseEnd = Math.min(pulseStart + 0.075, start + duration);
+        pulseGain.gain.setValueAtTime(0.0001, pulseStart);
+        pulseGain.gain.exponentialRampToValueAtTime(0.12, pulsePeak);
+        pulseGain.gain.exponentialRampToValueAtTime(0.0001, pulseEnd);
+      }
       source.connect(filter);
-      filter.connect(gain);
-      gain.connect(audio.destination);
+      filter.connect(pulseGain);
+      pulseGain.connect(masterGain);
+      masterGain.connect(audio.destination);
       source.start(start);
       source.stop(start + duration);
     } catch {

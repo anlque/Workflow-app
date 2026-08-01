@@ -8,7 +8,9 @@ export function didCrossPhaseBoundary(
   if (previous.status === 'completed' || previous.status === 'stopped') {
     return false;
   }
+  if (previous.status === 'transitioning') return false;
   return (
+    current.status === 'transitioning' ||
     current.currentPhaseIndex > previous.currentPhaseIndex ||
     current.status === 'completed'
   );

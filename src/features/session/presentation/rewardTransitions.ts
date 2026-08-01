@@ -1,45 +1,34 @@
-import { rollReward, type DiceSide } from '@/features/workflow';
+import { isRewardDueAfterPhase, type RewardDice } from '@/features/workflow';
 
 import type { Session } from '../domain/Session';
 
-export function rewardsForSessionTransition(
+export function rewardOpportunityForSessionTransition(
   previous: Session | null,
   current: Session,
-  random: () => number,
-): readonly DiceSide[] {
-  if (previous === null) return [];
+): RewardDice | null {
+  const dice = current.snapshot.workflow.rewardDice;
+  if (dice === undefined) return null;
+
+  if (current.status === 'paused' && current.pauseReason === 'reward') {
+    if (previous === null) return dice;
+    if (previous.id !== current.id) return null;
+    return previous.status === 'paused' &&
+      previous.pauseReason === 'reward' &&
+      previous.currentPhaseIndex === current.currentPhaseIndex
+      ? null
+      : dice;
+  }
+
   if (
-    previous.id !== current.id ||
-    previous.status === 'completed' ||
-    previous.status === 'stopped'
+    current.status === 'completed' &&
+    previous !== null &&
+    previous.id === current.id &&
+    previous.status !== 'completed' &&
+    previous.status !== 'stopped' &&
+    isRewardDueAfterPhase(current.snapshot.workflow, current.currentPhaseIndex)
   ) {
-    return [];
+    return dice;
   }
 
-  const workflow = current.snapshot.workflow;
-  const dice = workflow.rewardDice;
-  if (dice === undefined) return [];
-
-  const lastCompletedIndex =
-    current.status === 'completed'
-      ? current.currentPhaseIndex
-      : current.currentPhaseIndex - 1;
-  if (lastCompletedIndex < previous.currentPhaseIndex) return [];
-
-  const rewards: DiceSide[] = [];
-  for (
-    let index = previous.currentPhaseIndex;
-    index <= lastCompletedIndex;
-    index += 1
-  ) {
-    const phase = workflow.phases[index];
-    if (phase?.type !== 'focus') continue;
-    const completedFocusCount = workflow.phases
-      .slice(0, index + 1)
-      .filter(({ type }) => type === 'focus').length;
-    if (completedFocusCount % dice.frequency === 0) {
-      rewards.push(rollReward(dice, random));
-    }
-  }
-  return Object.freeze(rewards);
+  return null;
 }

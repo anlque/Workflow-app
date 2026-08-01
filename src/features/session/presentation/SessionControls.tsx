@@ -39,8 +39,18 @@ export function SessionControls({
     }
   }
 
-  if (session.status === 'completed' || session.status === 'stopped') {
+  if (
+    session.status === 'completed' ||
+    session.status === 'stopped' ||
+    session.status === 'transitioning'
+  ) {
     return null;
+  }
+
+  if (session.status === 'paused' && session.pauseReason === 'reward') {
+    return (
+      <p className="session-reward-pending">Reward pending — open focus view</p>
+    );
   }
 
   return (

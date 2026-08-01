@@ -5,6 +5,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { createWorkflow } from '@/features/workflow';
 
 import { createSession, pauseSession } from '../domain/Session';
+import { deriveSessionState } from '../domain/deriveSessionState';
 import { SessionControls } from './SessionControls';
 
 const workflow = createWorkflow({
@@ -56,5 +57,45 @@ describe('SessionControls', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Background unavailable.',
     );
+  });
+
+  test('renders no controls during a Phase transition', () => {
+    const transitioning = deriveSessionState(
+      createSession('session-1', workflow, 1_000),
+      61_000,
+    );
+
+    render(<SessionControls session={transitioning} {...callbacks()} />);
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  test('does not offer ordinary Resume for a Reward pause', () => {
+    const rewarded = createWorkflow({
+      id: 'workflow-rewarded',
+      name: 'Rewarded work',
+      phases: [
+        { type: 'focus', durationSeconds: 10, environment: {} },
+        { type: 'break', durationSeconds: 5, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const rewardPaused = deriveSessionState(
+      createSession('session-1', rewarded, 1_000),
+      12_000,
+    );
+
+    render(<SessionControls session={rewardPaused} {...callbacks()} />);
+
+    expect(screen.getByText('Reward pending — open focus view')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Resume' }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -45,7 +45,10 @@ class InMemorySessionRepository implements SessionRepository {
   public getActive(): Promise<Session | null> {
     return Promise.resolve(
       [...this.#sessions.values()].find(
-        ({ status }) => status === 'running' || status === 'paused',
+        ({ status }) =>
+          status === 'running' ||
+          status === 'transitioning' ||
+          status === 'paused',
       ) ?? null,
     );
   }
@@ -206,7 +209,7 @@ describe('createSessionCoordinator', () => {
     expect(messages.events).toHaveLength(2);
   });
 
-  test('reconciles a late alarm rather than decrementing time', async () => {
+  test('schedules and publishes both Phase and transition boundaries', async () => {
     const { value, clock, messages, alarms, coordinator } = setup();
     await coordinator.initialize();
     await messages.dispatch({
@@ -215,17 +218,30 @@ describe('createSessionCoordinator', () => {
       workflowId: value.id,
     });
 
-    clock.set(13_000);
+    clock.set(11_000);
+    await alarms.fire('flowarium.session-phase');
+
+    expect(messages.events.at(-1)?.session).toMatchObject({
+      status: 'transitioning',
+      currentPhaseIndex: 0,
+      transitionEndsAt: 12_000,
+    });
+    expect(alarms.scheduled).toEqual({
+      name: 'flowarium.session-phase',
+      when: 12_000,
+    });
+
+    clock.set(12_000);
     await alarms.fire('flowarium.session-phase');
 
     expect(messages.events.at(-1)?.session).toMatchObject({
       status: 'running',
       currentPhaseIndex: 1,
-      phaseEndsAt: 16_000,
+      phaseEndsAt: 17_000,
     });
     expect(alarms.scheduled).toEqual({
       name: 'flowarium.session-phase',
-      when: 16_000,
+      when: 17_000,
     });
   });
 
@@ -238,14 +254,82 @@ describe('createSessionCoordinator', () => {
       workflowId: value.id,
     });
 
-    clock.set(16_000);
+    clock.set(18_000);
     await alarms.fire('flowarium.session-phase');
 
     expect(messages.events.at(-1)?.session).toMatchObject({
       status: 'completed',
-      completedAt: 16_000,
+      completedAt: 18_000,
     });
     expect(alarms.scheduled).toBeNull();
+  });
+
+  test('continues a Reward pause only through the dedicated command', async () => {
+    const rewarded = createWorkflow({
+      id: 'workflow-rewarded',
+      name: 'Rewarded work',
+      phases: [
+        { type: 'focus', durationSeconds: 10, environment: {} },
+        { type: 'break', durationSeconds: 5, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const sessions = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const messages = new FakeMessageBus();
+    const alarms = new FakeAlarmScheduler();
+    const coordinator = createSessionCoordinator({
+      workflows: workflowRepository(rewarded),
+      sessions,
+      clock,
+      messages,
+      alarms,
+      createSessionId: () => 'session-1',
+    });
+    await coordinator.initialize();
+    await messages.dispatch({
+      type: 'session/start',
+      commandId: 'command-1',
+      workflowId: rewarded.id,
+    });
+    clock.set(12_000);
+    await alarms.fire('flowarium.session-phase');
+    expect(messages.events.at(-1)?.session).toMatchObject({
+      status: 'paused',
+      pauseReason: 'reward',
+      remainingMilliseconds: 5_000,
+    });
+    expect(alarms.scheduled).toBeNull();
+
+    await expect(
+      messages.dispatch({
+        type: 'session/resume',
+        commandId: 'command-2',
+        sessionId: 'session-1',
+      }),
+    ).rejects.toThrow();
+
+    clock.set(20_000);
+    await messages.dispatch({
+      type: 'session/continue-reward',
+      commandId: 'command-3',
+      sessionId: 'session-1',
+    });
+    expect(messages.events.at(-1)?.session).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+      phaseEndsAt: 25_000,
+    });
+    expect(alarms.scheduled).toEqual({
+      name: 'flowarium.session-phase',
+      when: 25_000,
+    });
   });
 
   test('restores and broadcasts active state during initialization', async () => {
