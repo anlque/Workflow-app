@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 
 import {
@@ -17,6 +17,8 @@ import {
   type WorkflowCatalogSource,
   type WorkflowId,
 } from '@/features/workflow';
+
+import { CompactActiveSessionBar } from './CompactActiveSessionBar';
 
 export type SidePanelDependencies = Readonly<{
   listWorkflows(): Promise<readonly Workflow[]>;
@@ -38,6 +40,8 @@ export function SidePanelApp({
   dependencies,
 }: Readonly<{ dependencies: SidePanelDependencies }>) {
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'session' | 'workflows'>('workflows');
+  const lastSessionId = useRef<SessionId | null>(null);
   const sessionStore = useMemo(createActiveSessionStore, []);
   const projection = useStore(sessionStore);
   const workflowCatalog = useMemo<WorkflowCatalogSource>(
@@ -58,6 +62,24 @@ export function SidePanelApp({
     return connection.disconnect;
   }, [dependencies.sessions, sessionStore]);
 
+  const activeSession = projection.session;
+  const hasActiveSession =
+    activeSession !== null &&
+    activeSession.status !== 'completed' &&
+    activeSession.status !== 'stopped';
+
+  useEffect(() => {
+    if (!hasActiveSession) {
+      lastSessionId.current = null;
+      setView('workflows');
+      return;
+    }
+    if (lastSessionId.current !== activeSession.id) {
+      lastSessionId.current = activeSession.id;
+      setView('session');
+    }
+  }, [activeSession, hasActiveSession]);
+
   if (error !== null || (workflows === null && refreshError !== null)) {
     return (
       <p className="feedback feedback--error" role="alert">
@@ -66,8 +88,6 @@ export function SidePanelApp({
     );
   }
   if (workflows === null) return <p role="status">Loading Workflows…</p>;
-
-  const activeSession = projection.session;
 
   return (
     <main className="side-panel-app">
@@ -80,8 +100,16 @@ export function SidePanelApp({
           <p>Your focus rhythms</p>
         </div>
       </header>
-      {activeSession === null ? null : (
+      {!hasActiveSession || view !== 'session' ? null : (
         <section className="side-panel-session" aria-label="Active session">
+          <Button
+            variant="quiet"
+            onClick={() => {
+              setView('workflows');
+            }}
+          >
+            Back to workflows
+          </Button>
           <ActiveSessionView
             session={activeSession}
             onPause={dependencies.pauseSession}
@@ -98,7 +126,7 @@ export function SidePanelApp({
           </Button>
         </section>
       )}
-      {activeSession === null ? (
+      {view === 'workflows' ? (
         <>
           {refreshError === null ? null : (
             <p className="feedback feedback--error" role="alert">
@@ -135,6 +163,14 @@ export function SidePanelApp({
               await dependencies.openFocusView();
             }}
           />
+          {hasActiveSession ? (
+            <CompactActiveSessionBar
+              session={activeSession}
+              onReturn={() => {
+                setView('session');
+              }}
+            />
+          ) : null}
         </>
       ) : null}
     </main>

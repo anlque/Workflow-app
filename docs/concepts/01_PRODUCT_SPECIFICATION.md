@@ -292,6 +292,12 @@ paused, can be stopped by the user and is durably restorable after extension
 surfaces or the service worker restart. Completed and stopped Sessions are
 retained as minimal history records.
 
+While a non-terminal Session is active, the side panel can switch between its
+mirrored Session controls and the Workflow Library without changing execution.
+The Library view keeps a compact sticky summary with the Workflow name, current
+Phase, anchor-derived countdown and a return action. Terminal Sessions do not
+show this compact summary.
+
 Successful Workflow catalog mutations invalidate open side-panel and idle focus
 lists, which reload from IndexedDB automatically. The invalidation carries no
 Workflow data, does not poll and never changes an active Session snapshot.
@@ -303,14 +309,16 @@ sides. Side probabilities are positive decimal weights normalized by the
 Domain; equal weights are used when custom weights are omitted. After the
 one-second Phase transition, an eligible non-final Reward pauses the full next
 Phase until the user clicks `Roll dice`, sees the result and clicks `Continue`.
-Ordinary Resume cannot bypass this pause. Mixing lasts 2.5 seconds, or 0.6
-seconds with reduced motion. Reward Dice Templates are not part of the MVP.
+The cube, result and current action use a centered composition with deliberate
+separation. Ordinary Resume cannot bypass this pause. Mixing lasts 2.5 seconds,
+or 0.6 seconds with reduced motion. Reward Dice Templates are not part of the
+MVP.
 
 Every completed Phase enters an authoritative one-second transition before the
-next Phase or Session completion. During it the complete timer card is softened,
-controls are unavailable, the boundary bell plays and outgoing ambient audio
-fades out. The next Phase then starts with its full configured duration and
-fades its ambient audio in over one second.
+next Phase or Session completion. During it the complete timer card receives a
+light blur, controls are unavailable, the boundary bell plays and outgoing
+ambient audio fades out. The next Phase then starts with its full configured
+duration and fades its ambient audio in over one second.
 
 MVP Assets are user-provided local images and audio files. Remote providers,
 video and animation are future work. Deleting a referenced Asset is rejected
@@ -321,11 +329,15 @@ collisions by generating new identifiers.
 
 System notifications and reminders are not part of the MVP. While the focus tab
 is open and loaded, a short local bell communicates an observed Phase boundary
-and a continuous local rolling sound accompanies Reward Dice mixing. These sounds
-are non-blocking, require no network request and are not guaranteed after the
-focus tab is closed, discarded or unloaded. The MVP requests only permissions
-required for the side panel, durable local storage, Session alarms and locating
-Flowarium's existing focus tab.
+and a layered local rolling sound accompanies Reward Dice mixing. One second
+after ordinary Session completion, a short completion chord plays. An eligible
+final Reward first plays a distinct Reward celebration one second after unlock.
+After the user rolls the dice and selects `Continue`, the Reward dialog closes,
+`Session complete` is revealed and the completion chord plays one second later.
+These sounds are non-blocking, require no network request and are not guaranteed
+after the focus tab is closed, discarded or unloaded. The MVP requests only
+permissions required for the side panel, durable local storage, Session alarms
+and locating Flowarium's existing focus tab.
 
 Direct interaction with the focus tab activates UI sounds under Chrome's
 autoplay policy. A restored Session exposes a non-blocking `Enable sounds`

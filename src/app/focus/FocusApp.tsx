@@ -20,6 +20,7 @@ import { Button } from '@/shared';
 import { FocusEnvironment } from './FocusEnvironment';
 import { FocusLauncher } from './FocusLauncher';
 import type { UiSoundPlayer } from './createUiSoundPlayer';
+import { useCompletionCue } from './useCompletionCue';
 
 export type FocusDependencies = Readonly<{
   sounds: UiSoundPlayer;
@@ -134,6 +135,11 @@ export function FocusApp({
     [dependencies],
   );
 
+  const scheduleCompletionReveal = useCompletionCue(
+    projection.session,
+    dependencies.sounds,
+  );
+
   if (projection.connection === 'connecting') {
     return <p role="status">Connecting to your session…</p>;
   }
@@ -205,6 +211,7 @@ export function FocusApp({
           session={session}
           reducedMotion={reducedMotion}
           onPhaseBoundary={dependencies.sounds.playBell}
+          onFinalRewardContinued={scheduleCompletionReveal}
           rewardInteraction={{
             onRoll: dependencies.sounds.playDiceRoll,
             continueReward: dependencies.continueReward,

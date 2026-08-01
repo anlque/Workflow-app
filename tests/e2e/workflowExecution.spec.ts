@@ -110,6 +110,18 @@ test('creates and controls a Workflow across extension contexts', async ({
   await focus.getByRole('button', { name: 'Start E2E focus' }).click();
 
   await expect(focus.getByRole('heading', { name: 'E2E focus' })).toBeVisible();
+  const sidePanel = await context.newPage();
+  await sidePanel.goto(extensionUrls.sidePanel);
+  await sidePanel.getByRole('button', { name: 'Back to workflows' }).click();
+  await expect(
+    sidePanel.getByRole('button', { name: 'Open E2E focus' }),
+  ).toBeVisible();
+  await expect(
+    sidePanel.getByRole('region', { name: 'Active session summary' }),
+  ).toBeVisible();
+  await sidePanel.getByRole('button', { name: 'Return to session' }).click();
+  await expect(sidePanel.getByRole('button', { name: 'Pause' })).toBeVisible();
+
   await focus.getByRole('button', { name: 'Pause' }).click();
   await expect(focus.getByRole('button', { name: 'Resume' })).toBeVisible();
   await focus.getByRole('button', { name: 'Resume' }).click();

@@ -48,6 +48,9 @@ describe('RewardResultDialog', () => {
     expect(screen.getByRole('dialog', { name: 'Reward unlocked' })).toHaveClass(
       'dialog--reward',
     );
+    expect(screen.getByTestId('reward-cube').parentElement).toHaveClass(
+      'reward-dialog__content',
+    );
   });
 
   test('mixes for 2.5 seconds and reveals the selected Reward', () => {

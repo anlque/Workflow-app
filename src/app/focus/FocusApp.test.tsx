@@ -1,30 +1,32 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 import { StrictMode } from 'react';
 
 import {
   createSession,
+  deriveSessionState,
+  type Session,
   type SessionProjectionClient,
 } from '@/features/session';
 import { createWorkflow } from '@/features/workflow';
 
 import { FocusApp, type FocusDependencies } from './FocusApp';
 
-function dependencies(
-  session: ReturnType<typeof createSession> | null,
-): FocusDependencies {
+function dependencies(session: Session | null): FocusDependencies {
   return {
     sounds: {
       unlock: vi.fn(() => Promise.resolve(true)),
       getState: vi.fn(() => 'ready' as const),
       playBell: vi.fn(),
       playDiceRoll: vi.fn(),
+      playSessionComplete: vi.fn(),
+      playRewardUnlocked: vi.fn(),
       dispose: vi.fn(),
     },
     sessions: {
       getActive: () => Promise.resolve(session),
-      subscribe: () => vi.fn(),
+      subscribe: vi.fn(() => vi.fn()),
     },
     pause: vi.fn(() => Promise.resolve()),
     resume: vi.fn(() => Promise.resolve()),
@@ -256,5 +258,58 @@ describe('FocusApp', () => {
     expect(
       await screen.findByRole('button', { name: 'Open side panel' }),
     ).toBeVisible();
+  });
+
+  test('plays final completion only after Reward continuation', async () => {
+    vi.useFakeTimers();
+    const workflow = createWorkflow({
+      id: 'rewarded-workflow',
+      name: 'Rewarded work',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: '☕', title: 'Tea' },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const initial = createSession('session-rewarded', workflow, 1_000);
+    const completed = deriveSessionState(initial, 3_000);
+    const deps = dependencies(initial);
+    let publish: ((session: Session | null) => void) | undefined;
+    vi.mocked(deps.sessions.subscribe).mockImplementation((listener) => {
+      publish = listener;
+      return vi.fn();
+    });
+    render(<FocusApp dependencies={deps} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      publish?.(completed);
+    });
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(deps.sounds.playRewardUnlocked).toHaveBeenCalledOnce();
+    expect(deps.sounds.playSessionComplete).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(2_500);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByText('Session complete')).toBeVisible();
+    act(() => {
+      vi.advanceTimersByTime(999);
+    });
+    expect(deps.sounds.playSessionComplete).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(deps.sounds.playSessionComplete).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 });

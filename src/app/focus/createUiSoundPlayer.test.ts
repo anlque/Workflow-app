@@ -13,9 +13,12 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
   const ramps: Ramp[] = [];
   const gainRamps: Ramp[][] = [];
   const oscillatorStarts: number[] = [];
+  const oscillatorFrequencies: number[] = [];
+  const oscillatorTypes: OscillatorType[] = [];
   const bufferSourceStarts: number[] = [];
   const bufferSourceStops: number[] = [];
   const bufferLengths: number[] = [];
+  const stereoPans: number[] = [];
   const resume = vi.fn(() => {
     currentState = 'running';
     return Promise.resolve();
@@ -40,13 +43,28 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
     destination: {},
     resume,
     close,
-    createOscillator: () => ({
-      ...connectable,
-      frequency: parameter(),
-      type: 'sine',
-      start: (at: number) => oscillatorStarts.push(at),
-      stop: vi.fn(),
-    }),
+    createOscillator: () => {
+      let type: OscillatorType = 'sine';
+      return {
+        ...connectable,
+        frequency: {
+          ...parameter(),
+          setValueAtTime(value: number, at: number) {
+            oscillatorFrequencies.push(value);
+            ramps.push({ kind: 'set', value, at });
+          },
+        },
+        get type() {
+          return type;
+        },
+        set type(value: OscillatorType) {
+          type = value;
+          oscillatorTypes.push(value);
+        },
+        start: (at: number) => oscillatorStarts.push(at),
+        stop: vi.fn(),
+      };
+    },
     createGain: () => {
       const values: Ramp[] = [];
       gainRamps.push(values);
@@ -68,15 +86,27 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
       frequency: parameter(),
       Q: { value: 0 },
     }),
+    createStereoPanner: () => ({
+      ...connectable,
+      pan: {
+        setValueAtTime(value: number) {
+          stereoPans.push(value);
+        },
+        value: 0,
+      },
+    }),
   };
   return {
     context: context as unknown as AudioContext,
     ramps,
     gainRamps,
     oscillatorStarts,
+    oscillatorFrequencies,
+    oscillatorTypes,
     bufferSourceStarts,
     bufferSourceStops,
     bufferLengths,
+    stereoPans,
     resume,
     close,
   };
@@ -97,26 +127,22 @@ describe('createUiSoundPlayer', () => {
     expect(fake.gainRamps.flat().some(({ value }) => value === 0.4)).toBe(true);
   });
 
-  test('synthesizes filtered noise for a dice roll after activation', async () => {
+  test('synthesizes the accepted pulsing full-duration dice roll', async () => {
     const fake = createFakeAudioContext();
     const player = createUiSoundPlayer(() => fake.context);
 
     await player.unlock();
     player.playDiceRoll(2_500);
 
-    expect(fake.bufferSourceStarts).toHaveLength(1);
+    expect(fake.bufferSourceStarts).toEqual([1]);
     expect(fake.bufferLengths).toEqual([20_000]);
     expect(fake.bufferSourceStops).toEqual([3.5]);
     expect(
       fake.gainRamps.some(
-        (values) => values.filter(({ value }) => value >= 0.45).length > 10,
+        (values) => values.filter(({ value }) => value === 0.5).length > 10,
       ),
     ).toBe(true);
-    expect(
-      fake.gainRamps.some((values) =>
-        values.some(({ value, at }) => value >= 0.7 && at >= 3.4),
-      ),
-    ).toBe(true);
+    expect(fake.stereoPans).toEqual([]);
   });
 
   test('does not consume sounds while locked and unlocks a suspended context', async () => {
@@ -131,6 +157,33 @@ describe('createUiSoundPlayer', () => {
     expect(player.getState()).toBe('ready');
     player.playBell();
     expect(fake.oscillatorStarts).toHaveLength(1);
+  });
+
+  test('synthesizes distinct completion and Reward celebrations', async () => {
+    const fake = createFakeAudioContext();
+    const player = createUiSoundPlayer(() => fake.context);
+    await player.unlock();
+
+    player.playSessionComplete();
+    expect(fake.oscillatorStarts).toEqual([1, 1, 1]);
+    expect(fake.oscillatorTypes).toEqual(['triangle', 'triangle', 'triangle']);
+
+    fake.oscillatorStarts.length = 0;
+    fake.oscillatorFrequencies.length = 0;
+    fake.oscillatorTypes.length = 0;
+    player.playRewardUnlocked();
+    expect(
+      fake.oscillatorStarts.map((value) => Number(value.toFixed(2))),
+    ).toEqual([1, 1.12, 1.24, 1.36]);
+    expect(fake.oscillatorFrequencies).toEqual([
+      1_046.5, 1_318.51, 1_567.98, 2_093,
+    ]);
+    expect(fake.oscillatorTypes).toEqual([
+      'square',
+      'square',
+      'square',
+      'square',
+    ]);
   });
 
   test('disposes its audio context once', async () => {

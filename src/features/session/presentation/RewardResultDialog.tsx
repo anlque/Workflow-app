@@ -67,16 +67,18 @@ export function RewardResultDialog({
       title="Reward unlocked"
       onCancel={() => undefined}
     >
-      <RewardCube icon={reward?.icon ?? '✦'} stage={cubeStage} />
-      {stage === 'result' && reward !== null ? (
-        <div className="reward-result">
-          <h3>{reward.title}</h3>
-          {reward.description === undefined ? null : (
-            <p>{reward.description}</p>
-          )}
-        </div>
-      ) : null}
-      {error === null ? null : <p role="alert">{error}</p>}
+      <div className="reward-dialog__content">
+        <RewardCube icon={reward?.icon ?? '✦'} stage={cubeStage} />
+        {stage === 'result' && reward !== null ? (
+          <div className="reward-result">
+            <h3>{reward.title}</h3>
+            {reward.description === undefined ? null : (
+              <p>{reward.description}</p>
+            )}
+          </div>
+        ) : null}
+        {error === null ? null : <p role="alert">{error}</p>}
+      </div>
       <div className="dialog__actions">
         {stage === 'result' ? (
           <Button

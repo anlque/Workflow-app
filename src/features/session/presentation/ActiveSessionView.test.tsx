@@ -172,4 +172,73 @@ describe('ActiveSessionView', () => {
     expect(continueReward).toHaveBeenCalledWith(initial.id);
     vi.useRealTimers();
   });
+
+  test('reveals final completion before requesting its delayed cue', () => {
+    vi.useFakeTimers();
+    const rewardedWorkflow = createWorkflow({
+      id: 'final-reward',
+      name: 'Final reward',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: '☕', title: 'Tea' },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const completed = deriveSessionState(
+      createSession('session-final', rewardedWorkflow, 1_000),
+      3_000,
+    );
+    const onFinalRewardContinued = vi.fn();
+
+    const initial = createSession('session-final', rewardedWorkflow, 1_000);
+    const { rerender } = render(
+      <ActiveSessionView
+        session={initial}
+        now={() => 1_000}
+        random={() => 0}
+        reducedMotion
+        rewardInteraction={{
+          onRoll: vi.fn(),
+          continueReward: vi.fn(() => Promise.resolve()),
+        }}
+        onFinalRewardContinued={onFinalRewardContinued}
+        {...actions}
+      />,
+    );
+
+    rerender(
+      <ActiveSessionView
+        session={completed}
+        now={() => 3_000}
+        random={() => 0}
+        reducedMotion
+        rewardInteraction={{
+          onRoll: vi.fn(),
+          continueReward: vi.fn(() => Promise.resolve()),
+        }}
+        onFinalRewardContinued={onFinalRewardContinued}
+        {...actions}
+      />,
+    );
+
+    expect(screen.queryByText('Session complete')).toBeInTheDocument();
+    expect(
+      screen.getByRole('dialog', { name: 'Reward unlocked' }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Reward unlocked' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Session complete')).toBeVisible();
+    expect(onFinalRewardContinued).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
 });

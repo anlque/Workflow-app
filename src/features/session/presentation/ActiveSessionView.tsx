@@ -15,6 +15,7 @@ export type ActiveSessionViewProps = Readonly<{
   random?: () => number;
   reducedMotion?: boolean;
   onPhaseBoundary?(): void;
+  onFinalRewardContinued?(): void;
   rewardInteraction?: Readonly<{
     onRoll(durationMs: 600 | 2500): void;
     continueReward(id: SessionId): Promise<void>;
@@ -33,6 +34,7 @@ export function ActiveSessionView({
   random = systemRandom,
   reducedMotion = false,
   onPhaseBoundary,
+  onFinalRewardContinued,
   rewardInteraction,
   onPause,
   onResume,
@@ -78,10 +80,12 @@ export function ActiveSessionView({
         reducedMotion={reducedMotion}
         onRoll={rewardInteraction.onRoll}
         onContinue={async () => {
+          const isFinalReward = session.status === 'completed';
           if (session.status === 'paused' && session.pauseReason === 'reward') {
             await rewardInteraction.continueReward(session.id);
           }
           setRewardDice(null);
+          if (isFinalReward) onFinalRewardContinued?.();
         }}
       />
     );
