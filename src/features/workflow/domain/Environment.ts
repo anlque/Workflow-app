@@ -1,6 +1,6 @@
-declare const assetIdBrand: unique symbol;
+import type { AssetId } from '@/shared';
 
-export type AssetId = string & { readonly [assetIdBrand]: 'AssetId' };
+export type { AssetId } from '@/shared';
 
 export type Environment = Readonly<{
   backgroundAssetId?: AssetId;

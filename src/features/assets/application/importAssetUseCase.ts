@@ -19,11 +19,10 @@ export type ImportAssetInput = Readonly<{
   createdAt: number;
 }>;
 
-export async function importAssetUseCase(
-  repository: AssetRepository,
+export function validateAssetImport(
   policy: AssetImportPolicy,
   input: ImportAssetInput,
-): Promise<Asset> {
+): Asset {
   const kindPolicy = policy[input.kind];
   if (!Number.isSafeInteger(kindPolicy.maxBytes) || kindPolicy.maxBytes <= 0) {
     throw new AssetValidationError('Asset size policy is invalid.');
@@ -40,7 +39,7 @@ export async function importAssetUseCase(
     throw new AssetValidationError('Asset exceeds the configured size limit.');
   }
 
-  const asset = createAsset({
+  return createAsset({
     id: input.id,
     name: input.name,
     kind: input.kind,
@@ -48,6 +47,14 @@ export async function importAssetUseCase(
     byteSize: input.blob.size,
     createdAt: input.createdAt,
   });
+}
+
+export async function importAssetUseCase(
+  repository: AssetRepository,
+  policy: AssetImportPolicy,
+  input: ImportAssetInput,
+): Promise<Asset> {
+  const asset = validateAssetImport(policy, input);
   await repository.save(asset, input.blob);
   return asset;
 }

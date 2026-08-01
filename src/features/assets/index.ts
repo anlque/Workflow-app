@@ -3,6 +3,7 @@ export type { WorkflowAssetReferences } from './application/WorkflowAssetReferen
 export { deleteAssetUseCase } from './application/deleteAssetUseCase';
 export {
   importAssetUseCase,
+  validateAssetImport,
   type AssetImportPolicy,
   type AssetKindImportPolicy,
   type ImportAssetInput,

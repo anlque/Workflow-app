@@ -30,3 +30,15 @@ export { duplicateWorkflowUseCase } from './application/duplicateWorkflowUseCase
 export { listWorkflowsUseCase } from './application/listWorkflowsUseCase';
 export { reorderWorkflowsUseCase } from './application/reorderWorkflowsUseCase';
 export { updateWorkflowUseCase } from './application/updateWorkflowUseCase';
+export {
+  WorkflowPackageValidationError,
+  type WorkflowPackageUnitOfWork,
+  type WorkflowPackageV1,
+} from './application/WorkflowPackage';
+export { exportWorkflowUseCase } from './application/exportWorkflowUseCase';
+export {
+  importWorkflowUseCase,
+  type WorkflowImportIdentity,
+  type WorkflowImportOptions,
+} from './application/importWorkflowUseCase';
+export { DexieWorkflowPackageUnitOfWork } from './infrastructure/DexieWorkflowPackageUnitOfWork';

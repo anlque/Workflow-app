@@ -32,4 +32,11 @@ export class FlowariumDatabase extends Dexie {
   ): Promise<Result> {
     return this.transaction('rw', tableName, operation);
   }
+
+  public runReadWriteMany<Result>(
+    tableNames: readonly string[],
+    operation: () => Promise<Result>,
+  ): Promise<Result> {
+    return this.transaction('rw', [...tableNames], operation);
+  }
 }

@@ -1,8 +1,8 @@
+import type { AssetId } from '@/shared';
+
 import { AssetValidationError } from './AssetErrors';
 
-declare const assetIdBrand: unique symbol;
-
-export type AssetId = string & { readonly [assetIdBrand]: 'AssetId' };
+export type { AssetId } from '@/shared';
 export type AssetKind = 'image' | 'audio';
 
 export type Asset = Readonly<{
