@@ -206,4 +206,27 @@ describe('WorkflowEditor', () => {
     ).toBeVisible();
     expect(onSave).not.toHaveBeenCalled();
   });
+
+  test('saves break phases as the Reward Dice cadence trigger', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    render(
+      <WorkflowEditor workflowId="workflow-1" assets={[]} onSave={onSave} />,
+    );
+
+    await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
+    await user.click(screen.getByLabelText('Enable Reward Dice'));
+    await user.selectOptions(screen.getByLabelText('Reward after'), 'break');
+    await user.type(screen.getByLabelText('Reward side 1 icon'), '☕');
+    await user.type(screen.getByLabelText('Reward side 1 title'), 'Tea');
+    await user.type(screen.getByLabelText('Reward side 2 icon'), '🚶');
+    await user.type(screen.getByLabelText('Reward side 2 title'), 'Walk');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+
+    expect(onSave.mock.calls[0]?.[0].rewardDice?.triggerPhaseType).toBe(
+      'break',
+    );
+  });
 });

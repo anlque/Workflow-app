@@ -61,7 +61,12 @@ export function RewardResultDialog({
   }
 
   return (
-    <Dialog open title="Reward unlocked" onCancel={() => undefined}>
+    <Dialog
+      open
+      className="dialog--reward"
+      title="Reward unlocked"
+      onCancel={() => undefined}
+    >
       <RewardCube icon={reward?.icon ?? '✦'} stage={cubeStage} />
       {stage === 'result' && reward !== null ? (
         <div className="reward-result">
@@ -95,7 +100,7 @@ export function RewardResultDialog({
               onRoll(duration);
             }}
           >
-            Roll
+            Roll dice
           </Button>
         )}
       </div>

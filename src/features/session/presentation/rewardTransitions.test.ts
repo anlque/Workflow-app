@@ -83,4 +83,34 @@ describe('rewardOpportunityForSessionTransition', () => {
     ).toBeNull();
     expect(rewardOpportunityForSessionTransition(initial, another)).toBeNull();
   });
+
+  test('reports a reward only after the configured break boundary', () => {
+    const breakWorkflow = createWorkflow({
+      id: 'workflow-break',
+      name: 'Focus and recover',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+        { type: 'focus', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        triggerPhaseType: 'break',
+        frequency: 1,
+        sides: [
+          { icon: '☕', title: 'Tea' },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const initial = createSession('session-break', breakWorkflow, 1_000);
+    const afterFocus = deriveSessionState(initial, 3_000);
+    const afterBreak = deriveSessionState(initial, 5_000);
+
+    expect(
+      rewardOpportunityForSessionTransition(initial, afterFocus),
+    ).toBeNull();
+    expect(
+      rewardOpportunityForSessionTransition(afterFocus, afterBreak),
+    ).toEqual(breakWorkflow.rewardDice);
+  });
 });

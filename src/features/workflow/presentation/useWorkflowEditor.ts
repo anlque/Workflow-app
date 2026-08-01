@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import type { RewardPhaseType } from '../domain/RewardDice';
 import type { CreateWorkflowInput, Workflow } from '../domain/Workflow';
 
 export type PhaseDraft = Readonly<{
@@ -21,6 +22,7 @@ export type RewardSideDraft = Readonly<{
 
 export type RewardDiceDraft = Readonly<{
   enabled: boolean;
+  triggerPhaseType: RewardPhaseType;
   frequency: string;
   sides: readonly RewardSideDraft[];
 }>;
@@ -77,6 +79,7 @@ function initialDraft(workflowId: string, workflow?: Workflow): WorkflowDraft {
     })) ?? [newPhase()],
     rewardDice: {
       enabled: workflow?.rewardDice !== undefined,
+      triggerPhaseType: workflow?.rewardDice?.triggerPhaseType ?? 'focus',
       frequency: String(workflow?.rewardDice?.frequency ?? 1),
       sides: workflow?.rewardDice?.sides.map((side) => ({
         key: key(),
@@ -173,7 +176,11 @@ export function validateWorkflowDraft(
         ...(weight === undefined ? {} : { weight }),
       };
     });
-    rewardDice = { frequency: frequency ?? 1, sides };
+    rewardDice = {
+      triggerPhaseType: draft.rewardDice.triggerPhaseType,
+      frequency: frequency ?? 1,
+      sides,
+    };
   }
 
   if (Object.keys(errors).length > 0) return { valid: false, errors };
@@ -240,6 +247,12 @@ export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
       setDraft((current) => ({
         ...current,
         rewardDice: { ...current.rewardDice, frequency },
+      }));
+    },
+    setRewardTriggerPhaseType(triggerPhaseType: RewardPhaseType): void {
+      setDraft((current) => ({
+        ...current,
+        rewardDice: { ...current.rewardDice, triggerPhaseType },
       }));
     },
     updateRewardSide(sideKey: string, patch: Partial<RewardSideDraft>): void {

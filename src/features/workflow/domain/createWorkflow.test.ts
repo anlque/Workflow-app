@@ -82,6 +82,41 @@ describe('createWorkflow', () => {
     expect(Object.isFrozen(workflow.rewardDice?.sides)).toBe(true);
   });
 
+  test('defaults legacy Reward Dice to focus phases', () => {
+    const workflow = createWorkflow({
+      id: 'workflow-1',
+      name: 'Deep work',
+      phases: [validPhase],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+
+    expect(workflow.rewardDice?.triggerPhaseType).toBe('focus');
+  });
+
+  test('creates Reward Dice triggered by break phases', () => {
+    const workflow = createWorkflow({
+      id: 'workflow-1',
+      name: 'Deep work',
+      phases: [validPhase],
+      rewardDice: {
+        triggerPhaseType: 'break',
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+
+    expect(workflow.rewardDice?.triggerPhaseType).toBe('break');
+  });
+
   test('assigns equal probabilities when all custom weights are omitted', () => {
     const workflow = createWorkflow({
       id: 'workflow-1',

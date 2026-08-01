@@ -88,6 +88,22 @@ function workflow(): Workflow {
   });
 }
 
+function rewardedWorkflow(): Workflow {
+  return createWorkflow({
+    id: 'workflow-rewarded',
+    name: 'Focus and recover',
+    phases: [{ type: 'break', durationSeconds: 10, environment: {} }],
+    rewardDice: {
+      triggerPhaseType: 'break',
+      frequency: 1,
+      sides: [
+        { icon: 'tea', title: 'Tea' },
+        { icon: 'walk', title: 'Walk' },
+      ],
+    },
+  });
+}
+
 async function addAsset(
   repository: MemoryAssetRepository,
   id: string,
@@ -107,6 +123,32 @@ async function addAsset(
 }
 
 describe('Workflow package', () => {
+  test('preserves the Reward Dice trigger phase through export and import', async () => {
+    const data = await exportWorkflowUseCase(
+      rewardedWorkflow(),
+      new MemoryAssetRepository(),
+    );
+    const workflows = new MemoryWorkflowRepository();
+
+    const imported = await importWorkflowUseCase(
+      workflows,
+      new MemoryAssetRepository(),
+      new MemoryUnitOfWork(),
+      data,
+      { maxFileBytes: 10_000, assetPolicy: policy },
+      {
+        createWorkflowId: () => 'workflow-new',
+        createAssetId: () => 'asset-new',
+        now: () => 2_000,
+      },
+    );
+
+    expect(JSON.parse(data)).toMatchObject({
+      workflow: { rewardDice: { triggerPhaseType: 'break' } },
+    });
+    expect(imported.rewardDice?.triggerPhaseType).toBe('break');
+  });
+
   test('exports only referenced Assets with deterministic transport-safe encoding', async () => {
     const assets = new MemoryAssetRepository();
     await addAsset(assets, 'asset-unused');

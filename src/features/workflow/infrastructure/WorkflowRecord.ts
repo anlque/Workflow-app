@@ -15,6 +15,7 @@ export type WorkflowRecord = Readonly<{
     }>;
   }>[];
   rewardDice?: Readonly<{
+    triggerPhaseType?: string;
     frequency: number;
     sides: readonly Readonly<{
       icon: string;

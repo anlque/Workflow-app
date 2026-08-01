@@ -103,7 +103,12 @@ export function ActiveSessionView({
   const phase =
     workflow.phases[session.currentPhaseIndex] ?? workflow.phases[0];
   return (
-    <section className="active-session">
+    <section
+      className="active-session"
+      data-transitioning={
+        session.status === 'transitioning' ? 'true' : undefined
+      }
+    >
       <h1>{workflow.name}</h1>
       <p className="session-phase">
         {session.status === 'transitioning' ? (
@@ -115,13 +120,7 @@ export function ActiveSessionView({
           </>
         )}
       </p>
-      <output
-        className="session-countdown"
-        aria-label="Time remaining"
-        data-transitioning={
-          session.status === 'transitioning' ? 'true' : undefined
-        }
-      >
+      <output className="session-countdown" aria-label="Time remaining">
         {formatSessionCountdown(session, displayNow)}
       </output>
       <SessionControls

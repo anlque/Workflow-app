@@ -4,10 +4,17 @@ export type DialogProps = Readonly<{
   open: boolean;
   title: ReactNode;
   children: ReactNode;
+  className?: string;
   onCancel(): void;
 }>;
 
-export function Dialog({ open, title, children, onCancel }: DialogProps) {
+export function Dialog({
+  open,
+  title,
+  children,
+  className,
+  onCancel,
+}: DialogProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -26,7 +33,7 @@ export function Dialog({ open, title, children, onCancel }: DialogProps) {
   return (
     <dialog
       ref={dialogRef}
-      className="dialog"
+      className={['dialog', className].filter(Boolean).join(' ')}
       data-position="viewport-center"
       aria-labelledby={titleId}
       onCancel={(event) => {

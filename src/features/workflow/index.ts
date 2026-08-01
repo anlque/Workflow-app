@@ -10,7 +10,11 @@ export type {
   PhaseInput,
   PhaseType,
 } from './domain/Phase';
-export type { RewardDice, RewardDiceInput } from './domain/RewardDice';
+export type {
+  RewardDice,
+  RewardDiceInput,
+  RewardPhaseType,
+} from './domain/RewardDice';
 export type {
   CreateWorkflowInput,
   Workflow,

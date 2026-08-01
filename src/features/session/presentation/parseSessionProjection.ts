@@ -30,6 +30,14 @@ function optionalString(value: unknown): string | undefined {
   return value === undefined ? undefined : string(value);
 }
 
+function optionalRewardPhaseType(
+  value: unknown,
+): 'focus' | 'break' | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'focus' || value === 'break') return value;
+  return invalid();
+}
+
 function pauseReason(value: unknown): 'user' | 'reward' {
   if (value === 'user' || value === 'reward') return value;
   return invalid();
@@ -42,6 +50,7 @@ function workflow(value: unknown) {
   const diceValue = input['rewardDice'];
   const dice = diceValue === undefined ? undefined : record(diceValue);
   const sides = dice?.['sides'];
+  const triggerPhaseType = optionalRewardPhaseType(dice?.['triggerPhaseType']);
   if (dice !== undefined && !Array.isArray(sides)) return invalid();
   return createWorkflow({
     id: string(input['id']),
@@ -68,6 +77,7 @@ function workflow(value: unknown) {
       ? {}
       : {
           rewardDice: {
+            ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
             frequency: number(dice['frequency']),
             sides: (sides as unknown[]).map((value) => {
               const side = record(value);

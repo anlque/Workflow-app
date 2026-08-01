@@ -225,7 +225,8 @@ Users can configure:
 - icon for each side;
 - description for each side;
 - probability of each side;
-- reward frequency.
+- reward frequency;
+- whether completed focus or break Phases count toward that frequency.
 
 If probabilities are not customized, all sides must have equal probability.
 
@@ -295,21 +296,21 @@ Successful Workflow catalog mutations invalidate open side-panel and idle focus
 lists, which reload from IndexedDB automatically. The invalidation carries no
 Workflow data, does not poll and never changes an active Session snapshot.
 
-Reward Dice is optional. When enabled, it is evaluated after each completed
-focus Phase according to an integer frequency of one or more completed focus
-Phases. It contains at least two sides. Side probabilities are positive decimal
-weights normalized by the Domain; equal weights are used when custom weights are
-omitted. After the one-second Phase transition, an eligible non-final Reward
-pauses the full next Phase until the user clicks `Roll`, sees the result and
-clicks `Continue`. Ordinary Resume cannot bypass this pause. Mixing lasts 2.5
-seconds, or 0.6 seconds with reduced motion. Reward Dice Templates are not part
-of the MVP.
+Reward Dice is optional. Each Workflow selects whether completed `focus` or
+`break` Phases count toward its integer frequency of one or more matching
+Phases; legacy configurations default to `focus`. It contains at least two
+sides. Side probabilities are positive decimal weights normalized by the
+Domain; equal weights are used when custom weights are omitted. After the
+one-second Phase transition, an eligible non-final Reward pauses the full next
+Phase until the user clicks `Roll dice`, sees the result and clicks `Continue`.
+Ordinary Resume cannot bypass this pause. Mixing lasts 2.5 seconds, or 0.6
+seconds with reduced motion. Reward Dice Templates are not part of the MVP.
 
 Every completed Phase enters an authoritative one-second transition before the
-next Phase or Session completion. During it the timer is softened, controls are
-unavailable, the boundary bell plays and outgoing ambient audio fades out. The
-next Phase then starts with its full configured duration and fades its ambient
-audio in over one second.
+next Phase or Session completion. During it the complete timer card is softened,
+controls are unavailable, the boundary bell plays and outgoing ambient audio
+fades out. The next Phase then starts with its full configured duration and
+fades its ambient audio in over one second.
 
 MVP Assets are user-provided local images and audio files. Remote providers,
 video and animation are future work. Deleting a referenced Asset is rejected

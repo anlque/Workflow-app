@@ -46,7 +46,7 @@ export function createUiSoundPlayer(
       oscillator.type = 'sine';
       oscillator.frequency.setValueAtTime(880, start);
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.24, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.4, start + 0.01);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.7);
       oscillator.connect(gain);
       gain.connect(audio.destination);
@@ -78,18 +78,28 @@ export function createUiSoundPlayer(
       const masterGain = audio.createGain();
       source.buffer = buffer;
       filter.type = 'bandpass';
-      filter.frequency.value = 720;
-      filter.Q.value = 0.8;
+      filter.frequency.value = 1_100;
+      filter.Q.value = 0.65;
       masterGain.gain.setValueAtTime(0.0001, start);
-      masterGain.gain.exponentialRampToValueAtTime(0.65, start + 0.02);
+      masterGain.gain.exponentialRampToValueAtTime(0.8, start + 0.02);
+      masterGain.gain.setValueAtTime(
+        0.8,
+        start + Math.max(0.02, duration - 0.08),
+      );
       masterGain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      let impactIndex = 0;
       for (let offset = 0; offset < duration; offset += 0.12) {
         const pulseStart = start + offset;
         const pulsePeak = Math.min(pulseStart + 0.012, start + duration);
-        const pulseEnd = Math.min(pulseStart + 0.075, start + duration);
+        const pulseEnd = Math.min(pulseStart + 0.09, start + duration);
+        filter.frequency.setValueAtTime(
+          impactIndex % 2 === 0 ? 900 : 1_450,
+          pulseStart,
+        );
         pulseGain.gain.setValueAtTime(0.0001, pulseStart);
-        pulseGain.gain.exponentialRampToValueAtTime(0.12, pulsePeak);
+        pulseGain.gain.exponentialRampToValueAtTime(0.5, pulsePeak);
         pulseGain.gain.exponentialRampToValueAtTime(0.0001, pulseEnd);
+        impactIndex += 1;
       }
       source.connect(filter);
       filter.connect(pulseGain);

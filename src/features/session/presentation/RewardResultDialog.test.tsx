@@ -45,6 +45,9 @@ describe('RewardResultDialog', () => {
     expect(random).not.toHaveBeenCalled();
     expect(onRoll).not.toHaveBeenCalled();
     expect(screen.queryByText('Tea')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Reward unlocked' })).toHaveClass(
+      'dialog--reward',
+    );
   });
 
   test('mixes for 2.5 seconds and reveals the selected Reward', () => {
@@ -61,7 +64,7 @@ describe('RewardResultDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Roll' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
 
     expect(random).toHaveBeenCalledOnce();
     expect(onRoll).toHaveBeenCalledWith(2_500);
@@ -69,7 +72,7 @@ describe('RewardResultDialog', () => {
       'data-state',
       'mixing',
     );
-    expect(screen.getByRole('button', { name: 'Roll' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Roll dice' })).toBeDisabled();
     expect(screen.queryByText('Tea')).not.toBeInTheDocument();
 
     act(() => {
@@ -97,7 +100,7 @@ describe('RewardResultDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Roll' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
 
     expect(onRoll).toHaveBeenCalledWith(600);
     expect(screen.getByTestId('reward-cube')).toHaveAttribute(
@@ -142,7 +145,7 @@ describe('RewardResultDialog', () => {
         onContinue={() => Promise.reject(new Error('Background unavailable.'))}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Roll' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
     act(() => {
       vi.advanceTimersByTime(600);
     });

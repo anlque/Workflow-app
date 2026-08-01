@@ -253,7 +253,9 @@ It defines:
 
 - probabilities;
 
-- trigger frequency.
+- trigger frequency;
+
+- trigger Phase type (`focus` or `break`).
 
 Reward Dice belongs exclusively to its parent Workflow.
 
@@ -435,8 +437,9 @@ Deleting a Workflow must never automatically delete shared Assets.
 A Workflow owns zero or one Reward Dice configuration.
 
 Reward Dice may be disabled. When enabled it contains at least two Dice Sides,
-has a trigger frequency of at least one completed Focus Phase and is evaluated
-only after a completed Focus Phase.
+has a trigger frequency of at least one completed Phase of its configured
+`focus` or `break` type and is evaluated only after a completed Phase of that
+type. Missing legacy trigger types default to `focus`.
 
 Dice Side probabilities are positive decimal weights. The Domain normalizes
 custom weights; when weights are omitted, all sides receive equal weight.

@@ -11,6 +11,7 @@ type Ramp = Readonly<{
 function createFakeAudioContext(state: AudioContextState = 'running') {
   let currentState = state;
   const ramps: Ramp[] = [];
+  const gainRamps: Ramp[][] = [];
   const oscillatorStarts: number[] = [];
   const bufferSourceStarts: number[] = [];
   const bufferSourceStops: number[] = [];
@@ -20,15 +21,15 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
     return Promise.resolve();
   });
   const close = vi.fn(() => Promise.resolve());
-  const parameter = {
+  const parameter = (target: Ramp[] = ramps) => ({
     setValueAtTime(value: number, at: number) {
-      ramps.push({ kind: 'set', value, at });
+      target.push({ kind: 'set', value, at });
     },
     exponentialRampToValueAtTime(value: number, at: number) {
-      ramps.push({ kind: 'exponential', value, at });
+      target.push({ kind: 'exponential', value, at });
     },
     value: 0,
-  };
+  });
   const connectable = { connect: vi.fn() };
   const context = {
     get state() {
@@ -41,12 +42,16 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
     close,
     createOscillator: () => ({
       ...connectable,
-      frequency: parameter,
+      frequency: parameter(),
       type: 'sine',
       start: (at: number) => oscillatorStarts.push(at),
       stop: vi.fn(),
     }),
-    createGain: () => ({ ...connectable, gain: parameter }),
+    createGain: () => {
+      const values: Ramp[] = [];
+      gainRamps.push(values);
+      return { ...connectable, gain: parameter(values) };
+    },
     createBuffer: (_channels: number, length: number) => {
       bufferLengths.push(length);
       return { getChannelData: () => new Float32Array(length) };
@@ -60,13 +65,14 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
     createBiquadFilter: () => ({
       ...connectable,
       type: 'lowpass',
-      frequency: { value: 0 },
+      frequency: parameter(),
       Q: { value: 0 },
     }),
   };
   return {
     context: context as unknown as AudioContext,
     ramps,
+    gainRamps,
     oscillatorStarts,
     bufferSourceStarts,
     bufferSourceStops,
@@ -88,7 +94,7 @@ describe('createUiSoundPlayer', () => {
 
     expect(createContext).toHaveBeenCalledOnce();
     expect(fake.oscillatorStarts).toHaveLength(2);
-    expect(fake.ramps.some(({ value }) => value === 0.24)).toBe(true);
+    expect(fake.gainRamps.flat().some(({ value }) => value === 0.4)).toBe(true);
   });
 
   test('synthesizes filtered noise for a dice roll after activation', async () => {
@@ -102,8 +108,15 @@ describe('createUiSoundPlayer', () => {
     expect(fake.bufferLengths).toEqual([20_000]);
     expect(fake.bufferSourceStops).toEqual([3.5]);
     expect(
-      fake.ramps.filter(({ value }) => value === 0.12).length,
-    ).toBeGreaterThan(10);
+      fake.gainRamps.some(
+        (values) => values.filter(({ value }) => value >= 0.45).length > 10,
+      ),
+    ).toBe(true);
+    expect(
+      fake.gainRamps.some((values) =>
+        values.some(({ value, at }) => value >= 0.7 && at >= 3.4),
+      ),
+    ).toBe(true);
   });
 
   test('does not consume sounds while locked and unlocks a suspended context', async () => {

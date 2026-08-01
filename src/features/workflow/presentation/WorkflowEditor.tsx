@@ -246,6 +246,9 @@ export function WorkflowEditor({
         onEnabledChange={(enabled) => {
           editor.setRewardEnabled(enabled);
         }}
+        onTriggerPhaseTypeChange={(triggerPhaseType) => {
+          editor.setRewardTriggerPhaseType(triggerPhaseType);
+        }}
         onFrequencyChange={(frequency) => {
           editor.setRewardFrequency(frequency);
         }}

@@ -150,14 +150,6 @@ body {
   gap: 0.625rem;
 }
 
-.focus-app__close-panel,
-.focus-app__enable-sounds {
-  color: var(--color-ink);
-  background: var(--color-surface);
-  border-color: var(--color-border);
-  box-shadow: 0 2px 6px oklch(0.2 0.02 160 / 16%);
-}
-
 .focus-environment {
   position: absolute;
   inset: 0;
@@ -223,7 +215,7 @@ body {
   line-height: 1;
 }
 
-.session-countdown[data-transitioning='true'] {
+.focus-app__content:has(.active-session[data-transitioning='true']) {
   filter: blur(0.45rem);
   opacity: 0.62;
   transition:
@@ -407,6 +399,14 @@ select {
   background: transparent;
 }
 
+.button.focus-app__close-panel,
+.button.focus-app__enable-sounds {
+  color: var(--color-ink);
+  background: var(--color-surface-raised);
+  border-color: var(--color-ink-muted);
+  box-shadow: 0 2px 6px oklch(0.2 0.02 160 / 28%);
+}
+
 .button--danger {
   color: white;
   background: var(--color-danger);
@@ -470,6 +470,13 @@ select {
 
 .dialog::backdrop {
   background: oklch(0.2 0.02 160 / 45%);
+}
+
+.dialog--reward {
+  width: min(34rem, calc(100vw - 2rem));
+  min-height: min(28rem, calc(100vh - 2rem));
+  padding: clamp(1.5rem, 5vw, 3.5rem);
+  background: var(--color-surface);
 }
 
 .dialog__title {

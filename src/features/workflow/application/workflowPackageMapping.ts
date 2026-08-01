@@ -25,6 +25,14 @@ function optionalString(value: unknown): string | undefined {
   return value === undefined ? undefined : string(value);
 }
 
+function optionalRewardPhaseType(
+  value: unknown,
+): 'focus' | 'break' | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'focus' || value === 'break') return value;
+  return invalid();
+}
+
 function hasExactKeys(
   value: Readonly<Record<string, unknown>>,
   required: readonly string[],
@@ -60,6 +68,7 @@ export function serializeWorkflow(workflow: Workflow): unknown {
       ? {}
       : {
           rewardDice: {
+            triggerPhaseType: workflow.rewardDice.triggerPhaseType,
             frequency: workflow.rewardDice.frequency,
             sides: workflow.rewardDice.sides.map((side) => ({
               icon: side.icon,
@@ -85,8 +94,14 @@ export function parseWorkflow(value: unknown): Workflow {
     const rewardValue = input['rewardDice'];
     const reward = rewardValue === undefined ? undefined : record(rewardValue);
     const sideValues = reward?.['sides'];
+    const triggerPhaseType = optionalRewardPhaseType(
+      reward?.['triggerPhaseType'],
+    );
     if (reward !== undefined && !Array.isArray(sideValues)) return invalid();
-    if (reward !== undefined && !hasExactKeys(reward, ['frequency', 'sides'])) {
+    if (
+      reward !== undefined &&
+      !hasExactKeys(reward, ['frequency', 'sides'], ['triggerPhaseType'])
+    ) {
       return invalid();
     }
 
@@ -127,6 +142,7 @@ export function parseWorkflow(value: unknown): Workflow {
         ? {}
         : {
             rewardDice: {
+              ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
               frequency: number(reward['frequency']),
               sides: (sideValues as unknown[]).map((sideValue) => {
                 const side = record(sideValue);

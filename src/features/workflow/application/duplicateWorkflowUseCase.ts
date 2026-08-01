@@ -27,6 +27,7 @@ export async function duplicateWorkflowUseCase(
       ? {}
       : {
           rewardDice: {
+            triggerPhaseType: source.rewardDice.triggerPhaseType,
             frequency: source.rewardDice.frequency,
             sides: source.rewardDice.sides.map((side) => ({
               icon: side.icon,

@@ -1,7 +1,11 @@
 import type { DiceSide, DiceSideInput } from './DiceSide';
 import type { AssetId, Environment, EnvironmentInput } from './Environment';
 import type { DurationSeconds, Phase, PhaseInput, PhaseType } from './Phase';
-import type { RewardDice, RewardDiceInput } from './RewardDice';
+import type {
+  RewardDice,
+  RewardDiceInput,
+  RewardPhaseType,
+} from './RewardDice';
 import {
   createWorkflowId,
   type CreateWorkflowInput,
@@ -78,7 +82,16 @@ function validateDiceSide(input: DiceSideInput): void {
   }
 }
 
+function createRewardPhaseType(value: unknown): RewardPhaseType {
+  if (value === undefined || value === 'focus') return 'focus';
+  if (value === 'break') return 'break';
+  throw new WorkflowValidationError(
+    'Reward Dice trigger Phase type must be focus or break.',
+  );
+}
+
 function createRewardDice(input: RewardDiceInput): RewardDice {
+  const triggerPhaseType = createRewardPhaseType(input.triggerPhaseType);
   if (!Number.isInteger(input.frequency) || input.frequency < 1) {
     throw new WorkflowValidationError(
       'Reward Dice frequency must be a positive integer.',
@@ -137,6 +150,7 @@ function createRewardDice(input: RewardDiceInput): RewardDice {
   ];
 
   return Object.freeze({
+    triggerPhaseType,
     frequency: input.frequency,
     sides: Object.freeze(sides),
   });

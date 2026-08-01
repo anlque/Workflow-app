@@ -14,12 +14,12 @@ export function isRewardDueAfterPhase(
   const dice = workflow.rewardDice;
   if (
     dice === undefined ||
-    workflow.phases[completedPhaseIndex]?.type !== 'focus'
+    workflow.phases[completedPhaseIndex]?.type !== dice.triggerPhaseType
   ) {
     return false;
   }
-  const completedFocusCount = workflow.phases
+  const completedMatchingPhaseCount = workflow.phases
     .slice(0, completedPhaseIndex + 1)
-    .filter(({ type }) => type === 'focus').length;
-  return completedFocusCount % dice.frequency === 0;
+    .filter(({ type }) => type === dice.triggerPhaseType).length;
+  return completedMatchingPhaseCount % dice.frequency === 0;
 }

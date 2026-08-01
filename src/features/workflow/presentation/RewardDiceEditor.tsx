@@ -1,5 +1,7 @@
 import { Button, Field } from '@/shared';
 
+import type { RewardPhaseType } from '../domain/RewardDice';
+
 import type {
   RewardDiceDraft,
   RewardSideDraft,
@@ -10,6 +12,7 @@ export type RewardDiceEditorProps = Readonly<{
   draft: RewardDiceDraft;
   errors: WorkflowDraftErrors;
   onEnabledChange(enabled: boolean): void;
+  onTriggerPhaseTypeChange(value: RewardPhaseType): void;
   onFrequencyChange(value: string): void;
   onSideChange(key: string, patch: Partial<RewardSideDraft>): void;
   onAddSide(): void;
@@ -20,6 +23,7 @@ export function RewardDiceEditor({
   draft,
   errors,
   onEnabledChange,
+  onTriggerPhaseTypeChange,
   onFrequencyChange,
   onSideChange,
   onAddSide,
@@ -44,9 +48,23 @@ export function RewardDiceEditor({
         <details open>
           <summary>Reward Dice configuration</summary>
           <div className="reward-editor__content">
+            <Field label="Reward after">
+              <select
+                className="select"
+                value={draft.triggerPhaseType}
+                onChange={(event) => {
+                  onTriggerPhaseTypeChange(
+                    event.target.value as RewardPhaseType,
+                  );
+                }}
+              >
+                <option value="focus">Focus phases</option>
+                <option value="break">Break phases</option>
+              </select>
+            </Field>
             <Field
               label="Reward frequency"
-              hint="Completed focus phases between rolls."
+              hint={`Completed ${draft.triggerPhaseType} phases between rolls.`}
               error={errors['reward:frequency']}
             >
               <input

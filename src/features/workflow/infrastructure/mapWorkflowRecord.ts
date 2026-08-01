@@ -30,6 +30,12 @@ function optionalString(value: unknown): string | undefined {
   return value === undefined ? undefined : stringValue(value);
 }
 
+function rewardPhaseType(value: unknown): 'focus' | 'break' | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'focus' || value === 'break') return value;
+  return invalidRecord();
+}
+
 function mapEnvironmentRecord(value: unknown): EnvironmentInput {
   const record = objectRecord(value);
   const backgroundAssetId = optionalString(record['backgroundAssetId']);
@@ -55,11 +61,13 @@ function mapPhaseRecord(value: unknown): PhaseInput {
 function mapRewardDiceRecord(value: unknown): RewardDiceInput {
   const record = objectRecord(value);
   const sides = record['sides'];
+  const triggerPhaseType = rewardPhaseType(record['triggerPhaseType']);
   if (!Array.isArray(sides)) {
     return invalidRecord();
   }
 
   return {
+    ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
     frequency: numberValue(record['frequency']),
     sides: sides.map((sideValue) => {
       const side = objectRecord(sideValue);
@@ -131,6 +139,7 @@ export function mapWorkflowToRecord(
       ? {}
       : {
           rewardDice: {
+            triggerPhaseType: workflow.rewardDice.triggerPhaseType,
             frequency: workflow.rewardDice.frequency,
             sides: workflow.rewardDice.sides.map((side) => ({
               icon: side.icon,

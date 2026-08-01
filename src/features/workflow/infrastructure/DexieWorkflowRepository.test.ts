@@ -42,6 +42,7 @@ function workflow(id: string, name: string): Workflow {
       },
     ],
     rewardDice: {
+      triggerPhaseType: 'break',
       frequency: 2,
       sides: [
         { icon: 'tea', title: 'Tea', description: 'Make tea', weight: 3 },
@@ -72,6 +73,34 @@ describe('DexieWorkflowRepository', () => {
     await repository.save(expected);
 
     await expect(repository.get(expected.id)).resolves.toEqual(expected);
+    await expect(repository.get(expected.id)).resolves.toMatchObject({
+      rewardDice: { triggerPhaseType: 'break' },
+    });
+  });
+
+  test('defaults a legacy stored Reward Dice trigger to focus', async () => {
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
+    await database.table<unknown, WorkflowId>('workflows').put({
+      id: 'legacy',
+      schemaVersion: 1,
+      order: 0,
+      name: 'Legacy',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea', probability: 0.5 },
+          { icon: 'walk', title: 'Walk', probability: 0.5 },
+        ],
+      },
+    });
+
+    await expect(
+      repository.get(workflow('legacy', 'Fixture').id),
+    ).resolves.toMatchObject({
+      rewardDice: { triggerPhaseType: 'focus' },
+    });
   });
 
   test('appends new Workflows and lists them in stable order', async () => {

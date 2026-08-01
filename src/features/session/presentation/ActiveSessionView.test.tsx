@@ -86,7 +86,7 @@ describe('ActiveSessionView', () => {
     expect(onPhaseBoundary).toHaveBeenCalledOnce();
   });
 
-  test('softens the timer and removes controls during the transition', () => {
+  test('softens the complete Session card and removes controls during the transition', () => {
     const transitioning = deriveSessionState(
       createSession('session-1', workflow, 1_000),
       61_000,
@@ -101,9 +101,11 @@ describe('ActiveSessionView', () => {
     );
 
     expect(screen.getByText('Transitioning to the next phase…')).toBeVisible();
-    expect(screen.getByLabelText('Time remaining')).toHaveAttribute(
+    expect(
+      screen.getByRole('heading', { name: 'Deep work' }).closest('section'),
+    ).toHaveAttribute('data-transitioning', 'true');
+    expect(screen.getByLabelText('Time remaining')).not.toHaveAttribute(
       'data-transitioning',
-      'true',
     );
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
@@ -159,7 +161,7 @@ describe('ActiveSessionView', () => {
     ).toBeVisible();
     expect(random).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Roll' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
     expect(random).toHaveBeenCalledOnce();
     expect(onRewardRoll).toHaveBeenCalledWith(600);
     act(() => {

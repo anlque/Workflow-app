@@ -165,6 +165,39 @@ describe('Session', () => {
     });
   });
 
+  test('pauses only after a qualifying break when Reward Dice targets breaks', () => {
+    const rewarded = createWorkflow({
+      id: 'workflow-break-rewarded',
+      name: 'Rewarded recovery',
+      phases: [
+        { type: 'focus', durationSeconds: 10, environment: {} },
+        { type: 'break', durationSeconds: 5, environment: {} },
+        { type: 'focus', durationSeconds: 20, environment: {} },
+      ],
+      rewardDice: {
+        triggerPhaseType: 'break',
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const initial = createSession('session-1', rewarded, 1_000);
+
+    expect(deriveSessionState(initial, 12_000)).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+      phaseEndsAt: 17_000,
+    });
+    expect(deriveSessionState(initial, 18_000)).toMatchObject({
+      status: 'paused',
+      pauseReason: 'reward',
+      currentPhaseIndex: 2,
+      remainingMilliseconds: 20_000,
+    });
+  });
+
   test('stops late derivation at the first Reward pause', () => {
     const rewarded = createWorkflow({
       id: 'workflow-rewarded',

@@ -10,9 +10,15 @@ describe('RewardDiceEditor', () => {
     const onEnabledChange = vi.fn();
     render(
       <RewardDiceEditor
-        draft={{ enabled: false, frequency: '1', sides: [] }}
+        draft={{
+          enabled: false,
+          triggerPhaseType: 'focus',
+          frequency: '1',
+          sides: [],
+        }}
         errors={{}}
         onEnabledChange={onEnabledChange}
+        onTriggerPhaseTypeChange={() => undefined}
         onFrequencyChange={() => undefined}
         onSideChange={() => undefined}
         onAddSide={() => undefined}
@@ -30,6 +36,7 @@ describe('RewardDiceEditor', () => {
       <RewardDiceEditor
         draft={{
           enabled: true,
+          triggerPhaseType: 'focus',
           frequency: '1',
           sides: [
             {
@@ -50,6 +57,7 @@ describe('RewardDiceEditor', () => {
         }}
         errors={{}}
         onEnabledChange={() => undefined}
+        onTriggerPhaseTypeChange={() => undefined}
         onFrequencyChange={() => undefined}
         onSideChange={() => undefined}
         onAddSide={() => undefined}
@@ -65,5 +73,36 @@ describe('RewardDiceEditor', () => {
     expect(
       screen.getByText('A Reward Dice needs at least two sides.'),
     ).toBeVisible();
+  });
+
+  test('selects the phase type used for Reward Dice cadence', async () => {
+    const user = userEvent.setup();
+    const onTriggerPhaseTypeChange = vi.fn();
+    render(
+      <RewardDiceEditor
+        draft={{
+          enabled: true,
+          triggerPhaseType: 'focus',
+          frequency: '1',
+          sides: [],
+        }}
+        errors={{}}
+        onEnabledChange={() => undefined}
+        onTriggerPhaseTypeChange={onTriggerPhaseTypeChange}
+        onFrequencyChange={() => undefined}
+        onSideChange={() => undefined}
+        onAddSide={() => undefined}
+        onRemoveSide={() => undefined}
+      />,
+    );
+
+    expect(screen.getByLabelText('Reward after')).toHaveValue('focus');
+    expect(
+      screen.getByText('Completed focus phases between rolls.'),
+    ).toBeVisible();
+
+    await user.selectOptions(screen.getByLabelText('Reward after'), 'break');
+
+    expect(onTriggerPhaseTypeChange).toHaveBeenCalledWith('break');
   });
 });

@@ -23,8 +23,10 @@ execution configuration into an immutable Session snapshot. Session retains the
 source Workflow identifier for traceability but executes only the snapshot.
 
 The MVP supports `focus` and `break` Phases, executes the ordered sequence once
-and permits one active Session. Reward Dice is evaluated only after completed
-focus Phases. Reward Dice Templates are future scope.
+and permits one active Session. Each Workflow configures Reward Dice to count
+completed `focus` or `break` Phases; missing legacy values default to `focus`.
+The immutable Session snapshot preserves that selection for the active Session.
+Reward Dice Templates are future scope.
 
 ## Alternatives Considered
 
@@ -43,4 +45,3 @@ Session snapshots.
 
 - `docs/concepts/01_PRODUCT_SPECIFICATION.md`
 - `docs/concepts/02_DOMAIN_MODEL.md`
-

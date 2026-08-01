@@ -171,6 +171,13 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
     'src',
     /^blob:/u,
   );
+  await expect
+    .poll(() =>
+      focus
+        .getByRole('button', { name: 'Open side panel' })
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
+    )
+    .not.toBe('rgba(0, 0, 0, 0)');
 
   await expireActiveSessionDeadline(focus);
 
@@ -179,7 +186,7 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
       timeout: 15_000,
     },
   );
-  await expect(focus.getByLabel('Time remaining')).toHaveAttribute(
+  await expect(focus.locator('.active-session')).toHaveAttribute(
     'data-transitioning',
     'true',
   );
@@ -197,11 +204,25 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
     0,
   );
   await expectViewportCentered(reward);
+  await expect(reward).toHaveClass(/dialog--reward/u);
+  const coversTimerCard = await reward.evaluate((dialog) => {
+    const dialogBounds = dialog.getBoundingClientRect();
+    const timerCard = document.querySelector('.focus-app__content');
+    if (timerCard === null) return false;
+    const timerBounds = timerCard.getBoundingClientRect();
+    return (
+      dialogBounds.left <= timerBounds.left &&
+      dialogBounds.right >= timerBounds.right &&
+      dialogBounds.top <= timerBounds.top &&
+      dialogBounds.bottom >= timerBounds.bottom
+    );
+  });
+  expect(coversTimerCard).toBe(true);
   await expect(focus.getByTestId('reward-cube')).toHaveAttribute(
     'data-state',
     'ready',
   );
-  await focus.getByRole('button', { name: 'Roll' }).click();
+  await focus.getByRole('button', { name: 'Roll dice' }).click();
   await expect(focus.getByTestId('reward-cube')).toHaveAttribute(
     'data-state',
     'mixing',

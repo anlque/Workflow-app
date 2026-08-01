@@ -27,6 +27,27 @@ function workflow(frequency?: number) {
   });
 }
 
+function breakRewardWorkflow() {
+  return createWorkflow({
+    id: 'workflow-break-reward',
+    name: 'Focus and recover',
+    phases: [
+      { type: 'focus', durationSeconds: 10, environment: {} },
+      { type: 'break', durationSeconds: 5, environment: {} },
+      { type: 'focus', durationSeconds: 10, environment: {} },
+      { type: 'break', durationSeconds: 5, environment: {} },
+    ],
+    rewardDice: {
+      triggerPhaseType: 'break',
+      frequency: 2,
+      sides: [
+        { icon: 'tea', title: 'Tea' },
+        { icon: 'walk', title: 'Walk' },
+      ],
+    },
+  });
+}
+
 describe('isRewardDueAfterPhase', () => {
   test.each([
     ['no Reward Dice', workflow(), 0, false],
@@ -42,4 +63,12 @@ describe('isRewardDueAfterPhase', () => {
       expect(isRewardDueAfterPhase(value, completedPhaseIndex)).toBe(expected);
     },
   );
+
+  test('counts only completed phases of the configured break type', () => {
+    const value = breakRewardWorkflow();
+
+    expect(isRewardDueAfterPhase(value, 0)).toBe(false);
+    expect(isRewardDueAfterPhase(value, 1)).toBe(false);
+    expect(isRewardDueAfterPhase(value, 3)).toBe(true);
+  });
 });
