@@ -1,6 +1,9 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { createOptionsDependencies } from './createOptionsDependencies';
+import { OptionsApp } from './OptionsApp';
+
 export function bootstrapOptions(container: HTMLElement | null): void {
   if (container === null) {
     throw new Error(
@@ -8,11 +11,10 @@ export function bootstrapOptions(container: HTMLElement | null): void {
     );
   }
 
+  const dependencies = createOptionsDependencies();
   createRoot(container).render(
     <StrictMode>
-      <main>
-        <h1>Flowarium settings</h1>
-      </main>
+      <OptionsApp dependencies={dependencies} />
     </StrictMode>,
   );
 }

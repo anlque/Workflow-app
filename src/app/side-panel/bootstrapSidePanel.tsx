@@ -1,6 +1,9 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { createSidePanelDependencies } from './createSidePanelDependencies';
+import { SidePanelApp } from './SidePanelApp';
+
 export function bootstrapSidePanel(container: HTMLElement | null): void {
   if (container === null) {
     throw new Error(
@@ -8,12 +11,10 @@ export function bootstrapSidePanel(container: HTMLElement | null): void {
     );
   }
 
+  const dependencies = createSidePanelDependencies();
   createRoot(container).render(
     <StrictMode>
-      <main>
-        <h1>Flowarium</h1>
-        <p>Your Workflow Library will appear here.</p>
-      </main>
+      <SidePanelApp dependencies={dependencies} />
     </StrictMode>,
   );
 }

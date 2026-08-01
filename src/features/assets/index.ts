@@ -25,3 +25,12 @@ export {
 export { BrowserAssetUrlService } from './infrastructure/BrowserAssetUrlService';
 export { DexieAssetRepository } from './infrastructure/DexieAssetRepository';
 export { assetDatabaseSchemas } from './infrastructure/AssetRecord';
+export { AssetPicker, type AssetPickerProps } from './presentation/AssetPicker';
+export {
+  AssetLibrary,
+  type AssetLibraryProps,
+} from './presentation/AssetLibrary';
+export {
+  AssetPreview,
+  type AssetPreviewProps,
+} from './presentation/AssetPreview';

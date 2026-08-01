@@ -24,6 +24,9 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/chrome": "^0.2.2",
     "@types/node": "^26.1.2",
     "@types/react": "^19.2.18",
@@ -31,6 +34,7 @@
     "@wxt-dev/module-react": "^1.2.2",
     "eslint": "^10.8.0",
     "fake-indexeddb": "^6.2.5",
+    "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",

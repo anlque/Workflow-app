@@ -29,6 +29,7 @@ yarn-error.log*
 .idea/
 .vscode/
 /AGENTS.md
+/docs/superpowers
 
 # Prisma and database
 *.db

@@ -23,3 +23,7 @@ export {
   ChromeSettingsRepository,
   type SettingsStorageArea,
 } from './infrastructure/ChromeSettingsRepository';
+export {
+  SettingsPage,
+  type SettingsPageProps,
+} from './presentation/SettingsPage';
