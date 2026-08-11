@@ -11,7 +11,7 @@ const imageId = createAssetId('image-1');
 const audioId = createAssetId('audio-1');
 const nextAudioId = createAssetId('audio-2');
 
-function setup(environment: Environment, reducedMotion = false) {
+function setup(environment: Environment, reducedMotion = false, volume = 1) {
   const loadAssetUrl = vi.fn((id) =>
     Promise.resolve(
       id === imageId
@@ -27,6 +27,7 @@ function setup(environment: Environment, reducedMotion = false) {
       environment={environment}
       reducedMotion={reducedMotion}
       playing
+      volume={volume}
       loadAssetUrl={loadAssetUrl}
       releaseAssetUrl={releaseAssetUrl}
     />,
@@ -86,6 +87,7 @@ describe('FocusEnvironment', () => {
         environment={{ backgroundAssetId: createAssetId('image-2') }}
         reducedMotion={false}
         playing
+        volume={1}
         loadAssetUrl={loadAssetUrl}
         releaseAssetUrl={releaseAssetUrl}
       />,
@@ -111,6 +113,7 @@ describe('FocusEnvironment', () => {
         environment={{ backgroundAssetId: imageId }}
         reducedMotion={false}
         playing
+        volume={1}
         loadAssetUrl={loadAssetUrl}
         releaseAssetUrl={vi.fn()}
       />,
@@ -141,6 +144,20 @@ describe('FocusEnvironment', () => {
       vi.advanceTimersByTime(1_000);
     });
     expect(audio?.volume).toBe(1);
+  });
+
+  test('fades ambient audio to the selected master volume', async () => {
+    vi.useFakeTimers();
+    setup({ audioAssetId: audioId }, false, 0.35);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(document.querySelector('audio')?.volume).toBeCloseTo(0.35);
   });
 
   test('offers a manual audio action when autoplay is blocked', async () => {
@@ -177,6 +194,7 @@ describe('FocusEnvironment', () => {
         environment={{ audioAssetId: nextAudioId }}
         reducedMotion={false}
         playing
+        volume={1}
         loadAssetUrl={loadAssetUrl}
         releaseAssetUrl={releaseAssetUrl}
       />,

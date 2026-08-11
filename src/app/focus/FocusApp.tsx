@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 
 import {
@@ -89,6 +89,8 @@ export function FocusApp({
   const store = useMemo(createActiveSessionStore, []);
   const projection = useStore(store);
   const [soundState, setSoundState] = useState(dependencies.sounds.getState);
+  const [volumePercent, setVolumePercent] = useState(100);
+  const lastAudibleVolumeRef = useRef(100);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [panelPending, setPanelPending] = useState(false);
@@ -96,6 +98,18 @@ export function FocusApp({
   async function activateSounds(): Promise<void> {
     await dependencies.sounds.unlock();
     setSoundState(dependencies.sounds.getState());
+  }
+
+  function updateVolume(nextVolumePercent: number): void {
+    const normalizedVolume = Math.min(100, Math.max(0, nextVolumePercent));
+    if (normalizedVolume > 0) lastAudibleVolumeRef.current = normalizedVolume;
+    setVolumePercent(normalizedVolume);
+    dependencies.sounds.setVolume(normalizedVolume / 100);
+  }
+
+  function toggleSound(): void {
+    void activateSounds();
+    updateVolume(volumePercent === 0 ? lastAudibleVolumeRef.current : 0);
   }
 
   function togglePanel(): void {
@@ -178,6 +192,29 @@ export function FocusApp({
   return (
     <main className="focus-app" data-reduced-motion={String(reducedMotion)}>
       <div className="focus-app__utility-actions">
+        <div className="focus-app__volume-control">
+          <Button
+            className="focus-app__sound-toggle"
+            variant="quiet"
+            aria-pressed={volumePercent === 0}
+            onClick={toggleSound}
+          >
+            {volumePercent === 0 ? 'Unmute sound' : 'Mute sound'}
+          </Button>
+          <label>
+            <span>Volume</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={volumePercent}
+              onChange={(event) => {
+                updateVolume(Number(event.currentTarget.value));
+              }}
+            />
+          </label>
+        </div>
         {soundState === 'locked' ? (
           <Button
             className="focus-app__enable-sounds"
@@ -203,6 +240,7 @@ export function FocusApp({
         environment={phase.environment}
         reducedMotion={reducedMotion}
         playing={session.status === 'running'}
+        volume={volumePercent / 100}
         loadAssetUrl={dependencies.loadAssetUrl}
         releaseAssetUrl={dependencies.releaseAssetUrl}
       />

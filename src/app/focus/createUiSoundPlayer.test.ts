@@ -127,6 +127,21 @@ describe('createUiSoundPlayer', () => {
     expect(fake.gainRamps.flat().some(({ value }) => value === 0.4)).toBe(true);
   });
 
+  test('applies master volume to generated UI sounds', async () => {
+    const fake = createFakeAudioContext();
+    const player = createUiSoundPlayer(() => fake.context);
+    await player.unlock();
+
+    player.setVolume(0.25);
+    player.playBell();
+
+    expect(fake.gainRamps.flat().some(({ value }) => value === 0.1)).toBe(true);
+
+    player.setVolume(0);
+    player.playBell();
+    expect(fake.oscillatorStarts).toHaveLength(1);
+  });
+
   test('synthesizes the accepted pulsing full-duration dice roll', async () => {
     const fake = createFakeAudioContext();
     const player = createUiSoundPlayer(() => fake.context);

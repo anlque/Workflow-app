@@ -1,6 +1,7 @@
 export type UiSoundPlayer = Readonly<{
   unlock(): Promise<boolean>;
   getState(): 'locked' | 'ready' | 'unavailable';
+  setVolume(volume: number): void;
   playBell(): void;
   playDiceRoll(durationMs: 600 | 2500): void;
   playSessionComplete(): void;
@@ -14,6 +15,7 @@ export function createUiSoundPlayer(
   let context: AudioContext | undefined;
   let disposed = false;
   let state: 'locked' | 'ready' | 'unavailable' = 'locked';
+  let volume = 1;
 
   async function unlock(): Promise<boolean> {
     if (disposed || state === 'unavailable') return false;
@@ -34,8 +36,12 @@ export function createUiSoundPlayer(
     return state;
   }
 
+  function setVolume(nextVolume: number): void {
+    volume = Math.min(1, Math.max(0, nextVolume));
+  }
+
   function getReadyContext(): AudioContext | undefined {
-    return state === 'ready' ? context : undefined;
+    return state === 'ready' && volume > 0 ? context : undefined;
   }
 
   function playBell(): void {
@@ -48,7 +54,10 @@ export function createUiSoundPlayer(
       oscillator.type = 'sine';
       oscillator.frequency.setValueAtTime(880, start);
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.4, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(
+        Math.max(0.0001, 0.4 * volume),
+        start + 0.01,
+      );
       gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.7);
       oscillator.connect(gain);
       gain.connect(audio.destination);
@@ -83,9 +92,10 @@ export function createUiSoundPlayer(
       filter.frequency.value = 1_100;
       filter.Q.value = 0.65;
       masterGain.gain.setValueAtTime(0.0001, start);
-      masterGain.gain.exponentialRampToValueAtTime(0.8, start + 0.02);
+      const peakVolume = Math.max(0.0001, 0.8 * volume);
+      masterGain.gain.exponentialRampToValueAtTime(peakVolume, start + 0.02);
       masterGain.gain.setValueAtTime(
-        0.8,
+        peakVolume,
         start + Math.max(0.02, duration - 0.08),
       );
       masterGain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
@@ -135,7 +145,7 @@ export function createUiSoundPlayer(
         oscillator.frequency.setValueAtTime(note.frequency, noteStart);
         noteGain.gain.setValueAtTime(0.0001, noteStart);
         noteGain.gain.exponentialRampToValueAtTime(
-          note.gain,
+          Math.max(0.0001, note.gain * volume),
           noteStart + 0.015,
         );
         noteGain.gain.exponentialRampToValueAtTime(
@@ -206,6 +216,7 @@ export function createUiSoundPlayer(
   return {
     unlock,
     getState,
+    setVolume,
     playBell,
     playDiceRoll,
     playSessionComplete,

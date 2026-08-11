@@ -18,6 +18,7 @@ function dependencies(session: Session | null): FocusDependencies {
     sounds: {
       unlock: vi.fn(() => Promise.resolve(true)),
       getState: vi.fn(() => 'ready' as const),
+      setVolume: vi.fn(),
       playBell: vi.fn(),
       playDiceRoll: vi.fn(),
       playSessionComplete: vi.fn(),
@@ -101,6 +102,35 @@ describe('FocusApp', () => {
     });
     invalidate?.();
     expect(deps.listWorkflows).not.toHaveBeenCalled();
+  });
+
+  test('controls master sound volume during an active Session', async () => {
+    const user = userEvent.setup();
+    const session = createSession(
+      'session-1',
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+      }),
+      Date.now(),
+    );
+    const deps = dependencies(session);
+    render(<FocusApp dependencies={deps} />);
+
+    const volume = await screen.findByRole('slider', { name: 'Volume' });
+    expect(volume).toHaveValue('100');
+
+    fireEvent.change(volume, { target: { value: '35' } });
+    expect(deps.sounds.setVolume).toHaveBeenLastCalledWith(0.35);
+
+    await user.click(screen.getByRole('button', { name: 'Mute sound' }));
+    expect(deps.sounds.setVolume).toHaveBeenLastCalledWith(0);
+    expect(screen.getByRole('button', { name: 'Unmute sound' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Unmute sound' }));
+    expect(deps.sounds.setVolume).toHaveBeenLastCalledWith(0.35);
+    expect(volume).toHaveValue('35');
   });
 
   test('refreshes the idle launcher after catalog invalidation', async () => {

@@ -149,6 +149,32 @@ body {
   z-index: 1;
   display: flex;
   gap: 0.625rem;
+  align-items: flex-start;
+}
+
+.focus-app__volume-control {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.375rem;
+  color: var(--color-ink);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-ink-muted);
+  border-radius: var(--radius-control);
+  box-shadow: 0 2px 6px oklch(0.2 0.02 160 / 28%);
+}
+
+.focus-app__volume-control label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.focus-app__volume-control input {
+  width: clamp(5rem, 10vw, 8rem);
 }
 
 .focus-environment {
@@ -403,7 +429,8 @@ textarea {
 }
 
 .button.focus-app__close-panel,
-.button.focus-app__enable-sounds {
+.button.focus-app__enable-sounds,
+.button.focus-app__sound-toggle {
   color: var(--color-ink);
   background: var(--color-surface-raised);
   border-color: var(--color-ink-muted);

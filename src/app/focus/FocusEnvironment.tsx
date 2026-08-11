@@ -10,6 +10,7 @@ export type FocusEnvironmentProps = Readonly<{
   environment: Environment;
   reducedMotion: boolean;
   playing: boolean;
+  volume: number;
   loadAssetUrl(id: AssetId): Promise<string | null>;
   releaseAssetUrl(url: string): void;
 }>;
@@ -55,6 +56,7 @@ export function FocusEnvironment({
   environment,
   reducedMotion,
   playing,
+  volume,
   loadAssetUrl,
   releaseAssetUrl,
 }: FocusEnvironmentProps) {
@@ -68,7 +70,11 @@ export function FocusEnvironment({
     loadAssetUrl,
     releaseAssetUrl,
   );
-  const ambientAudio = useAmbientAudio({ sourceUrl: audio.url, playing });
+  const ambientAudio = useAmbientAudio({
+    sourceUrl: audio.url,
+    playing,
+    volume,
+  });
 
   return (
     <div

@@ -16,15 +16,18 @@ const RAMP_INTERVAL_MS = 50;
 export function useAmbientAudio({
   sourceUrl,
   playing,
+  volume,
   fadeDurationMs = DEFAULT_FADE_DURATION_MS,
 }: Readonly<{
   sourceUrl: string | null;
   playing: boolean;
+  volume: number;
   fadeDurationMs?: number;
 }>): AmbientAudioControls {
   const audioRef = useRef<HTMLAudioElement>(null);
   const intervalRef = useRef<number | undefined>(undefined);
   const generationRef = useRef(0);
+  const targetVolumeRef = useRef(volume);
   const [activeSourceUrl, setActiveSourceUrl] = useState<string | null>(null);
   const [state, setState] = useState<AmbientAudioState>('idle');
 
@@ -69,7 +72,7 @@ export function useAmbientAudio({
     try {
       await audio.play();
       setState('playing');
-      rampTo(1);
+      rampTo(targetVolumeRef.current);
     } catch (cause) {
       setState(
         cause instanceof DOMException && cause.name !== 'NotAllowedError'
@@ -78,6 +81,11 @@ export function useAmbientAudio({
       );
     }
   }, [activeSourceUrl, cancelRamp, rampTo]);
+
+  useEffect(() => {
+    targetVolumeRef.current = volume;
+    if (state === 'playing') rampTo(volume);
+  }, [rampTo, state, volume]);
 
   useEffect(() => {
     const audio = audioRef.current;
