@@ -18,10 +18,17 @@ consequences behind accepted long-lived decisions.
 
 ### Work on the implementation
 
-The developer onboarding and reference set is being added incrementally. Until
-those guides are present, start with the repository [README](../README.md), then
-read the relevant Concept documents and ADRs before following source entrypoints
-from `entrypoints/` into the matching `src/app/` composition root.
+Start with [Getting Started](onboarding/01_GETTING_STARTED.md) to install, build,
+load and verify the extension. Continue with the
+[System Tour](onboarding/02_SYSTEM_TOUR.md), then read the
+[Runtime Model](onboarding/03_RUNTIME_MODEL.md). Use the
+[Project Map](development/PROJECT_MAP.md) to locate ownership, the
+[Runtime and Navigation reference](development/RUNTIME_AND_NAVIGATION.md) for
+extension surfaces, and
+[Architecture Boundaries](development/ARCHITECTURE_BOUNDARIES.md) before adding
+dependencies. The remaining reference is being added incrementally; until a
+specific guide is present, read the relevant Concept documents and ADRs before
+changing its source owner.
 
 ## Source of Truth
 
