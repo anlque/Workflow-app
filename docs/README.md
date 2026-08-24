@@ -26,9 +26,15 @@ load and verify the extension. Continue with the
 [Runtime and Navigation reference](development/RUNTIME_AND_NAVIGATION.md) for
 extension surfaces, and
 [Architecture Boundaries](development/ARCHITECTURE_BOUNDARIES.md) before adding
-dependencies. The remaining reference is being added incrementally; until a
-specific guide is present, read the relevant Concept documents and ADRs before
-changing its source owner.
+dependencies. For cross-context behavior, continue with
+[State and Data Flow](development/STATE_AND_DATA_FLOW.md) and the complete
+[Runtime Messaging catalog](development/MESSAGING.md). Use
+[Persistence and Compatibility](development/PERSISTENCE.md) before changing
+records, schemas or import/export behavior. Feature internals are documented in
+the [Workflow reference](development/features/WORKFLOW.md) and
+[Session reference](development/features/SESSION.md). The remaining reference
+is being added incrementally; until a specific guide is present, read the
+relevant Concept documents and ADRs before changing its source owner.
 
 ## Source of Truth
 
