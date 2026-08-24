@@ -246,7 +246,8 @@ Parcel was rejected because it provides less explicit control over the build pro
 
 Vite introduces:
 
-- dependence on the Rollup ecosystem for production builds;
+- dependence on its production bundler ecosystem; the current Vite 8 dependency
+  tree uses Rolldown;
 - occasional plugin compatibility considerations;
 - some browser extension integrations requiring dedicated plugins.
 
@@ -286,7 +287,7 @@ It is responsible for rendering interactive interfaces across the extension's vi
 
 - side panel;
 - options page;
-- full-page focus mode;
+- full-page focus view;
 - future onboarding and marketplace interfaces.
 
 React must remain a presentation technology.
@@ -372,15 +373,20 @@ Replacing React must not require changes to Domain or Application logic.
 
 ## Styling
 
-### Primary Technology
+### Primary Technologies
 
-Tailwind CSS 4 with CSS Custom Properties
+- semantic CSS classes;
+- CSS Custom Properties;
+- Tailwind CSS 4 build pipeline.
 
 ### Purpose
 
-Tailwind CSS provides the primary styling system for application interfaces.
-
-CSS Custom Properties provide reusable design tokens and support dynamic values that are not known at build time.
+Semantic CSS classes in `src/styles/global.css` provide the current component
+styling system. CSS Custom Properties provide reusable design tokens and support
+dynamic values that are not known at build time. Tailwind CSS supplies the
+configured build pipeline and generated base layers; utility classes may be used
+when they improve clarity, but they are not the current ownership model for
+component styles.
 
 Together they enable:
 
@@ -391,23 +397,24 @@ Together they enable:
 - user-configurable environments;
 - dynamic themes.
 
-### Why Tailwind CSS
+### Why This Combination
 
-The project contains multiple compact and highly interactive extension interfaces.
+The project contains multiple compact and highly interactive extension
+interfaces. Semantic classes keep related component rules readable, CSS Custom
+Properties centralize design tokens and dynamic Environment values, and the
+Tailwind pipeline provides a compatible build-time CSS foundation without a
+runtime styling dependency.
 
-Tailwind CSS provides a utility-first styling model that makes layout and visual relationships explicit near the component markup.
+This combination offers:
 
-It was selected because it offers:
-
-- fast interface development;
 - consistent spacing and typography;
-- minimal naming overhead;
 - straightforward responsive behavior;
 - strong Vite integration;
 - build-time CSS generation;
 - no runtime styling dependency.
 
-Tailwind is particularly suitable for extension development because its output is ordinary static CSS and does not require remote code execution.
+The resulting output is ordinary static CSS and does not require remote code
+execution, which is compatible with extension security constraints.
 
 ### CSS Custom Properties
 
@@ -421,13 +428,13 @@ CSS Custom Properties should represent:
 - runtime environment values;
 - reusable animation parameters.
 
-Dynamic user values must not be assembled into generated Tailwind class names.
+Dynamic user values must not be assembled into generated class names.
 
 Preferred:
 
 ```tsx
 <div
-    className="bg-[var(--environment-background)]"
+    className="focus-environment"
     style={{
         '--environment-background': backgroundColor,
     } as React.CSSProperties}
@@ -437,12 +444,11 @@ Preferred:
 Avoid:
 
 ```tsx
-<div className={`bg-[${backgroundColor}]`} />
+<div className={`background-${backgroundColor}`} />
 ```
 
-Tailwind utilities are generated from statically discoverable source code.
-
-Runtime values should therefore be passed through CSS Custom Properties or inline styles with narrowly defined responsibilities.
+Runtime values should be passed through CSS Custom Properties or inline styles
+with narrowly defined responsibilities.
 
 ### Configuration Principles
 
@@ -455,7 +461,9 @@ Styling should:
 - remain responsive across extension surfaces;
 - avoid deeply nested selectors;
 - avoid arbitrary values when an existing token is appropriate;
-- keep feature-specific styling within the owning feature.
+- use semantic class names that identify the component or UI responsibility;
+- keep the current shared visual system coherent when styles move closer to a
+  feature.
 
 Custom CSS remains appropriate for:
 
@@ -467,15 +475,17 @@ Custom CSS remains appropriate for:
 
 ### Component Abstraction
 
-Repeated visual patterns should be extracted into reusable UI components rather than replaced with large groups of copied utility classes.
+Repeated visual patterns should be extracted into reusable UI components rather
+than copied as large groups of declarations or utilities.
 
 Component variants should use explicit, type-safe APIs.
 
-Utilities should remain readable and should not turn components into unstructured collections of styling tokens.
+Class composition should remain readable and should not turn components into
+unstructured collections of styling tokens.
 
 ### Architectural Role
 
-Tailwind belongs to the Presentation layer and build tooling.
+CSS belongs to the Presentation layer. Tailwind belongs to build tooling.
 
 CSS variables may also be exposed through the Shared design system.
 
@@ -483,37 +493,38 @@ Business logic must remain independent of styling technologies.
 
 ### Alternatives Considered
 
-CSS Modules were considered because they provide strong style isolation and familiar CSS authoring.
+CSS Modules were considered because they provide strong style isolation and
+familiar CSS authoring.
 
 Vanilla Extract was considered for type-safe build-time styling.
 
-CSS-in-JS solutions were rejected because they introduce runtime overhead and additional complexity that is unnecessary for this project.
+CSS-in-JS solutions were rejected because they introduce runtime overhead and
+additional complexity that is unnecessary for this project.
 
-Tailwind was selected because it provides the best balance of development speed, consistency and low runtime cost.
+A Tailwind-only utility convention was not adopted because the current semantic
+classes provide clearer ownership for the existing component styles. Tailwind
+remains in the build pipeline without becoming a second mandatory component
+styling convention.
 
 ### Trade-offs
 
-Tailwind introduces:
-
-- verbose class lists;
-- coupling to utility conventions;
-- reduced separation between markup and styling;
-- the need for disciplined component extraction;
-- limited support for dynamically generated class names.
-
-These trade-offs are acceptable when Tailwind is combined with reusable components, design tokens and narrowly scoped custom CSS.
+The current combination introduces two styling mechanisms and therefore requires
+a clear convention: semantic CSS remains the default, CSS Custom Properties own
+tokens and runtime values, and Tailwind utilities are optional rather than a
+second competing design system.
 
 ### Replacement Criteria
 
-Tailwind should be reconsidered if it begins to:
+The styling stack should be reconsidered if it begins to:
 
 - reduce readability;
 - cause substantial duplication;
+- create competing conventions;
 - obstruct the design system;
-- create unacceptable bundle or build complexity;
-- limit required styling capabilities.
+- create unacceptable bundle or build complexity.
 
-Replacing Tailwind must not affect Domain, Application or Infrastructure code.
+Replacing the styling pipeline must not affect Domain, Application or
+Infrastructure code.
 
 ## State Management
 
@@ -886,7 +897,9 @@ Such changes should not require modifications to Domain or Application logic.
 - Vitest
 - React Testing Library
 - Playwright
-- MSW (when external integrations are introduced)
+
+MSW may be introduced when external integrations require network-boundary
+tests. It is not an installed MVP dependency.
 
 ### Purpose
 
@@ -932,11 +945,12 @@ Most tests should remain fast, deterministic and independent of browser infrastr
 
 - Complete user journeys
 - Extension runtime
-- Popup
+- Side panel document
 - Options page
+- Focus view
 - Background communication
 
-**MSW**
+**MSW (future)**
 
 - Mock external services
 - Future provider integrations
@@ -975,8 +989,6 @@ Testing technologies may evolve independently provided the overall testing strat
 - pnpm
 - ESLint
 - Prettier
-- Husky
-- lint-staged
 - GitHub Actions
 
 ### Purpose
@@ -998,14 +1010,6 @@ Static code analysis.
 **Prettier**
 
 Consistent code formatting.
-
-**Husky**
-
-Git hooks.
-
-**lint-staged**
-
-Fast pre-commit validation.
 
 **GitHub Actions**
 

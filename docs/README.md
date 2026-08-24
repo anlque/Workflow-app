@@ -1,0 +1,68 @@
+# Flowarium Documentation
+
+This directory is the entry point for product, architecture and developer
+documentation.
+
+## Reading Paths
+
+### Understand the product and its rules
+
+Read [`concepts/`](concepts/) in numerical order. These documents define the
+product scope, Domain language, architecture, code organization, engineering
+standards and testing policy.
+
+### Understand architectural decisions
+
+Use the [ADR index](adr/README.md) to find the reasoning, alternatives and
+consequences behind accepted long-lived decisions.
+
+### Work on the implementation
+
+The developer onboarding and reference set is being added incrementally. Until
+those guides are present, start with the repository [README](../README.md), then
+read the relevant Concept documents and ADRs before following source entrypoints
+from `entrypoints/` into the matching `src/app/` composition root.
+
+## Source of Truth
+
+Documentation authority is ordered as follows:
+
+1. `docs/concepts/` defines normative product, Domain and engineering rules.
+2. Accepted records in `docs/adr/` explain binding architectural decisions.
+3. `docs/development/` describes how the current source implements those rules.
+4. `docs/onboarding/` provides an ordered learning path through the same current
+   implementation.
+5. The root `README.md` remains a concise setup and project entry point.
+
+If implementation and documentation disagree, do not silently document the
+drift. Determine whether the implementation is wrong or whether a new
+architectural decision supersedes an existing one, then update the appropriate
+source of truth.
+
+## Document Status
+
+- Concepts and Accepted ADRs are normative.
+- Developer reference describes current implementation and must change with it.
+- Onboarding documents are explanatory and link to normative sources.
+- Flows explain behavior that crosses several owners.
+- Recipes are bounded change checklists, not architectural exceptions.
+
+Agent-local planning artifacts may exist under the Git-ignored
+`docs/superpowers/` directory. They are execution aids, not project
+documentation or a source of truth.
+
+## Maintenance Rule
+
+Update developer documentation in the same change when modifying:
+
+- a public feature API;
+- an extension surface or navigation path;
+- a runtime message;
+- state ownership;
+- a persistence record, schema version or compatibility default;
+- a documented cross-cutting flow;
+- required setup or verification commands.
+
+Do not duplicate normative rules in onboarding or reference documents. Link to
+the owning Concept or ADR and explain only how the current implementation
+realizes it.

@@ -69,19 +69,19 @@ Boolean values should read naturally.
 
 Examples:
 
-- IsOpen
-- HasAccess
-- CanRetry
-- ShouldPersist
+- isOpen
+- hasAccess
+- canRetry
+- shouldPersist
 
 Functions should describe actions.
 
 Examples:
 
-- CreateWorkflow
-- LoadSession
-- ValidateImport
-- SaveSettings
+- createWorkflow
+- loadSession
+- validateImport
+- saveSettings
 
 Types should represent business concepts.
 
@@ -414,8 +414,6 @@ TError
 Prefer descriptive generic names whenever they represent meaningful domain concepts.
 
 Single-letter generic parameters are acceptable only when their meaning is universally understood or constrained to a very small scope.
-
-unless the generic meaning is immediately obvious.
 
 ---
 

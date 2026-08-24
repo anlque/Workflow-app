@@ -228,17 +228,11 @@ File names should briefly describe the decision.
 
 ---
 
-# Initial ADR Candidates
+# ADR Index
 
-The following architectural decisions are expected to receive ADRs during the project:
-
-- Use Chrome Manifest V3 with WXT for the MVP.
-- Adopt feature-first clean architecture and explicit dependency ownership.
-- Define the Workflow aggregate and immutable Session snapshots.
-- Coordinate authoritative Session execution across extension contexts.
-- Use local-first persistence with Dexie, IndexedDB and `chrome.storage.local`.
-- Define local Asset storage and lifecycle.
-- Use a versioned import and export format.
+Current records and their statuses are listed in
+[`docs/adr/README.md`](../adr/README.md). New ADR numbers are allocated from that
+index and must not reuse a number from a Superseded or Archived record.
 
 ---
 

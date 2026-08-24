@@ -35,7 +35,7 @@ Examples:
 - Workflow
 - Session
 - Asset
-- Reward Dice Template
+- Reward Dice Template (future scope)
 
 ## Value Objects
 
@@ -182,7 +182,9 @@ from an absolute timestamp. Pauses carry a `user` or `reward` reason; only the
 dedicated Reward continuation may resume a Reward pause. Completed and stopped
 Sessions are retained as minimal history records.
 
-Workflows are permanent.
+Workflow definitions are reusable and persist independently of their Sessions.
+A Workflow may be deleted without changing any Session snapshot that was
+created from it.
 
 ---
 
@@ -236,8 +238,8 @@ Examples:
 
 - image;
 - audio;
-- video;
-- animation.
+- future video;
+- future animation.
 
 Each Asset has a stable identity and may be referenced by multiple Workflows.
 
@@ -256,6 +258,8 @@ It defines:
 - trigger frequency;
 
 - trigger Phase type (`focus` or `break`).
+
+- zero to three optional rerolls after the initial roll.
 
 Reward Dice belongs exclusively to its parent Workflow.
 
@@ -359,7 +363,9 @@ Reward Dice owns its Dice Sides.
 
 Assets may be referenced by multiple Workflows.
 
-Sessions belong to a single Workflow.
+Each Session is created from a single Workflow. It retains the source Workflow
+identifier for traceability and executes an immutable snapshot; it does not
+require the source Workflow to continue existing.
 
 ---
 
@@ -397,7 +403,9 @@ Session Completes
 
 Workflow Remains Unchanged
 
-Workflow is immutable during execution.
+Session execution never mutates its source Workflow. The Session snapshot is
+immutable; any separately permitted edit to the reusable Workflow definition
+does not alter that snapshot.
 
 ---
 
@@ -412,7 +420,8 @@ Workflows. It is not a separately persisted Entity or aggregate.
 
 A Workflow may create many Sessions.
 
-A Session always references exactly one Workflow.
+A Session always records exactly one source Workflow identifier and one
+immutable Workflow snapshot. This is not a live persistence reference.
 
 A Session stores an immutable snapshot of the Workflow configuration used when
 it starts. Deleting or editing the source Workflow does not change an existing
@@ -423,8 +432,8 @@ A Workflow may contain multiple Phases.
 A Workflow contains at least one ordered Phase. The MVP executes the ordered
 sequence once. Each Phase has a positive duration and is either Focus or Break.
 
-At most one Session may be active. Valid active states are Running and Paused.
-Terminal states are Completed and Stopped.
+At most one Session may be active. Valid active states are Running,
+Transitioning and Paused. Terminal states are Completed and Stopped.
 
 Each Phase owns exactly one Environment.
 
@@ -439,7 +448,10 @@ A Workflow owns zero or one Reward Dice configuration.
 Reward Dice may be disabled. When enabled it contains at least two Dice Sides,
 has a trigger frequency of at least one completed Phase of its configured
 `focus` or `break` type and is evaluated only after a completed Phase of that
-type. Missing legacy trigger types default to `focus`.
+type. Missing legacy trigger types default to `focus`. Each Reward Dice permits
+zero to three rerolls after its initial roll; missing legacy values default to
+zero. The allowance resets for every Reward opportunity, unused rerolls do not
+accumulate, and the last displayed result is the accepted Reward.
 
 Dice Side probabilities are positive decimal weights. The Domain normalizes
 custom weights; when weights are omitted, all sides receive equal weight.

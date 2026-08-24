@@ -65,7 +65,11 @@ They should avoid depending on:
 
 Refactoring internal implementation should not require rewriting tests when public behavior remains unchanged.
 
-For user-interface tests, queries should resemble how users and assistive technologies locate elements. `data-testid` should be a fallback when semantic queries are not practical. This follows Testing Library’s official guiding principle of testing software in a way that resembles real usage.  [oai_citation:0‡Testing Library](https://testing-library.com/docs/guiding-principles/?utm_source=chatgpt.com)
+For user-interface tests, queries should resemble how users and assistive
+technologies locate elements. `data-testid` should be a fallback when semantic
+queries are not practical. This follows
+[Testing Library's guiding principle](https://testing-library.com/docs/guiding-principles/)
+of testing software in a way that resembles real usage.
 
 ---
 
@@ -202,7 +206,8 @@ They should prefer:
 
 They should avoid direct assertions against internal component state.
 
-React Testing Library is intentionally designed to encourage tests that resemble actual usage instead of testing component internals.  [oai_citation:1‡Testing Library](https://testing-library.com/docs/react-testing-library/intro/?utm_source=chatgpt.com)
+React Testing Library is intentionally designed to encourage tests that
+resemble actual usage instead of testing component internals.
 
 ---
 
@@ -254,7 +259,9 @@ Typical scenarios include:
 - persistence across side panel, options page and focus view;
 - communication with the background service worker.
 
-Playwright is used because its official extension workflow supports loading Chromium extensions through a persistent browser context.  [oai_citation:2‡Playwright](https://playwright.dev/docs/chrome-extensions?utm_source=chatgpt.com)
+Playwright is used because its
+[extension workflow](https://playwright.dev/docs/chrome-extensions) supports
+loading Chromium extensions through a persistent browser context.
 
 End-to-end tests should cover critical journeys rather than every possible branch.
 
@@ -312,6 +319,14 @@ Testing should verify communication between:
 Cross-context messaging should be treated as an integration boundary.
 
 Extension-specific behavior should be verified through End-to-End tests rather than implementation-specific unit tests.
+
+The current Playwright fixture loads the production extension and its real
+background service worker, then opens the generated options, side-panel and
+focus documents by their extension URLs. This verifies extension-origin
+messaging, persistence and assembled page behavior. It does not reproduce
+Chrome's side-panel container, toolbar UI or every `sidePanel.open()` and
+`sidePanel.close()` interaction. Those browser-shell behaviors require focused
+adapter tests and manual verification until the harness supports them directly.
 
 ---
 

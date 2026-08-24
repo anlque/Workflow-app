@@ -149,13 +149,15 @@ The `platform` directory contains adapters to the execution environment.
 
 It provides access to browser APIs, persistence mechanisms and external services.
 
-MVP examples include:
+Current MVP modules include:
 
-- Chrome APIs
+- alarms
 - messaging
 - storage
-- notifications
-- logging
+
+Feature-specific browser adapters may live in feature Infrastructure, while
+surface-specific browser adapters may live beside their composition code in
+`app`. The exact ownership rule is recorded in ADR-0008.
 
 Platform contains infrastructure code only.
 
@@ -176,7 +178,10 @@ Possible feature examples include:
 - constants
 - testing utilities
 
-Business concepts such as `Workflow`, `Session` or `Reward Dice` must never be placed inside `shared`.
+Business entities and business rules such as `Workflow`, `Session` or Reward
+Dice must never be placed inside `shared`. A deliberately tiny Shared Kernel may
+contain an identity contract that is referenced by more than one feature, as
+recorded in ADR-0009. `AssetId` is the only current example.
 
 ---
 
@@ -208,7 +213,9 @@ Typical examples include:
 - reset styles
 - typography
 
-Feature-specific styles should remain inside their corresponding feature modules whenever practical.
+Current component styling uses semantic class names and is consolidated in
+`src/styles/global.css`. Feature-specific styles may move beside their owning
+feature when doing so improves ownership without fragmenting the design system.
 
 ---
 
@@ -514,6 +521,7 @@ Example structure:
 ```text
 shared/
 │
+├── domain/
 ├── ui/
 ├── lib/
 ├── hooks/
@@ -527,7 +535,8 @@ shared/
 
 ## What Does NOT Belong in Shared
 
-Business concepts must never be placed inside `shared`.
+Business entities, aggregate rules and use cases must never be placed inside
+`shared`.
 
 Examples include:
 
@@ -538,6 +547,10 @@ Examples include:
 - Reward Dice;
 - Media;
 - Statistics.
+
+The narrow Shared Kernel exception is limited to explicitly accepted
+cross-feature contracts such as `AssetId`. It must not become a general location
+for types whose owner is merely inconvenient to choose.
 
 These concepts belong to their owning feature.
 
@@ -627,7 +640,8 @@ Avoid generic directories such as:
 
 ## Shared Types
 
-Shared types should represent generic concepts only.
+Shared types should represent generic concepts or an explicitly accepted Shared
+Kernel contract only.
 
 Examples include:
 
@@ -640,7 +654,7 @@ Business entities must remain inside their owning feature.
 
 ---
 
-## Design Principles
+## Shared Design Principles
 
 Shared exists to reduce duplication without introducing coupling.
 
@@ -650,7 +664,7 @@ If moving code makes ownership less obvious, the code should remain inside its f
 
 ---
 
-## Design Principles
+## Top-Level Design Principles
 
 The top-level project structure follows several important rules.
 
@@ -680,27 +694,27 @@ Platform contains no business rules.
 
 ## Typical Contents
 
-Example structure:
+Current structure:
 
 ```text
 platform/
 │
-├── chrome/
+├── alarms/
 ├── messaging/
-├── storage/
-├── notifications/
-├── media-providers/
-├── logging/
-└── serialization/
+└── storage/
 ```
 
 Platform modules should be organized by technical capability rather than by business feature.
 
+Additional modules such as notifications, media providers, logging or generic
+serialization must be added only when a documented requirement needs them.
+
 ---
 
-## chrome/
+## Browser API Adapters
 
-The `chrome` directory contains low-level wrappers around Chrome Extension APIs.
+Browser API adapters are placed according to ownership rather than forced into a
+`chrome` directory that does not currently exist.
 
 Typical responsibilities include:
 
@@ -713,12 +727,15 @@ Typical responsibilities include:
 - side panel;
 - context menus.
 
-Direct access to `chrome.*` APIs outside `platform` should be avoided.
+Direct browser API access is allowed only in Platform adapters,
+feature-specific Infrastructure adapters and narrow surface adapters owned by
+`app`. Domain, Application and Presentation must never access browser APIs.
 
-Preferred:
+Allowed in a Platform adapter, feature Infrastructure or a narrow `app`
+adapter:
 
 ```ts
-import { chromeTabs } from '@/platform/chrome';
+import { browser } from 'wxt/browser';
 ```
 
 Avoid:
@@ -806,9 +823,11 @@ implements workflow persistence.
 
 ---
 
-## notifications/
+## Future notifications/
 
-The `notifications` directory provides adapters for system-level notifications and related browser capabilities.
+A future `notifications` directory may provide adapters for system-level
+notifications and related browser capabilities. System notifications are not
+part of the MVP and the directory must not be created speculatively.
 
 It may handle:
 
@@ -823,9 +842,10 @@ That decision belongs to Application or Domain logic.
 
 ---
 
-## media-providers/
+## Future media-providers/
 
-The `media-providers` directory contains adapters for external media sources.
+A future `media-providers` directory may contain adapters for external media
+sources. Remote providers are not part of the MVP.
 
 Typical examples include:
 
@@ -840,9 +860,10 @@ Platform adapters should normalize external data before exposing it to higher la
 
 ---
 
-## logging/
+## Future logging/
 
-The `logging` directory provides application-wide logging and diagnostics.
+A future `logging` directory may provide application-wide logging and
+diagnostics when the project has a concrete observability requirement.
 
 Typical responsibilities include:
 
@@ -878,11 +899,12 @@ Feature infrastructure may use Platform to implement application contracts.
 
 ## Direct Access Rule
 
-Technology-specific APIs should be accessed through Platform adapters whenever isolation provides clear value.
+Technology-specific APIs should be accessed through an adapter owned by
+Platform, feature Infrastructure or `app`, according to ADR-0008.
 
 This rule should not create wrappers that merely rename stable APIs without adding any boundary, normalization or testability benefit.
 
-A Platform adapter is justified when it provides at least one of the following:
+An adapter is justified when it provides at least one of the following:
 
 - runtime isolation;
 - type-safe contracts;

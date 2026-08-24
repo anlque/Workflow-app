@@ -291,14 +291,9 @@ The testing pyramid mirrors the architecture.
 
 ---
 
-# Candidate ADRs
+# Accepted ADRs
 
-The following architectural decisions may become formal ADRs after the architecture is finalized.
-
-- Workflow is immutable during execution.
-- Domain is framework-independent.
-- Feature-first architecture.
-- Value Objects are immutable.
-- Storage is an implementation detail.
-- Assets are referenced rather than embedded.
-- Reward Dice Templates, when introduced after the MVP, create independent copies.
+Accepted architectural decisions are indexed in
+[`docs/adr/README.md`](../adr/README.md). This document defines the current
+architecture; ADRs preserve the reasoning and consequences behind individual
+long-lived decisions.

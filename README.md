@@ -79,7 +79,8 @@ Dexie and WXT. The MV3 background service worker is authoritative for active
 Session transitions; each UI context holds only an ephemeral validated
 projection. Timing is derived from persisted epoch anchors rather than intervals.
 
-Architectural decisions and concept documentation live in `docs/`.
+Start with the [documentation hub](docs/README.md) for the Concept reading order,
+accepted architectural decisions and developer documentation paths.
 
 Open side-panel and idle focus Workflow lists refresh automatically after
 successful catalog changes in another extension surface. Active Sessions remain

@@ -76,6 +76,10 @@ Everything else in the application exists to improve this experience.
 
 The product allows users to create fully personalized focus workflows.
 
+This section describes the broader product direction. The later **MVP Scope**
+section is the source of truth for functionality implemented in the current
+version. Capabilities that are not included there remain future scope.
+
 Users can create and maintain multiple independent workflows.
 
 Each workflow represents a personalized environment optimized for a specific activity, such as software development, studying, reading, writing, exercising or meditation.
@@ -89,14 +93,14 @@ Each workflow may include:
 - custom duration;
 - visual environment;
 - ambient audio;
-- notifications. 
+- future notifications.
 
 ## Break Phase
 
 - custom duration;
 - separate environment;
 - separate audio;
-- reminders.
+- future reminders.
 
 ## Reward System
 
@@ -139,10 +143,8 @@ Examples include:
 
 - local images;
 - local audio;
-- remote images;
-- remote audio;
-- future videos;
-- future animations.
+- future remote images and audio;
+- future videos and animations.
 
 Assets may originate from different providers.
 
@@ -150,17 +152,18 @@ The workflow should not depend on where an asset comes from.
 
 ---
 
-# Asset Providers
+# Asset Sources and Future Providers
 
-The application should support multiple asset providers.
+The MVP accepts user-provided local files only. Later versions may support
+multiple remote or bundled asset providers.
 
 Examples:
 
-- Local Storage
-- Unsplash
-- Spotify
-- Pixabay
-- Future providers
+- local file import (MVP);
+- Unsplash (future);
+- Spotify (future);
+- Pixabay (future);
+- other future providers.
 
 Providers should behave as interchangeable sources.
 
@@ -185,7 +188,7 @@ The application must allow users to:
 
 Each workflow must support:
 
-- custom work duration;
+- custom focus duration;
 - custom break duration;
 - environment configuration;
 - reward configuration;
@@ -227,6 +230,7 @@ Users can configure:
 - probability of each side;
 - reward frequency;
 - whether completed focus or break Phases count toward that frequency.
+- zero to three optional rerolls after the initial roll.
 
 If probabilities are not customized, all sides must have equal probability.
 
@@ -272,9 +276,10 @@ The MVP targets Chrome on Manifest V3 and contains these extension surfaces:
 - side panel as a compact Workflow Library and Session surface;
 - options page for Workflow editing, Asset management and application settings;
 - background service worker for authoritative Session coordination;
-- a full-page focus view opened or activated from the extension toolbar or side
-  panel. When no Session is active, the focus view allows the user to select and
-  start an existing Workflow without opening the side panel.
+- a full-page focus view hosted in a dedicated browser focus tab. The tab is
+  opened or activated from the extension toolbar or side panel. When no Session
+  is active, the focus view allows the user to select and start an existing
+  Workflow without opening the side panel.
 
 The MVP does not require a popup or content scripts. Additional browsers and
 extension surfaces remain future work.
@@ -304,11 +309,15 @@ Workflow data, does not poll and never changes an active Session snapshot.
 
 Reward Dice is optional. Each Workflow selects whether completed `focus` or
 `break` Phases count toward its integer frequency of one or more matching
-Phases; legacy configurations default to `focus`. It contains at least two
-sides. Side probabilities are positive decimal weights normalized by the
-Domain; equal weights are used when custom weights are omitted. After the
-one-second Phase transition, an eligible non-final Reward pauses the full next
-Phase until the user clicks `Roll dice`, sees the result and clicks `Continue`.
+Phases; legacy configurations default to `focus`. Each dice configures zero to
+three optional rerolls after its initial roll; missing legacy values default to
+zero. The allowance starts fresh for every Reward, unused rerolls do not carry
+over, and the last displayed result is accepted when the user continues. It
+contains at least two sides. Side probabilities are positive decimal weights
+normalized by the Domain; equal weights are used when custom weights are
+omitted. After the one-second Phase transition, an eligible non-final Reward
+pauses the full next Phase until the user clicks `Roll dice`, sees the result
+and clicks `Continue`.
 The cube, result and current action use a centered composition with deliberate
 separation. Ordinary Resume cannot bypass this pause. Mixing lasts 2.5 seconds,
 or 0.6 seconds with reduced motion. Reward Dice Templates are not part of the

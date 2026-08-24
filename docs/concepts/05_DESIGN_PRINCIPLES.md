@@ -462,7 +462,7 @@ type Phase = {
 Preferred:
 
 ```ts
-type PhaseType = 'focus' | 'short-break' | 'long-break';
+type PhaseType = 'focus' | 'break';
 
 type Phase = {
   type: PhaseType;
@@ -570,11 +570,8 @@ function getPhaseLabel(type: PhaseType): string {
     case 'focus':
       return 'Focus';
 
-    case 'short-break':
-      return 'Short break';
-
-    case 'long-break':
-      return 'Long break';
+    case 'break':
+      return 'Break';
 
     default:
       return assertNever(type);
