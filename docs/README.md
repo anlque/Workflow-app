@@ -32,9 +32,16 @@ dependencies. For cross-context behavior, continue with
 [Persistence and Compatibility](development/PERSISTENCE.md) before changing
 records, schemas or import/export behavior. Feature internals are documented in
 the [Workflow reference](development/features/WORKFLOW.md) and
-[Session reference](development/features/SESSION.md). The remaining reference
-is being added incrementally; until a specific guide is present, read the
-relevant Concept documents and ADRs before changing its source owner.
+[Session reference](development/features/SESSION.md), with supporting references
+for [Assets](development/features/ASSETS.md) and
+[Settings](development/features/SETTINGS.md). For behavior spanning owners, use
+the source-linked flows for [starting a Session](development/flows/START_SESSION.md),
+[Phase transitions](development/flows/PHASE_TRANSITION.md),
+[Reward Dice](development/flows/REWARD_DICE.md),
+[Workflow catalog synchronization](development/flows/WORKFLOW_CATALOG_SYNC.md)
+and [import/export](development/flows/IMPORT_EXPORT.md). The testing/debugging
+commands, fixture boundaries and extension troubleshooting live in
+[Testing and Debugging](development/TESTING_AND_DEBUGGING.md).
 
 ## Source of Truth
 
