@@ -51,6 +51,8 @@ function workflow(value: unknown) {
   const dice = diceValue === undefined ? undefined : record(diceValue);
   const sides = dice?.['sides'];
   const triggerPhaseType = optionalRewardPhaseType(dice?.['triggerPhaseType']);
+  const rerolls =
+    dice?.['rerolls'] === undefined ? undefined : number(dice['rerolls']);
   if (dice !== undefined && !Array.isArray(sides)) return invalid();
   return createWorkflow({
     id: string(input['id']),
@@ -79,6 +81,7 @@ function workflow(value: unknown) {
           rewardDice: {
             ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
             frequency: number(dice['frequency']),
+            ...(rerolls === undefined ? {} : { rerolls }),
             sides: (sides as unknown[]).map((value) => {
               const side = record(value);
               const description = optionalString(side['description']);

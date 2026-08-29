@@ -252,6 +252,9 @@ export function WorkflowEditor({
         onFrequencyChange={(frequency) => {
           editor.setRewardFrequency(frequency);
         }}
+        onRerollsChange={(rerolls) => {
+          editor.setRewardRerolls(rerolls);
+        }}
         onSideChange={(key, side) => {
           editor.updateRewardSide(key, side);
         }}

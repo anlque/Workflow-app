@@ -148,6 +148,49 @@ describe('DexieSessionRepository', () => {
     });
   });
 
+  test('defaults missing version-1 Session Reward Dice rerolls during restoration', async () => {
+    const store = database();
+    const repository = new DexieSessionRepository(store);
+    const rewardedWorkflow = createWorkflow({
+      id: 'legacy-reward-workflow',
+      name: 'Legacy Reward',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        rerolls: 3,
+        sides: [
+          { icon: '☕', title: 'Tea' },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const session = createSession(
+      'legacy-reward-session',
+      rewardedWorkflow,
+      1_000,
+    );
+    await repository.save(session);
+    const table = store.table<SessionRecord, string>('sessions');
+    const stored = await table.get(session.id);
+    if (stored === undefined || typeof stored !== 'object') {
+      throw new Error('Expected a stored Session record.');
+    }
+    const storedReward = (
+      stored as {
+        session: { workflow: { rewardDice?: Record<string, unknown> } };
+      }
+    ).session.workflow.rewardDice;
+    if (storedReward === undefined) {
+      throw new Error('Expected stored Reward Dice.');
+    }
+    delete storedReward['rerolls'];
+    await table.put(stored);
+
+    const restored = await repository.get(session.id);
+
+    expect(restored?.snapshot.workflow.rewardDice?.rerolls).toBe(0);
+  });
+
   test('clears active lookup when a Session becomes terminal', async () => {
     const repository = new DexieSessionRepository(database());
     const running = createSession('session-1', workflow(), 1_000);

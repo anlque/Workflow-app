@@ -28,6 +28,24 @@ export type ActiveSessionViewProps = Readonly<{
 const systemNow = (): number => Date.now();
 const systemRandom = (): number => Math.random();
 
+type RewardOpportunity = Readonly<{
+  key: string;
+  sessionId: SessionId;
+  dice: RewardDice;
+}>;
+
+function rewardOpportunity(
+  session: Session,
+  dice: RewardDice,
+): RewardOpportunity {
+  const status = session.status === 'completed' ? 'completed' : 'paused';
+  return {
+    key: `${session.id}:${String(session.currentPhaseIndex)}:${status}`,
+    sessionId: session.id,
+    dice,
+  };
+}
+
 export function ActiveSessionView({
   session,
   now = systemNow,
@@ -41,22 +59,29 @@ export function ActiveSessionView({
   onStop,
 }: ActiveSessionViewProps) {
   const [displayNow, setDisplayNow] = useState(now);
-  const [rewardDice, setRewardDice] = useState<RewardDice | null>(() =>
-    rewardInteraction === undefined
-      ? null
-      : rewardOpportunityForSessionTransition(null, session),
-  );
+  const [reward, setReward] = useState<RewardOpportunity | null>(() => {
+    if (rewardInteraction === undefined) return null;
+    const dice = rewardOpportunityForSessionTransition(null, session);
+    return dice === null ? null : rewardOpportunity(session, dice);
+  });
   const previousSession = useRef(session);
 
   useEffect(() => {
     const previous = previousSession.current;
-    const nextReward = rewardOpportunityForSessionTransition(previous, session);
+    const rewardBaseline = previous.id === session.id ? previous : null;
+    const nextReward = rewardOpportunityForSessionTransition(
+      rewardBaseline,
+      session,
+    );
     previousSession.current = session;
     if (didCrossPhaseBoundary(previous, session)) {
       onPhaseBoundary?.();
     }
+    if (previous.id !== session.id) {
+      setReward(null);
+    }
     if (nextReward !== null && rewardInteraction !== undefined) {
-      setRewardDice(nextReward);
+      setReward(rewardOpportunity(session, nextReward));
     }
   }, [onPhaseBoundary, rewardInteraction, session]);
 
@@ -73,9 +98,11 @@ export function ActiveSessionView({
 
   const workflow = session.snapshot.workflow;
   const rewardResult =
-    rewardDice === null || rewardInteraction === undefined ? null : (
+    reward?.sessionId !== session.id ||
+    rewardInteraction === undefined ? null : (
       <RewardResultDialog
-        dice={rewardDice}
+        key={reward.key}
+        dice={reward.dice}
         random={random}
         reducedMotion={reducedMotion}
         onRoll={rewardInteraction.onRoll}
@@ -84,7 +111,7 @@ export function ActiveSessionView({
           if (session.status === 'paused' && session.pauseReason === 'reward') {
             await rewardInteraction.continueReward(session.id);
           }
-          setRewardDice(null);
+          setReward(null);
           if (isFinalReward) onFinalRewardContinued?.();
         }}
       />

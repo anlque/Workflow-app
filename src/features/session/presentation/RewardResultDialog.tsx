@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   rollReward,
@@ -29,8 +29,10 @@ export function RewardResultDialog({
 }: RewardResultDialogProps) {
   const [stage, setStage] = useState<RewardStage>('ready');
   const [reward, setReward] = useState<DiceSide | null>(null);
+  const [usedRerolls, setUsedRerolls] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
   const duration: MixingDuration = reducedMotion ? 600 : 2_500;
 
   useEffect(() => {
@@ -42,6 +44,12 @@ export function RewardResultDialog({
       window.clearTimeout(timer);
     };
   }, [duration, stage]);
+
+  useEffect(() => {
+    if (stage === 'result' && usedRerolls > 0 && usedRerolls >= dice.rerolls) {
+      actionsRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    }
+  }, [dice.rerolls, stage, usedRerolls]);
 
   const cubeStage: RewardCubeStage =
     stage === 'mixing' && reducedMotion ? 'mixing-reduced' : stage;
@@ -60,6 +68,21 @@ export function RewardResultDialog({
     }
   }
 
+  function roll(): void {
+    setError(null);
+    setReward(rollReward(dice, random));
+    setStage('mixing');
+    onRoll(duration);
+  }
+
+  function reroll(): void {
+    if (stage !== 'result' || usedRerolls >= dice.rerolls) return;
+    setUsedRerolls((count) => count + 1);
+    roll();
+  }
+
+  const rerollsLeft = dice.rerolls - usedRerolls;
+
   return (
     <Dialog
       open
@@ -70,7 +93,12 @@ export function RewardResultDialog({
       <div className="reward-dialog__content">
         <RewardCube icon={reward?.icon ?? '✦'} stage={cubeStage} />
         {stage === 'result' && reward !== null ? (
-          <div className="reward-result">
+          <div
+            className="reward-result"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             <h3>{reward.title}</h3>
             {reward.description === undefined ? null : (
               <p>{reward.description}</p>
@@ -79,27 +107,37 @@ export function RewardResultDialog({
         ) : null}
         {error === null ? null : <p role="alert">{error}</p>}
       </div>
-      <div className="dialog__actions">
-        {stage === 'result' ? (
-          <Button
-            variant="primary"
-            pending={pending}
-            pendingLabel="Continuing…"
-            onClick={() => {
-              void continueSession();
-            }}
-          >
-            Continue
-          </Button>
+      <div ref={actionsRef} className="dialog__actions">
+        {stage === 'result' || usedRerolls > 0 ? (
+          <>
+            <Button
+              variant="primary"
+              disabled={stage === 'mixing'}
+              pending={pending}
+              pendingLabel="Continuing…"
+              onClick={() => {
+                void continueSession();
+              }}
+            >
+              Continue
+            </Button>
+            {rerollsLeft > 0 || stage === 'mixing' ? (
+              <Button
+                variant="secondary"
+                disabled={stage === 'mixing' || pending}
+                onClick={reroll}
+              >
+                Roll again · {Math.max(rerollsLeft, 1)} left
+              </Button>
+            ) : null}
+          </>
         ) : (
           <Button
             variant="primary"
             disabled={stage !== 'ready'}
             onClick={() => {
               if (stage !== 'ready') return;
-              setReward(rollReward(dice, random));
-              setStage('mixing');
-              onRoll(duration);
+              roll();
             }}
           >
             Roll dice

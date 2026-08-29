@@ -20,6 +20,38 @@ describe('parseSessionProjection', () => {
     expect(parseSessionProjection(structuredClone(value))).toEqual(value);
   });
 
+  test('defaults missing Reward Dice rerolls in a runtime Session projection', () => {
+    const value = createSession(
+      'legacy-reward-session',
+      createWorkflow({
+        id: 'legacy-reward-workflow',
+        name: 'Legacy Reward',
+        phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+        rewardDice: {
+          frequency: 1,
+          rerolls: 3,
+          sides: [
+            { icon: '☕', title: 'Tea' },
+            { icon: '🌿', title: 'Fresh air' },
+          ],
+        },
+      }),
+      1_000,
+    );
+    const legacyProjection = structuredClone(value) as {
+      snapshot: { workflow: { rewardDice?: Record<string, unknown> } };
+    };
+    const legacyReward = legacyProjection.snapshot.workflow.rewardDice;
+    if (legacyReward === undefined) {
+      throw new Error('Expected projected Reward Dice.');
+    }
+    delete legacyReward['rerolls'];
+
+    const restored = parseSessionProjection(legacyProjection);
+
+    expect(restored?.snapshot.workflow.rewardDice?.rerolls).toBe(0);
+  });
+
   test('accepts null and rejects malformed values', () => {
     expect(parseSessionProjection(null)).toBeNull();
     expect(() => parseSessionProjection({ status: 'running' })).toThrow();

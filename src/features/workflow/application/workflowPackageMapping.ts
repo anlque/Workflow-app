@@ -70,6 +70,7 @@ export function serializeWorkflow(workflow: Workflow): unknown {
           rewardDice: {
             triggerPhaseType: workflow.rewardDice.triggerPhaseType,
             frequency: workflow.rewardDice.frequency,
+            rerolls: workflow.rewardDice.rerolls,
             sides: workflow.rewardDice.sides.map((side) => ({
               icon: side.icon,
               title: side.title,
@@ -97,10 +98,16 @@ export function parseWorkflow(value: unknown): Workflow {
     const triggerPhaseType = optionalRewardPhaseType(
       reward?.['triggerPhaseType'],
     );
+    const rerolls =
+      reward?.['rerolls'] === undefined ? undefined : number(reward['rerolls']);
     if (reward !== undefined && !Array.isArray(sideValues)) return invalid();
     if (
       reward !== undefined &&
-      !hasExactKeys(reward, ['frequency', 'sides'], ['triggerPhaseType'])
+      !hasExactKeys(
+        reward,
+        ['frequency', 'sides'],
+        ['triggerPhaseType', 'rerolls'],
+      )
     ) {
       return invalid();
     }
@@ -144,6 +151,7 @@ export function parseWorkflow(value: unknown): Workflow {
             rewardDice: {
               ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
               frequency: number(reward['frequency']),
+              ...(rerolls === undefined ? {} : { rerolls }),
               sides: (sideValues as unknown[]).map((sideValue) => {
                 const side = record(sideValue);
                 if (

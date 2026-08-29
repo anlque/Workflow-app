@@ -15,6 +15,7 @@ export function createSessionSnapshot(source: Workflow): SessionSnapshot {
           rewardDice: {
             triggerPhaseType: source.rewardDice.triggerPhaseType,
             frequency: source.rewardDice.frequency,
+            rerolls: source.rewardDice.rerolls,
             sides: source.rewardDice.sides.map((side) => ({
               icon: side.icon,
               title: side.title,

@@ -96,6 +96,7 @@ function rewardedWorkflow(): Workflow {
     rewardDice: {
       triggerPhaseType: 'break',
       frequency: 1,
+      rerolls: 3,
       sides: [
         { icon: 'tea', title: 'Tea' },
         { icon: 'walk', title: 'Walk' },
@@ -144,9 +145,40 @@ describe('Workflow package', () => {
     );
 
     expect(JSON.parse(data)).toMatchObject({
-      workflow: { rewardDice: { triggerPhaseType: 'break' } },
+      workflow: { rewardDice: { triggerPhaseType: 'break', rerolls: 3 } },
     });
     expect(imported.rewardDice?.triggerPhaseType).toBe('break');
+    expect(imported.rewardDice?.rerolls).toBe(3);
+  });
+
+  test('defaults missing version-1 Reward Dice rerolls during import', async () => {
+    const exported = await exportWorkflowUseCase(
+      rewardedWorkflow(),
+      new MemoryAssetRepository(),
+    );
+    const legacyPackage = JSON.parse(exported) as {
+      workflow: { rewardDice?: Record<string, unknown> };
+    };
+    const legacyReward = legacyPackage.workflow.rewardDice;
+    if (legacyReward === undefined) {
+      throw new Error('Expected exported Reward Dice.');
+    }
+    delete legacyReward['rerolls'];
+
+    const imported = await importWorkflowUseCase(
+      new MemoryWorkflowRepository(),
+      new MemoryAssetRepository(),
+      new MemoryUnitOfWork(),
+      JSON.stringify(legacyPackage),
+      { maxFileBytes: 10_000, assetPolicy: policy },
+      {
+        createWorkflowId: () => 'workflow-new',
+        createAssetId: () => 'asset-new',
+        now: () => 2_000,
+      },
+    );
+
+    expect(imported.rewardDice?.rerolls).toBe(0);
   });
 
   test('exports only referenced Assets with deterministic transport-safe encoding', async () => {

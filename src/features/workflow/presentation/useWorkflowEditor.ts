@@ -24,6 +24,7 @@ export type RewardDiceDraft = Readonly<{
   enabled: boolean;
   triggerPhaseType: RewardPhaseType;
   frequency: string;
+  rerolls: string;
   sides: readonly RewardSideDraft[];
 }>;
 
@@ -81,6 +82,7 @@ function initialDraft(workflowId: string, workflow?: Workflow): WorkflowDraft {
       enabled: workflow?.rewardDice !== undefined,
       triggerPhaseType: workflow?.rewardDice?.triggerPhaseType ?? 'focus',
       frequency: String(workflow?.rewardDice?.frequency ?? 1),
+      rerolls: String(workflow?.rewardDice?.rerolls ?? 0),
       sides: workflow?.rewardDice?.sides.map((side) => ({
         key: key(),
         icon: side.icon,
@@ -96,6 +98,12 @@ function positiveInteger(value: string): number | null {
   if (!/^\d+$/.test(value)) return null;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function rerollCount(value: string): number | null {
+  if (!/^\d$/.test(value)) return null;
+  const parsed = Number(value);
+  return parsed >= 0 && parsed <= 3 ? parsed : null;
 }
 
 function minutesToDurationSeconds(value: string): number | null {
@@ -141,8 +149,12 @@ export function validateWorkflowDraft(
   let rewardDice: CreateWorkflowInput['rewardDice'];
   if (draft.rewardDice.enabled) {
     const frequency = positiveInteger(draft.rewardDice.frequency);
+    const rerolls = rerollCount(draft.rewardDice.rerolls);
     if (frequency === null) {
       errors['reward:frequency'] = 'Frequency must be a positive whole number.';
+    }
+    if (rerolls === null) {
+      errors['reward:rerolls'] = 'Choose between 0 and 3 rerolls.';
     }
     if (draft.rewardDice.sides.length < 2) {
       errors['reward:sides'] = 'Reward Dice needs at least two sides.';
@@ -179,6 +191,7 @@ export function validateWorkflowDraft(
     rewardDice = {
       triggerPhaseType: draft.rewardDice.triggerPhaseType,
       frequency: frequency ?? 1,
+      rerolls: rerolls ?? 0,
       sides,
     };
   }
@@ -247,6 +260,12 @@ export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
       setDraft((current) => ({
         ...current,
         rewardDice: { ...current.rewardDice, frequency },
+      }));
+    },
+    setRewardRerolls(rerolls: string): void {
+      setDraft((current) => ({
+        ...current,
+        rewardDice: { ...current.rewardDice, rerolls },
       }));
     },
     setRewardTriggerPhaseType(triggerPhaseType: RewardPhaseType): void {

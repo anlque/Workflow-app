@@ -92,9 +92,15 @@ function createRewardPhaseType(value: unknown): RewardPhaseType {
 
 function createRewardDice(input: RewardDiceInput): RewardDice {
   const triggerPhaseType = createRewardPhaseType(input.triggerPhaseType);
+  const rerolls = input.rerolls ?? 0;
   if (!Number.isInteger(input.frequency) || input.frequency < 1) {
     throw new WorkflowValidationError(
       'Reward Dice frequency must be a positive integer.',
+    );
+  }
+  if (!Number.isInteger(rerolls) || rerolls < 0 || rerolls > 3) {
+    throw new WorkflowValidationError(
+      'Reward Dice rerolls must be an integer from 0 through 3.',
     );
   }
 
@@ -152,6 +158,7 @@ function createRewardDice(input: RewardDiceInput): RewardDice {
   return Object.freeze({
     triggerPhaseType,
     frequency: input.frequency,
+    rerolls,
     sides: Object.freeze(sides),
   });
 }

@@ -97,7 +97,47 @@ describe('createWorkflow', () => {
     });
 
     expect(workflow.rewardDice?.triggerPhaseType).toBe('focus');
+    expect(workflow.rewardDice?.rerolls).toBe(0);
   });
+
+  test.each([0, 1, 2, 3])('accepts %s Reward Dice rerolls', (rerolls) => {
+    const workflow = createWorkflow({
+      id: 'workflow-1',
+      name: 'Deep work',
+      phases: [validPhase],
+      rewardDice: {
+        frequency: 1,
+        rerolls,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+
+    expect(workflow.rewardDice?.rerolls).toBe(rerolls);
+  });
+
+  test.each([-1, 4, 0.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects invalid Reward Dice rerolls %s',
+    (rerolls) => {
+      expect(() =>
+        createWorkflow({
+          id: 'workflow-1',
+          name: 'Deep work',
+          phases: [validPhase],
+          rewardDice: {
+            frequency: 1,
+            rerolls,
+            sides: [
+              { icon: 'tea', title: 'Tea' },
+              { icon: 'walk', title: 'Walk' },
+            ],
+          },
+        }),
+      ).toThrow('Reward Dice rerolls must be an integer from 0 through 3.');
+    },
+  );
 
   test('creates Reward Dice triggered by break phases', () => {
     const workflow = createWorkflow({

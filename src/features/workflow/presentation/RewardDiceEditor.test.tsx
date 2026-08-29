@@ -14,12 +14,14 @@ describe('RewardDiceEditor', () => {
           enabled: false,
           triggerPhaseType: 'focus',
           frequency: '1',
+          rerolls: '0',
           sides: [],
         }}
         errors={{}}
         onEnabledChange={onEnabledChange}
         onTriggerPhaseTypeChange={() => undefined}
         onFrequencyChange={() => undefined}
+        onRerollsChange={() => undefined}
         onSideChange={() => undefined}
         onAddSide={() => undefined}
         onRemoveSide={() => undefined}
@@ -38,6 +40,7 @@ describe('RewardDiceEditor', () => {
           enabled: true,
           triggerPhaseType: 'focus',
           frequency: '1',
+          rerolls: '0',
           sides: [
             {
               key: 'tea',
@@ -59,6 +62,7 @@ describe('RewardDiceEditor', () => {
         onEnabledChange={() => undefined}
         onTriggerPhaseTypeChange={() => undefined}
         onFrequencyChange={() => undefined}
+        onRerollsChange={() => undefined}
         onSideChange={() => undefined}
         onAddSide={() => undefined}
         onRemoveSide={() => undefined}
@@ -84,12 +88,14 @@ describe('RewardDiceEditor', () => {
           enabled: true,
           triggerPhaseType: 'focus',
           frequency: '1',
+          rerolls: '0',
           sides: [],
         }}
         errors={{}}
         onEnabledChange={() => undefined}
         onTriggerPhaseTypeChange={onTriggerPhaseTypeChange}
         onFrequencyChange={() => undefined}
+        onRerollsChange={() => undefined}
         onSideChange={() => undefined}
         onAddSide={() => undefined}
         onRemoveSide={() => undefined}
@@ -104,5 +110,39 @@ describe('RewardDiceEditor', () => {
     await user.selectOptions(screen.getByLabelText('Reward after'), 'break');
 
     expect(onTriggerPhaseTypeChange).toHaveBeenCalledWith('break');
+  });
+
+  test('selects the number of additional rolls', async () => {
+    const user = userEvent.setup();
+    const onRerollsChange = vi.fn();
+    render(
+      <RewardDiceEditor
+        draft={{
+          enabled: true,
+          triggerPhaseType: 'focus',
+          frequency: '1',
+          rerolls: '0',
+          sides: [],
+        }}
+        errors={{ 'reward:rerolls': 'Choose between 0 and 3 rerolls.' }}
+        onEnabledChange={() => undefined}
+        onTriggerPhaseTypeChange={() => undefined}
+        onFrequencyChange={() => undefined}
+        onRerollsChange={onRerollsChange}
+        onSideChange={() => undefined}
+        onAddSide={() => undefined}
+        onRemoveSide={() => undefined}
+      />,
+    );
+
+    expect(screen.getByLabelText('Available rerolls')).toHaveValue('0');
+    expect(
+      screen.getByText('Additional rolls available after the first roll.'),
+    ).toBeVisible();
+    expect(screen.getByText('Choose between 0 and 3 rerolls.')).toBeVisible();
+
+    await user.selectOptions(screen.getByLabelText('Available rerolls'), '3');
+
+    expect(onRerollsChange).toHaveBeenCalledWith('3');
   });
 });

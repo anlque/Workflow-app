@@ -14,6 +14,7 @@ export type RewardDiceEditorProps = Readonly<{
   onEnabledChange(enabled: boolean): void;
   onTriggerPhaseTypeChange(value: RewardPhaseType): void;
   onFrequencyChange(value: string): void;
+  onRerollsChange(value: string): void;
   onSideChange(key: string, patch: Partial<RewardSideDraft>): void;
   onAddSide(): void;
   onRemoveSide(key: string): void;
@@ -25,6 +26,7 @@ export function RewardDiceEditor({
   onEnabledChange,
   onTriggerPhaseTypeChange,
   onFrequencyChange,
+  onRerollsChange,
   onSideChange,
   onAddSide,
   onRemoveSide,
@@ -74,6 +76,24 @@ export function RewardDiceEditor({
                   onFrequencyChange(event.target.value);
                 }}
               />
+            </Field>
+            <Field
+              label="Available rerolls"
+              hint="Additional rolls available after the first roll."
+              error={errors['reward:rerolls']}
+            >
+              <select
+                className="select"
+                value={draft.rerolls}
+                onChange={(event) => {
+                  onRerollsChange(event.target.value);
+                }}
+              >
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
             </Field>
             {errors['reward:sides'] === undefined ? null : (
               <p className="field__error" role="alert">

@@ -215,6 +215,7 @@ export async function importWorkflowUseCase(
           rewardDice: {
             triggerPhaseType: sourceWorkflow.rewardDice.triggerPhaseType,
             frequency: sourceWorkflow.rewardDice.frequency,
+            rerolls: sourceWorkflow.rewardDice.rerolls,
             sides: sourceWorkflow.rewardDice.sides.map((side) => ({
               icon: side.icon,
               title: side.title,

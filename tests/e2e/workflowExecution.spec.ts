@@ -164,6 +164,7 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
     label: 'reward-background.png',
   });
   await options.getByLabel('Enable Reward Dice').check();
+  await options.getByLabel('Available rerolls').selectOption('1');
   await options.getByLabel('Reward side 1 icon').fill('☕');
   await options.getByLabel('Reward side 1 title').fill('Tea');
   await options.getByLabel('Reward side 2 icon').fill('🧘');
@@ -240,6 +241,15 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
     'mixing',
   );
   await expect(reward).toContainText(/Tea|Stretch/u);
+  await focus.getByRole('button', { name: 'Roll again · 1 left' }).click();
+  await expect(focus.getByTestId('reward-cube')).toHaveAttribute(
+    'data-state',
+    'mixing',
+  );
+  await expect(reward).toContainText(/Tea|Stretch/u);
+  await expect(focus.getByRole('button', { name: /Roll again/u })).toHaveCount(
+    0,
+  );
   await focus.getByRole('button', { name: 'Continue' }).click();
   await expect(focus.getByText('Break · Phase 2 of 2')).toBeVisible();
   await expect(focus.getByLabel('Time remaining')).toHaveText(/00:(29|30)/u);

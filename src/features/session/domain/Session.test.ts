@@ -26,7 +26,19 @@ function workflow() {
 
 describe('Session', () => {
   test('starts from a deeply immutable independent Workflow snapshot', () => {
-    const source = workflow();
+    const source = createWorkflow({
+      id: 'workflow-rewarded',
+      name: 'Deep work',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        rerolls: 3,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
 
     const session = createSession('session-1', source, 1_000);
 
@@ -37,6 +49,7 @@ describe('Session', () => {
     expect(session.snapshot.workflow).toEqual(source);
     expect(session.snapshot.workflow).not.toBe(source);
     expect(session.snapshot.workflow.phases).not.toBe(source.phases);
+    expect(session.snapshot.workflow.rewardDice?.rerolls).toBe(3);
     expect(Object.isFrozen(session)).toBe(true);
     expect(Object.isFrozen(session.snapshot)).toBe(true);
     expect(Object.isFrozen(session.snapshot.workflow)).toBe(true);

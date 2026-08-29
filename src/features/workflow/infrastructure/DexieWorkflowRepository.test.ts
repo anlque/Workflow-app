@@ -44,6 +44,7 @@ function workflow(id: string, name: string): Workflow {
     rewardDice: {
       triggerPhaseType: 'break',
       frequency: 2,
+      rerolls: 3,
       sides: [
         { icon: 'tea', title: 'Tea', description: 'Make tea', weight: 3 },
         { icon: 'walk', title: 'Walk', weight: 1 },
@@ -74,7 +75,7 @@ describe('DexieWorkflowRepository', () => {
 
     await expect(repository.get(expected.id)).resolves.toEqual(expected);
     await expect(repository.get(expected.id)).resolves.toMatchObject({
-      rewardDice: { triggerPhaseType: 'break' },
+      rewardDice: { triggerPhaseType: 'break', rerolls: 3 },
     });
   });
 
@@ -99,7 +100,7 @@ describe('DexieWorkflowRepository', () => {
     await expect(
       repository.get(workflow('legacy', 'Fixture').id),
     ).resolves.toMatchObject({
-      rewardDice: { triggerPhaseType: 'focus' },
+      rewardDice: { triggerPhaseType: 'focus', rerolls: 0 },
     });
   });
 

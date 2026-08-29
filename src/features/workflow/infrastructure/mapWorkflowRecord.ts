@@ -62,6 +62,10 @@ function mapRewardDiceRecord(value: unknown): RewardDiceInput {
   const record = objectRecord(value);
   const sides = record['sides'];
   const triggerPhaseType = rewardPhaseType(record['triggerPhaseType']);
+  const rerolls =
+    record['rerolls'] === undefined
+      ? undefined
+      : numberValue(record['rerolls']);
   if (!Array.isArray(sides)) {
     return invalidRecord();
   }
@@ -69,6 +73,7 @@ function mapRewardDiceRecord(value: unknown): RewardDiceInput {
   return {
     ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
     frequency: numberValue(record['frequency']),
+    ...(rerolls === undefined ? {} : { rerolls }),
     sides: sides.map((sideValue) => {
       const side = objectRecord(sideValue);
       const description = optionalString(side['description']);
@@ -141,6 +146,7 @@ export function mapWorkflowToRecord(
           rewardDice: {
             triggerPhaseType: workflow.rewardDice.triggerPhaseType,
             frequency: workflow.rewardDice.frequency,
+            rerolls: workflow.rewardDice.rerolls,
             sides: workflow.rewardDice.sides.map((side) => ({
               icon: side.icon,
               title: side.title,

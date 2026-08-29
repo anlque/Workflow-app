@@ -20,6 +20,24 @@ const dice = createWorkflow({
 
 if (dice === undefined) throw new Error('Expected Reward Dice fixture.');
 
+const rerollDice = createWorkflow({
+  id: 'workflow-rerolls',
+  name: 'Rewarded work',
+  phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+  rewardDice: {
+    frequency: 1,
+    rerolls: 2,
+    sides: [
+      { icon: '☕', title: 'Tea' },
+      { icon: '🌿', title: 'Fresh air' },
+    ],
+  },
+}).rewardDice;
+
+if (rerollDice === undefined) {
+  throw new Error('Expected reroll Reward Dice fixture.');
+}
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -88,6 +106,166 @@ describe('RewardResultDialog', () => {
     );
     expect(screen.getByText('Tea')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: /Roll again/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  test('replaces the result until the configured rerolls are exhausted', () => {
+    vi.useFakeTimers();
+    const random = vi
+      .fn<() => number>()
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.75)
+      .mockReturnValueOnce(0);
+    const onRoll = vi.fn();
+    render(
+      <RewardResultDialog
+        dice={rerollDice}
+        random={random}
+        reducedMotion
+        onRoll={onRoll}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.getByText('Tea')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Roll again · 2 left' }),
+    ).toBeVisible();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll again · 2 left' }),
+    );
+    expect(screen.queryByText('Tea')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Roll again · 1 left' }),
+    ).toBeDisabled();
+    expect(onRoll).toHaveBeenCalledTimes(2);
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.getByText('Fresh air')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Roll again · 1 left' }),
+    ).toBeVisible();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll again · 1 left' }),
+    );
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.getByText('Tea')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: /Roll again/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+    expect(random).toHaveBeenCalledTimes(3);
+    expect(onRoll).toHaveBeenCalledTimes(3);
+    expect(onRoll).toHaveBeenNthCalledWith(3, 600);
+  });
+
+  test('keeps keyboard focus on the reroll action while its result is mixing', () => {
+    vi.useFakeTimers();
+    render(
+      <RewardResultDialog
+        dice={rerollDice}
+        random={() => 0}
+        reducedMotion
+        onRoll={vi.fn()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    const reroll = screen.getByRole('button', {
+      name: 'Roll again · 2 left',
+    });
+    reroll.focus();
+
+    fireEvent.click(reroll);
+
+    const mixingReroll = screen.getByRole('button', {
+      name: 'Roll again · 1 left',
+    });
+    expect(mixingReroll).toBeDisabled();
+    expect(mixingReroll).toHaveFocus();
+  });
+
+  test('announces a replacement Reward as an atomic polite status', () => {
+    vi.useFakeTimers();
+    const random = vi
+      .fn<() => number>()
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.75);
+    render(
+      <RewardResultDialog
+        dice={rerollDice}
+        random={random}
+        reducedMotion
+        onRoll={vi.fn()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll again · 2 left' }),
+    );
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Fresh air');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'true');
+  });
+
+  test('moves focus to Continue after the final reroll is revealed', () => {
+    vi.useFakeTimers();
+    render(
+      <RewardResultDialog
+        dice={rerollDice}
+        random={() => 0}
+        reducedMotion
+        onRoll={vi.fn()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll again · 2 left' }),
+    );
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    const finalReroll = screen.getByRole('button', {
+      name: 'Roll again · 1 left',
+    });
+    finalReroll.focus();
+    fireEvent.click(finalReroll);
+    const mixingFinalReroll = screen.getByRole('button', {
+      name: 'Roll again · 1 left',
+    });
+    expect(mixingFinalReroll).toBeDisabled();
+    expect(mixingFinalReroll).toHaveFocus();
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus();
   });
 
   test('uses a 600 ms sound window and no visual roll with reduced motion', () => {

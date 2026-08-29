@@ -11,7 +11,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createAsset } from '@/features/assets';
 
 import type { CreateWorkflowInput } from '../domain/Workflow';
-import { useWorkflowEditor } from './useWorkflowEditor';
+import { useWorkflowEditor, validateWorkflowDraft } from './useWorkflowEditor';
 import { WorkflowEditor } from './WorkflowEditor';
 
 const image = createAsset({
@@ -155,6 +155,23 @@ describe('WorkflowEditor', () => {
     expect(result.current.draft.rewardDice.sides).toHaveLength(2);
   });
 
+  test('defaults rerolls to zero and rejects drafts outside the allowed range', () => {
+    const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
+
+    expect(result.current.draft.rewardDice.rerolls).toBe('0');
+    act(() => {
+      result.current.setRewardEnabled(true);
+      result.current.setRewardRerolls('4');
+    });
+
+    const validation = validateWorkflowDraft(result.current.draft);
+    expect(validation.valid).toBe(false);
+    if (validation.valid) throw new Error('Expected invalid rerolls.');
+    expect(validation.errors['reward:rerolls']).toBe(
+      'Choose between 0 and 3 rerolls.',
+    );
+  });
+
   test('adds, reorders and saves ordered Phases with Asset references', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
@@ -228,5 +245,26 @@ describe('WorkflowEditor', () => {
     expect(onSave.mock.calls[0]?.[0].rewardDice?.triggerPhaseType).toBe(
       'break',
     );
+  });
+
+  test('saves the configured Reward Dice rerolls', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    render(
+      <WorkflowEditor workflowId="workflow-1" assets={[]} onSave={onSave} />,
+    );
+
+    await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
+    await user.click(screen.getByLabelText('Enable Reward Dice'));
+    await user.selectOptions(screen.getByLabelText('Available rerolls'), '3');
+    await user.type(screen.getByLabelText('Reward side 1 icon'), '☕');
+    await user.type(screen.getByLabelText('Reward side 1 title'), 'Tea');
+    await user.type(screen.getByLabelText('Reward side 2 icon'), '🚶');
+    await user.type(screen.getByLabelText('Reward side 2 title'), 'Walk');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+
+    expect(onSave.mock.calls[0]?.[0].rewardDice?.rerolls).toBe(3);
   });
 });

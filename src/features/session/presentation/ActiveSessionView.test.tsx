@@ -241,4 +241,230 @@ describe('ActiveSessionView', () => {
     expect(onFinalRewardContinued).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });
+
+  test('starts each Session Reward with fresh result and reroll state', () => {
+    vi.useFakeTimers();
+    const rewardedWorkflow = createWorkflow({
+      id: 'session-reward-lifecycle',
+      name: 'Session reward lifecycle',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        rerolls: 2,
+        sides: [
+          { icon: '☕', title: 'Tea' },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const sessionA = createSession('session-a', rewardedWorkflow, 1_000);
+    const sessionB = createSession('session-b', rewardedWorkflow, 4_000);
+    const rewardInteraction = {
+      onRoll: vi.fn(),
+      continueReward: vi.fn(() => Promise.resolve()),
+    };
+    const random = vi
+      .fn<() => number>()
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.75)
+      .mockReturnValueOnce(0);
+    const { rerender } = render(
+      <ActiveSessionView
+        session={sessionA}
+        now={() => 1_000}
+        random={random}
+        reducedMotion
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+
+    rerender(
+      <ActiveSessionView
+        session={deriveSessionState(sessionA, 3_000)}
+        now={() => 3_000}
+        random={random}
+        reducedMotion
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll again · 2 left' }),
+    );
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.getByText('Fresh air')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Roll again · 1 left' }),
+    ).toBeVisible();
+
+    rerender(
+      <ActiveSessionView
+        session={sessionB}
+        now={() => 4_000}
+        random={random}
+        reducedMotion
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+    expect(
+      screen.queryByRole('dialog', { name: 'Reward unlocked' }),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <ActiveSessionView
+        session={deriveSessionState(sessionB, 6_000)}
+        now={() => 6_000}
+        random={random}
+        reducedMotion
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Roll dice' })).toBeVisible();
+    expect(screen.queryByText('Fresh air')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(
+      screen.getByRole('button', { name: 'Roll again · 2 left' }),
+    ).toBeVisible();
+    vi.useRealTimers();
+  });
+
+  test('hydrates a different reward-paused Session with a fresh Reward opportunity', () => {
+    vi.useFakeTimers();
+    const rewardedWorkflow = createWorkflow({
+      id: 'hydrated-reward',
+      name: 'Hydrated reward',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        rerolls: 2,
+        sides: [
+          { icon: '☕', title: 'Tea' },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const sessionA = createSession('hydration-a', rewardedWorkflow, 1_000);
+    const sessionB = createSession('hydration-b', rewardedWorkflow, 4_000);
+    const rewardInteraction = {
+      onRoll: vi.fn(),
+      continueReward: vi.fn(() => Promise.resolve()),
+    };
+    const random = vi
+      .fn<() => number>()
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.75)
+      .mockReturnValueOnce(0);
+    const { rerender } = render(
+      <ActiveSessionView
+        session={sessionA}
+        now={() => 1_000}
+        random={random}
+        reducedMotion
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+    rerender(
+      <ActiveSessionView
+        session={deriveSessionState(sessionA, 3_000)}
+        now={() => 3_000}
+        random={random}
+        reducedMotion
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll again · 2 left' }),
+    );
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.getByText('Fresh air')).toBeVisible();
+
+    rerender(
+      <ActiveSessionView
+        session={deriveSessionState(sessionB, 6_000)}
+        now={() => 6_000}
+        random={random}
+        reducedMotion
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Roll dice' })).toBeVisible();
+    expect(screen.queryByText('Fresh air')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(
+      screen.getByRole('button', { name: 'Roll again · 2 left' }),
+    ).toBeVisible();
+    vi.useRealTimers();
+  });
+
+  test('does not replay a final Reward when switching to an already-completed Session', () => {
+    const rewardedWorkflow = createWorkflow({
+      id: 'transient-final-reward',
+      name: 'Transient final reward',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: '☕', title: 'Tea' },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const sessionA = createSession('final-switch-a', rewardedWorkflow, 1_000);
+    const sessionB = createSession('final-switch-b', rewardedWorkflow, 4_000);
+    const rewardInteraction = {
+      onRoll: vi.fn(),
+      continueReward: vi.fn(() => Promise.resolve()),
+    };
+    const { rerender } = render(
+      <ActiveSessionView
+        session={sessionA}
+        now={() => 1_000}
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+
+    rerender(
+      <ActiveSessionView
+        session={deriveSessionState(sessionB, 6_000)}
+        now={() => 6_000}
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+
+    expect(screen.getByText('Session complete')).toBeVisible();
+    expect(
+      screen.queryByRole('dialog', { name: 'Reward unlocked' }),
+    ).not.toBeInTheDocument();
+  });
 });
