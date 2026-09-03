@@ -80,6 +80,8 @@ test('generated manifest contains only approved permissions and no hosts', async
     string,
     unknown
   >;
+  expect(manifest['name']).toBe('Locusora');
+  expect(manifest['short_name']).toBe('Locusora');
   expect(manifest['permissions']).toEqual([
     'sidePanel',
     'storage',
@@ -87,7 +89,7 @@ test('generated manifest contains only approved permissions and no hosts', async
     'tabs',
   ]);
   expect(manifest['action']).toEqual({
-    default_title: 'Open Flowarium focus view',
+    default_title: 'Open Locusora focus view',
   });
   expect(manifest['host_permissions']).toBeUndefined();
   expect(manifest['content_scripts']).toBeUndefined();

@@ -8,7 +8,7 @@ import {
   createAsset,
   DexieAssetRepository,
 } from '@/features/assets';
-import { FlowariumDatabase } from '@/platform/storage';
+import { LocusoraDatabase } from '@/platform/storage';
 
 import { workflowDatabaseSchemas } from './WorkflowRecord';
 import { DexieWorkflowPackageUnitOfWork } from './DexieWorkflowPackageUnitOfWork';
@@ -21,9 +21,9 @@ afterEach(async () => {
 
 describe('DexieWorkflowPackageUnitOfWork', () => {
   test('rolls back Asset writes when the package operation fails', async () => {
-    const name = `flowarium-package-test-${crypto.randomUUID()}`;
+    const name = `locusora-package-test-${crypto.randomUUID()}`;
     databaseNames.push(name);
-    const database = new FlowariumDatabase({
+    const database = new LocusoraDatabase({
       name,
       schemas: [...workflowDatabaseSchemas, ...assetDatabaseSchemas],
     });

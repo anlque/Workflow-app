@@ -19,7 +19,7 @@ const extensionPath = resolve(import.meta.dirname, '../../.output/chrome-mv3');
 export async function expireActiveSessionDeadline(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('flowarium');
+      const request = indexedDB.open('locusora');
       request.onsuccess = () => {
         resolve(request.result);
       };
@@ -79,7 +79,7 @@ export async function expireActiveSessionDeadline(page: Page): Promise<void> {
         };
       };
     };
-    await extension.chrome.alarms.create('flowarium.session-phase', {
+    await extension.chrome.alarms.create('locusora.session-phase', {
       when: Date.now() + 1,
     });
   });

@@ -3,7 +3,7 @@ import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { afterEach, describe, expect, test } from 'vitest';
 
-import { FlowariumDatabase } from '@/platform/storage';
+import { LocusoraDatabase } from '@/platform/storage';
 import { createWorkflow, workflowDatabaseSchemas } from '@/features/workflow';
 
 import {
@@ -20,10 +20,10 @@ import { sessionDatabaseSchemas, type SessionRecord } from './SessionRecord';
 const databaseNames: string[] = [];
 
 function database(
-  name = `flowarium-session-test-${crypto.randomUUID()}`,
-): FlowariumDatabase {
+  name = `locusora-session-test-${crypto.randomUUID()}`,
+): LocusoraDatabase {
   databaseNames.push(name);
-  return new FlowariumDatabase({
+  return new LocusoraDatabase({
     name,
     schemas: [...workflowDatabaseSchemas, ...sessionDatabaseSchemas],
   });
@@ -86,7 +86,7 @@ describe('DexieSessionRepository', () => {
   );
 
   test('restores the active Session after reopening the database', async () => {
-    const name = `flowarium-session-reopen-${crypto.randomUUID()}`;
+    const name = `locusora-session-reopen-${crypto.randomUUID()}`;
     const firstDatabase = database(name);
     const expected = createSession('session-1', workflow(), 1_000);
     await new DexieSessionRepository(firstDatabase).save(expected);

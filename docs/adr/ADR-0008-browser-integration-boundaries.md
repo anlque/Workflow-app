@@ -10,7 +10,7 @@ Date: 2026-08-24
 
 ## Context
 
-ADR-0001 requires browser-specific behavior to remain behind adapters. Flowarium
+ADR-0001 requires browser-specific behavior to remain behind adapters. Locusora
 has three distinct kinds of browser integration: reusable technical capabilities
 such as alarms and runtime messaging, feature-specific persistence such as
 Settings in `chrome.storage.local`, and surface-specific navigation such as

@@ -12,7 +12,7 @@ Source root: [`src/features/settings/`](../../../src/features/settings/).
 
 - the validated immutable Settings value and defaults;
 - Settings repository and use-case contracts;
-- the `flowarium/settings` version-1 package parser and import/export;
+- the `locusora/settings` version-1 package parser and import/export;
 - the `chrome.storage.local` adapter under the `settings` key;
 - the Options Settings presentation and operation feedback;
 - the root public API in
@@ -93,7 +93,7 @@ Options checks whether it still exists and falls back to the first Workflow.
 | `updateSettingsUseCase` | Repository and `unknown` input    | Validates first, then saves                                                                 | Updated Settings; no write on invalid input        |
 | `exportSettingsUseCase` | Repository                        | Loads validated/default settings and serializes a version-1 envelope                        | Deterministic compact JSON                         |
 | `importSettingsUseCase` | Repository, JSON text, byte limit | Checks UTF-8 size, parses `unknown`, validates exact envelope and Settings, then saves      | Imported Settings; no write on validation failure  |
-| `parseSettingsPackage`  | `unknown` value                   | Requires exactly `kind`, `version`, `settings` with kind `flowarium/settings` and version 1 | Frozen package or `SettingsPackageValidationError` |
+| `parseSettingsPackage`  | `unknown` value                   | Requires exactly `kind`, `version`, `settings` with kind `locusora/settings` and version 1 | Frozen package or `SettingsPackageValidationError` |
 
 The Options composition currently limits a Settings package to 1 MiB and owns
 file reading/download. Side panel writes `lastSelectedWorkflowId` before opening

@@ -88,7 +88,7 @@ export function SettingsPage({
     <section className="settings-page" aria-labelledby="settings-title">
       <header>
         <h2 id="settings-title">Settings</h2>
-        <p>Choose how Flowarium looks, moves and carries your data.</p>
+        <p>Choose how Locusora looks, moves and carries your data.</p>
       </header>
 
       <fieldset className="settings-group">

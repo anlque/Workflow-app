@@ -6,9 +6,7 @@ import { FocusApp } from './FocusApp';
 
 export function bootstrapFocus(container: HTMLElement | null): void {
   if (container === null) {
-    throw new Error(
-      'Unable to start Flowarium: focus root element is missing.',
-    );
+    throw new Error('Unable to start Locusora: focus root element is missing.');
   }
 
   const dependencies = createFocusDependencies();

@@ -48,7 +48,7 @@ implicitly select or start a Workflow.
    one-active check in its write transaction, protecting against competing
    starts.
 9. The coordinator publishes `session/changed` with the saved Session and then
-   schedules `flowarium.session-phase` for `phaseEndsAt`.
+   schedules `locusora.session-phase` for `phaseEndsAt`.
 10. The message bus returns `{ ok: true, result: session }` to the command
     sender. `ChromeSessionClient` runtime-validates the result even though its
     public start method returns `void`.

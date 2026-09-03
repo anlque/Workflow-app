@@ -32,7 +32,7 @@ configured MIME allowlists.
 4. [`serializeWorkflow()`](../../../src/features/workflow/application/workflowPackageMapping.ts)
    creates the public Workflow shape, preserving Phase/side order and emitting
    current Reward trigger/reroll fields.
-5. The use case serializes `{ kind: 'flowarium/workflow', version: 1, workflow,
+5. The use case serializes `{ kind: 'locusora/workflow', version: 1, workflow,
 assets }`. Sorted Assets and stable property/array order make repeated export
    deterministic for unchanged input.
 6. Options creates a temporary JSON Blob/object URL, clicks a download link and
@@ -42,7 +42,7 @@ assets }`. Sorted Assets and stable property/array order make repeated export
 
 1. [`importWorkflowUseCase()`](../../../src/features/workflow/application/importWorkflowUseCase.ts)
    checks UTF-8 byte size before parsing JSON as `unknown`.
-2. It requires the exact four-field envelope, kind `flowarium/workflow`, version
+2. It requires the exact four-field envelope, kind `locusora/workflow`, version
    1 and an Asset array.
 3. `parseWorkflow()` validates exact nested keys and reconstructs a trusted
    Workflow through `createWorkflow()`; accepted legacy package omissions for
@@ -68,7 +68,7 @@ assets }`. Sorted Assets and stable property/array order make repeated export
 
 1. [`exportSettingsUseCase()`](../../../src/features/settings/application/exportSettingsUseCase.ts)
    loads validated settings or defaults and serializes
-   `{ kind: 'flowarium/settings', version: 1, settings }`.
+   `{ kind: 'locusora/settings', version: 1, settings }`.
 2. Export uses the same temporary browser download mechanism but a distinct file
    name.
 3. [`importSettingsUseCase()`](../../../src/features/settings/application/importSettingsUseCase.ts)

@@ -1,11 +1,18 @@
 # Getting Started
 
-This guide takes a clean checkout to a locally loaded Flowarium extension and
+> **Pre-release data reset:** the Locusora identity build opens a fresh local
+> IndexedDB database. Export any developer data that must be retained before
+> reloading the unpacked extension. The application does not migrate or delete
+> data belonging to the previous pre-release identity; remove it manually from
+> Chrome's extension details or DevTools **Application** storage when it is no
+> longer needed.
+
+This guide takes a clean checkout to a locally loaded Locusora extension and
 explains which artifact each command produces.
 
 ## What You Will Run
 
-Flowarium is a Chrome Manifest V3 extension built by WXT. Local development uses
+Locusora is a Chrome Manifest V3 extension built by WXT. Local development uses
 two distinct unpacked extensions:
 
 | Build | Directory | Use |
@@ -68,7 +75,7 @@ development server.
 The development manifest intentionally differs from production. WXT adds a
 localhost host permission, a `scripting` permission and reload infrastructure so
 the generated pages can communicate with the development server. These are
-build-tool permissions, not Flowarium production permissions.
+build-tool permissions, not Locusora production permissions.
 
 ## Production Extension
 
@@ -78,7 +85,7 @@ Create a self-contained production build:
 pnpm build
 ```
 
-The command writes `.output/chrome-mv3`. Its manifest contains the Flowarium MVP
+The command writes `.output/chrome-mv3`. Its manifest contains the Locusora MVP
 permissions:
 
 - `sidePanel` for opening and closing the side panel;
@@ -96,7 +103,7 @@ requests.
 3. Select **Load unpacked**.
 4. Choose `.output/chrome-mv3-dev` while `pnpm dev` is running, or choose
    `.output/chrome-mv3` after `pnpm build`.
-5. Pin Flowarium to the toolbar if you want direct access to its action.
+5. Pin Locusora to the toolbar if you want direct access to its action.
 
 Load the selected build directory itself, not `.output` and not the repository
 root. Chrome reads the `manifest.json` inside that directory.
@@ -109,9 +116,9 @@ manually if Chrome retains an old background worker, manifest or extension page.
 
 | Surface | How to reach it | Responsibility |
 | --- | --- | --- |
-| Focus view | Click the Flowarium toolbar action or **Open focus view** in the side panel | Select a Workflow when idle and display the full active Session environment |
+| Focus view | Click the Locusora toolbar action or **Open focus view** in the side panel | Select a Workflow when idle and display the full active Session environment |
 | Side panel | Use Chrome's extension side-panel control or the focus-view button | Compact Workflow Library and mirrored Session controls |
-| Options page | Open Flowarium details → **Extension options**, or use an in-product settings action | Workflow editing, local Assets and application Settings |
+| Options page | Open Locusora details → **Extension options**, or use an in-product settings action | Workflow editing, local Assets and application Settings |
 | Background worker | Inspect the service worker from `chrome://extensions` | Authoritative Session commands, persistence reconciliation and alarms |
 
 The focus view is an extension application hosted in a normal browser focus tab.
@@ -167,7 +174,7 @@ Select `.output/chrome-mv3-dev` or `.output/chrome-mv3` directly. The parent
 
 ### Chrome shows behavior from an earlier build
 
-Use **Reload** for Flowarium on `chrome://extensions`, then reopen the affected
+Use **Reload** for Locusora on `chrome://extensions`, then reopen the affected
 extension page. For background behavior, open the service-worker inspector and
 confirm that the current worker started without an initialization error.
 

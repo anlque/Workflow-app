@@ -1,6 +1,6 @@
 import type { Table } from 'dexie';
 
-import type { FlowariumDatabase } from '@/platform/storage';
+import type { LocusoraDatabase } from '@/platform/storage';
 
 import { SessionApplicationError } from '../application/SessionApplicationError';
 import type { SessionRepository } from '../application/SessionRepository';
@@ -9,10 +9,10 @@ import { mapSessionRecord, mapSessionToRecord } from './mapSessionRecord';
 import type { SessionRecord } from './SessionRecord';
 
 export class DexieSessionRepository implements SessionRepository {
-  readonly #database: FlowariumDatabase;
+  readonly #database: LocusoraDatabase;
   readonly #sessions: Table<SessionRecord, string>;
 
-  public constructor(database: FlowariumDatabase) {
+  public constructor(database: LocusoraDatabase) {
     this.#database = database;
     this.#sessions = database.table<SessionRecord, string>('sessions');
   }

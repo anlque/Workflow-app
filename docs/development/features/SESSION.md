@@ -261,7 +261,7 @@ not either lose the Reward or replay it after every reload.
   eligibility.
 - Application depends on Session Domain and Workflow root type for start.
 - Infrastructure depends on Session ports/Domain, Workflow root construction,
-  `FlowariumDatabase` and Dexie.
+  `LocusoraDatabase` and Dexie.
 - Presentation depends on Session inward modules, Workflow root Reward behavior,
   React, Zustand and shared UI.
 - The feature does not import `src/app`, messaging implementations, alarms or

@@ -15,7 +15,7 @@ import {
   listWorkflowsUseCase,
   workflowDatabaseSchemas,
 } from '@/features/workflow';
-import { FlowariumDatabase } from '@/platform/storage';
+import { LocusoraDatabase } from '@/platform/storage';
 import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 
 import {
@@ -31,7 +31,7 @@ import {
 } from '../closeSidePanel';
 
 export function createFocusDependencies(): FocusDependencies {
-  const database = new FlowariumDatabase({
+  const database = new LocusoraDatabase({
     schemas: [
       ...workflowDatabaseSchemas,
       ...sessionDatabaseSchemas,

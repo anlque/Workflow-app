@@ -1,7 +1,7 @@
 # Runtime and Navigation
 
 This reference maps Chrome extension locations to source entrypoints and
-explains how navigation occurs. Flowarium does not use React Router.
+explains how navigation occurs. Locusora does not use React Router.
 
 ## Extension Documents
 
@@ -71,7 +71,7 @@ or newer.
 
 ## What Is Not Routing
 
-Flowarium has no React Router and no client-side URL router.
+Locusora has no React Router and no client-side URL router.
 
 The Options page uses local React state for these tabs:
 

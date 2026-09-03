@@ -60,7 +60,7 @@ export async function exportWorkflowUseCase(
     }),
   );
   const envelope: WorkflowPackageV1 = {
-    kind: 'flowarium/workflow',
+    kind: 'locusora/workflow',
     version: 1,
     workflow: serializeWorkflow(workflow),
     assets: encodedAssets,

@@ -1,12 +1,12 @@
 # System Tour
 
-This tour follows one user action from the browser shell into Flowarium and back
+This tour follows one user action from the browser shell into Locusora and back
 to rendered state. Keep the [Project Map](../development/PROJECT_MAP.md) open for
 ownership details.
 
 ## 1. Start at a Browser Surface
 
-Flowarium has four independent Chrome MV3 contexts:
+Locusora has four independent Chrome MV3 contexts:
 
 - the non-visual background worker;
 - the focus view in a normal browser tab;
@@ -53,7 +53,7 @@ The focus, Options and side-panel bootstraps call matching dependency factories:
 
 These factories create concrete repositories, browser adapters and use-case
 closures, then pass a typed dependency object into the surface component. This
-is where Flowarium is allowed to know both an inward Application contract and
+is where Locusora is allowed to know both an inward Application contract and
 its outward implementation.
 
 The background bootstrap performs the same job directly: it composes the
@@ -101,7 +101,7 @@ cross-context path:
    checks that no active Session exists, asks Domain to create an immutable
    Session snapshot and saves it through the `SessionRepository` port.
 6. The injected Dexie repositories cross the persistence boundary through the
-   shared `FlowariumDatabase`; the alarm adapter schedules the next wake-up.
+   shared `LocusoraDatabase`; the alarm adapter schedules the next wake-up.
 7. The coordinator broadcasts `session/changed` after the authoritative change.
 8. Each open Session surface receives the projection independently and replaces
    its local Zustand projection.

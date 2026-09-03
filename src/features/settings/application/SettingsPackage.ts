@@ -1,7 +1,7 @@
 import { createSettings, type Settings } from '../domain/Settings';
 
 export type SettingsPackageV1 = Readonly<{
-  kind: 'flowarium/settings';
+  kind: 'locusora/settings';
   version: 1;
   settings: Settings;
 }>;
@@ -20,14 +20,14 @@ export function parseSettingsPackage(value: unknown): SettingsPackageV1 {
   const record = value as Readonly<Record<string, unknown>>;
   if (
     Object.keys(record).length !== 3 ||
-    record['kind'] !== 'flowarium/settings' ||
+    record['kind'] !== 'locusora/settings' ||
     record['version'] !== 1
   ) {
     throw new SettingsPackageValidationError();
   }
   try {
     return Object.freeze({
-      kind: 'flowarium/settings',
+      kind: 'locusora/settings',
       version: 1,
       settings: createSettings(record['settings']),
     });

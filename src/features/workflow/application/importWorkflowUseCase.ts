@@ -153,7 +153,7 @@ export async function importWorkflowUseCase(
   const envelope = record(decoded);
   if (
     Object.keys(envelope).length !== 4 ||
-    envelope['kind'] !== 'flowarium/workflow' ||
+    envelope['kind'] !== 'locusora/workflow' ||
     envelope['version'] !== 1 ||
     !Array.isArray(envelope['assets'])
   ) {

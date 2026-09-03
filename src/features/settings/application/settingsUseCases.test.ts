@@ -65,7 +65,7 @@ describe('Settings use cases', () => {
     await importSettingsUseCase(target, exported, { maxFileBytes: 1_024 });
 
     expect(exported).toBe(
-      '{"kind":"flowarium/settings","version":1,"settings":{"theme":"light","reducedMotion":"no-preference"}}',
+      '{"kind":"locusora/settings","version":1,"settings":{"theme":"light","reducedMotion":"no-preference"}}',
     );
     expect(target.value).toEqual(source.value);
   });
@@ -73,11 +73,11 @@ describe('Settings use cases', () => {
   test.each([
     [
       'unsupported version',
-      '{"kind":"flowarium/settings","version":2,"settings":{}}',
+      '{"kind":"locusora/settings","version":2,"settings":{}}',
     ],
     [
       'corrupt data',
-      '{"kind":"flowarium/settings","version":1,"settings":{"theme":"bad"}}',
+      '{"kind":"locusora/settings","version":1,"settings":{"theme":"bad"}}',
     ],
     ['invalid JSON', '{'],
   ])('rejects %s without writes', async (_case, data) => {

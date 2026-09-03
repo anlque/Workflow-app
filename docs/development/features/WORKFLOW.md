@@ -219,7 +219,7 @@ Current consumers:
 - Domain depends on the minimal Shared Kernel `AssetId` only.
 - Application depends on Workflow Domain and, for package operations, Assets
   root contracts.
-- Infrastructure depends on Workflow ports/Domain, `FlowariumDatabase`, Dexie
+- Infrastructure depends on Workflow ports/Domain, `LocusoraDatabase`, Dexie
   and Assets root contracts for the multi-table unit of work.
 - Presentation depends on Workflow inward layers, React, shared UI and Assets
   public presentation/types where Asset selection is required.

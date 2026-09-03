@@ -136,7 +136,7 @@ Those decisions remain with Domain, Application or Infrastructure owners.
 ## Persistence Composition Boundary
 
 Feature Infrastructure owns its record, mapper, repository and database schema
-fragment. [`FlowariumDatabase`](../../src/platform/storage/FlowariumDatabase.ts)
+fragment. [`LocusoraDatabase`](../../src/platform/storage/LocusoraDatabase.ts)
 knows how to apply cumulative fragments but knows nothing about Workflow,
 Session or Asset behavior. Each runtime composition root supplies the same
 fragments:

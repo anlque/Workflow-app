@@ -1,6 +1,6 @@
 # Persistence and Compatibility
 
-Flowarium is local-first. Domain values remain independent of storage, while
+Locusora is local-first. Domain values remain independent of storage, while
 feature Infrastructure owns records, validation, mapping and repository
 adapters. This page documents the current durable formats and the procedure for
 changing them safely.
@@ -9,19 +9,27 @@ changing them safely.
 
 | Data | Store | Key/indexes | Owning adapter | Notes |
 | --- | --- | --- | --- | --- |
-| Workflows | IndexedDB database `flowarium`, table `workflows` | Primary `id`; index `order` | `DexieWorkflowRepository` | `order` is persistence metadata for the Workflow Library collection, not part of the Domain aggregate |
-| Sessions | IndexedDB database `flowarium`, table `sessions` | Primary `id`; indexes `active`, `updatedAt` | `DexieSessionRepository` | Running, Transitioning and Paused use `active = 1`; Completed and Stopped use `active = 0` |
-| Asset metadata and Blob content | IndexedDB database `flowarium`, table `assets` | Primary `id`; index `createdAt` | `DexieAssetRepository` | Metadata and Blob are one record; Workflow Environments store only Asset identifiers |
+| Workflows | IndexedDB database `locusora`, table `workflows` | Primary `id`; index `order` | `DexieWorkflowRepository` | `order` is persistence metadata for the Workflow Library collection, not part of the Domain aggregate |
+| Sessions | IndexedDB database `locusora`, table `sessions` | Primary `id`; indexes `active`, `updatedAt` | `DexieSessionRepository` | Running, Transitioning and Paused use `active = 1`; Completed and Stopped use `active = 0` |
+| Asset metadata and Blob content | IndexedDB database `locusora`, table `assets` | Primary `id`; index `createdAt` | `DexieAssetRepository` | Metadata and Blob are one record; Workflow Environments store only Asset identifiers |
 | Settings | `chrome.storage.local`, key `settings` | Chrome Storage key only | `ChromeSettingsRepository` | Theme, reduced motion and optional last-selected Workflow; missing value resolves to defaults |
 | React/Zustand state, countdown text, object URLs and audio state | Not persistent | None | Owning Presentation or `app` module | Reconstructed from durable facts and browser state |
 
 [ADR-0005](../adr/ADR-0005-local-first-persistence.md) owns this technology and
 data split. No network fallback or synchronization exists in the MVP.
 
+## Pre-release Identity Reset
+
+The pre-release identity rename creates the fresh `locusora` IndexedDB
+database. No runtime migration or cleanup is performed. Export local data that
+must be retained before loading the renamed build; otherwise clear old extension
+data manually from Chrome's extension details or DevTools **Application**
+storage.
+
 ## Composed IndexedDB Schema
 
-[`FlowariumDatabase`](../../src/platform/storage/FlowariumDatabase.ts) opens one
-Dexie database named `flowarium`. Feature Infrastructure exports schema
+[`LocusoraDatabase`](../../src/platform/storage/LocusoraDatabase.ts) opens one
+Dexie database named `locusora`. Feature Infrastructure exports schema
 fragments; each production runtime composition supplies the same complete list:
 
 ```ts
@@ -32,7 +40,7 @@ fragments; each production runtime composition supplies the same complete list:
 ]
 ```
 
-`FlowariumDatabase` sorts fragments by version and accumulates their store
+`LocusoraDatabase` sorts fragments by version and accumulates their store
 definitions before calling `this.version(version).stores(...)`. The effective
 history is:
 
@@ -58,12 +66,12 @@ These version numbers solve different compatibility problems:
 
 | Version | Scope | Current value | Changes when |
 | --- | --- | --- | --- |
-| Dexie database version | Whole `flowarium` database structure and upgrade order | 1, 2, 3 history | A table/index changes or existing stored data needs a database migration |
+| Dexie database version | Whole `locusora` database structure and upgrade order | 1, 2, 3 history | A table/index changes or existing stored data needs a database migration |
 | `WorkflowRecord.schemaVersion` | One Workflow record serialization shape | 1 | The Workflow record reader/writer needs a new incompatible serialization |
 | `SessionRecord.schemaVersion` | One Session record envelope | 1 | The Session record reader/writer needs a new incompatible serialization |
 | `AssetRecord.schemaVersion` | One Asset record shape | 1 | The Asset record reader/writer needs a new incompatible serialization |
-| Workflow package `version` | Public `flowarium/workflow` import/export envelope | 1 | The external Workflow package contract changes |
-| Settings package `version` | Public `flowarium/settings` import/export envelope | 1 | The external Settings package contract changes |
+| Workflow package `version` | Public `locusora/workflow` import/export envelope | 1 | The external Workflow package contract changes |
+| Settings package `version` | Public `locusora/settings` import/export envelope | 1 | The external Settings package contract changes |
 
 A database version must not be copied into a record, and a record
 `schemaVersion` must not be used to order Dexie migrations. Public package
@@ -236,12 +244,12 @@ rolls back both tables, so no partial imported package remains.
 
 Export performs the inverse public operation: it sorts referenced identifiers,
 requires metadata and Blob content for each, Base64-encodes them, and writes a
-`flowarium/workflow` version-1 envelope. The package is a transport contract, not
+`locusora/workflow` version-1 envelope. The package is a transport contract, not
 a storage dump.
 
 ### Settings import
 
-Settings import has a separate `flowarium/settings` version-1 envelope. It
+Settings import has a separate `locusora/settings` version-1 envelope. It
 validates file size, exact envelope keys and Domain Settings, then performs one
 `chrome.storage.local.set`.
 

@@ -346,7 +346,7 @@ After the user rolls the dice and selects `Continue`, the Reward dialog closes,
 These sounds are non-blocking, require no network request and are not guaranteed
 after the focus tab is closed, discarded or unloaded. The MVP requests only
 permissions required for the side panel, durable local storage, Session alarms
-and locating Flowarium's existing focus tab.
+and locating Locusora's existing focus tab.
 
 Direct interaction with the focus tab activates UI sounds under Chrome's
 autoplay policy. A restored Session exposes a non-blocking `Enable sounds`

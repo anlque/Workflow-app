@@ -1,11 +1,11 @@
-import type { FlowariumDatabase } from '@/platform/storage';
+import type { LocusoraDatabase } from '@/platform/storage';
 
 import type { WorkflowPackageUnitOfWork } from '../application/WorkflowPackage';
 
 export class DexieWorkflowPackageUnitOfWork implements WorkflowPackageUnitOfWork {
-  readonly #database: FlowariumDatabase;
+  readonly #database: LocusoraDatabase;
 
-  public constructor(database: FlowariumDatabase) {
+  public constructor(database: LocusoraDatabase) {
     this.#database = database;
   }
 

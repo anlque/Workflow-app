@@ -127,7 +127,7 @@ pnpm test:e2e
 - the test needs a real clock, uncontrolled random value or arbitrary delay;
 - a component assertion reads internal React state or relies on CSS classes when
   semantic behavior is available;
-- a repository fixture reuses the developer's `flowarium` database;
+- a repository fixture reuses the developer's `locusora` database;
 - test cleanup could delete a non-test database or broad filesystem path;
 - production code gains a test-only branch;
 - a mock replaces the behavior being tested;

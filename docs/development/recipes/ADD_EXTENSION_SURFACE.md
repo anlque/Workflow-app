@@ -81,7 +81,7 @@ one `src/app` bootstrap; they never coordinate feature use cases.
 13. Manually verify browser-shell behavior that direct extension URLs cannot
     reproduce.
 
-Flowarium uses separate extension documents, not React Router routes. Each
+Locusora uses separate extension documents, not React Router routes. Each
 surface has its own React root, JavaScript memory and projection lifecycle.
 
 ## Compatibility Checks

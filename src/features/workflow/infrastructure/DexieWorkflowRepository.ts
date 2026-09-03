@@ -1,6 +1,6 @@
 import type { Table } from 'dexie';
 
-import type { FlowariumDatabase } from '@/platform/storage';
+import type { LocusoraDatabase } from '@/platform/storage';
 
 import type { WorkflowRepository } from '../application/WorkflowRepository';
 import type { Workflow, WorkflowId } from '../domain/Workflow';
@@ -9,10 +9,10 @@ import { mapWorkflowRecord, mapWorkflowToRecord } from './mapWorkflowRecord';
 import type { WorkflowRecord } from './WorkflowRecord';
 
 export class DexieWorkflowRepository implements WorkflowRepository {
-  readonly #database: FlowariumDatabase;
+  readonly #database: LocusoraDatabase;
   readonly #workflows: Table<WorkflowRecord, string>;
 
-  public constructor(database: FlowariumDatabase) {
+  public constructor(database: LocusoraDatabase) {
     this.#database = database;
     this.#workflows = database.table<WorkflowRecord, string>('workflows');
   }

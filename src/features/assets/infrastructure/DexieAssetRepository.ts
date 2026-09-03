@@ -1,6 +1,6 @@
 import type { Table } from 'dexie';
 
-import type { FlowariumDatabase } from '@/platform/storage';
+import type { LocusoraDatabase } from '@/platform/storage';
 
 import type { AssetRepository } from '../application/AssetRepository';
 import { createAsset, type Asset, type AssetId } from '../domain/Asset';
@@ -51,7 +51,7 @@ function toRecord(asset: Asset, blob: Blob): AssetRecord {
 export class DexieAssetRepository implements AssetRepository {
   readonly #assets: Table<AssetRecord, string>;
 
-  public constructor(database: FlowariumDatabase) {
+  public constructor(database: LocusoraDatabase) {
     this.#assets = database.table<AssetRecord, string>('assets');
   }
 

@@ -14,7 +14,7 @@ import {
 } from '@/features/session';
 import { createWorkflowId, type WorkflowRepository } from '@/features/workflow';
 
-const SESSION_PHASE_ALARM = 'flowarium.session-phase';
+const SESSION_PHASE_ALARM = 'locusora.session-phase';
 
 export type SessionCoordinatorDependencies = Readonly<{
   workflows: WorkflowRepository;

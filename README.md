@@ -1,6 +1,6 @@
-# Flowarium
+# Locusora
 
-Flowarium is a local-first Chrome extension for building personalized focus
+Locusora is a local-first Chrome extension for building personalized focus
 Workflows, running durable timed Sessions, creating atmospheric environments and
 adding optional Reward Dice rituals.
 
@@ -17,11 +17,11 @@ adding optional Reward Dice rituals.
 - Store local Assets in IndexedDB and preferences in `chrome.storage.local`.
 - Import and export versioned Workflow and Settings packages.
 
-Flowarium makes no network requests, requests no host permissions and does not
+Locusora makes no network requests, requests no host permissions and does not
 include content scripts. MVP data remains in the local Chrome profile unless the
 user explicitly exports it.
 
-Click the Flowarium toolbar action to open the focus tab. With no active Session,
+Click the Locusora toolbar action to open the focus tab. With no active Session,
 choose and start an existing Workflow there. The side panel remains available as
 a compact Workflow Library and Session controller, and configuration opens in a
 regular Options tab. While the focus tab remains open and loaded, Phase changes

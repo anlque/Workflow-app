@@ -112,7 +112,7 @@ preferences stored outside IndexedDB.
 | --- | --- | --- | --- | --- |
 | [`src/platform/alarms/`](../../src/platform/alarms/) | Alarm boundary | `AlarmScheduler` port and `ChromeAlarmScheduler` | WXT/browser APIs | Gives background Session coordination a replaceable deadline wake-up mechanism |
 | [`src/platform/messaging/`](../../src/platform/messaging/) | Runtime communication | Message types, exact parsers, bus contract/Chrome adapter and Workflow catalog events | WXT/browser APIs | Defines typed communication between isolated extension contexts |
-| [`src/platform/storage/`](../../src/platform/storage/) | Database composition | `FlowariumDatabase`, schema-fragment types and Dexie configuration | Dexie | Composes feature-owned schemas into the single local database |
+| [`src/platform/storage/`](../../src/platform/storage/) | Database composition | `LocusoraDatabase`, schema-fragment types and Dexie configuration | Dexie | Composes feature-owned schemas into the single local database |
 | [`src/shared/domain/`](../../src/shared/domain/) | Minimal Shared Kernel | `AssetId` | No feature or platform module | Gives Workflow and Assets one identity contract without duplicating it |
 | [`src/shared/ui/`](../../src/shared/ui/) | UI primitives | Button, Dialog, Field and Select components with local barrels/tests | React | Centralizes genuinely reused accessible primitives, not feature behavior |
 

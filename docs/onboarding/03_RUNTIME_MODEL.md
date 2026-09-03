@@ -1,6 +1,6 @@
 # Runtime Model
 
-Flowarium is one extension package running in four isolated JavaScript contexts.
+Locusora is one extension package running in four isolated JavaScript contexts.
 They share extension-origin storage and communicate through Chrome APIs, but
 they do not share memory.
 
@@ -14,7 +14,7 @@ they do not share memory.
 | Side panel | [`entrypoints/sidepanel/main.tsx`](../../entrypoints/sidepanel/main.tsx) | [`bootstrapSidePanel()`](../../src/app/side-panel/bootstrapSidePanel.tsx) | One root in `sidepanel.html` | While Chrome keeps the side-panel document loaded; it may be recreated after close | Workflow repository in IndexedDB; Settings in Chrome Storage | Sends Session commands/request, receives Session projections, and publishes/subscribes to Workflow catalog invalidation | Owns compact local view state; never authoritative Session state |
 
 Every context that opens IndexedDB composes the same cumulative feature schema
-fragments into `FlowariumDatabase`. The database is one extension-origin
+fragments into `LocusoraDatabase`. The database is one extension-origin
 resource even though each context creates its own connection object.
 
 ## Runtime Topology

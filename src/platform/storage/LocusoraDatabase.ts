@@ -5,16 +5,13 @@ export type DatabaseSchema = Readonly<{
   stores: Readonly<Record<string, string>>;
 }>;
 
-export type FlowariumDatabaseOptions = Readonly<{
+export type LocusoraDatabaseOptions = Readonly<{
   name?: string;
   schemas: readonly DatabaseSchema[];
 }>;
 
-export class FlowariumDatabase extends Dexie {
-  public constructor({
-    name = 'flowarium',
-    schemas,
-  }: FlowariumDatabaseOptions) {
+export class LocusoraDatabase extends Dexie {
+  public constructor({ name = 'locusora', schemas }: LocusoraDatabaseOptions) {
     super(name);
 
     const cumulativeStores: Record<string, string> = {};

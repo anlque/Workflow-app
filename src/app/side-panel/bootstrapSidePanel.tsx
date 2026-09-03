@@ -7,7 +7,7 @@ import { SidePanelApp } from './SidePanelApp';
 export function bootstrapSidePanel(container: HTMLElement | null): void {
   if (container === null) {
     throw new Error(
-      'Unable to start Flowarium: side panel root element is missing.',
+      'Unable to start Locusora: side panel root element is missing.',
     );
   }
 

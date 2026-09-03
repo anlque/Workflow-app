@@ -4,7 +4,9 @@ import { createChromeFocusTabController } from './createChromeFocusTabController
 
 test('maps Focus Tab operations to the Chrome tabs and windows APIs', async () => {
   const chrome = {
-    runtime: { getURL: vi.fn(() => 'chrome-extension://flowarium/focus.html') },
+    runtime: {
+      getURL: vi.fn(() => 'chrome-extension://test-extension-id/focus.html'),
+    },
     tabs: {
       query: vi.fn(() => Promise.resolve([{ id: 7, windowId: 3 }])),
       create: vi.fn(() => Promise.resolve({})),
@@ -19,7 +21,7 @@ test('maps Focus Tab operations to the Chrome tabs and windows APIs', async () =
 
   expect(chrome.runtime.getURL).toHaveBeenCalledWith('/focus.html');
   expect(chrome.tabs.query).toHaveBeenCalledWith({
-    url: 'chrome-extension://flowarium/focus.html',
+    url: 'chrome-extension://test-extension-id/focus.html',
   });
   expect(chrome.tabs.update).toHaveBeenCalledWith(7, { active: true });
   expect(chrome.windows.update).toHaveBeenCalledWith(3, { focused: true });
@@ -30,7 +32,7 @@ describe('createChromeFocusTabController', () => {
   test('creates the extension Focus URL when no tab exists', async () => {
     const chrome = {
       runtime: {
-        getURL: vi.fn(() => 'chrome-extension://flowarium/focus.html'),
+        getURL: vi.fn(() => 'chrome-extension://test-extension-id/focus.html'),
       },
       tabs: {
         query: vi.fn(() => Promise.resolve([])),
@@ -45,7 +47,7 @@ describe('createChromeFocusTabController', () => {
     await createChromeFocusTabController(chrome).openOrActivate();
 
     expect(chrome.tabs.create).toHaveBeenCalledWith({
-      url: 'chrome-extension://flowarium/focus.html',
+      url: 'chrome-extension://test-extension-id/focus.html',
     });
   });
 });

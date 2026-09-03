@@ -136,7 +136,7 @@ export function OptionsApp({
   if (snapshot === null) {
     return (
       <p className="app-message" role="status">
-        Loading Flowarium…
+        Loading Locusora…
       </p>
     );
   }
@@ -149,7 +149,7 @@ export function OptionsApp({
     <main className="options-app">
       <header className="app-header">
         <div>
-          <h1>Flowarium</h1>
+          <h1>Locusora</h1>
           <p>
             Design the rhythms and environments that help you return to focus.
           </p>

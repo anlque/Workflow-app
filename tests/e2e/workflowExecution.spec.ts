@@ -25,18 +25,21 @@ test('loads every MVP extension surface in an isolated profile', async ({
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
+  await expect(options).toHaveTitle('Locusora settings');
   await expect(
-    options.getByRole('heading', { name: 'Flowarium' }),
+    options.getByRole('heading', { name: 'Locusora' }),
   ).toBeVisible();
 
   const sidePanel = await context.newPage();
   await sidePanel.goto(extensionUrls.sidePanel);
+  await expect(sidePanel).toHaveTitle('Locusora');
   await expect(
-    sidePanel.getByRole('heading', { name: 'Flowarium' }),
+    sidePanel.getByRole('heading', { name: 'Locusora' }),
   ).toBeVisible();
 
   const focus = await context.newPage();
   await focus.goto(extensionUrls.focus);
+  await expect(focus).toHaveTitle('Locusora focus');
   await expect(
     focus.getByRole('heading', { name: 'Choose a Workflow' }),
   ).toBeVisible();
@@ -55,7 +58,7 @@ test('opens the Options page directly from an empty Focus Tab', async ({
 
   await expect(options).toHaveURL(extensionUrls.options);
   await expect(
-    options.getByRole('heading', { name: 'Flowarium' }),
+    options.getByRole('heading', { name: 'Locusora' }),
   ).toBeVisible();
 });
 

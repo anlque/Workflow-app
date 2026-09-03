@@ -9,12 +9,13 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   manifest: {
-    name: 'Flowarium',
+    name: 'Locusora',
+    short_name: 'Locusora',
     description:
       'Build personalized focus workflows, environments and reward rituals.',
     permissions: ['sidePanel', 'storage', 'alarms', 'tabs'],
     action: {
-      default_title: 'Open Flowarium focus view',
+      default_title: 'Open Locusora focus view',
     },
   },
 });

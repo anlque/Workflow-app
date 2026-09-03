@@ -3,7 +3,7 @@ import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { FlowariumDatabase } from '@/platform/storage';
+import { LocusoraDatabase } from '@/platform/storage';
 
 import { createAsset } from '../domain/Asset';
 import { AssetStorageError, AssetValidationError } from '../domain/AssetErrors';
@@ -13,10 +13,10 @@ import { assetDatabaseSchemas } from './AssetRecord';
 
 const databaseNames: string[] = [];
 
-function database(): FlowariumDatabase {
-  const name = `flowarium-asset-test-${crypto.randomUUID()}`;
+function database(): LocusoraDatabase {
+  const name = `locusora-asset-test-${crypto.randomUUID()}`;
   databaseNames.push(name);
-  return new FlowariumDatabase({ name, schemas: assetDatabaseSchemas });
+  return new LocusoraDatabase({ name, schemas: assetDatabaseSchemas });
 }
 
 afterEach(async () => {

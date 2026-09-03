@@ -6,7 +6,7 @@ export async function exportSettingsUseCase(
   repository: SettingsRepository,
 ): Promise<string> {
   const envelope: SettingsPackageV1 = {
-    kind: 'flowarium/settings',
+    kind: 'locusora/settings',
     version: 1,
     settings: await getSettingsUseCase(repository),
   };

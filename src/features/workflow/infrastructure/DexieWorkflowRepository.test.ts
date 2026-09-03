@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 
 import { afterEach, describe, expect, test } from 'vitest';
 
-import { FlowariumDatabase } from '@/platform/storage';
+import { LocusoraDatabase } from '@/platform/storage';
 
 import { createWorkflow } from '../domain/createWorkflow';
 import type { Workflow, WorkflowId } from '../domain/Workflow';
@@ -10,11 +10,11 @@ import { WorkflowValidationError } from '../domain/WorkflowErrors';
 import { DexieWorkflowRepository } from './DexieWorkflowRepository';
 import { workflowDatabaseSchemas } from './WorkflowRecord';
 
-const databases: FlowariumDatabase[] = [];
+const databases: LocusoraDatabase[] = [];
 
-function createDatabase(): FlowariumDatabase {
-  const database = new FlowariumDatabase({
-    name: `flowarium-workflow-test-${crypto.randomUUID()}`,
+function createDatabase(): LocusoraDatabase {
+  const database = new LocusoraDatabase({
+    name: `locusora-workflow-test-${crypto.randomUUID()}`,
     schemas: workflowDatabaseSchemas,
   });
   databases.push(database);
@@ -58,6 +58,16 @@ afterEach(async () => {
 });
 
 describe('DexieWorkflowRepository', () => {
+  test('uses the Locusora database name by default', () => {
+    const database = new LocusoraDatabase({
+      schemas: workflowDatabaseSchemas,
+    });
+
+    expect(database.name).toBe('locusora');
+
+    database.close();
+  });
+
   test('opens the ordered version-1 Workflow schema', async () => {
     const database = createDatabase();
 

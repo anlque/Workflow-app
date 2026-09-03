@@ -145,6 +145,7 @@ describe('Workflow package', () => {
     );
 
     expect(JSON.parse(data)).toMatchObject({
+      kind: 'locusora/workflow',
       workflow: { rewardDice: { triggerPhaseType: 'break', rerolls: 3 } },
     });
     expect(imported.rewardDice?.triggerPhaseType).toBe('break');
@@ -265,10 +266,10 @@ describe('Workflow package', () => {
   });
 
   test.each([
-    ['unsupported version', '{"kind":"flowarium/workflow","version":2}'],
+    ['unsupported version', '{"kind":"locusora/workflow","version":2}'],
     [
       'corrupt package',
-      '{"kind":"flowarium/workflow","version":1,"workflow":{},"assets":[]}',
+      '{"kind":"locusora/workflow","version":1,"workflow":{},"assets":[]}',
     ],
     ['invalid JSON', '{'],
   ])('rejects %s with zero writes', async (_case, data) => {

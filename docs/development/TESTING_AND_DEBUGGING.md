@@ -135,8 +135,8 @@ compatibility or schema problem.
 
 ### Background Worker Does Not Start
 
-- **First check:** on `chrome://extensions`, open Flowarium's service-worker
-  inspector and look for `Flowarium background initialization failed.` or a WXT
+- **First check:** on `chrome://extensions`, open Locusora's service-worker
+  inspector and look for `Locusora background initialization failed.` or a WXT
   startup crash. Confirm a worker URL exists for the extension ID you loaded.
 - **Owner:** [`entrypoints/background.ts`](../../entrypoints/background.ts),
   [`bootstrapBackground.ts`](../../src/app/background/bootstrapBackground.ts),
@@ -209,13 +209,13 @@ The manifest E2E assertion also catches unexpected production permissions.
 
 ### IndexedDB Record Is Rejected
 
-- **First check:** capture the error and inspect the `flowarium` record in the
+- **First check:** capture the error and inspect the `locusora` record in the
   extension page's DevTools **Application → IndexedDB**. Check outer
   `schemaVersion`, required fields and state-specific values; for Assets also
   compare Blob MIME/size with metadata.
 - **Owner:** the feature mapper/repository under
   `src/features/{workflow,session,assets}/infrastructure/`, plus
-  [`FlowariumDatabase.ts`](../../src/platform/storage/FlowariumDatabase.ts) for
+  [`LocusoraDatabase.ts`](../../src/platform/storage/LocusoraDatabase.ts) for
   composed schema versions.
 - **Recovery:** reproduce with the captured shape in a repository regression
   test and decide whether it is corruption or supported legacy data. Add a

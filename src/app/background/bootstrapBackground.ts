@@ -1,6 +1,6 @@
 import { ChromeAlarmScheduler } from '@/platform/alarms';
 import { ChromeMessageBus } from '@/platform/messaging';
-import { FlowariumDatabase } from '@/platform/storage';
+import { LocusoraDatabase } from '@/platform/storage';
 import { assetDatabaseSchemas } from '@/features/assets';
 import {
   DexieSessionRepository,
@@ -32,7 +32,7 @@ export async function bootstrapBackground(): Promise<void> {
     },
   };
   registerFocusAction(action, focusTabs);
-  const database = new FlowariumDatabase({
+  const database = new LocusoraDatabase({
     schemas: [
       ...workflowDatabaseSchemas,
       ...sessionDatabaseSchemas,

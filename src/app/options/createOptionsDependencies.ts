@@ -29,7 +29,7 @@ import {
   updateWorkflowUseCase,
   workflowDatabaseSchemas,
 } from '@/features/workflow';
-import { FlowariumDatabase } from '@/platform/storage';
+import { LocusoraDatabase } from '@/platform/storage';
 import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 
 import type { OptionsDependencies } from './OptionsApp';
@@ -64,7 +64,7 @@ function downloadJson(data: string, filename: string): void {
 }
 
 export function createOptionsDependencies(): OptionsDependencies {
-  const database = new FlowariumDatabase({
+  const database = new LocusoraDatabase({
     schemas: [
       ...workflowDatabaseSchemas,
       ...sessionDatabaseSchemas,
@@ -159,7 +159,7 @@ export function createOptionsDependencies(): OptionsDependencies {
     async exportSettings() {
       downloadJson(
         await exportSettingsUseCase(settings),
-        'flowarium-settings.json',
+        'locusora-settings.json',
       );
     },
     async importSettings(file) {
@@ -173,7 +173,7 @@ export function createOptionsDependencies(): OptionsDependencies {
       if (workflow === null) throw new Error(`Workflow ${id} was not found.`);
       downloadJson(
         await exportWorkflowUseCase(workflow, assets),
-        'flowarium-workflow.json',
+        'locusora-workflow.json',
       );
     },
     async importWorkflow(file) {

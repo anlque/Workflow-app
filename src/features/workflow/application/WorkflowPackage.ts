@@ -1,5 +1,5 @@
 export type WorkflowPackageV1 = Readonly<{
-  kind: 'flowarium/workflow';
+  kind: 'locusora/workflow';
   version: 1;
   workflow: unknown;
   assets: readonly unknown[];

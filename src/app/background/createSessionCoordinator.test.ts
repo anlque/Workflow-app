@@ -187,7 +187,7 @@ describe('createSessionCoordinator', () => {
     expect(session).toMatchObject({ status: 'running', id: 'session-1' });
     expect(messages.events.at(-1)?.session).toEqual(session);
     expect(alarms.scheduled).toEqual({
-      name: 'flowarium.session-phase',
+      name: 'locusora.session-phase',
       when: 11_000,
     });
   });
@@ -219,7 +219,7 @@ describe('createSessionCoordinator', () => {
     });
 
     clock.set(11_000);
-    await alarms.fire('flowarium.session-phase');
+    await alarms.fire('locusora.session-phase');
 
     expect(messages.events.at(-1)?.session).toMatchObject({
       status: 'transitioning',
@@ -227,12 +227,12 @@ describe('createSessionCoordinator', () => {
       transitionEndsAt: 12_000,
     });
     expect(alarms.scheduled).toEqual({
-      name: 'flowarium.session-phase',
+      name: 'locusora.session-phase',
       when: 12_000,
     });
 
     clock.set(12_000);
-    await alarms.fire('flowarium.session-phase');
+    await alarms.fire('locusora.session-phase');
 
     expect(messages.events.at(-1)?.session).toMatchObject({
       status: 'running',
@@ -240,7 +240,7 @@ describe('createSessionCoordinator', () => {
       phaseEndsAt: 17_000,
     });
     expect(alarms.scheduled).toEqual({
-      name: 'flowarium.session-phase',
+      name: 'locusora.session-phase',
       when: 17_000,
     });
   });
@@ -255,7 +255,7 @@ describe('createSessionCoordinator', () => {
     });
 
     clock.set(18_000);
-    await alarms.fire('flowarium.session-phase');
+    await alarms.fire('locusora.session-phase');
 
     expect(messages.events.at(-1)?.session).toMatchObject({
       status: 'completed',
@@ -299,7 +299,7 @@ describe('createSessionCoordinator', () => {
       workflowId: rewarded.id,
     });
     clock.set(12_000);
-    await alarms.fire('flowarium.session-phase');
+    await alarms.fire('locusora.session-phase');
     expect(messages.events.at(-1)?.session).toMatchObject({
       status: 'paused',
       pauseReason: 'reward',
@@ -327,7 +327,7 @@ describe('createSessionCoordinator', () => {
       phaseEndsAt: 25_000,
     });
     expect(alarms.scheduled).toEqual({
-      name: 'flowarium.session-phase',
+      name: 'locusora.session-phase',
       when: 25_000,
     });
   });
@@ -344,7 +344,7 @@ describe('createSessionCoordinator', () => {
       { type: 'session/changed', session: existing },
     ]);
     expect(alarms.scheduled).toEqual({
-      name: 'flowarium.session-phase',
+      name: 'locusora.session-phase',
       when: 11_000,
     });
   });

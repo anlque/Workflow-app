@@ -1,4 +1,4 @@
-# Flowarium Documentation
+# Locusora Documentation
 
 This directory is the entry point for product, architecture and developer
 documentation.

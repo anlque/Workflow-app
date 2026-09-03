@@ -149,7 +149,7 @@ its own transient object URL/audio lifecycle in `src/app/focus`.
 
 - Domain depends only on Shared Kernel `AssetId` and its own errors.
 - Application depends inward on Asset Domain and on injected ports.
-- Infrastructure depends on Asset contracts, `FlowariumDatabase`, Dexie and
+- Infrastructure depends on Asset contracts, `LocusoraDatabase`, Dexie and
   browser URL APIs.
 - Presentation depends on Asset Domain, React and Shared UI.
 - Workflow may consume the Assets root API for public package operations; no

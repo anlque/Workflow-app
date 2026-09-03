@@ -96,7 +96,7 @@ export function SidePanelApp({
           F
         </span>
         <div>
-          <h1>Flowarium</h1>
+          <h1>Locusora</h1>
           <p>Your focus rhythms</p>
         </div>
       </header>

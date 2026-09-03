@@ -72,7 +72,7 @@ rebuild it through `createWorkflow()` and must copy every owned field explicitly
 | [`workflowPackageMapping.ts`](../../src/features/workflow/application/workflowPackageMapping.ts)     | Serializes current rerolls, accepts the optional key, narrows it as a number and delegates final validation to Domain | Mapping owns the public Workflow transport shape                  | Export would lose the value, or older packages without it would be rejected | [`workflowPackage.test.ts`](../../src/features/workflow/application/workflowPackage.test.ts) round-trips a value of 3  |
 | [`importWorkflowUseCase.ts`](../../src/features/workflow/application/importWorkflowUseCase.ts)       | Copies parsed rerolls while rebuilding the imported Workflow with new identities                                      | Import owns identity/reference rewriting after package validation | The parsed value would be discarded during the second constructor pass      | The same package round-trip test and `tests/e2e/dataPortability.spec.ts`                                               |
 
-The public package remains `flowarium/workflow` version 1 because the reader
+The public package remains `locusora/workflow` version 1 because the reader
 accepts the absent field and Domain supplies the documented legacy default.
 Current writers include it. An incompatible semantic or structural change would
 require a new package version rather than another implicit default.

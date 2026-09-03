@@ -7,7 +7,7 @@ import { OptionsApp } from './OptionsApp';
 export function bootstrapOptions(container: HTMLElement | null): void {
   if (container === null) {
     throw new Error(
-      'Unable to start Flowarium: options root element is missing.',
+      'Unable to start Locusora: options root element is missing.',
     );
   }
 

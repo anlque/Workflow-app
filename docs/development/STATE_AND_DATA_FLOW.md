@@ -1,6 +1,6 @@
 # State and Data Flow
 
-Flowarium separates state by owner and lifetime. The central rule is that a
+Locusora separates state by owner and lifetime. The central rule is that a
 stored value, an authoritative runtime value and a React projection are not the
 same kind of state even when they describe the same Session or Workflow.
 

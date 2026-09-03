@@ -133,7 +133,7 @@ or invalidation.
 ## Listener Coexistence
 
 Chrome invokes several `runtime.onMessage` listeners for the same raw value.
-Flowarium listeners therefore use ownership filtering:
+Locusora listeners therefore use ownership filtering:
 
 - Session command listener attempts only supported Session commands;
 - active Session listener attempts only `session/get-active`;

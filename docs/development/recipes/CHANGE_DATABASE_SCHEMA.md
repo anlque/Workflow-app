@@ -35,7 +35,7 @@ value unless the change also affects IndexedDB.
 | -------------------------------------------- | ---------------------------------------------------- |
 | Feature record and schema fragment           | `src/features/<feature>/infrastructure/*Record.ts`   |
 | `unknown` → Domain mapping and serialization | feature Infrastructure mapper/repository             |
-| Cumulative schema assembly                   | `src/platform/storage/FlowariumDatabase.ts`          |
+| Cumulative schema assembly                   | `src/platform/storage/LocusoraDatabase.ts`          |
 | Complete production fragments                | background and three UI dependency composition roots |
 | Cross-table atomic operation                 | owning feature unit-of-work adapter                  |
 | Public package compatibility                 | Workflow or Settings Application package modules     |
@@ -51,7 +51,7 @@ does not import feature concepts or decide their transformation.
 2. Allocate the next global Dexie version. The current history ends at 3, so the
    next version is 4 regardless of which feature owns the change.
 3. Add the feature-owned schema fragment with only its new/changed store
-   definitions. `FlowariumDatabase` accumulates prior definitions; never reuse or
+   definitions. `LocusoraDatabase` accumulates prior definitions; never reuse or
    independently number a feature version.
 4. Keep the effective stores cumulative. Verify that a new database opened at
    the latest version contains Workflow, Session and Asset tables.

@@ -11,7 +11,7 @@ Date: 2026-08-24
 ## Context
 
 Workflows, Sessions and Assets require structured and transactional local
-storage. They share the `flowarium` IndexedDB database so cross-feature
+storage. They share the `locusora` IndexedDB database so cross-feature
 operations such as Workflow package import can update Workflow and Asset tables
 atomically. Each feature still owns its records, mappers and repository adapter.
 
@@ -21,10 +21,10 @@ allocation rule.
 
 ## Decision
 
-Use one Dexie database named `flowarium`. Feature Infrastructure exports ordered
+Use one Dexie database named `locusora`. Feature Infrastructure exports ordered
 schema fragments for the tables it owns. Every runtime context that opens the
 database composes the same complete set of fragments through
-`FlowariumDatabase`.
+`LocusoraDatabase`.
 
 Database version numbers form one global, monotonically increasing sequence
 across all features. A new schema change takes the next project-wide integer;

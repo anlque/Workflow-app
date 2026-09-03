@@ -10,7 +10,7 @@ Date: 2026-07-31
 
 ## Context
 
-Flowarium needs multiple browser-extension entry points, Manifest generation,
+Locusora needs multiple browser-extension entry points, Manifest generation,
 development reloads and production packaging. Maintaining this build
 infrastructure directly would not add product value. The MVP needs one supported
 runtime before cross-browser support is attempted.

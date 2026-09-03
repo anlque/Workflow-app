@@ -1,5 +1,5 @@
 export {
-  FlowariumDatabase,
+  LocusoraDatabase,
   type DatabaseSchema,
-  type FlowariumDatabaseOptions,
-} from './FlowariumDatabase';
+  type LocusoraDatabaseOptions,
+} from './LocusoraDatabase';
