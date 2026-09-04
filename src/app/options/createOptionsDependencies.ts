@@ -63,7 +63,9 @@ function downloadJson(data: string, filename: string): void {
   }
 }
 
-export function createOptionsDependencies(): OptionsDependencies {
+export function createOptionsDependencies(
+  preferences: OptionsDependencies['preferences'],
+): OptionsDependencies {
   const database = new LocusoraDatabase({
     schemas: [
       ...workflowDatabaseSchemas,
@@ -91,6 +93,7 @@ export function createOptionsDependencies(): OptionsDependencies {
   };
 
   return {
+    preferences,
     async load() {
       const [workflowValues, assetValues, settingsValue] = await Promise.all([
         listWorkflowsUseCase(workflows),

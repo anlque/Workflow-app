@@ -29,7 +29,9 @@ import type { SidePanelDependencies } from './SidePanelApp';
 import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
 import { createChromeFocusTabController } from '../focus/createChromeFocusTabController';
 
-export function createSidePanelDependencies(): SidePanelDependencies {
+export function createSidePanelDependencies(
+  preferences: SidePanelDependencies['preferences'],
+): SidePanelDependencies {
   const focusTabs = createChromeFocusTabController(browser);
   const database = new LocusoraDatabase({
     schemas: [
@@ -53,6 +55,7 @@ export function createSidePanelDependencies(): SidePanelDependencies {
   const catalogEvents = createChromeWorkflowCatalogEvents();
 
   return {
+    preferences,
     sessions,
     startSession: (id) => sessions.start(id),
     pauseSession: (id) => sessions.pause(id),

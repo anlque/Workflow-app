@@ -30,6 +30,10 @@
   background: var(--color-canvas);
 }
 
+:root[data-preferences-ready='false'] {
+  visibility: hidden;
+}
+
 :root[data-theme='dark'] {
   --color-canvas: oklch(0.19 0.015 160);
   --color-navigation: oklch(0.235 0.018 160);
@@ -347,21 +351,6 @@ body {
   to {
     transform: rotateX(360deg) rotateY(360deg) rotateZ(360deg) scale(1);
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .reward-cube-scene[data-state='mixing'] .reward-cube {
-    animation: none;
-  }
-}
-
-[data-reduced-motion='true'] *,
-[data-reduced-motion='true'] *::before,
-[data-reduced-motion='true'] *::after {
-  scroll-behavior: auto !important;
-  transition-duration: 0.01ms !important;
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
 }
 
 button,
@@ -1150,17 +1139,6 @@ textarea {
 
   .phase-item__actions {
     justify-content: flex-start;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
   }
 }
 

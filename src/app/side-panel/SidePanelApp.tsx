@@ -9,6 +9,8 @@ import {
   type SessionProjectionClient,
 } from '@/features/session';
 import { Button } from '@/shared';
+import type { DocumentPreferences } from '@/app/document-preferences/DocumentPreferences';
+import { useDocumentPreferences } from '@/app/document-preferences/useDocumentPreferences';
 
 import {
   WorkflowLibrary,
@@ -21,6 +23,7 @@ import {
 import { CompactActiveSessionBar } from './CompactActiveSessionBar';
 
 export type SidePanelDependencies = Readonly<{
+  preferences: DocumentPreferences;
   listWorkflows(): Promise<readonly Workflow[]>;
   subscribeWorkflowChanges(listener: () => void): () => void;
   createWorkflow(): Promise<void>;
@@ -39,6 +42,9 @@ export type SidePanelDependencies = Readonly<{
 export function SidePanelApp({
   dependencies,
 }: Readonly<{ dependencies: SidePanelDependencies }>) {
+  const { effectiveReducedMotion } = useDocumentPreferences(
+    dependencies.preferences,
+  );
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'session' | 'workflows'>('workflows');
   const lastSessionId = useRef<SessionId | null>(null);
@@ -115,6 +121,7 @@ export function SidePanelApp({
           </Button>
           <ActiveSessionView
             session={activeSession}
+            reducedMotion={effectiveReducedMotion}
             onPause={dependencies.pauseSession}
             onResume={dependencies.resumeSession}
             onStop={dependencies.stopSession}

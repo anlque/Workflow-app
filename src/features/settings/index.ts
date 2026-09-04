@@ -1,4 +1,5 @@
 export type { SettingsRepository } from './application/SettingsRepository';
+export type { DocumentPreferenceSource } from './application/DocumentPreferenceSource';
 export {
   parseSettingsPackage,
   SettingsPackageValidationError,
@@ -19,6 +20,10 @@ export {
   type Settings,
   type Theme,
 } from './domain/Settings';
+export {
+  ChromeDocumentPreferenceSource,
+  type StorageChangeEvent,
+} from './infrastructure/ChromeDocumentPreferenceSource';
 export {
   ChromeSettingsRepository,
   type SettingsStorageArea,

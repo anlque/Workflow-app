@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
 import { defaultSettings } from '@/features/settings';
+import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
 import {
   createWorkflow,
   type CreateWorkflowInput,
@@ -13,6 +14,7 @@ import { OptionsApp, type OptionsDependencies } from './OptionsApp';
 
 function dependencies(): OptionsDependencies {
   return {
+    preferences: createTestDocumentPreferences(),
     load: () =>
       Promise.resolve({ workflows: [], assets: [], settings: defaultSettings }),
     saveWorkflow: () => Promise.resolve(),
@@ -34,6 +36,30 @@ function dependencies(): OptionsDependencies {
 }
 
 describe('OptionsApp', () => {
+  test('shows theme and motion changes received from another document', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies();
+    const preferences = deps.preferences as ReturnType<
+      typeof createTestDocumentPreferences
+    >;
+    render(<OptionsApp dependencies={deps} />);
+    await user.click(await screen.findByRole('tab', { name: 'Settings' }));
+    expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveValue(
+      'system',
+    );
+    act(() => {
+      preferences.setSnapshot({
+        theme: 'dark',
+        reducedMotion: 'reduce',
+        effectiveReducedMotion: true,
+      });
+    });
+    expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveValue('dark');
+    expect(
+      screen.getByRole('combobox', { name: 'Reduced motion' }),
+    ).toHaveValue('reduce');
+  });
+
   test('provides a keyboard-operable three-tab workspace', async () => {
     const user = userEvent.setup();
     const { container } = render(<OptionsApp dependencies={dependencies()} />);

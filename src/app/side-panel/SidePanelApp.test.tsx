@@ -4,6 +4,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { createSession, deriveSessionState } from '@/features/session';
 import { createWorkflow } from '@/features/workflow';
+import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
 
 import { SidePanelApp, type SidePanelDependencies } from './SidePanelApp';
 
@@ -14,6 +15,7 @@ function dependencies(
   > = null,
 ): SidePanelDependencies {
   return {
+    preferences: createTestDocumentPreferences(),
     listWorkflows: () => Promise.resolve(workflows),
     subscribeWorkflowChanges: vi.fn(() => vi.fn()),
     createWorkflow: () => Promise.resolve(),

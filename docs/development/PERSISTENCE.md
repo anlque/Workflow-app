@@ -192,6 +192,14 @@ The Settings object accepts only `theme`, `reducedMotion` and optional
 values. There is no separate Settings database schema or record
 `schemaVersion`.
 
+Each extension document independently reads this same key before its first
+visible render and listens to `chrome.storage.onChanged` for the local
+`settings` key. The per-document controller is not another persistence layer:
+it holds only a validated rendering snapshot and effective system-motion value.
+Missing, invalid or temporarily unreadable values use existing defaults for
+safe document presentation; update/import use cases remain strict. Controllers
+unsubscribe from storage and media-query events on document teardown.
+
 ## Why Stored Values Enter as `unknown`
 
 TypeScript types do not validate bytes already in a browser profile. Records may

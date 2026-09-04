@@ -16,6 +16,8 @@ import {
   type WorkflowId,
 } from '@/features/workflow';
 import { Button } from '@/shared';
+import type { DocumentPreferences } from '@/app/document-preferences/DocumentPreferences';
+import { useDocumentPreferences } from '@/app/document-preferences/useDocumentPreferences';
 
 import { FocusEnvironment } from './FocusEnvironment';
 import { FocusLauncher } from './FocusLauncher';
@@ -23,6 +25,7 @@ import type { UiSoundPlayer } from './createUiSoundPlayer';
 import { useCompletionCue } from './useCompletionCue';
 
 export type FocusDependencies = Readonly<{
+  preferences: DocumentPreferences;
   sounds: UiSoundPlayer;
   sessions: SessionProjectionClient;
   pause(id: SessionId): Promise<void>;
@@ -31,7 +34,6 @@ export type FocusDependencies = Readonly<{
   stop(id: SessionId): Promise<void>;
   loadAssetUrl(id: AssetId): Promise<string | null>;
   releaseAssetUrl(url: string): void;
-  loadReducedMotion(): Promise<boolean>;
   closeSidePanel(): Promise<void>;
   openSidePanel(): Promise<void>;
   subscribeSidePanelState(listener: (open: boolean) => void): () => void;
@@ -91,7 +93,9 @@ export function FocusApp({
   const [soundState, setSoundState] = useState(dependencies.sounds.getState);
   const [volumePercent, setVolumePercent] = useState(100);
   const lastAudibleVolumeRef = useRef(100);
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const { effectiveReducedMotion: reducedMotion } = useDocumentPreferences(
+    dependencies.preferences,
+  );
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [panelPending, setPanelPending] = useState(false);
 
@@ -134,12 +138,7 @@ export function FocusApp({
 
   useEffect(() => {
     const connection = connectSessionMessages(store, dependencies.sessions);
-    let active = true;
-    void dependencies.loadReducedMotion().then((value) => {
-      if (active) setReducedMotion(value);
-    });
     return () => {
-      active = false;
       connection.disconnect();
     };
   }, [dependencies, store]);
@@ -162,10 +161,7 @@ export function FocusApp({
   }
   if (projection.session === null) {
     return (
-      <main
-        className="focus-app focus-app--empty"
-        data-reduced-motion={String(reducedMotion)}
-      >
+      <main className="focus-app focus-app--empty">
         <div className="focus-app__utility-actions">
           <Button
             className="focus-app__close-panel"
@@ -190,7 +186,7 @@ export function FocusApp({
     session.snapshot.workflow.phases[session.currentPhaseIndex] ??
     session.snapshot.workflow.phases[0];
   return (
-    <main className="focus-app" data-reduced-motion={String(reducedMotion)}>
+    <main className="focus-app">
       <div className="focus-app__utility-actions">
         <div className="focus-app__volume-control">
           <Button

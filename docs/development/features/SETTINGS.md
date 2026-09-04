@@ -36,9 +36,9 @@ Consumers import only from `@/features/settings`.
 | Group                      | Exports                                                                                                                 |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Domain                     | `Settings`, `Theme`, `ReducedMotion`, `createSettings`, `defaultSettings`, `SettingsValidationError`                    |
-| Application contracts      | `SettingsRepository`, `SettingsPackageV1`, `SettingsImportLimits`, `SettingsPackageValidationError`                     |
+| Application contracts      | `SettingsRepository`, `DocumentPreferenceSource`, `SettingsPackageV1`, `SettingsImportLimits`, `SettingsPackageValidationError` |
 | Application behavior       | `getSettingsUseCase`, `updateSettingsUseCase`, `exportSettingsUseCase`, `importSettingsUseCase`, `parseSettingsPackage` |
-| Infrastructure composition | `ChromeSettingsRepository`, `SettingsStorageArea`                                                                       |
+| Infrastructure composition | `ChromeSettingsRepository`, `ChromeDocumentPreferenceSource`, storage adapter types                                      |
 | Presentation               | `SettingsPage`, `SettingsPageProps`                                                                                     |
 
 Infrastructure is public only so `src/app` can compose a concrete adapter.
@@ -113,9 +113,17 @@ write. See [Persistence and Compatibility](../PERSISTENCE.md) and
 
 ## Presentation Consumers
 
-Options loads Settings together with Workflows and Assets, then applies
-`theme` and `reducedMotion` as root document data attributes. After an update or
-import it reloads its snapshot so the controls and document state agree.
+Every document composition root starts its own document-preference controller
+before mounting React. The controller validates the durable value, applies
+`data-theme` and effective `data-reduced-motion` to the root, then reveals the
+document. It subscribes to local `settings` changes, so Focus, Side Panel and
+Options update without reload. Options also uses that live snapshot for its two
+appearance controls while retaining its normal reload for operation feedback.
+
+`theme: system` remains CSS-driven. `reducedMotion: system` is resolved through
+`matchMedia`; only this mode owns a media-query listener. Explicit `reduce` and
+`no-preference` override the OS value. Each controller removes storage, media
+and React subscriptions on `pagehide`.
 
 `SettingsPage` provides:
 
@@ -143,7 +151,7 @@ package contracts.
 | ---------------------------------------- | ------------------ | ------------------------------------------------------ |
 | Unknown field, enum or Workflow ID       | Domain             | Throws `SettingsValidationError`                       |
 | Invalid/oversized JSON or wrong envelope | Application        | Throws `SettingsPackageValidationError` before a write |
-| Invalid persisted value                  | Application/Domain | Load rejects; defaults apply only to absence           |
+| Invalid persisted value                  | Application/Domain | Use cases reject; document preferences recover to defaults |
 | Chrome Storage read/write failure        | Infrastructure     | Rejects to the caller                                  |
 | UI operation failure                     | Presentation       | Keeps rendered Settings and shows an accessible error  |
 
@@ -154,7 +162,8 @@ package contracts.
 | Defaults, validation, deterministic package and no-write failures | `application/settingsUseCases.test.ts`            |
 | Single Chrome Storage key mapping                                 | `infrastructure/ChromeSettingsRepository.test.ts` |
 | Appearance updates, pending state and portability feedback        | `presentation/SettingsPage.test.tsx`              |
-| Options composition and application of settings                   | `src/app/options/OptionsApp.test.tsx`             |
+| Cross-document loading and application                            | `src/app/document-preferences/*.test.*`            |
+| Options live preference controls                                  | `src/app/options/OptionsApp.test.tsx`              |
 | Settings import/export journey                                    | `tests/e2e/dataPortability.spec.ts`               |
 
 Run focused tests with:

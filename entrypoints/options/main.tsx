@@ -1,4 +1,4 @@
 import { bootstrapOptions } from '@/app/options/bootstrapOptions';
 import '@/styles/global.css';
 
-bootstrapOptions(document.getElementById('root'));
+void bootstrapOptions(document.getElementById('root'));

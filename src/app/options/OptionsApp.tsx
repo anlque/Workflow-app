@@ -7,6 +7,8 @@ import {
   type AssetKind,
 } from '@/features/assets';
 import { SettingsPage, type Settings } from '@/features/settings';
+import type { DocumentPreferences } from '@/app/document-preferences/DocumentPreferences';
+import { useDocumentPreferences } from '@/app/document-preferences/useDocumentPreferences';
 import {
   createWorkflowId,
   WorkflowEditor,
@@ -23,6 +25,7 @@ type OptionsSnapshot = Readonly<{
 }>;
 
 export type OptionsDependencies = {
+  preferences: DocumentPreferences;
   load(): Promise<OptionsSnapshot>;
   saveWorkflow(input: CreateWorkflowInput): Promise<void>;
   duplicateWorkflow(id: WorkflowId): Promise<void>;
@@ -51,6 +54,7 @@ function tabLabel(tab: Tab): string {
 export function OptionsApp({
   dependencies,
 }: Readonly<{ dependencies: OptionsDependencies }>) {
+  const documentPreferences = useDocumentPreferences(dependencies.preferences);
   const [snapshot, setSnapshot] = useState<OptionsSnapshot | null>(null);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<
     WorkflowId | undefined
@@ -99,13 +103,6 @@ export function OptionsApp({
       active = false;
     };
   }, [dependencies]);
-
-  useEffect(() => {
-    if (snapshot === null) return;
-    document.documentElement.dataset['theme'] = snapshot.settings.theme;
-    document.documentElement.dataset['reducedMotion'] =
-      snapshot.settings.reducedMotion;
-  }, [snapshot]);
 
   function selectTab(tab: Tab): void {
     setActiveTab(tab);
@@ -276,7 +273,11 @@ export function OptionsApp({
           />
         ) : (
           <SettingsPage
-            settings={snapshot.settings}
+            settings={{
+              ...snapshot.settings,
+              theme: documentPreferences.theme,
+              reducedMotion: documentPreferences.reducedMotion,
+            }}
             onUpdate={async (settings) => {
               await dependencies.updateSettings(settings);
               await load(selectedWorkflowId);

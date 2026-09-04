@@ -10,11 +10,13 @@ import {
   type SessionProjectionClient,
 } from '@/features/session';
 import { createWorkflow } from '@/features/workflow';
+import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
 
 import { FocusApp, type FocusDependencies } from './FocusApp';
 
 function dependencies(session: Session | null): FocusDependencies {
   return {
+    preferences: createTestDocumentPreferences(),
     sounds: {
       unlock: vi.fn(() => Promise.resolve(true)),
       getState: vi.fn(() => 'ready' as const),
@@ -35,7 +37,6 @@ function dependencies(session: Session | null): FocusDependencies {
     stop: vi.fn(() => Promise.resolve()),
     loadAssetUrl: vi.fn(() => Promise.resolve(null)),
     releaseAssetUrl: vi.fn(),
-    loadReducedMotion: vi.fn(() => Promise.resolve(false)),
     closeSidePanel: vi.fn(() => Promise.resolve()),
     openSidePanel: vi.fn(() => Promise.resolve()),
     subscribeSidePanelState: vi.fn(() => vi.fn()),
@@ -47,6 +48,39 @@ function dependencies(session: Session | null): FocusDependencies {
 }
 
 describe('FocusApp', () => {
+  test('updates active presentation when effective reduced motion changes', async () => {
+    const session = createSession(
+      'session-1',
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+      }),
+      Date.now(),
+    );
+    const deps = dependencies(session);
+    const preferences = deps.preferences as ReturnType<
+      typeof createTestDocumentPreferences
+    >;
+    const { container } = render(<FocusApp dependencies={deps} />);
+    await screen.findByRole('heading', { name: 'Deep work' });
+    expect(container.querySelector('.focus-environment')).toHaveAttribute(
+      'data-reduced-motion',
+      'false',
+    );
+    act(() => {
+      preferences.setSnapshot({
+        theme: 'system',
+        reducedMotion: 'reduce',
+        effectiveReducedMotion: true,
+      });
+    });
+    expect(container.querySelector('.focus-environment')).toHaveAttribute(
+      'data-reduced-motion',
+      'true',
+    );
+  });
+
   test('does not dispose document-scoped sounds during StrictMode effect checks', async () => {
     const deps = dependencies(null);
 

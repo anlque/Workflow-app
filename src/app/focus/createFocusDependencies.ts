@@ -5,10 +5,6 @@ import {
   BrowserAssetUrlService,
   DexieAssetRepository,
 } from '@/features/assets';
-import {
-  ChromeSettingsRepository,
-  getSettingsUseCase,
-} from '@/features/settings';
 import { sessionDatabaseSchemas } from '@/features/session';
 import {
   DexieWorkflowRepository,
@@ -30,7 +26,9 @@ import {
   subscribeSidePanelState,
 } from '../closeSidePanel';
 
-export function createFocusDependencies(): FocusDependencies {
+export function createFocusDependencies(
+  preferences: FocusDependencies['preferences'],
+): FocusDependencies {
   const database = new LocusoraDatabase({
     schemas: [
       ...workflowDatabaseSchemas,
@@ -51,9 +49,9 @@ export function createFocusDependencies(): FocusDependencies {
     },
   };
   const sessions = new ChromeSessionClient(runtime, () => crypto.randomUUID());
-  const settings = new ChromeSettingsRepository();
   const catalogEvents = createChromeWorkflowCatalogEvents();
   return {
+    preferences,
     sounds: createUiSoundPlayer(),
     closeSidePanel,
     openSidePanel,
@@ -74,12 +72,6 @@ export function createFocusDependencies(): FocusDependencies {
     },
     releaseAssetUrl(url) {
       urls.revoke(url);
-    },
-    async loadReducedMotion() {
-      const preference = (await getSettingsUseCase(settings)).reducedMotion;
-      if (preference === 'reduce') return true;
-      if (preference === 'no-preference') return false;
-      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     },
   };
 }
