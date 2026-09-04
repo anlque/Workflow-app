@@ -5,6 +5,9 @@
   "type": "module",
   "packageManager": "pnpm@10.14.0",
   "scripts": {
+    "brand:export": "node scripts/brand/export-brand-assets.mjs",
+    "brand:capture-screenshots": "pnpm build && node scripts/brand/capture-store-screenshots.mjs",
+    "brand:verify": "node scripts/brand/verify-brand-assets.mjs",
     "dev": "wxt",
     "build": "wxt build",
     "postinstall": "wxt prepare",

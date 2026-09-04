@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 280" role="img" aria-labelledby="title">
+  <title id="title">Locusora small Chrome Web Store promotional tile</title>
+  <rect width="440" height="280" rx="0" fill="#255C46"/>
+  <g fill="none" stroke="#3D8A68" stroke-width="18" opacity=".72">
+    <ellipse cx="410" cy="140" rx="182" ry="166"/>
+    <ellipse cx="410" cy="140" rx="132" ry="116"/>
+    <ellipse cx="410" cy="140" rx="82" ry="68"/>
+  </g>
+  <g transform="translate(34 58) scale(2.56)">
+    <path fill="#29483A" stroke="#82D2A9" stroke-width="5" d="M32 8C45 8 56 18 56 31S46 55 32 56 8 46 8 32 18 9 32 8Z"/>
+    <path fill="none" stroke="#C2E9D3" stroke-width="5" stroke-linecap="round" stroke-dasharray="34 10" d="M32 18c8 0 14 6 14 14s-6 14-14 14-14-6-14-14 6-14 14-14Z"/>
+    <circle cx="32" cy="32" r="5" fill="#F2B86B"/>
+  </g>
+  <text x="34" y="244" fill="#EDF7F1" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="44" font-weight="600" letter-spacing="-1.5">Locusora</text>
+  <circle cx="410" cy="140" r="13" fill="#F2B86B"/>
+</svg>

@@ -36,7 +36,7 @@ function dependencies(): OptionsDependencies {
 describe('OptionsApp', () => {
   test('provides a keyboard-operable three-tab workspace', async () => {
     const user = userEvent.setup();
-    render(<OptionsApp dependencies={dependencies()} />);
+    const { container } = render(<OptionsApp dependencies={dependencies()} />);
 
     const workflowsTab = await screen.findByRole('tab', { name: 'Workflows' });
     expect(workflowsTab).toHaveAttribute('aria-selected', 'true');
@@ -52,6 +52,10 @@ describe('OptionsApp', () => {
     );
     expect(screen.getByRole('tabpanel', { name: 'Assets' })).toBeVisible();
     expect(screen.queryByRole('tabpanel', { name: 'Workflows' })).toBeNull();
+    expect(container.querySelector('.brand-logo')).toHaveAttribute(
+      'src',
+      '/brand/locusora-mark.svg',
+    );
   });
 
   test('activates the Settings tab by click', async () => {

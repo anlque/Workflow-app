@@ -35,10 +35,16 @@ function dependencies(
 
 describe('SidePanelApp', () => {
   test('shows the compact Workflow empty state', async () => {
-    render(<SidePanelApp dependencies={dependencies()} />);
+    const { container } = render(
+      <SidePanelApp dependencies={dependencies()} />,
+    );
     expect(
       await screen.findByText('Build your first focus rhythm.'),
     ).toBeVisible();
+    expect(container.querySelector('.brand-logo')).toHaveAttribute(
+      'src',
+      '/brand/locusora-mark.svg',
+    );
   });
 
   test('opens a Workflow in the options editor', async () => {

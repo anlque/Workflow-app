@@ -103,6 +103,13 @@ body {
   margin: 0;
 }
 
+.focus-launcher__heading,
+.app-header__identity {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
 .focus-launcher__empty {
   display: flex;
   flex-direction: column;
@@ -1102,16 +1109,11 @@ textarea {
   font-size: 0.9375rem;
 }
 
-.brand-mark {
-  display: grid;
-  place-items: center;
+.brand-logo {
+  display: block;
   width: 2.5rem;
   height: 2.5rem;
   flex: 0 0 auto;
-  color: white;
-  background: var(--color-accent);
-  border-radius: var(--radius-control);
-  font-weight: 800;
 }
 
 @media (max-width: 52rem) {

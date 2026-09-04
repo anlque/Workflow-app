@@ -59,6 +59,9 @@ Run commands from the repository root.
 | `pnpm test`         | Both Vitest projects pass, including Domain, components, repositories, messaging and architecture | A built extension or actual Chromium shell                                       |
 | `pnpm build`        | WXT creates `.output/chrome-mv3` and its production manifest/bundles                              | User journeys; Chrome must still load or Playwright must exercise the artifact   |
 | `pnpm test:e2e`     | Rebuilds, then runs all Playwright extension journeys                                             | Chrome's toolbar UI and native side-panel container interactions                 |
+| `pnpm brand:export` | Recreates manifest icons, favicon, public SVGs and Store promo artwork from approved SVG sources  | Store screenshots or Chrome-shell presentation                                   |
+| `pnpm brand:capture-screenshots` | Rebuilds and captures three real 1280×800 extension states in isolated Chromium | Native toolbar appearance or Store policy acceptance |
+| `pnpm brand:verify` | Checks brand media signatures/dimensions, SVG viewBoxes and built manifest icon paths              | Subjective legibility or visual quality                                           |
 
 For fast local feedback, target the narrowest owner:
 
@@ -70,6 +73,11 @@ pnpm exec playwright test tests/e2e/dataPortability.spec.ts
 
 A focused pass is not the completion gate. Before handing off a changing phase,
 run the checks proportional to its scope and finish with the full required gate.
+
+For brand changes, follow the complete inventory and manual light/dark toolbar
+procedure in [Brand Assets](../product/BRAND_ASSETS.md). Automated media checks
+cannot reproduce Chrome's native toolbar compositing, so load the production
+unpacked build and inspect the pinned icon in both browser themes before release.
 
 ### CI Order
 

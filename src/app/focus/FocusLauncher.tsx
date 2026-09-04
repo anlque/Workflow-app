@@ -18,9 +18,17 @@ export function FocusLauncher({
 }: FocusLauncherProps) {
   return (
     <section className="focus-launcher" aria-labelledby="focus-launcher-title">
-      <div>
-        <h1 id="focus-launcher-title">Choose a Workflow</h1>
-        <p>Start a focus rhythm without leaving this tab.</p>
+      <div className="focus-launcher__heading">
+        <img
+          className="brand-logo"
+          src="/brand/locusora-mark.svg"
+          alt=""
+          aria-hidden="true"
+        />
+        <div>
+          <h1 id="focus-launcher-title">Choose a Workflow</h1>
+          <p>Start a focus rhythm without leaving this tab.</p>
+        </div>
       </div>
       {error === null ? null : (
         <p className="feedback feedback--error" role="alert">

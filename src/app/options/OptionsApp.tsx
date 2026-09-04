@@ -148,11 +148,19 @@ export function OptionsApp({
   return (
     <main className="options-app">
       <header className="app-header">
-        <div>
-          <h1>Locusora</h1>
-          <p>
-            Design the rhythms and environments that help you return to focus.
-          </p>
+        <div className="app-header__identity">
+          <img
+            className="brand-logo"
+            src="/brand/locusora-mark.svg"
+            alt=""
+            aria-hidden="true"
+          />
+          <div>
+            <h1>Locusora</h1>
+            <p>
+              Design the rhythms and environments that help you return to focus.
+            </p>
+          </div>
         </div>
       </header>
       <div className="tabs" role="tablist" aria-label="Configuration">

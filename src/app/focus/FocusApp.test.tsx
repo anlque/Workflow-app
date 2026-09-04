@@ -62,12 +62,16 @@ describe('FocusApp', () => {
 
   test('shows the Workflow launcher without an active Session', async () => {
     const deps = dependencies(null);
-    render(<FocusApp dependencies={deps} />);
+    const { container } = render(<FocusApp dependencies={deps} />);
     expect(
       await screen.findByRole('heading', { name: 'Choose a Workflow' }),
     ).toBeVisible();
     expect(deps.listWorkflows).toHaveBeenCalledOnce();
     expect(deps.closeSidePanel).not.toHaveBeenCalled();
+    expect(container.querySelector('.brand-logo')).toHaveAttribute(
+      'src',
+      '/brand/locusora-mark.svg',
+    );
   });
 
   test('renders the current Session and Phase environment', async () => {

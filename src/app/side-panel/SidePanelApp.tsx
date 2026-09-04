@@ -92,9 +92,12 @@ export function SidePanelApp({
   return (
     <main className="side-panel-app">
       <header className="side-panel-header">
-        <span className="brand-mark" aria-hidden="true">
-          F
-        </span>
+        <img
+          className="brand-logo"
+          src="/brand/locusora-mark.svg"
+          alt=""
+          aria-hidden="true"
+        />
         <div>
           <h1>Locusora</h1>
           <p>Your focus rhythms</p>

@@ -40,6 +40,22 @@ export default defineConfig(
     },
   },
   {
+    files: ['scripts/**/*.mjs'],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      ...tseslint.configs.disableTypeChecked.languageOptions,
+      globals: {
+        chrome: 'readonly',
+        console: 'readonly',
+        document: 'readonly',
+        indexedDB: 'readonly',
+        process: 'readonly',
+        URL: 'readonly',
+        window: 'readonly',
+      },
+    },
+  },
+  {
     files: [
       'src/features/**/*.{ts,tsx}',
       'src/platform/**/*.{ts,tsx}',
