@@ -31,6 +31,22 @@ export function WorkflowEditor({
   const [saved, setSaved] = useState(false);
   const saveStatusTimer = useRef<number | undefined>(undefined);
 
+  function setDurationError(phaseKey: string, invalid: boolean): void {
+    const errorKey = `phase:${phaseKey}:duration`;
+    setErrors((current) => {
+      if (invalid) {
+        return {
+          ...current,
+          [errorKey]:
+            'Duration must be at least 0.5 minutes in 0.5-minute increments.',
+        };
+      }
+      return Object.fromEntries(
+        Object.entries(current).filter(([key]) => key !== errorKey),
+      );
+    });
+  }
+
   function clearSavedStatus(): void {
     setSaved(false);
     if (saveStatusTimer.current !== undefined) {
@@ -194,14 +210,35 @@ export function WorkflowEditor({
                 >
                   <input
                     inputMode="decimal"
-                    type="number"
-                    min="0.5"
-                    step="0.5"
+                    type="text"
                     value={phase.durationMinutes}
                     onChange={(event) => {
+                      setDurationError(phase.key, false);
                       editor.updatePhase(phase.key, {
                         durationMinutes: event.target.value,
                       });
+                    }}
+                    onBlur={() => {
+                      setDurationError(
+                        phase.key,
+                        !editor.commitPhaseDuration(phase.key),
+                      );
+                    }}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key !== 'ArrowUp' &&
+                        event.key !== 'ArrowDown'
+                      ) {
+                        return;
+                      }
+                      event.preventDefault();
+                      setDurationError(
+                        phase.key,
+                        !editor.stepPhaseDuration(
+                          phase.key,
+                          event.key === 'ArrowUp' ? 1 : -1,
+                        ),
+                      );
                     }}
                   />
                 </Field>

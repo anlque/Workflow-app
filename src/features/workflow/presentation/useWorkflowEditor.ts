@@ -118,6 +118,20 @@ function minutesToDurationSeconds(value: string): number | null {
     : null;
 }
 
+function normalizedDurationMinutes(value: string): string | null {
+  const seconds = minutesToDurationSeconds(value);
+  return seconds === null ? null : String(seconds / 60);
+}
+
+function steppedDurationMinutes(
+  value: string,
+  direction: -1 | 1,
+): string | null {
+  const current = normalizedDurationMinutes(value);
+  if (current === null) return null;
+  return String(Math.max(0.5, Number(current) + direction * 0.5));
+}
+
 export function validateWorkflowDraft(
   draft: WorkflowDraft,
 ): WorkflowDraftValidation {
@@ -226,6 +240,25 @@ export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
       setDraft((current) => ({ ...current, name }));
     },
     updatePhase,
+    commitPhaseDuration(phaseKey: string): boolean {
+      const phase = draft.phases.find(({ key: value }) => value === phaseKey);
+      if (phase === undefined) return false;
+      const durationMinutes = normalizedDurationMinutes(phase.durationMinutes);
+      if (durationMinutes === null) return false;
+      updatePhase(phaseKey, { durationMinutes });
+      return true;
+    },
+    stepPhaseDuration(phaseKey: string, direction: -1 | 1): boolean {
+      const phase = draft.phases.find(({ key: value }) => value === phaseKey);
+      if (phase === undefined) return false;
+      const durationMinutes = steppedDurationMinutes(
+        phase.durationMinutes,
+        direction,
+      );
+      if (durationMinutes === null) return false;
+      updatePhase(phaseKey, { durationMinutes });
+      return true;
+    },
     addPhase(): void {
       setDraft((current) => ({
         ...current,
