@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Asset, AssetId } from '../domain/Asset';
 
@@ -17,24 +17,29 @@ export function AssetPreview({
 }: AssetPreviewProps) {
   const [url, setUrl] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const callbacks = useRef({ loadBlob, createObjectUrl, revokeObjectUrl });
+  callbacks.current = { loadBlob, createObjectUrl, revokeObjectUrl };
 
   useEffect(() => {
     let active = true;
     let ownedUrl: string | null = null;
-    void loadBlob(asset.id).then((blob) => {
+    const owner = callbacks.current;
+    setUrl(null);
+    setUnavailable(false);
+    void owner.loadBlob(asset.id).then((blob) => {
       if (!active) return;
       if (blob === null) {
         setUnavailable(true);
         return;
       }
-      ownedUrl = createObjectUrl(blob);
+      ownedUrl = owner.createObjectUrl(blob);
       setUrl(ownedUrl);
     });
     return () => {
       active = false;
-      if (ownedUrl !== null) revokeObjectUrl(ownedUrl);
+      if (ownedUrl !== null) owner.revokeObjectUrl(ownedUrl);
     };
-  }, [asset.id, createObjectUrl, loadBlob, revokeObjectUrl]);
+  }, [asset.id]);
 
   if (unavailable) {
     return <p className="asset-preview__empty">Preview unavailable</p>;

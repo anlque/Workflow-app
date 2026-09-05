@@ -33,9 +33,9 @@ export type OptionsDependencies = {
   reorderWorkflows(ids: readonly WorkflowId[]): Promise<void>;
   importAsset(file: File, kind: AssetKind): Promise<void>;
   deleteAsset(id: AssetId): Promise<void>;
-  loadAssetBlob(id: AssetId): Promise<Blob | null>;
-  createObjectUrl(blob: Blob): string;
-  revokeObjectUrl(url: string): void;
+  loadAssetBlob: (id: AssetId) => Promise<Blob | null>;
+  createObjectUrl: (blob: Blob) => string;
+  revokeObjectUrl: (url: string) => void;
   updateSettings(settings: Settings): Promise<void>;
   exportSettings(): Promise<void>;
   importSettings(file: File): Promise<void>;
@@ -265,11 +265,9 @@ export function OptionsApp({
               await dependencies.deleteAsset(id);
               await load(selectedWorkflowId);
             }}
-            loadBlob={(id) => dependencies.loadAssetBlob(id)}
-            createObjectUrl={(blob) => dependencies.createObjectUrl(blob)}
-            revokeObjectUrl={(url) => {
-              dependencies.revokeObjectUrl(url);
-            }}
+            loadBlob={dependencies.loadAssetBlob}
+            createObjectUrl={dependencies.createObjectUrl}
+            revokeObjectUrl={dependencies.revokeObjectUrl}
           />
         ) : (
           <SettingsPage

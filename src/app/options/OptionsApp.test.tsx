@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
+import { createAsset } from '@/features/assets';
 import { defaultSettings } from '@/features/settings';
 import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
 import {
@@ -36,6 +37,54 @@ function dependencies(): OptionsDependencies {
 }
 
 describe('OptionsApp', () => {
+  test('does not recreate a playing audio preview after importing an image', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies();
+    const audio = createAsset({
+      id: 'audio-1',
+      name: 'Rain',
+      kind: 'audio',
+      mimeType: 'audio/mpeg',
+      byteSize: 5,
+      createdAt: 1,
+    });
+    const image = createAsset({
+      id: 'image-1',
+      name: 'Forest',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 5,
+      createdAt: 2,
+    });
+    let assets = [audio];
+    deps.load = vi.fn(() =>
+      Promise.resolve({ workflows: [], assets, settings: defaultSettings }),
+    );
+    deps.loadAssetBlob = vi.fn(() => Promise.resolve(new Blob(['audio'])));
+    deps.createObjectUrl = vi.fn(() => 'blob:rain');
+    deps.revokeObjectUrl = vi.fn();
+    deps.importAsset = vi.fn(() => {
+      assets = [audio, image];
+      return Promise.resolve();
+    });
+    render(<OptionsApp dependencies={deps} />);
+    await user.click(await screen.findByRole('tab', { name: 'Assets' }));
+    const playing = await screen.findByLabelText('Preview Rain');
+    (playing as HTMLAudioElement).currentTime = 7;
+
+    await user.upload(
+      screen.getByLabelText('Add local image or audio'),
+      new File(['image'], 'forest.png', { type: 'image/png' }),
+    );
+    await screen.findByRole('img', { name: 'Preview of Forest' });
+
+    expect(screen.getByLabelText('Preview Rain')).toBe(playing);
+    expect((playing as HTMLAudioElement).currentTime).toBe(7);
+    expect(deps.loadAssetBlob).toHaveBeenCalledTimes(2);
+    expect(deps.createObjectUrl).toHaveBeenCalledTimes(2);
+    expect(deps.revokeObjectUrl).not.toHaveBeenCalled();
+  });
+
   test('shows theme and motion changes received from another document', async () => {
     const user = userEvent.setup();
     const deps = dependencies();

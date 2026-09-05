@@ -48,6 +48,40 @@ function setup(
 }
 
 describe('AssetLibrary', () => {
+  test('keeps an audio preview URL across equivalent catalog rerenders', async () => {
+    const blob = new Blob(['audio'], { type: 'audio/mpeg' });
+    const createObjectUrl = vi.fn(() => 'blob:rain');
+    const revokeObjectUrl = vi.fn();
+    const view = render(
+      <AssetLibrary
+        assets={[audio]}
+        onImport={() => Promise.resolve()}
+        onDelete={() => Promise.resolve()}
+        loadBlob={() => Promise.resolve(blob)}
+        createObjectUrl={createObjectUrl}
+        revokeObjectUrl={revokeObjectUrl}
+      />,
+    );
+    const playing = await screen.findByLabelText('Preview Rain');
+    (playing as HTMLAudioElement).currentTime = 9;
+
+    view.rerender(
+      <AssetLibrary
+        assets={[audio]}
+        onImport={() => Promise.resolve()}
+        onDelete={() => Promise.resolve()}
+        loadBlob={() => Promise.resolve(blob)}
+        createObjectUrl={createObjectUrl}
+        revokeObjectUrl={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('Preview Rain')).toBe(playing);
+    expect((playing as HTMLAudioElement).currentTime).toBe(9);
+    expect(createObjectUrl).toHaveBeenCalledOnce();
+    expect(revokeObjectUrl).not.toHaveBeenCalled();
+  });
+
   test('identifies image and audio Assets accessibly', () => {
     setup();
 
