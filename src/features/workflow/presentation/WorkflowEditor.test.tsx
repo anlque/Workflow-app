@@ -77,6 +77,30 @@ describe('WorkflowEditor', () => {
     ).toBeVisible();
   });
 
+  test('normalizes a valid duration only when the field blurs', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflowId="workflow-1"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+    const duration = screen.getByLabelText('Phase 1 duration in minutes');
+
+    await user.clear(duration);
+    await user.type(duration, '1.0');
+    expect(duration).toHaveValue('1.0');
+
+    await user.tab();
+    expect(duration).toHaveValue('1');
+    expect(
+      screen.queryByText(
+        'Duration must be at least 0.5 minutes in 0.5-minute increments.',
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   test('steps by half a minute with arrow keys and saves integer seconds', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
@@ -99,6 +123,29 @@ describe('WorkflowEditor', () => {
         phases: [expect.objectContaining({ durationSeconds: 90 })],
       }),
     );
+  });
+
+  test('does not step below the half-minute minimum with ArrowDown', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflowId="workflow-1"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+    const duration = screen.getByLabelText('Phase 1 duration in minutes');
+
+    await user.clear(duration);
+    await user.type(duration, '0.5');
+    await user.keyboard('{ArrowDown}');
+
+    expect(duration).toHaveValue('0.5');
+    expect(
+      screen.queryByText(
+        'Duration must be at least 0.5 minutes in 0.5-minute increments.',
+      ),
+    ).not.toBeInTheDocument();
   });
 
   test('retains invalid duration input and blocks saving', async () => {
