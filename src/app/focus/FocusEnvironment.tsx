@@ -4,13 +4,17 @@ import type { AssetId } from '@/features/assets';
 import type { Environment } from '@/features/workflow';
 import { Button } from '@/shared';
 
-import { useAmbientAudio } from './useAmbientAudio';
+import {
+  useAmbientAudio,
+  type AmbientAudioDeviceChanges,
+} from './useAmbientAudio';
 
 export type FocusEnvironmentProps = Readonly<{
   environment: Environment;
   reducedMotion: boolean;
   playing: boolean;
   volume: number;
+  deviceChanges?: AmbientAudioDeviceChanges | null;
   loadAssetUrl(id: AssetId): Promise<string | null>;
   releaseAssetUrl(url: string): void;
 }>;
@@ -57,6 +61,7 @@ export function FocusEnvironment({
   reducedMotion,
   playing,
   volume,
+  deviceChanges,
   loadAssetUrl,
   releaseAssetUrl,
 }: FocusEnvironmentProps) {
@@ -74,39 +79,51 @@ export function FocusEnvironment({
     sourceUrl: audio.url,
     playing,
     volume,
+    ...(deviceChanges === undefined ? {} : { deviceChanges }),
   });
 
   return (
-    <div
-      className="focus-environment"
-      data-testid="focus-environment"
-      data-reduced-motion={String(reducedMotion)}
-      style={{ backgroundColor: environment.backgroundColor }}
-    >
-      {image.url === null ? null : <img src={image.url} alt="" />}
-      {ambientAudio.sourceUrl === null ? null : (
-        <audio
-          ref={ambientAudio.audioRef}
-          src={ambientAudio.sourceUrl}
-          loop
-          hidden
-          aria-hidden="true"
-        />
-      )}
-      {ambientAudio.state === 'blocked' ? (
-        <Button
-          className="focus-environment__audio-action"
-          variant="secondary"
-          onClick={() => void ambientAudio.enable()}
-        >
-          Enable audio
-        </Button>
-      ) : null}
-      {image.unavailable || audio.unavailable ? (
-        <p className="focus-environment__status" role="status">
-          A focus environment asset is unavailable.
-        </p>
-      ) : null}
-    </div>
+    <>
+      <div
+        className="focus-environment"
+        data-testid="focus-environment"
+        data-reduced-motion={String(reducedMotion)}
+        style={{ backgroundColor: environment.backgroundColor }}
+      >
+        {image.url === null ? null : <img src={image.url} alt="" />}
+        {ambientAudio.sourceUrl === null ? null : (
+          <audio
+            ref={ambientAudio.audioRef}
+            src={ambientAudio.sourceUrl}
+            loop
+            hidden
+            aria-hidden="true"
+          />
+        )}
+      </div>
+      <div className="focus-environment__controls">
+        {ambientAudio.state === 'blocked' ? (
+          <Button
+            variant="secondary"
+            onClick={() => void ambientAudio.enable()}
+          >
+            Enable audio
+          </Button>
+        ) : null}
+        {ambientAudio.state === 'recovery-blocked' ? (
+          <Button
+            variant="secondary"
+            onClick={() => void ambientAudio.resume()}
+          >
+            Resume audio
+          </Button>
+        ) : null}
+        {image.unavailable || audio.unavailable ? (
+          <p className="focus-environment__status" role="status">
+            A focus environment asset is unavailable.
+          </p>
+        ) : null}
+      </div>
+    </>
   );
 }

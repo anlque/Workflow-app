@@ -210,6 +210,21 @@ body {
   max-width: min(22rem, calc(100% - 2rem));
 }
 
+.focus-environment__controls {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+  pointer-events: none;
+}
+
+.focus-environment__controls > * {
+  pointer-events: auto;
+}
+
 .focus-environment__status {
   position: absolute;
   right: 1rem;

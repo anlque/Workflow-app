@@ -11,6 +11,7 @@ import {
 } from '@/features/session';
 import { createWorkflow } from '@/features/workflow';
 import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
+import { createAssetId } from '@/features/assets';
 
 import { FocusApp, type FocusDependencies } from './FocusApp';
 
@@ -169,6 +170,51 @@ describe('FocusApp', () => {
     await user.click(screen.getByRole('button', { name: 'Unmute sound' }));
     expect(deps.sounds.setVolume).toHaveBeenLastCalledWith(0.35);
     expect(volume).toHaveValue('35');
+  });
+
+  test('keeps the Session countdown running when ambient audio pauses', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(10_000);
+    const session = createSession(
+      'session-1',
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [
+          {
+            type: 'focus',
+            durationSeconds: 60,
+            environment: { audioAssetId: createAssetId('ambient-1') },
+          },
+        ],
+      }),
+      Date.now(),
+    );
+    const deps = dependencies(session);
+    vi.mocked(deps.loadAssetUrl).mockResolvedValue('blob:ambient');
+    render(<FocusApp dependencies={deps} />);
+    const countdown = await screen.findByLabelText('Time remaining');
+    const audio = document.querySelector('audio');
+    if (!(audio instanceof HTMLAudioElement)) {
+      throw new Error('Ambient audio element was not rendered.');
+    }
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => {
+      audio.dispatchEvent(new Event('pause'));
+    });
+    expect(
+      await screen.findByRole('button', { name: 'Resume audio' }),
+    ).toBeVisible();
+
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(countdown).toHaveTextContent('00:59');
+    expect(deps.pause).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   test('refreshes the idle launcher after catalog invalidation', async () => {

@@ -145,6 +145,24 @@ missing content without inventing a fallback Asset.
 Focus playback also loads referenced Blobs through `AssetRepository` and owns
 its own transient object URL/audio lifecycle in `src/app/focus`.
 
+`useAmbientAudio` keeps one hidden media element and one active object URL while
+the current Phase is playing. The focus document listens for supported
+`mediaDevices.devicechange` events and coalesces a burst into one playback-state
+check. Audio that Chrome has already rerouted and kept playing is left untouched.
+If the element is paused after the device change, Focus preserves its source and
+browser-maintained position and offers manual Resume. Resume calls `play()` on
+that element without pausing, loading or seeking, then fades to the latest
+volume. Recoverable aborted/network media failures offer the same action; decode and
+unsupported-source failures are terminal for that source.
+
+Initial autoplay rejection exposes **Enable audio**. A device-induced pause or
+rejected Resume exposes the separate, non-blocking **Resume audio** action.
+Pause, source replacement and focus-document teardown cancel listeners, timers
+and invalidate pending playback results.
+Ambient playback remains transient Presentation behavior: every failure leaves
+the background-authoritative Session timer and transitions unchanged. Cue/audio
+channel policy remains deferred to AU-001.
+
 ## Dependencies
 
 - Domain depends only on Shared Kernel `AssetId` and its own errors.

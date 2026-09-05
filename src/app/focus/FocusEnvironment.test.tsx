@@ -1,4 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -6,10 +12,27 @@ import { createAssetId } from '@/features/assets';
 import type { Environment } from '@/features/workflow';
 
 import { FocusEnvironment } from './FocusEnvironment';
+import type { AmbientAudioDeviceChanges } from './useAmbientAudio';
 
 const imageId = createAssetId('image-1');
 const audioId = createAssetId('audio-1');
 const nextAudioId = createAssetId('audio-2');
+
+class FakeDeviceChanges implements AmbientAudioDeviceChanges {
+  readonly target = new EventTarget();
+
+  addEventListener(type: 'devicechange', listener: EventListener): void {
+    this.target.addEventListener(type, listener);
+  }
+
+  removeEventListener(type: 'devicechange', listener: EventListener): void {
+    this.target.removeEventListener(type, listener);
+  }
+
+  dispatch(): void {
+    this.target.dispatchEvent(new Event('devicechange'));
+  }
+}
 
 function setup(environment: Environment, reducedMotion = false, volume = 1) {
   const loadAssetUrl = vi.fn((id) =>
@@ -171,9 +194,80 @@ describe('FocusEnvironment', () => {
     const enable = await screen.findByRole('button', {
       name: 'Enable audio',
     });
+    expect(enable.closest('.focus-environment__controls')).not.toBeNull();
+    expect(enable.closest('.focus-environment')).toBeNull();
     await user.click(enable);
 
     expect(play).toHaveBeenCalledTimes(2);
+  });
+
+  test('offers retryable Resume audio after a device-induced pause', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const deviceChanges = new FakeDeviceChanges();
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, 'play')
+      .mockResolvedValueOnce()
+      .mockRejectedValueOnce(new DOMException('Output lost', 'AbortError'))
+      .mockResolvedValueOnce();
+    const loadAssetUrl = vi.fn(() => Promise.resolve('blob:audio'));
+    const releaseAssetUrl = vi.fn();
+    render(
+      <FocusEnvironment
+        environment={{ audioAssetId: audioId, backgroundAssetId: imageId }}
+        reducedMotion={false}
+        playing
+        volume={0.5}
+        deviceChanges={deviceChanges}
+        loadAssetUrl={loadAssetUrl}
+        releaseAssetUrl={releaseAssetUrl}
+      />,
+    );
+    const audio = await waitFor(() => {
+      const element = document.querySelector('audio');
+      if (!(element instanceof HTMLAudioElement)) {
+        throw new Error('Ambient audio element was not rendered.');
+      }
+      return element;
+    });
+    Object.defineProperty(audio, 'readyState', {
+      configurable: true,
+      value: HTMLMediaElement.HAVE_ENOUGH_DATA,
+    });
+    await waitFor(() => {
+      expect(play).toHaveBeenCalledOnce();
+    });
+    audio.currentTime = 12.5;
+
+    act(() => {
+      deviceChanges.dispatch();
+      deviceChanges.dispatch();
+      vi.advanceTimersByTime(150);
+    });
+
+    await screen.findByRole('button', {
+      name: 'Resume audio',
+    });
+    expect(document.querySelector('.focus-environment img')).not.toBeNull();
+    expect(
+      screen
+        .getByRole('button', { name: 'Resume audio' })
+        .closest('.focus-environment__controls'),
+    ).not.toBeNull();
+    expect(document.querySelectorAll('audio')).toHaveLength(1);
+    expect(document.querySelector('audio')).toBe(audio);
+    expect(audio).toHaveAttribute('src', 'blob:audio');
+    fireEvent.click(screen.getByRole('button', { name: 'Resume audio' }));
+    await waitFor(() => {
+      expect(play).toHaveBeenCalledTimes(2);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Resume audio' }));
+    await waitFor(() => {
+      expect(play).toHaveBeenCalledTimes(3);
+    });
+    expect(audio.currentTime).toBe(12.5);
   });
 
   test('fades out the current track before playing a phase replacement', async () => {
