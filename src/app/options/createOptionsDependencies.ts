@@ -4,6 +4,7 @@ import {
   deleteAssetUseCase,
   DexieAssetRepository,
   importAssetUseCase,
+  type ActiveSessionAssetReferences,
   type AssetImportPolicy,
   type WorkflowAssetReferences,
 } from '@/features/assets';
@@ -14,7 +15,11 @@ import {
   importSettingsUseCase,
   updateSettingsUseCase,
 } from '@/features/settings';
-import { sessionDatabaseSchemas } from '@/features/session';
+import {
+  activeSessionReferencesAsset,
+  DexieSessionRepository,
+  sessionDatabaseSchemas,
+} from '@/features/session';
 import {
   createWorkflowId,
   createWorkflowUseCase,
@@ -75,6 +80,7 @@ export function createOptionsDependencies(
   });
   const workflows = new DexieWorkflowRepository(database);
   const assets = new DexieAssetRepository(database);
+  const sessions = new DexieSessionRepository(database);
   const settings = new ChromeSettingsRepository();
   const urls = new BrowserAssetUrlService();
   const unitOfWork = new DexieWorkflowPackageUnitOfWork(database);
@@ -90,6 +96,9 @@ export function createOptionsDependencies(
         ),
       ).length;
     },
+  };
+  const activeSessionReferences: ActiveSessionAssetReferences = {
+    has: (assetId) => activeSessionReferencesAsset(sessions, assetId),
   };
 
   return {
@@ -149,7 +158,7 @@ export function createOptionsDependencies(
       });
     },
     async deleteAsset(id) {
-      await deleteAssetUseCase(assets, references, id);
+      await deleteAssetUseCase(assets, activeSessionReferences, references, id);
     },
     loadAssetBlob: (id) => assets.getBlob(id),
     createObjectUrl: (blob) => urls.create(blob),

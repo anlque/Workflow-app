@@ -1,4 +1,6 @@
 export type { AssetRepository } from './application/AssetRepository';
+export type { ActiveSessionAssetReferences } from './application/ActiveSessionAssetReferences';
+export { ActiveSessionReferencedAssetError } from './application/ActiveSessionReferencedAssetError';
 export type { WorkflowAssetReferences } from './application/WorkflowAssetReferences';
 export { deleteAssetUseCase } from './application/deleteAssetUseCase';
 export {

@@ -39,8 +39,8 @@ Consumers import only from `@/features/assets`.
 | Group                      | Exports                                                                                                                                                  |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Domain                     | `Asset`, `AssetId`, `AssetKind`, `CreateAssetInput`, `createAsset`, `createAssetId`                                                                      |
-| Errors                     | `AssetValidationError`, `ReferencedAssetError`, `AssetStorageError`                                                                                      |
-| Application ports          | `AssetRepository`, `WorkflowAssetReferences`                                                                                                             |
+| Errors                     | `AssetValidationError`, `ReferencedAssetError`, `ActiveSessionReferencedAssetError`, `AssetStorageError`                                                 |
+| Application ports          | `AssetRepository`, `ActiveSessionAssetReferences`, `WorkflowAssetReferences`                                                                              |
 | Application behavior       | `importAssetUseCase`, `validateAssetImport`, `deleteAssetUseCase`, `listAssetsUseCase`, `AssetImportPolicy`, `AssetKindImportPolicy`, `ImportAssetInput` |
 | Infrastructure composition | `DexieAssetRepository`, `assetDatabaseSchemas`, `BrowserAssetUrlService`                                                                                 |
 | Presentation               | `AssetLibrary`, `AssetPicker`, `AssetPreview` and their prop types                                                                                       |
@@ -60,9 +60,10 @@ picker or React dependency.
 ### Application
 
 [`application/`](../../../src/features/assets/application/) defines the
-repository and reference-count ports. Import validates file content and policy
-before saving. Deletion asks the injected reference service before touching the
-repository. This keeps Assets independent of Workflow Infrastructure.
+repository and reference ports. Import validates file content and policy before
+saving. Deletion asks the injected active Session port first, then the Workflow
+reference counter, before touching the repository. This keeps Assets independent
+of Session and Workflow Infrastructure.
 
 ### Infrastructure
 
@@ -89,6 +90,8 @@ composition root; they do not instantiate repositories.
 - Stored Blob size and MIME type must exactly match the metadata on both reads
   and writes.
 - An Asset referenced by one or more Workflows cannot be deleted.
+- An Asset referenced anywhere in an active immutable Session snapshot cannot be
+  deleted, even when its saved Workflow no longer references it.
 
 The feature trusts declared browser MIME data only after exact policy matching;
 it does not decode media or inspect magic bytes.
@@ -100,11 +103,13 @@ it does not decode media or inspect magic bytes.
 | `validateAssetImport` | Policy and import input                            | Validates policy, Blob content/MIME/size and constructs metadata | Trusted `Asset` or `AssetValidationError`            |
 | `importAssetUseCase`  | Repository, policy, identifier/name/kind/Blob/time | Validates completely, then saves metadata and Blob               | Imported Asset; no write on validation failure       |
 | `listAssetsUseCase`   | Repository                                         | Delegates the ordered local catalog read                         | Readonly Asset list                                  |
-| `deleteAssetUseCase`  | Repository, reference counter, Asset ID            | Validates the count, rejects references, otherwise deletes       | `void`, `ReferencedAssetError` or dependency failure |
+| `deleteAssetUseCase`  | Repository, active Session port, Workflow counter, Asset ID | Rejects active Session first, then Workflow references; otherwise deletes | `void`, typed reference error or dependency failure |
 
 The Options composition generates identifiers and timestamps. It implements
 `WorkflowAssetReferences` by counting Workflows with at least one matching
-Environment reference, then refreshes its local snapshot after mutations.
+Environment reference. It composes `ActiveSessionAssetReferences` from the
+public Session query and `DexieSessionRepository`, then refreshes its local
+snapshot after mutations.
 
 ## Persistence
 
@@ -130,6 +135,8 @@ Options uses the library for local import, preview and guarded deletion. It
 infers `image` or `audio` from the selected file's MIME prefix, renders pending
 and accessible error feedback, and confirms deletion. The injected Application
 operation remains the authoritative kind/size/MIME boundary.
+An Application rejection keeps the confirmation dialog open and renders the
+recoverable error inline.
 
 ### `AssetPicker`
 
@@ -172,7 +179,11 @@ channel policy remains deferred to AU-001.
 - Presentation depends on Asset Domain, React and Shared UI.
 - Workflow may consume the Assets root API for public package operations; no
   feature imports Assets internals.
-- Options composes policy, repositories, reference counting and UI operations.
+- Assets never imports Session. Options composes the public Session query into
+  the narrow active-reference port alongside Workflow counting and UI operations.
+- AS-001 and AS-003 reuse this port/query boundary. RW-005 extends Session's one
+  snapshot traversal for Bonus environments. A later Asset lifecycle ADR will
+  supersede ADR-0006; ST-005 does not rewrite it.
 
 ## Failure Model
 
@@ -181,6 +192,7 @@ channel policy remains deferred to AU-001.
 | Invalid metadata or import policy/content  | Domain/Application | Throws `AssetValidationError` before persistence             |
 | Invalid Workflow reference count           | Application        | Throws; deletion is not attempted                            |
 | Referenced Asset deletion                  | Application        | Throws `ReferencedAssetError` with the Workflow count        |
+| Active Session Asset deletion              | Application        | Throws `ActiveSessionReferencedAssetError` before Workflow lookup or deletion |
 | Corrupt record or mismatched Blob metadata | Infrastructure     | Throws `AssetValidationError` at the read/write boundary     |
 | Browser quota exhausted                    | Infrastructure     | Throws normalized `AssetStorageError`                        |
 | Missing preview Blob                       | Presentation       | Shows `Preview unavailable`                                  |
@@ -191,7 +203,7 @@ channel policy remains deferred to AU-001.
 | Area                                              | Primary proof                                               |
 | ------------------------------------------------- | ----------------------------------------------------------- |
 | Metadata invariants and immutability              | `domain/Asset.test.ts`                                      |
-| Import policy and guarded deletion                | `application/assetUseCases.test.ts`                         |
+| Import policy, guard priority and no-write deletion | `application/assetUseCases.test.ts`                       |
 | Blob mapping, corrupt rows, quota and object URLs | `infrastructure/DexieAssetRepository.test.ts`               |
 | Library import/delete feedback                    | `presentation/AssetLibrary.test.tsx`                        |
 | Kind filtering and empty selection                | `presentation/AssetPicker.test.tsx`                         |
@@ -211,7 +223,8 @@ pnpm vitest run src/features/assets
 3. Update Domain validation and every record/package mapper together.
 4. Keep size/MIME limits injected unless the rule becomes a Domain invariant.
 5. Preserve no-write-before-validation and reference-aware deletion.
-6. Check Workflow Environment kind/reference validation and package mapping.
-7. Verify every object URL has one explicit revocation owner.
-8. Update unit, repository and component tests; add E2E only for an assembled
+6. Preserve active Session guard priority over Workflow reference counting.
+7. Check Workflow Environment kind/reference validation and package mapping.
+8. Verify every object URL has one explicit revocation owner.
+9. Update unit, repository and component tests; add E2E only for an assembled
    user journey change.

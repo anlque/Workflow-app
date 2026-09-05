@@ -2,6 +2,7 @@ export type { Clock } from './application/Clock';
 export { SessionApplicationError } from './application/SessionApplicationError';
 export type { SessionChangedEvent } from './application/SessionEvents';
 export type { SessionRepository } from './application/SessionRepository';
+export { activeSessionReferencesAsset } from './application/activeSessionReferencesAsset';
 export { advanceSessionUseCase } from './application/advanceSessionUseCase';
 export { continueRewardSessionUseCase } from './application/continueRewardSessionUseCase';
 export { getActiveSessionUseCase } from './application/getActiveSessionUseCase';

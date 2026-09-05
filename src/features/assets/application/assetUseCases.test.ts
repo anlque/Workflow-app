@@ -1,7 +1,8 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import type { Asset, AssetId } from '../domain/Asset';
 import type { AssetRepository } from './AssetRepository';
+import { ActiveSessionReferencedAssetError } from './ActiveSessionReferencedAssetError';
 import { deleteAssetUseCase } from './deleteAssetUseCase';
 import {
   importAssetUseCase,
@@ -11,6 +12,7 @@ import {
 class InMemoryAssetRepository implements AssetRepository {
   readonly assets = new Map<AssetId, Readonly<{ asset: Asset; blob: Blob }>>();
   saveCalls = 0;
+  deleteCalls = 0;
 
   public list(): Promise<readonly Asset[]> {
     return Promise.resolve([...this.assets.values()].map(({ asset }) => asset));
@@ -27,6 +29,7 @@ class InMemoryAssetRepository implements AssetRepository {
   }
 
   public delete(id: AssetId): Promise<void> {
+    this.deleteCalls += 1;
     this.assets.delete(id);
     return Promise.resolve();
   }
@@ -100,10 +103,41 @@ describe('Asset use cases', () => {
     await expect(
       deleteAssetUseCase(
         repository,
+        { has: () => Promise.resolve(false) },
         { count: () => Promise.resolve(1) },
         asset.id,
       ),
     ).rejects.toThrow('Asset is referenced by 1 Workflow.');
+    expect(repository.deleteCalls).toBe(0);
+    await expect(repository.getBlob(asset.id)).resolves.not.toBeNull();
+  });
+
+  test('prioritizes an active Session reference and performs no deletion', async () => {
+    const repository = new InMemoryAssetRepository();
+    const asset = await importAssetUseCase(repository, policy, {
+      id: 'asset-1',
+      name: 'Local media',
+      kind: 'image',
+      blob: new Blob(['x'], { type: 'image/png' }),
+      createdAt: 1_000,
+    });
+    const countWorkflowReferences = vi.fn(() => Promise.resolve(1));
+
+    const deletion = deleteAssetUseCase(
+      repository,
+      { has: () => Promise.resolve(true) },
+      { count: countWorkflowReferences },
+      asset.id,
+    );
+
+    await expect(deletion).rejects.toBeInstanceOf(
+      ActiveSessionReferencedAssetError,
+    );
+    await expect(deletion).rejects.toThrow(
+      'This Asset is used by the active Session. Stop the Session or wait for it to finish before deleting it.',
+    );
+    expect(countWorkflowReferences).not.toHaveBeenCalled();
+    expect(repository.deleteCalls).toBe(0);
     await expect(repository.getBlob(asset.id)).resolves.not.toBeNull();
   });
 
@@ -119,10 +153,12 @@ describe('Asset use cases', () => {
 
     await deleteAssetUseCase(
       repository,
+      { has: () => Promise.resolve(false) },
       { count: () => Promise.resolve(0) },
       asset.id,
     );
 
+    expect(repository.deleteCalls).toBe(1);
     await expect(repository.getBlob(asset.id)).resolves.toBeNull();
   });
 });

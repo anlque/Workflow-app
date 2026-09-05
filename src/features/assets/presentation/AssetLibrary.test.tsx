@@ -130,4 +130,39 @@ describe('AssetLibrary', () => {
     );
     expect(screen.getByText('Forest')).toBeVisible();
   });
+
+  test('keeps the deletion dialog open with the active Session error', async () => {
+    const user = userEvent.setup();
+    setup({
+      onDelete: () =>
+        Promise.reject(
+          new Error(
+            'This Asset is used by the active Session. Stop the Session or wait for it to finish before deleting it.',
+          ),
+        ),
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Delete Forest' }));
+    await user.click(screen.getByRole('button', { name: 'Delete asset' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Delete Forest?' });
+    expect(dialog).toBeVisible();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This Asset is used by the active Session. Stop the Session or wait for it to finish before deleting it.',
+    );
+    expect(screen.getByText('Forest')).toBeVisible();
+  });
+
+  test('closes the dialog after successful deletion', async () => {
+    const user = userEvent.setup();
+    const { onDelete } = setup();
+
+    await user.click(screen.getByRole('button', { name: 'Delete Forest' }));
+    await user.click(screen.getByRole('button', { name: 'Delete asset' }));
+
+    expect(onDelete).toHaveBeenCalledWith(image.id);
+    expect(
+      screen.queryByRole('dialog', { name: 'Delete Forest?' }),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -41,7 +41,7 @@ exports:
 | Group | Exports |
 | --- | --- |
 | Application contracts/errors/events | `Clock`, `SessionRepository`, `SessionChangedEvent`, `SessionApplicationError` |
-| Application use cases | `advanceSessionUseCase`, `continueRewardSessionUseCase`, `getActiveSessionUseCase`, `pauseSessionUseCase`, `resumeSessionUseCase`, `startSessionUseCase`, `stopSessionUseCase` |
+| Application queries/use cases | `activeSessionReferencesAsset`, `advanceSessionUseCase`, `continueRewardSessionUseCase`, `getActiveSessionUseCase`, `pauseSessionUseCase`, `resumeSessionUseCase`, `startSessionUseCase`, `stopSessionUseCase` |
 | Domain types | `Session`, `SessionId`, `RunningSession`, `TransitioningSession`, `PausedSession`, `CompletedSession`, `StoppedSession`, `RestoreSessionInput`, `SessionSnapshot` |
 | Domain behavior/errors | `createSession`, `createSessionId`, `restoreSession`, `pauseSession`, `resumeSession`, `continueRewardSession`, `stopSession`, `getRemainingSeconds`, `deriveSessionState`, `SessionValidationError`, `SessionTransitionError` |
 | Infrastructure composition | `DexieSessionRepository`, `sessionDatabaseSchemas` |
@@ -64,8 +64,8 @@ Domain errors. It depends on Workflow only through its root public API.
 ### Application
 
 [`application/`](../../../src/features/session/application/) defines `Clock`,
-`SessionRepository`, events/errors and use cases. `loadSession` is an internal
-not-found boundary shared by commands.
+`SessionRepository`, events/errors, queries and use cases. `loadSession` is an
+internal not-found boundary shared by commands.
 
 ### Infrastructure
 
@@ -150,6 +150,7 @@ Completed Session, not another authoritative Session state.
 | `startSessionUseCase` | Requires no active Session, creates snapshot and first Running state using injected clock/ID | Saves new active Session |
 | `advanceSessionUseCase` | Loads by ID and derives at current clock | Saves only if the immutable state object changed |
 | `getActiveSessionUseCase` | Loads the one active row and reconciles elapsed anchors | Saves changed state; returns only non-terminal result, otherwise `null` |
+| `activeSessionReferencesAsset` | Reads the persisted active row and checks background/audio across every immutable snapshot Phase | Boolean only; never reconciles or writes |
 | `pauseSessionUseCase` | Loads, reconciles and applies user pause | Saves Paused Session |
 | `resumeSessionUseCase` | Loads and resumes only user pause | Saves Running Session with new anchors |
 | `continueRewardSessionUseCase` | Loads and continues only Reward pause | Saves Running next Phase with new anchors |
@@ -157,6 +158,12 @@ Completed Session, not another authoritative Session state.
 
 All clock and repository dependencies are explicit. The use cases do not know
 Chrome, alarms, messages or Dexie.
+
+The Asset-reference query treats Running, Transitioning and either Paused reason
+as active. Completed and Stopped are non-blocking. Its single snapshot traversal
+is the extension point for RW-005 Bonus environments; AS-001 and AS-003 consume
+the public query through an Assets-owned port rather than importing Session
+internals. A later lifecycle ADR will supersede ADR-0006 with this boundary.
 
 ## Persistence
 
@@ -268,6 +275,8 @@ not either lose the Reward or replay it after every reload.
   browser APIs.
 - Background `app` composition imports Session and Workflow root APIs and injects
   concrete ports.
+- Options composes the public read-only Asset-reference query with
+  `DexieSessionRepository`; Session does not depend on Assets.
 
 ## Failure Model
 
@@ -287,6 +296,7 @@ not either lose the Reward or replay it after every reload.
 | --- | --- |
 | Snapshot immutability, states, anchors, late derivation and Reward pauses | `domain/Session.test.ts` |
 | Application persistence and missing/second-active failures | `application/sessionUseCases.test.ts` |
+| Active snapshot Asset references and terminal-state exclusions | `application/activeSessionReferencesAsset.test.ts` |
 | Database restoration, one-active invariant, legacy pause and corruption | `infrastructure/DexieSessionRepository.test.ts` |
 | Projection hydration and event race | `presentation/ActiveSessionStore.test.ts` |
 | Runtime projection reconstruction | `presentation/parseSessionProjection.test.ts` |

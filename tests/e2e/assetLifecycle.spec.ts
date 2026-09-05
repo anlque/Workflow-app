@@ -5,7 +5,7 @@ const onePixelPng = Buffer.from(
   'base64',
 );
 
-test('protects referenced local Assets and makes no network requests', async ({
+test('protects Assets referenced by an immutable active Session snapshot', async ({
   context,
   extensionUrls,
 }) => {
@@ -42,13 +42,38 @@ test('protects referenced local Assets and makes no network requests', async ({
   await expect(options.getByRole('alert')).toHaveText(
     'Asset is referenced by 1 Workflow.',
   );
+  await expect(
+    options.getByRole('listitem', { name: 'Image: forest.png' }),
+  ).toBeVisible();
   await options.getByRole('button', { name: 'Cancel' }).click();
+
+  const focus = await context.newPage();
+  await focus.goto(extensionUrls.focus);
+  await focus.getByRole('button', { name: 'Start Forest focus' }).click();
+  await expect(
+    focus.getByRole('heading', { name: 'Forest focus' }),
+  ).toBeVisible();
 
   await options.getByRole('tab', { name: 'Workflows' }).click();
   await options.getByLabel('Background image').selectOption({ label: 'None' });
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await options.getByRole('tab', { name: 'Assets' }).click();
   await options.getByRole('button', { name: 'Delete forest.png' }).click();
+  await options.getByRole('button', { name: 'Delete asset' }).click();
+  await expect(options.getByRole('alert')).toHaveText(
+    'This Asset is used by the active Session. Stop the Session or wait for it to finish before deleting it.',
+  );
+  await expect(
+    options.getByRole('dialog', { name: 'Delete forest.png?' }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('listitem', { name: 'Image: forest.png' }),
+  ).toBeVisible();
+
+  await focus.getByRole('button', { name: 'Stop' }).click();
+  await focus.getByRole('button', { name: 'Stop session' }).click();
+  await expect(focus.getByText('Session stopped')).toBeVisible();
+
   await options.getByRole('button', { name: 'Delete asset' }).click();
   await expect(
     options.getByRole('listitem', { name: 'Image: forest.png' }),
