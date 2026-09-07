@@ -27,7 +27,7 @@ and `wxt.config.ts`.
 
 - Node.js 22 is the project reference version.
 - pnpm 10.14 is pinned by `packageManager` in `package.json`.
-- Chrome 141 or newer is required by the project's programmable side-panel
+- Chrome 142 or newer is required by the project's synchronized side-panel
   closing behavior.
 
 Check the active tools:

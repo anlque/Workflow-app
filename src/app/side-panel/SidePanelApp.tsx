@@ -37,6 +37,7 @@ export type SidePanelDependencies = Readonly<{
   resumeSession(id: SessionId): Promise<void>;
   stopSession(id: SessionId): Promise<void>;
   openFocusView(): Promise<void>;
+  closeSidePanel(): Promise<void>;
 }>;
 
 export function SidePanelApp({
@@ -46,7 +47,10 @@ export function SidePanelApp({
     dependencies.preferences,
   );
   const [error, setError] = useState<string | null>(null);
+  const [closeError, setCloseError] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
   const [view, setView] = useState<'session' | 'workflows'>('workflows');
+  const closingRef = useRef(false);
   const lastSessionId = useRef<SessionId | null>(null);
   const sessionStore = useMemo(createActiveSessionStore, []);
   const projection = useStore(sessionStore);
@@ -59,6 +63,25 @@ export function SidePanelApp({
   );
   const { workflows, refreshError, reload } =
     useWorkflowCatalog(workflowCatalog);
+
+  async function closePanel(): Promise<void> {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setClosing(true);
+    setCloseError(null);
+    try {
+      await dependencies.closeSidePanel();
+    } catch (cause) {
+      setCloseError(
+        cause instanceof Error
+          ? cause.message
+          : 'Unable to close the Side Panel. Try again.',
+      );
+    } finally {
+      closingRef.current = false;
+      setClosing(false);
+    }
+  }
 
   useEffect(() => {
     const connection = connectSessionMessages(
@@ -108,7 +131,24 @@ export function SidePanelApp({
           <h1>Locusora</h1>
           <p>Your focus rhythms</p>
         </div>
+        <Button
+          className="side-panel-header__close"
+          variant="quiet"
+          aria-label="Close side panel"
+          pending={closing}
+          pendingLabel="Closing…"
+          onClick={() => {
+            void closePanel();
+          }}
+        >
+          Close side panel
+        </Button>
       </header>
+      {closeError === null ? null : (
+        <p className="feedback feedback--error" role="alert">
+          {closeError}
+        </p>
+      )}
       {!hasActiveSession || view !== 'session' ? null : (
         <section className="side-panel-session" aria-label="Active session">
           <Button

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -32,6 +32,7 @@ function dependencies(
     resumeSession: vi.fn(() => Promise.resolve()),
     stopSession: vi.fn(() => Promise.resolve()),
     openFocusView: vi.fn(() => Promise.resolve()),
+    closeSidePanel: vi.fn(() => Promise.resolve()),
   };
 }
 
@@ -63,6 +64,94 @@ describe('SidePanelApp', () => {
       await screen.findByRole('button', { name: 'Open Deep work' }),
     );
     expect(deps.openWorkflow).toHaveBeenCalledWith(workflow.id);
+  });
+
+  test('closes the Side Panel through the injected dependency', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies();
+    render(<SidePanelApp dependencies={deps} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Close side panel' }),
+    );
+
+    expect(deps.closeSidePanel).toHaveBeenCalledOnce();
+  });
+
+  test('disables the close control and coalesces rapid clicks while pending', async () => {
+    let finishClose: (() => void) | undefined;
+    const deps = dependencies();
+    Object.assign(deps, {
+      closeSidePanel: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishClose = resolve;
+          }),
+      ),
+    });
+    render(<SidePanelApp dependencies={deps} />);
+    const close = await screen.findByRole('button', {
+      name: 'Close side panel',
+    });
+
+    fireEvent.click(close);
+    fireEvent.click(close);
+    fireEvent.click(close);
+
+    expect(close).toBeDisabled();
+    expect(close).toHaveAttribute('aria-busy', 'true');
+    expect(close).toHaveTextContent('Closing…');
+    expect(deps.closeSidePanel).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      finishClose?.();
+      await Promise.resolve();
+    });
+  });
+
+  test('shows a recoverable close error without hiding Side Panel content', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies();
+    Object.assign(deps, {
+      closeSidePanel: vi.fn(() =>
+        Promise.reject(new Error('Unable to close the Side Panel. Try again.')),
+      ),
+    });
+    render(<SidePanelApp dependencies={deps} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Close side panel' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to close the Side Panel. Try again.',
+    );
+    expect(screen.getByText('Build your first focus rhythm.')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Close side panel' }),
+    ).toBeEnabled();
+  });
+
+  test('allows retrying Side Panel close after a failure', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies();
+    Object.assign(deps, {
+      closeSidePanel: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Close failed.'))
+        .mockResolvedValueOnce(undefined),
+    });
+    render(<SidePanelApp dependencies={deps} />);
+    const close = await screen.findByRole('button', {
+      name: 'Close side panel',
+    });
+
+    await user.click(close);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Close failed.');
+    await user.click(close);
+
+    expect(deps.closeSidePanel).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   test('starts a Workflow and opens the focus view in a new tab', async () => {

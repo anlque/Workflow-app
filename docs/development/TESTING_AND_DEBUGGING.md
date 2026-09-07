@@ -257,7 +257,7 @@ speaker output manually in the focus tab.
 
 ### Side-Panel Button State or Open/Close Behavior Is Wrong
 
-- **First check:** confirm Chrome 141+ and use the native side-panel control once
+- **First check:** confirm Chrome 142+ and use the native side-panel control once
   while watching whether the focus button label changes. The focus projection is
   driven by `sidePanel.onOpened`/`onClosed`; the current adapter does not query an
   initial open state.

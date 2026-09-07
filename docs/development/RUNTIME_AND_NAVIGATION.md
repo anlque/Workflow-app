@@ -66,8 +66,16 @@ The focus button is an explicit independent control. While an operation is
 pending, its optimistic label is rolled back if Chrome rejects the call and
 subsequent browser lifecycle events update it.
 
-The programmable close API is the reason the documented Chrome baseline is 141
-or newer.
+The Side Panel composition injects the same `closeSidePanel()` boundary into
+`SidePanelApp`. Its accessible close button is single-flight and disabled while
+Chrome handles the request. Missing window identity, unsupported close API and
+browser rejection remain recoverable inline errors: the existing panel content
+stays mounted and the user can retry.
+
+The Side Panel lifecycle boundary requires Chrome 142 or newer: programmable
+`sidePanel.close()` is available from Chrome 141, while the synchronized
+`sidePanel.onClosed` event is available from Chrome 142. The manifest enforces
+that complete baseline through `minimum_chrome_version`.
 
 ## What Is Not Routing
 
@@ -142,8 +150,8 @@ navigation APIs.
   adapts focus navigation to Chrome.
 - [`createFocusTabController.test.ts`](../../src/app/background/createFocusTabController.test.ts)
   proves create, activation, window focus and request coalescing.
-- [`closeSidePanel.ts`](../../src/app/closeSidePanel.ts) owns focus-view panel
-  lifecycle integration.
+- [`closeSidePanel.ts`](../../src/app/closeSidePanel.ts) owns focus-view and
+  Side Panel lifecycle integration.
 - [`OptionsApp.tsx`](../../src/app/options/OptionsApp.tsx) and
   [`SidePanelApp.tsx`](../../src/app/side-panel/SidePanelApp.tsx) own local view
   state.

@@ -1,11 +1,28 @@
 import { browser } from 'wxt/browser';
 
 export async function closeSidePanel(): Promise<void> {
-  const currentWindow = await browser.windows.getCurrent();
+  let currentWindow: { id?: number | undefined };
+  try {
+    currentWindow = await browser.windows.getCurrent();
+  } catch (cause) {
+    throw new Error('Unable to close the Side Panel. Try again.', { cause });
+  }
   if (currentWindow.id === undefined) {
     throw new Error('Current browser window is unavailable.');
   }
-  await browser.sidePanel.close({ windowId: currentWindow.id });
+  const close = (
+    browser.sidePanel as unknown as {
+      close?: (options: { windowId: number }) => Promise<void>;
+    }
+  ).close;
+  if (typeof close !== 'function') {
+    throw new Error('Closing the Side Panel is not supported in this browser.');
+  }
+  try {
+    await close({ windowId: currentWindow.id });
+  } catch (cause) {
+    throw new Error('Unable to close the Side Panel. Try again.', { cause });
+  }
 }
 
 export async function openSidePanel(): Promise<void> {

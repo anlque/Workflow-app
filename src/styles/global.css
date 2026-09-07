@@ -1048,6 +1048,10 @@ textarea {
   font-size: 0.9375rem;
 }
 
+.side-panel-header__close {
+  margin-left: auto;
+}
+
 .side-panel-session {
   display: flex;
   flex-direction: column;

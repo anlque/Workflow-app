@@ -28,6 +28,7 @@ import {
 import type { SidePanelDependencies } from './SidePanelApp';
 import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
 import { createChromeFocusTabController } from '../focus/createChromeFocusTabController';
+import { closeSidePanel } from '../closeSidePanel';
 
 export function createSidePanelDependencies(
   preferences: SidePanelDependencies['preferences'],
@@ -64,6 +65,7 @@ export function createSidePanelDependencies(
     async openFocusView() {
       await focusTabs.openOrActivate();
     },
+    closeSidePanel,
     listWorkflows: () => listWorkflowsUseCase(workflows),
     subscribeWorkflowChanges: (listener) =>
       catalogEvents.subscribeChanged(listener),

@@ -11,6 +11,7 @@ export default defineConfig({
   manifest: {
     name: 'Locusora',
     short_name: 'Locusora',
+    minimum_chrome_version: '142',
     description:
       'Build personalized focus workflows, environments and reward rituals.',
     permissions: ['sidePanel', 'storage', 'alarms', 'tabs'],

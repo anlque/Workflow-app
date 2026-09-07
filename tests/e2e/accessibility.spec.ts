@@ -82,6 +82,7 @@ test('generated manifest contains only approved permissions and no hosts', async
   >;
   expect(manifest['name']).toBe('Locusora');
   expect(manifest['short_name']).toBe('Locusora');
+  expect(manifest['minimum_chrome_version']).toBe('142');
   expect(manifest['permissions']).toEqual([
     'sidePanel',
     'storage',
