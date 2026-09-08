@@ -108,6 +108,7 @@ function rewardedWorkflow(): Workflow {
 async function addAsset(
   repository: MemoryAssetRepository,
   id: string,
+  role?: string,
 ): Promise<void> {
   const blob = new Blob([id], { type: 'image/png' });
   await repository.save(
@@ -118,12 +119,286 @@ async function addAsset(
       mimeType: blob.type,
       byteSize: blob.size,
       createdAt: 1_000,
+      ...(role === undefined ? {} : { role }),
     }),
     blob,
   );
 }
 
 describe('Workflow package', () => {
+  async function expectRejectedPackage(packageValue: unknown): Promise<void> {
+    const workflows = new MemoryWorkflowRepository();
+    const assets = new MemoryAssetRepository();
+    const unitOfWork = new MemoryUnitOfWork();
+    await expect(
+      importWorkflowUseCase(
+        workflows,
+        assets,
+        unitOfWork,
+        JSON.stringify(packageValue),
+        { maxFileBytes: 10_000, assetPolicy: policy },
+        {
+          createWorkflowId: () => 'workflow-new',
+          createAssetId: () => 'asset-new',
+          now: () => 2_000,
+        },
+      ),
+    ).rejects.toThrow('Workflow package is invalid.');
+    expect(unitOfWork.runs).toBe(0);
+  }
+
+  test('imports a genuine version-1 direct package', async () => {
+    const data = {
+      kind: 'locusora/workflow',
+      version: 1,
+      workflow: {
+        id: 'legacy-workflow',
+        name: 'Legacy',
+        phases: [
+          {
+            type: 'focus',
+            durationSeconds: 10,
+            environment: { backgroundAssetId: 'legacy-image' },
+          },
+        ],
+      },
+      assets: [
+        {
+          id: 'legacy-image',
+          name: 'Legacy image',
+          kind: 'image',
+          mimeType: 'image/png',
+          byteSize: 1,
+          dataBase64: 'eA==',
+        },
+      ],
+    };
+
+    const imported = await importWorkflowUseCase(
+      new MemoryWorkflowRepository(),
+      new MemoryAssetRepository(),
+      new MemoryUnitOfWork(),
+      JSON.stringify(data),
+      { maxFileBytes: 10_000, assetPolicy: policy },
+      {
+        createWorkflowId: () => 'workflow-new',
+        createAssetId: () => 'asset-new',
+        now: () => 2_000,
+      },
+    );
+
+    expect(imported.phases[0].environment.backgroundAsset).toEqual({
+      type: 'direct',
+      assetId: 'asset-new',
+    });
+  });
+
+  test('enforces version-specific Workflow and Asset shapes', async () => {
+    const base = {
+      kind: 'locusora/workflow',
+      version: 1,
+      workflow: {
+        id: 'w',
+        name: 'W',
+        phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      },
+      assets: [],
+    };
+    await expectRejectedPackage({
+      ...base,
+      workflow: {
+        ...base.workflow,
+        phases: [
+          {
+            ...base.workflow.phases[0],
+            environment: { backgroundAsset: { type: 'direct', assetId: 'a' } },
+          },
+        ],
+      },
+    });
+    await expectRejectedPackage({
+      ...base,
+      assets: [
+        {
+          id: 'a',
+          name: 'A',
+          kind: 'image',
+          mimeType: 'image/png',
+          byteSize: 1,
+          dataBase64: 'eA==',
+          role: 'Backdrop',
+        },
+      ],
+    });
+    await expectRejectedPackage({
+      ...base,
+      version: 2,
+      workflow: {
+        ...base.workflow,
+        phases: [
+          {
+            ...base.workflow.phases[0],
+            environment: { backgroundAssetId: 'a' },
+          },
+        ],
+      },
+      assets: [
+        {
+          id: 'a',
+          name: 'A',
+          kind: 'image',
+          mimeType: 'image/png',
+          byteSize: 1,
+          dataBase64: 'eA==',
+        },
+      ],
+    });
+  });
+
+  test('rejects extra keys and contradictory AssetReference objects', async () => {
+    const asset = {
+      id: 'a',
+      name: 'A',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 1,
+      dataBase64: 'eA==',
+    };
+    const packageWith = (
+      reference: unknown,
+      packagedAsset: unknown = asset,
+    ) => ({
+      kind: 'locusora/workflow',
+      version: 2,
+      workflow: {
+        id: 'w',
+        name: 'W',
+        phases: [
+          {
+            type: 'focus',
+            durationSeconds: 1,
+            environment: { backgroundAsset: reference },
+          },
+        ],
+      },
+      assets: [packagedAsset],
+    });
+    await expectRejectedPackage(
+      packageWith({ type: 'direct', assetId: 'a', role: 'Backdrop' }),
+    );
+    await expectRejectedPackage(
+      packageWith(
+        { type: 'role', role: 'Backdrop', assetId: 'a' },
+        { ...asset, role: 'Backdrop' },
+      ),
+    );
+    await expectRejectedPackage(
+      packageWith({ type: 'direct', assetId: 'a', extra: true }),
+    );
+    await expectRejectedPackage(
+      packageWith({ type: 'direct', assetId: 'a' }, { ...asset, extra: true }),
+    );
+  });
+  test('exports version 2 and remaps a colliding imported Role to its imported Asset', async () => {
+    const sourceAssets = new MemoryAssetRepository();
+    await addAsset(sourceAssets, 'source-image', 'Backdrop');
+    const source = createWorkflow({
+      id: 'workflow-role',
+      name: 'Role workflow',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 10,
+          environment: { backgroundAsset: { type: 'role', role: 'Backdrop' } },
+        },
+      ],
+    });
+    const data = await exportWorkflowUseCase(source, sourceAssets);
+    const parsed = JSON.parse(data) as {
+      version: number;
+      assets: { role?: string }[];
+    };
+    const targetAssets = new MemoryAssetRepository();
+    await addAsset(targetAssets, 'local-image', 'backdrop');
+    targetAssets.writes = 0;
+
+    const imported = await importWorkflowUseCase(
+      new MemoryWorkflowRepository(),
+      targetAssets,
+      new MemoryUnitOfWork(),
+      data,
+      { maxFileBytes: 10_000, assetPolicy: policy },
+      {
+        createWorkflowId: () => 'workflow-new',
+        createAssetId: () => 'asset-new',
+        now: () => 2_000,
+      },
+    );
+
+    expect(parsed.version).toBe(2);
+    expect(parsed.assets).toEqual([
+      expect.objectContaining({ role: 'Backdrop' }),
+    ]);
+    expect(imported.phases[0].environment.backgroundAsset).toEqual({
+      type: 'role',
+      role: 'Backdrop (imported)',
+    });
+    expect(
+      targetAssets.values.get(createAssetId('asset-new'))?.asset.role,
+    ).toBe('Backdrop (imported)');
+  });
+
+  test('rejects one Role used as both image and audio before writes', async () => {
+    const bytes = new Uint8Array([1]);
+    const data = JSON.stringify({
+      kind: 'locusora/workflow',
+      version: 2,
+      workflow: {
+        id: 'source',
+        name: 'Wrong kind',
+        phases: [
+          {
+            type: 'focus',
+            durationSeconds: 10,
+            environment: {
+              backgroundAsset: { type: 'role', role: 'Shared' },
+              audioAsset: { type: 'role', role: 'Shared' },
+            },
+          },
+        ],
+      },
+      assets: [
+        {
+          id: 'asset',
+          name: 'Shared',
+          kind: 'audio',
+          mimeType: 'audio/mpeg',
+          byteSize: 1,
+          role: 'Shared',
+          dataBase64: btoa(String.fromCharCode(...bytes)),
+        },
+      ],
+    });
+    const workflows = new MemoryWorkflowRepository();
+    const assets = new MemoryAssetRepository();
+    const unitOfWork = new MemoryUnitOfWork();
+
+    await expect(
+      importWorkflowUseCase(
+        workflows,
+        assets,
+        unitOfWork,
+        data,
+        { maxFileBytes: 10_000, assetPolicy: policy },
+        {
+          createWorkflowId: () => 'new-workflow',
+          createAssetId: () => 'new-asset',
+          now: () => 1,
+        },
+      ),
+    ).rejects.toThrow();
+    expect(unitOfWork.runs).toBe(0);
+  });
   test('preserves the Reward Dice trigger phase through export and import', async () => {
     const data = await exportWorkflowUseCase(
       rewardedWorkflow(),
@@ -221,7 +496,10 @@ describe('Workflow package', () => {
     );
 
     expect(imported.id).toBe('workflow-new');
-    expect(imported.phases[0].environment.backgroundAssetId).toBe('asset-new');
+    expect(imported.phases[0].environment.backgroundAsset).toEqual({
+      type: 'direct',
+      assetId: 'asset-new',
+    });
     expect([...assets.values.keys()]).toEqual([createAssetId('asset-new')]);
     expect(unitOfWork.runs).toBe(1);
   });
@@ -258,7 +536,10 @@ describe('Workflow package', () => {
     );
 
     expect(imported.id).toBe('workflow-new');
-    expect(imported.phases[0].environment.backgroundAssetId).toBe('asset-new');
+    expect(imported.phases[0].environment.backgroundAsset).toEqual({
+      type: 'direct',
+      assetId: 'asset-new',
+    });
     expect([...assets.values.keys()]).toEqual([
       createAssetId('asset-collision'),
       createAssetId('asset-new'),
@@ -266,7 +547,7 @@ describe('Workflow package', () => {
   });
 
   test.each([
-    ['unsupported version', '{"kind":"locusora/workflow","version":2}'],
+    ['unsupported version', '{"kind":"locusora/workflow","version":3}'],
     [
       'corrupt package',
       '{"kind":"locusora/workflow","version":1,"workflow":{},"assets":[]}',

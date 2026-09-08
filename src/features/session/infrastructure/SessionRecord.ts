@@ -2,7 +2,7 @@ import type { DatabaseSchema } from '@/platform/storage';
 
 export type SessionRecord = Readonly<{
   id: string;
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   active: 0 | 1;
   updatedAt: number;
   session: unknown;

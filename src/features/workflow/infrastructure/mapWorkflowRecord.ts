@@ -36,25 +36,70 @@ function rewardPhaseType(value: unknown): 'focus' | 'break' | undefined {
   return invalidRecord();
 }
 
-function mapEnvironmentRecord(value: unknown): EnvironmentInput {
+function mapAssetReference(value: unknown) {
+  const reference = objectRecord(value);
+  const keys = Object.keys(reference);
+  if (
+    reference['type'] === 'direct' &&
+    keys.length === 2 &&
+    keys.includes('type') &&
+    keys.includes('assetId')
+  ) {
+    return {
+      type: 'direct' as const,
+      assetId: stringValue(reference['assetId']),
+    };
+  }
+  if (
+    reference['type'] === 'role' &&
+    keys.length === 2 &&
+    keys.includes('type') &&
+    keys.includes('role')
+  ) {
+    return { type: 'role' as const, role: stringValue(reference['role']) };
+  }
+  return invalidRecord();
+}
+
+function mapEnvironmentRecord(
+  value: unknown,
+  schemaVersion: 1 | 2,
+): EnvironmentInput {
   const record = objectRecord(value);
-  const backgroundAssetId = optionalString(record['backgroundAssetId']);
-  const audioAssetId = optionalString(record['audioAssetId']);
   const backgroundColor = optionalString(record['backgroundColor']);
 
+  if (schemaVersion === 1) {
+    const backgroundAssetId = optionalString(record['backgroundAssetId']);
+    const audioAssetId = optionalString(record['audioAssetId']);
+    return {
+      ...(backgroundAssetId === undefined ? {} : { backgroundAssetId }),
+      ...(audioAssetId === undefined ? {} : { audioAssetId }),
+      ...(backgroundColor === undefined ? {} : { backgroundColor }),
+    };
+  }
+
+  const backgroundAsset =
+    record['backgroundAsset'] === undefined
+      ? undefined
+      : mapAssetReference(record['backgroundAsset']);
+  const audioAsset =
+    record['audioAsset'] === undefined
+      ? undefined
+      : mapAssetReference(record['audioAsset']);
+
   return {
-    ...(backgroundAssetId === undefined ? {} : { backgroundAssetId }),
-    ...(audioAssetId === undefined ? {} : { audioAssetId }),
+    ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
+    ...(audioAsset === undefined ? {} : { audioAsset }),
     ...(backgroundColor === undefined ? {} : { backgroundColor }),
   };
 }
 
-function mapPhaseRecord(value: unknown): PhaseInput {
+function mapPhaseRecord(value: unknown, schemaVersion: 1 | 2): PhaseInput {
   const record = objectRecord(value);
   return {
     type: stringValue(record['type']),
     durationSeconds: numberValue(record['durationSeconds']),
-    environment: mapEnvironmentRecord(record['environment']),
+    environment: mapEnvironmentRecord(record['environment'], schemaVersion),
   };
 }
 
@@ -89,7 +134,7 @@ function mapRewardDiceRecord(value: unknown): RewardDiceInput {
 
 export function mapWorkflowRecord(value: unknown): Workflow {
   const record = objectRecord(value);
-  if (record['schemaVersion'] !== 1) {
+  if (record['schemaVersion'] !== 1 && record['schemaVersion'] !== 2) {
     return invalidRecord();
   }
 
@@ -111,7 +156,9 @@ export function mapWorkflowRecord(value: unknown): Workflow {
   return createWorkflow({
     id: stringValue(record['id']),
     name: stringValue(record['name']),
-    phases: phases.map(mapPhaseRecord),
+    phases: phases.map((phase) =>
+      mapPhaseRecord(phase, record['schemaVersion'] as 1 | 2),
+    ),
     ...(rewardDice === undefined ? {} : { rewardDice }),
   });
 }
@@ -122,19 +169,19 @@ export function mapWorkflowToRecord(
 ): WorkflowRecord {
   return {
     id: workflow.id,
-    schemaVersion: 1,
+    schemaVersion: 2,
     order,
     name: workflow.name,
     phases: workflow.phases.map((phase) => ({
       type: phase.type,
       durationSeconds: phase.durationSeconds,
       environment: {
-        ...(phase.environment.backgroundAssetId === undefined
+        ...(phase.environment.backgroundAsset === undefined
           ? {}
-          : { backgroundAssetId: phase.environment.backgroundAssetId }),
-        ...(phase.environment.audioAssetId === undefined
+          : { backgroundAsset: phase.environment.backgroundAsset }),
+        ...(phase.environment.audioAsset === undefined
           ? {}
-          : { audioAssetId: phase.environment.audioAssetId }),
+          : { audioAsset: phase.environment.audioAsset }),
         ...(phase.environment.backgroundColor === undefined
           ? {}
           : { backgroundColor: phase.environment.backgroundColor }),

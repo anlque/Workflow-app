@@ -1,7 +1,11 @@
 import { ChromeAlarmScheduler } from '@/platform/alarms';
 import { ChromeMessageBus } from '@/platform/messaging';
 import { LocusoraDatabase } from '@/platform/storage';
-import { assetDatabaseSchemas } from '@/features/assets';
+import {
+  assetDatabaseSchemas,
+  DexieAssetRepository,
+  resolveAssetRoleUseCase,
+} from '@/features/assets';
 import {
   DexieSessionRepository,
   sessionDatabaseSchemas,
@@ -9,6 +13,7 @@ import {
 } from '@/features/session';
 import {
   DexieWorkflowRepository,
+  resolveWorkflowAssetReferences,
   workflowDatabaseSchemas,
 } from '@/features/workflow';
 
@@ -39,6 +44,7 @@ export async function bootstrapBackground(): Promise<void> {
       ...assetDatabaseSchemas,
     ],
   });
+  const assets = new DexieAssetRepository(database);
   const coordinator = createSessionCoordinator({
     workflows: new DexieWorkflowRepository(database),
     sessions: new DexieSessionRepository(database),
@@ -46,6 +52,13 @@ export async function bootstrapBackground(): Promise<void> {
     messages: new ChromeMessageBus(),
     alarms: new ChromeAlarmScheduler(),
     createSessionId: () => crypto.randomUUID(),
+    workflowResolver: {
+      resolve: (workflow) =>
+        resolveWorkflowAssetReferences(workflow, {
+          resolve: (role, expectedKind) =>
+            resolveAssetRoleUseCase(assets, role, expectedKind),
+        }),
+    },
   });
   await coordinator.initialize();
 }

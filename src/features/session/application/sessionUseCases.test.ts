@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import { createWorkflow } from '@/features/workflow';
 
@@ -8,6 +8,7 @@ import { getActiveSessionUseCase } from './getActiveSessionUseCase';
 import { pauseSessionUseCase } from './pauseSessionUseCase';
 import { resumeSessionUseCase } from './resumeSessionUseCase';
 import { startSessionUseCase } from './startSessionUseCase';
+import type { SessionWorkflowResolver } from './SessionWorkflowResolver';
 import { stopSessionUseCase } from './stopSessionUseCase';
 import { FakeClock } from './testing/FakeClock';
 import { InMemorySessionRepository } from './testing/InMemorySessionRepository';
@@ -23,6 +24,123 @@ const workflow = () =>
   });
 
 describe('Session use cases', () => {
+  test('resolves Workflow Asset references before creating the snapshot', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const source = createWorkflow({
+      id: 'workflow-role',
+      name: 'Role workflow',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 10,
+          environment: { audioAsset: { type: 'role', role: 'Ambient' } },
+        },
+      ],
+    });
+    const resolved = createWorkflow({
+      id: source.id,
+      name: source.name,
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 10,
+          environment: { audioAsset: { type: 'direct', assetId: 'audio-1' } },
+        },
+      ],
+    });
+
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'session-1',
+      source,
+      { resolve: () => Promise.resolve(resolved) },
+    );
+
+    expect(started.snapshot.workflow).toEqual(resolved);
+    expect(started.snapshot.workflow).not.toBe(resolved);
+  });
+
+  test('resolves before save and performs zero writes when resolution fails', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const events: string[] = [];
+    const save = vi.spyOn(repository, 'save').mockImplementation((session) => {
+      events.push(`save:${session.snapshot.workflow.name}`);
+      return Promise.resolve();
+    });
+    const source = workflow();
+
+    await startSessionUseCase(repository, clock, 'session-1', source, {
+      resolve: (value) => {
+        events.push(`resolve:${value.name}`);
+        return Promise.resolve(value);
+      },
+    });
+
+    expect(events).toEqual(['resolve:Deep work', 'save:Deep work']);
+    save.mockClear();
+    await expect(
+      startSessionUseCase(repository, clock, 'session-2', source, {
+        resolve: () => Promise.reject(new Error('Role missing')),
+      }),
+    ).rejects.toThrow('Role missing');
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  test('keeps the resolved snapshot unchanged after the Role owner moves', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const source = createWorkflow({
+      id: 'workflow-role',
+      name: 'Role workflow',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 10,
+          environment: { audioAsset: { type: 'role', role: 'Ambient' } },
+        },
+      ],
+    });
+    let owner = 'audio-1';
+    const resolver: SessionWorkflowResolver = {
+      resolve: () =>
+        Promise.resolve(
+          createWorkflow({
+            id: source.id,
+            name: source.name,
+            phases: [
+              {
+                type: 'focus',
+                durationSeconds: 10,
+                environment: { audioAsset: { type: 'direct', assetId: owner } },
+              },
+            ],
+          }),
+        ),
+    };
+
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'session-1',
+      source,
+      resolver,
+    );
+    owner = 'audio-2';
+    const futureResolution = await resolver.resolve(source);
+
+    expect(futureResolution.phases[0].environment.audioAsset).toEqual({
+      type: 'direct',
+      assetId: 'audio-2',
+    });
+    expect(started.snapshot.workflow.phases[0].environment.audioAsset).toEqual({
+      type: 'direct',
+      assetId: 'audio-1',
+    });
+    await expect(repository.getActive()).resolves.toEqual(started);
+  });
   test('starts and persists the only active Session', async () => {
     const repository = new InMemorySessionRepository();
     const clock = new FakeClock(1_000);

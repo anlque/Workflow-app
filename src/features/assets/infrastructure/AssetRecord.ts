@@ -1,8 +1,7 @@
 import type { DatabaseSchema } from '@/platform/storage';
 
-export type AssetRecord = Readonly<{
+type AssetRecordBase = Readonly<{
   id: string;
-  schemaVersion: 1;
   name: string;
   kind: string;
   mimeType: string;
@@ -11,11 +10,28 @@ export type AssetRecord = Readonly<{
   blob: Blob;
 }>;
 
+export type AssetRecordV1 = AssetRecordBase & Readonly<{ schemaVersion: 1 }>;
+
+export type AssetRecordV2 = AssetRecordBase &
+  Readonly<{
+    schemaVersion: 2;
+    role?: string;
+    roleKey?: string;
+  }>;
+
+export type AssetRecord = AssetRecordV1 | AssetRecordV2;
+
 export const assetDatabaseSchemas: readonly DatabaseSchema[] = [
   {
     version: 3,
     stores: {
       assets: 'id, createdAt',
+    },
+  },
+  {
+    version: 4,
+    stores: {
+      assets: 'id, createdAt, &roleKey',
     },
   },
 ];

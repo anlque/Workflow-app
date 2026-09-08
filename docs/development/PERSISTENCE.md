@@ -1,5 +1,17 @@
 # Persistence and Compatibility
 
+## AS-001 compatibility update
+
+Global Dexie version 4 defines `assets: 'id, createdAt, &roleKey'`. The optional
+normalized key is globally unique; role-less rows are not indexed. Asset,
+Workflow and Session writers emit record version 2 while readers accept their
+compatible version-1 rows. Workflow and Session indexes are unchanged.
+
+Workflow package export emits version 2 with direct-or-Role references and
+optional Asset Roles; import accepts versions 1–2. Local collisions become
+`<role> (imported)`, `<role> (imported 2)`, and so on. ID/Role reservation,
+reference remapping and every Asset/Workflow write occur in one transaction.
+
 Locusora is local-first. Domain values remain independent of storage, while
 feature Infrastructure owns records, validation, mapping and repository
 adapters. This page documents the current durable formats and the procedure for

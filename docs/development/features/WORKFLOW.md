@@ -1,5 +1,17 @@
 # Workflow Feature
 
+## Asset reference modes
+
+Environment background and audio values are a discriminated `direct` Asset ID
+or `role` union. Background Role resolution requires an image; audio resolution
+requires audio. `resolveWorkflowAssetReferences` rebuilds a direct-only Workflow
+before Session creation. The editor remains direct-only until AS-002 but
+preserves an existing Role during unrelated edits.
+
+Workflow record version 2 writes the union. Its mapper reads version-1
+`backgroundAssetId`/`audioAssetId` fields as direct references. The table indexes
+are unchanged. Package export writes version 2; import supports versions 1–2.
+
 ## Purpose
 
 The Workflow feature owns reusable focus configuration. A Workflow is the

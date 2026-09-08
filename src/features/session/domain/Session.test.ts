@@ -56,6 +56,24 @@ describe('Session', () => {
     expect(Object.isFrozen(session.snapshot.workflow.phases)).toBe(true);
   });
 
+  test('rejects an unresolved Role before creating a Session snapshot', () => {
+    const source = createWorkflow({
+      id: 'workflow-role',
+      name: 'Role workflow',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 10,
+          environment: { audioAsset: { type: 'role', role: 'Ambient' } },
+        },
+      ],
+    });
+
+    expect(() => createSession('session-1', source, 1_000)).toThrow(
+      'Session snapshot requires direct Asset references.',
+    );
+  });
+
   test('pauses with exact remaining milliseconds after reconciling elapsed time', () => {
     const running = createSession('session-1', workflow(), 1_000);
 

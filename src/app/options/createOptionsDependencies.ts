@@ -91,8 +91,10 @@ export function createOptionsDependencies(
       return values.filter((workflow) =>
         workflow.phases.some(
           ({ environment }) =>
-            environment.backgroundAssetId === assetId ||
-            environment.audioAssetId === assetId,
+            (environment.backgroundAsset?.type === 'direct' &&
+              environment.backgroundAsset.assetId === assetId) ||
+            (environment.audioAsset?.type === 'direct' &&
+              environment.audioAsset.assetId === assetId),
         ),
       ).length;
     },

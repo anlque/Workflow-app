@@ -73,8 +73,8 @@ describe('FocusEnvironment', () => {
 
   test('loads local image and audio URLs and releases both on cleanup', async () => {
     const { unmount, releaseAssetUrl } = setup({
-      backgroundAssetId: imageId,
-      audioAssetId: audioId,
+      backgroundAsset: { type: 'direct', assetId: imageId },
+      audioAsset: { type: 'direct', assetId: audioId },
       backgroundColor: '#123456',
     });
 
@@ -98,7 +98,7 @@ describe('FocusEnvironment', () => {
 
   test('releases a replaced image URL', async () => {
     const { rerender, releaseAssetUrl, loadAssetUrl } = setup({
-      backgroundAssetId: imageId,
+      backgroundAsset: { type: 'direct', assetId: imageId },
     });
     await waitFor(() => {
       expect(document.querySelector('.focus-environment img')).not.toBeNull();
@@ -107,7 +107,12 @@ describe('FocusEnvironment', () => {
 
     rerender(
       <FocusEnvironment
-        environment={{ backgroundAssetId: createAssetId('image-2') }}
+        environment={{
+          backgroundAsset: {
+            type: 'direct',
+            assetId: createAssetId('image-2'),
+          },
+        }}
         reducedMotion={false}
         playing
         volume={1}
@@ -133,7 +138,7 @@ describe('FocusEnvironment', () => {
     const loadAssetUrl = vi.fn(() => Promise.resolve(null));
     render(
       <FocusEnvironment
-        environment={{ backgroundAssetId: imageId }}
+        environment={{ backgroundAsset: { type: 'direct', assetId: imageId } }}
         reducedMotion={false}
         playing
         volume={1}
@@ -151,7 +156,7 @@ describe('FocusEnvironment', () => {
     const play = vi
       .spyOn(HTMLMediaElement.prototype, 'play')
       .mockResolvedValue();
-    setup({ audioAssetId: audioId });
+    setup({ audioAsset: { type: 'direct', assetId: audioId } });
     await act(async () => {
       await Promise.resolve();
     });
@@ -171,7 +176,7 @@ describe('FocusEnvironment', () => {
 
   test('fades ambient audio to the selected master volume', async () => {
     vi.useFakeTimers();
-    setup({ audioAssetId: audioId }, false, 0.35);
+    setup({ audioAsset: { type: 'direct', assetId: audioId } }, false, 0.35);
     await act(async () => {
       await Promise.resolve();
     });
@@ -189,7 +194,7 @@ describe('FocusEnvironment', () => {
       .spyOn(HTMLMediaElement.prototype, 'play')
       .mockRejectedValueOnce(new DOMException('Blocked', 'NotAllowedError'))
       .mockResolvedValueOnce();
-    setup({ audioAssetId: audioId });
+    setup({ audioAsset: { type: 'direct', assetId: audioId } });
 
     const enable = await screen.findByRole('button', {
       name: 'Enable audio',
@@ -213,7 +218,10 @@ describe('FocusEnvironment', () => {
     const releaseAssetUrl = vi.fn();
     render(
       <FocusEnvironment
-        environment={{ audioAssetId: audioId, backgroundAssetId: imageId }}
+        environment={{
+          audioAsset: { type: 'direct', assetId: audioId },
+          backgroundAsset: { type: 'direct', assetId: imageId },
+        }}
         reducedMotion={false}
         playing
         volume={0.5}
@@ -275,7 +283,7 @@ describe('FocusEnvironment', () => {
     const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause');
     const play = vi.spyOn(HTMLMediaElement.prototype, 'play');
     const { rerender, loadAssetUrl, releaseAssetUrl } = setup({
-      audioAssetId: audioId,
+      audioAsset: { type: 'direct', assetId: audioId },
     });
     await act(async () => {
       await Promise.resolve();
@@ -285,7 +293,7 @@ describe('FocusEnvironment', () => {
 
     rerender(
       <FocusEnvironment
-        environment={{ audioAssetId: nextAudioId }}
+        environment={{ audioAsset: { type: 'direct', assetId: nextAudioId } }}
         reducedMotion={false}
         playing
         volume={1}

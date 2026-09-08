@@ -17,6 +17,7 @@ export type ImportAssetInput = Readonly<{
   kind: AssetKind;
   blob: Blob;
   createdAt: number;
+  role?: string;
 }>;
 
 export function validateAssetImport(
@@ -46,6 +47,7 @@ export function validateAssetImport(
     mimeType: input.blob.type,
     byteSize: input.blob.size,
     createdAt: input.createdAt,
+    ...(input.role === undefined ? {} : { role: input.role }),
   });
 }
 

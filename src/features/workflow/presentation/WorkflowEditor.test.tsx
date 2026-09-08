@@ -320,7 +320,10 @@ describe('WorkflowEditor', () => {
     expect(saved?.name).toBe('Deep work');
     expect(saved?.phases[0]?.type).toBe('break');
     expect(saved?.phases[1]?.type).toBe('focus');
-    expect(saved?.phases[1]?.environment.backgroundAssetId).toBe(image.id);
+    expect(saved?.phases[1]?.environment.backgroundAsset).toEqual({
+      type: 'direct',
+      assetId: image.id,
+    });
   });
 
   test('validates enabled Reward Dice frequency', async () => {

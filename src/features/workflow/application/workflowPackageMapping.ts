@@ -53,12 +53,12 @@ export function serializeWorkflow(workflow: Workflow): unknown {
       type: phase.type,
       durationSeconds: phase.durationSeconds,
       environment: {
-        ...(phase.environment.backgroundAssetId === undefined
+        ...(phase.environment.backgroundAsset === undefined
           ? {}
-          : { backgroundAssetId: phase.environment.backgroundAssetId }),
-        ...(phase.environment.audioAssetId === undefined
+          : { backgroundAsset: phase.environment.backgroundAsset }),
+        ...(phase.environment.audioAsset === undefined
           ? {}
-          : { audioAssetId: phase.environment.audioAssetId }),
+          : { audioAsset: phase.environment.audioAsset }),
         ...(phase.environment.backgroundColor === undefined
           ? {}
           : { backgroundColor: phase.environment.backgroundColor }),
@@ -84,7 +84,7 @@ export function serializeWorkflow(workflow: Workflow): unknown {
   };
 }
 
-export function parseWorkflow(value: unknown): Workflow {
+export function parseWorkflow(value: unknown, version: 1 | 2): Workflow {
   try {
     const input = record(value);
     if (!hasExactKeys(input, ['id', 'name', 'phases'], ['rewardDice'])) {
@@ -121,19 +121,50 @@ export function parseWorkflow(value: unknown): Workflow {
           return invalid();
         }
         const environment = record(phase['environment']);
-        if (
-          !hasExactKeys(
-            environment,
-            [],
-            ['backgroundAssetId', 'audioAssetId', 'backgroundColor'],
-          )
-        ) {
+        const environmentKeys =
+          version === 1
+            ? ['backgroundAssetId', 'audioAssetId', 'backgroundColor']
+            : ['backgroundAsset', 'audioAsset', 'backgroundColor'];
+        if (!hasExactKeys(environment, [], environmentKeys)) {
           return invalid();
         }
         const backgroundAssetId = optionalString(
           environment['backgroundAssetId'],
         );
         const audioAssetId = optionalString(environment['audioAssetId']);
+        const parseReference = (value: unknown) => {
+          const reference = record(value);
+          if (
+            reference['type'] === 'direct' &&
+            hasExactKeys(reference, ['type', 'assetId'])
+          ) {
+            return {
+              type: 'direct' as const,
+              assetId: string(reference['assetId']),
+            };
+          }
+          if (
+            reference['type'] === 'role' &&
+            hasExactKeys(reference, ['type', 'role'])
+          ) {
+            return { type: 'role' as const, role: string(reference['role']) };
+          }
+          return invalid();
+        };
+        const backgroundAsset =
+          environment['backgroundAsset'] === undefined
+            ? undefined
+            : parseReference(environment['backgroundAsset']);
+        const audioAsset =
+          environment['audioAsset'] === undefined
+            ? undefined
+            : parseReference(environment['audioAsset']);
+        if (
+          (backgroundAssetId !== undefined && backgroundAsset !== undefined) ||
+          (audioAssetId !== undefined && audioAsset !== undefined)
+        ) {
+          return invalid();
+        }
         const backgroundColor = optionalString(environment['backgroundColor']);
         return {
           type: string(phase['type']),
@@ -141,6 +172,8 @@ export function parseWorkflow(value: unknown): Workflow {
           environment: {
             ...(backgroundAssetId === undefined ? {} : { backgroundAssetId }),
             ...(audioAssetId === undefined ? {} : { audioAssetId }),
+            ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
+            ...(audioAsset === undefined ? {} : { audioAsset }),
             ...(backgroundColor === undefined ? {} : { backgroundColor }),
           },
         };

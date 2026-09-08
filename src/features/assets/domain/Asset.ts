@@ -5,6 +5,28 @@ import { AssetValidationError } from './AssetErrors';
 export type { AssetId } from '@/shared';
 export type AssetKind = 'image' | 'audio';
 
+declare const assetRoleBrand: unique symbol;
+export type AssetRole = string & { readonly [assetRoleBrand]: 'AssetRole' };
+
+const MAX_ASSET_ROLE_CODE_POINTS = 64;
+
+export function createAssetRole(value: string): AssetRole {
+  const normalized = value.normalize('NFKC').replace(/\s+/gu, ' ').trim();
+  if (normalized.length === 0) {
+    throw new AssetValidationError('Asset Role must not be empty.');
+  }
+  if (Array.from(normalized).length > MAX_ASSET_ROLE_CODE_POINTS) {
+    throw new AssetValidationError(
+      'Asset Role must not exceed 64 Unicode code points.',
+    );
+  }
+  return normalized as AssetRole;
+}
+
+export function assetRoleKey(role: AssetRole): string {
+  return role.toLowerCase().normalize('NFKC');
+}
+
 export type Asset = Readonly<{
   id: AssetId;
   name: string;
@@ -12,6 +34,7 @@ export type Asset = Readonly<{
   mimeType: string;
   byteSize: number;
   createdAt: number;
+  role?: AssetRole;
 }>;
 
 export type CreateAssetInput = Readonly<{
@@ -21,6 +44,7 @@ export type CreateAssetInput = Readonly<{
   mimeType: string;
   byteSize: number;
   createdAt: number;
+  role?: string;
 }>;
 
 export function createAssetId(value: string): AssetId {
@@ -57,5 +81,6 @@ export function createAsset(input: CreateAssetInput): Asset {
     mimeType: input.mimeType,
     byteSize: input.byteSize,
     createdAt: input.createdAt,
+    ...(input.role === undefined ? {} : { role: createAssetRole(input.role) }),
   });
 }

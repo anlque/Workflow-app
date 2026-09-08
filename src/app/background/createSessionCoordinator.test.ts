@@ -8,7 +8,13 @@ import type {
   SessionCommand,
 } from '@/platform/messaging';
 import {
+  createAsset,
+  resolveAssetRoleUseCase,
+  type AssetRoleRepository,
+} from '@/features/assets';
+import {
   createWorkflow,
+  resolveWorkflowAssetReferences,
   type Workflow,
   type WorkflowId,
   type WorkflowRepository,
@@ -169,11 +175,69 @@ function setup() {
     messages,
     alarms,
     createSessionId: () => `session-${String(nextId++)}`,
+    workflowResolver: { resolve: (workflow) => Promise.resolve(workflow) },
   });
   return { value, sessions, clock, messages, alarms, coordinator };
 }
 
 describe('createSessionCoordinator', () => {
+  test('composes the real Role resolvers into a direct Session snapshot', async () => {
+    const source = createWorkflow({
+      id: 'workflow-role',
+      name: 'Role workflow',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 10,
+          environment: { audioAsset: { type: 'role', role: 'Ambient' } },
+        },
+      ],
+    });
+    const asset = createAsset({
+      id: 'audio-1',
+      name: 'Ambient',
+      kind: 'audio',
+      mimeType: 'audio/mpeg',
+      byteSize: 1,
+      createdAt: 1,
+      role: 'Ambient',
+    });
+    const assetRoles: AssetRoleRepository = {
+      findByRole: () => Promise.resolve(asset),
+      moveRole: () => Promise.resolve(),
+    };
+    const sessions = new InMemorySessionRepository();
+    const messages = new FakeMessageBus();
+    const coordinator = createSessionCoordinator({
+      workflows: workflowRepository(source),
+      sessions,
+      clock: new FakeClock(1_000),
+      messages,
+      alarms: new FakeAlarmScheduler(),
+      createSessionId: () => 'session-1',
+      workflowResolver: {
+        resolve: (workflow) =>
+          resolveWorkflowAssetReferences(workflow, {
+            resolve: (role, kind) =>
+              resolveAssetRoleUseCase(assetRoles, role, kind),
+          }),
+      },
+    });
+    await coordinator.initialize();
+
+    const session = await messages.dispatch({
+      type: 'session/start',
+      commandId: 'command-role',
+      workflowId: source.id,
+    });
+
+    expect(
+      (session as Session).snapshot.workflow.phases[0].environment.audioAsset,
+    ).toEqual({
+      type: 'direct',
+      assetId: asset.id,
+    });
+  });
   test('handles a start command, broadcasts state and schedules the Phase boundary', async () => {
     const { value, messages, alarms, coordinator } = setup();
     await coordinator.initialize();
@@ -291,6 +355,7 @@ describe('createSessionCoordinator', () => {
       messages,
       alarms,
       createSessionId: () => 'session-1',
+      workflowResolver: { resolve: (workflow) => Promise.resolve(workflow) },
     });
     await coordinator.initialize();
     await messages.dispatch({

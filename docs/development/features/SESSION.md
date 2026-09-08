@@ -1,5 +1,13 @@
 # Session Feature
 
+## Resolved Asset snapshots
+
+Session start receives a Workflow resolver through its Application boundary.
+Roles resolve to same-kind direct IDs before construction, and
+`createSessionSnapshot` rejects any remaining Role. Moving a Role affects only
+future Sessions. New Session records use envelope version 2; the mapper still
+reads version-1 legacy ID fields. Timing never depends on Role lookup after start.
+
 ## Purpose
 
 The Session feature models one durable execution of an immutable Workflow

@@ -248,7 +248,10 @@ export function WorkflowEditor({
                   assets={assets}
                   value={phase.backgroundAssetId}
                   onChange={(backgroundAssetId) => {
-                    editor.updatePhase(phase.key, { backgroundAssetId });
+                    editor.updatePhase(phase.key, {
+                      backgroundAssetId,
+                      backgroundAssetRole: undefined,
+                    });
                   }}
                 />
                 <AssetPicker
@@ -257,7 +260,10 @@ export function WorkflowEditor({
                   assets={assets}
                   value={phase.audioAssetId}
                   onChange={(audioAssetId) => {
-                    editor.updatePhase(phase.key, { audioAssetId });
+                    editor.updatePhase(phase.key, {
+                      audioAssetId,
+                      audioAssetRole: undefined,
+                    });
                   }}
                 />
                 <Field label="Background color" hint="Optional CSS color.">

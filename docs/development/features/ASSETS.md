@@ -1,5 +1,20 @@
 # Assets Feature
 
+## Global Asset Roles
+
+An Asset may own one display `AssetRole`. Domain normalization applies NFKC,
+collapses Unicode whitespace, trims it and limits it to 64 Unicode code points;
+the global comparison key is locale-independent lowercase plus NFKC. User case
+is preserved. Global Dexie version 4 adds the unique `&roleKey` index across
+image and audio Assets. New records are version 2; reads remain compatible with
+role-less version-1 records.
+
+`moveAssetRoleUseCase` transfers a Role in one Asset-table transaction and
+rejects a target that owns another Role. `resolveAssetRoleUseCase` distinguishes
+missing and wrong-kind Roles. Assets retains the ST-005 injected Session port;
+AS-003 will reuse it for the accepted but not-yet-implemented retirement
+transaction.
+
 ## Purpose
 
 The Assets feature owns reusable local media and its lifecycle. In the MVP an

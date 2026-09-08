@@ -66,12 +66,16 @@ export function FocusEnvironment({
   releaseAssetUrl,
 }: FocusEnvironmentProps) {
   const image = useAssetUrl(
-    environment.backgroundAssetId,
+    environment.backgroundAsset?.type === 'direct'
+      ? environment.backgroundAsset.assetId
+      : undefined,
     loadAssetUrl,
     releaseAssetUrl,
   );
   const audio = useAssetUrl(
-    environment.audioAssetId,
+    environment.audioAsset?.type === 'direct'
+      ? environment.audioAsset.assetId
+      : undefined,
     loadAssetUrl,
     releaseAssetUrl,
   );

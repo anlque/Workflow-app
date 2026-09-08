@@ -2,7 +2,7 @@
 
 Store and Manage Local Assets Explicitly
 
-Status: Accepted
+Status: Superseded by [ADR-0011](ADR-0011-global-asset-roles-and-transactional-retirement.md)
 
 Date: 2026-07-31
 
@@ -42,4 +42,3 @@ before import writes begin.
 
 - `docs/concepts/01_PRODUCT_SPECIFICATION.md`
 - `docs/concepts/02_DOMAIN_MODEL.md`
-

@@ -11,6 +11,7 @@ import {
   type Clock,
   type Session,
   type SessionRepository,
+  type SessionWorkflowResolver,
 } from '@/features/session';
 import { createWorkflowId, type WorkflowRepository } from '@/features/workflow';
 
@@ -23,6 +24,7 @@ export type SessionCoordinatorDependencies = Readonly<{
   messages: RuntimeMessageBus;
   alarms: AlarmScheduler;
   createSessionId(): string;
+  workflowResolver: SessionWorkflowResolver;
 }>;
 
 export type SessionCoordinator = Readonly<{
@@ -36,6 +38,7 @@ export function createSessionCoordinator({
   messages,
   alarms,
   createSessionId,
+  workflowResolver,
 }: SessionCoordinatorDependencies): SessionCoordinator {
   const handledCommands = new Map<string, Promise<Session>>();
 
@@ -64,6 +67,7 @@ export function createSessionCoordinator({
         clock,
         createSessionId(),
         workflow,
+        workflowResolver,
       );
     } else if (command.type === 'session/pause') {
       session = await pauseSessionUseCase(sessions, clock, command.sessionId);

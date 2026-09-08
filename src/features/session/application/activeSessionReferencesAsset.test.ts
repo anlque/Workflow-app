@@ -20,10 +20,15 @@ function workflow(reference: 'background' | 'audio' | 'other' = 'background') {
         durationSeconds: 5,
         environment:
           reference === 'background'
-            ? { backgroundAssetId: targetId }
+            ? { backgroundAsset: { type: 'direct', assetId: targetId } }
             : reference === 'audio'
-              ? { audioAssetId: targetId }
-              : { backgroundAssetId: 'asset-other' },
+              ? { audioAsset: { type: 'direct', assetId: targetId } }
+              : {
+                  backgroundAsset: {
+                    type: 'direct',
+                    assetId: 'asset-other',
+                  },
+                },
       },
     ],
   });

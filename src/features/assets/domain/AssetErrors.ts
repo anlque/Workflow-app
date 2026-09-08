@@ -20,3 +20,10 @@ export class AssetStorageError extends Error {
     this.name = 'AssetStorageError';
   }
 }
+
+export class AssetRoleConflictError extends Error {
+  public constructor() {
+    super('Asset Role is already assigned to another Asset.');
+    this.name = 'AssetRoleConflictError';
+  }
+}

@@ -184,7 +184,12 @@ describe('FocusApp', () => {
           {
             type: 'focus',
             durationSeconds: 60,
-            environment: { audioAssetId: createAssetId('ambient-1') },
+            environment: {
+              audioAsset: {
+                type: 'direct',
+                assetId: createAssetId('ambient-1'),
+              },
+            },
           },
         ],
       }),

@@ -9,6 +9,8 @@ export type PhaseDraft = Readonly<{
   durationMinutes: string;
   backgroundAssetId: string | undefined;
   audioAssetId: string | undefined;
+  backgroundAssetRole: string | undefined;
+  audioAssetRole: string | undefined;
   backgroundColor: string;
 }>;
 
@@ -52,6 +54,8 @@ function newPhase(type: 'focus' | 'break' = 'focus'): PhaseDraft {
     durationMinutes: type === 'focus' ? '25' : '5',
     backgroundAssetId: undefined,
     audioAssetId: undefined,
+    backgroundAssetRole: undefined,
+    audioAssetRole: undefined,
     backgroundColor: '',
   };
 }
@@ -74,8 +78,22 @@ function initialDraft(workflowId: string, workflow?: Workflow): WorkflowDraft {
       key: key(),
       type: phase.type,
       durationMinutes: String(phase.durationSeconds / 60),
-      backgroundAssetId: phase.environment.backgroundAssetId,
-      audioAssetId: phase.environment.audioAssetId,
+      backgroundAssetId:
+        phase.environment.backgroundAsset?.type === 'direct'
+          ? phase.environment.backgroundAsset.assetId
+          : undefined,
+      audioAssetId:
+        phase.environment.audioAsset?.type === 'direct'
+          ? phase.environment.audioAsset.assetId
+          : undefined,
+      backgroundAssetRole:
+        phase.environment.backgroundAsset?.type === 'role'
+          ? phase.environment.backgroundAsset.role
+          : undefined,
+      audioAssetRole:
+        phase.environment.audioAsset?.type === 'role'
+          ? phase.environment.audioAsset.role
+          : undefined,
       backgroundColor: phase.environment.backgroundColor ?? '',
     })) ?? [newPhase()],
     rewardDice: {
@@ -147,12 +165,35 @@ export function validateWorkflowDraft(
       type: phase.type,
       durationSeconds: durationSeconds ?? 1,
       environment: {
-        ...(phase.backgroundAssetId === undefined
+        ...(phase.backgroundAssetId === undefined &&
+        phase.backgroundAssetRole === undefined
           ? {}
-          : { backgroundAssetId: phase.backgroundAssetId }),
-        ...(phase.audioAssetId === undefined
+          : {
+              backgroundAsset: {
+                ...(phase.backgroundAssetId === undefined
+                  ? {
+                      type: 'role' as const,
+                      role: phase.backgroundAssetRole ?? '',
+                    }
+                  : {
+                      type: 'direct' as const,
+                      assetId: phase.backgroundAssetId,
+                    }),
+              },
+            }),
+        ...(phase.audioAssetId === undefined &&
+        phase.audioAssetRole === undefined
           ? {}
-          : { audioAssetId: phase.audioAssetId }),
+          : {
+              audioAsset: {
+                ...(phase.audioAssetId === undefined
+                  ? { type: 'role' as const, role: phase.audioAssetRole ?? '' }
+                  : {
+                      type: 'direct' as const,
+                      assetId: phase.audioAssetId,
+                    }),
+              },
+            }),
         ...(phase.backgroundColor.trim().length === 0
           ? {}
           : { backgroundColor: phase.backgroundColor.trim() }),

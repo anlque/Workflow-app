@@ -1,5 +1,10 @@
 # Import and Export Flow
 
+Workflow package version 2 includes Asset Roles and direct-or-Role Environment
+references. Version-1 direct packages remain importable. Import never binds a
+colliding Role reference to a local Asset: it generates a deterministic imported
+Role, rewrites all imported references and writes Assets plus Workflow atomically.
+
 ## Trigger
 
 The user selects one of four Options actions: export/import the selected

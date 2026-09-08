@@ -26,6 +26,65 @@ describe('createWorkflow', () => {
     expect(Object.isFrozen(workflow.phases[0].environment)).toBe(true);
   });
 
+  test('creates direct and normalized Role Asset references', () => {
+    const workflow = createWorkflow({
+      id: 'workflow-1',
+      name: 'Deep work',
+      phases: [
+        {
+          ...validPhase,
+          environment: {
+            backgroundAsset: { type: 'direct', assetId: 'image-1' },
+            audioAsset: { type: 'role', role: '  Fav\tFocus ' },
+          },
+        },
+      ],
+    });
+
+    expect(workflow.phases[0].environment).toEqual({
+      backgroundAsset: { type: 'direct', assetId: 'image-1' },
+      audioAsset: { type: 'role', role: 'Fav Focus' },
+    });
+    expect(Object.isFrozen(workflow.phases[0].environment.audioAsset)).toBe(
+      true,
+    );
+  });
+
+  test('rejects an invalid Asset reference discriminator', () => {
+    expect(() =>
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [
+          {
+            ...validPhase,
+            environment: {
+              audioAsset: { type: 'dynamic', role: 'focus' } as never,
+            },
+          },
+        ],
+      }),
+    ).toThrow('Asset reference must be direct or role-based.');
+  });
+
+  test.each([
+    { type: 'direct', assetId: 'asset-1', role: 'Backdrop' },
+    { type: 'role', role: 'Backdrop', assetId: 'asset-1' },
+  ])('rejects contradictory Asset reference %#', (audioAsset) => {
+    expect(() =>
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [
+          {
+            ...validPhase,
+            environment: { audioAsset: audioAsset as never },
+          },
+        ],
+      }),
+    ).toThrow('Asset reference must be direct or role-based.');
+  });
+
   test.each(['', '   '])('rejects an empty Workflow name %j', (name) => {
     expect(() =>
       createWorkflow({ id: 'workflow-1', name, phases: [validPhase] }),

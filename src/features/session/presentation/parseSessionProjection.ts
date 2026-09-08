@@ -64,6 +64,30 @@ function workflow(value: unknown) {
         environment['backgroundAssetId'],
       );
       const audioAssetId = optionalString(environment['audioAssetId']);
+      const parseReference = (raw: unknown) => {
+        const reference = record(raw);
+        const keys = Object.keys(reference);
+        if (
+          reference['type'] !== 'direct' ||
+          keys.length !== 2 ||
+          !keys.includes('type') ||
+          !keys.includes('assetId')
+        ) {
+          return invalid();
+        }
+        return {
+          type: 'direct' as const,
+          assetId: string(reference['assetId']),
+        };
+      };
+      const backgroundAsset =
+        environment['backgroundAsset'] === undefined
+          ? undefined
+          : parseReference(environment['backgroundAsset']);
+      const audioAsset =
+        environment['audioAsset'] === undefined
+          ? undefined
+          : parseReference(environment['audioAsset']);
       const backgroundColor = optionalString(environment['backgroundColor']);
       return {
         type: string(phase['type']),
@@ -71,6 +95,8 @@ function workflow(value: unknown) {
         environment: {
           ...(backgroundAssetId === undefined ? {} : { backgroundAssetId }),
           ...(audioAssetId === undefined ? {} : { audioAssetId }),
+          ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
+          ...(audioAsset === undefined ? {} : { audioAsset }),
           ...(backgroundColor === undefined ? {} : { backgroundColor }),
         },
       };

@@ -1,6 +1,8 @@
 export type { DiceSide, DiceSideInput } from './domain/DiceSide';
 export type {
   AssetId,
+  AssetReference,
+  AssetReferenceInput,
   Environment,
   EnvironmentInput,
 } from './domain/Environment';
@@ -35,10 +37,13 @@ export { duplicateWorkflowUseCase } from './application/duplicateWorkflowUseCase
 export { listWorkflowsUseCase } from './application/listWorkflowsUseCase';
 export { reorderWorkflowsUseCase } from './application/reorderWorkflowsUseCase';
 export { updateWorkflowUseCase } from './application/updateWorkflowUseCase';
+export type { AssetReferenceResolver } from './application/AssetReferenceResolver';
+export { resolveWorkflowAssetReferences } from './application/resolveWorkflowAssetReferences';
 export {
   WorkflowPackageValidationError,
   type WorkflowPackageUnitOfWork,
   type WorkflowPackageV1,
+  type WorkflowPackageV2,
 } from './application/WorkflowPackage';
 export { exportWorkflowUseCase } from './application/exportWorkflowUseCase';
 export {

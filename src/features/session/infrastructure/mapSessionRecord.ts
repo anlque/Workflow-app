@@ -68,6 +68,30 @@ function parseWorkflow(value: unknown) {
         environment['backgroundAssetId'],
       );
       const audioAssetId = optionalString(environment['audioAssetId']);
+      const parseReference = (value: unknown) => {
+        const reference = record(value);
+        const keys = Object.keys(reference);
+        if (
+          reference['type'] !== 'direct' ||
+          keys.length !== 2 ||
+          !keys.includes('type') ||
+          !keys.includes('assetId')
+        ) {
+          return invalid();
+        }
+        return {
+          type: 'direct' as const,
+          assetId: string(reference['assetId']),
+        };
+      };
+      const backgroundAsset =
+        environment['backgroundAsset'] === undefined
+          ? undefined
+          : parseReference(environment['backgroundAsset']);
+      const audioAsset =
+        environment['audioAsset'] === undefined
+          ? undefined
+          : parseReference(environment['audioAsset']);
       const backgroundColor = optionalString(environment['backgroundColor']);
       return {
         type: string(phase['type']),
@@ -75,6 +99,8 @@ function parseWorkflow(value: unknown) {
         environment: {
           ...(backgroundAssetId === undefined ? {} : { backgroundAssetId }),
           ...(audioAssetId === undefined ? {} : { audioAssetId }),
+          ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
+          ...(audioAsset === undefined ? {} : { audioAsset }),
           ...(backgroundColor === undefined ? {} : { backgroundColor }),
         },
       };
@@ -104,7 +130,7 @@ function parseWorkflow(value: unknown) {
 export function mapSessionRecord(value: unknown): Session {
   const outer = record(value);
   if (
-    outer['schemaVersion'] !== 1 ||
+    (outer['schemaVersion'] !== 1 && outer['schemaVersion'] !== 2) ||
     (outer['active'] !== 0 && outer['active'] !== 1)
   ) {
     return invalid();
@@ -178,7 +204,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
             : session.stoppedAt;
   return {
     id: session.id,
-    schemaVersion: 1,
+    schemaVersion: 2,
     active,
     updatedAt,
     session: {
