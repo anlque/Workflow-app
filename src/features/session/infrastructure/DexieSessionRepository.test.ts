@@ -140,7 +140,13 @@ describe('DexieSessionRepository', () => {
 
       const result = repository.get(session.id);
       if (valid) {
-        await expect(result).resolves.toMatchObject({ id: session.id });
+        const restored = await result;
+        expect(
+          restored?.snapshot.workflow.phases[0]?.environment.backgroundAsset,
+        ).toEqual({
+          type: 'direct',
+          assetId: 'image-1',
+        });
       } else {
         await expect(result).rejects.toBeInstanceOf(SessionValidationError);
       }

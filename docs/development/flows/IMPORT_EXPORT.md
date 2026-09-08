@@ -69,9 +69,11 @@ assets }`. Sorted Assets and stable property/array order make repeated export
    deterministically renamed to `(imported)`, `(imported 2)`, and so on while
    the suffix fits the 64-code-point contract; imported Role references receive
    the same name. The imported Workflow is rebuilt through `createWorkflow()`.
-8. Only after all validation/reads/rewriting succeed,
-   [`DexieWorkflowPackageUnitOfWork`](../../../src/features/workflow/infrastructure/DexieWorkflowPackageUnitOfWork.ts)
-   writes all Assets and the Workflow in one `workflows + assets` transaction.
+8. Only after package validation succeeds,
+   [`unitOfWork.run`](../../../src/features/workflow/infrastructure/DexieWorkflowPackageUnitOfWork.ts)
+   opens one `workflows + assets` transaction. Reading local Workflow IDs and
+   Asset IDs/Roles, reserving collision keys, remapping IDs/Roles and all Asset
+   and Workflow writes happen inside that same transaction.
 9. Options wraps this mutation with catalog invalidation and reloads its local
    snapshot.
 

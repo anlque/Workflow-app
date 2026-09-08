@@ -78,4 +78,46 @@ describe('resolveWorkflowAssetReferences', () => {
       }),
     ).rejects.toBe(failure);
   });
+
+  test('resolves every repeated Role occurrence and preserves direct references', async () => {
+    const resolve = vi.fn<AssetReferenceResolver['resolve']>(() =>
+      Promise.resolve(createAssetId('audio-ambient')),
+    );
+    const workflow = createWorkflow({
+      id: 'workflow-repeated-role',
+      name: 'Repeated Role',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 60,
+          environment: {
+            backgroundAsset: { type: 'direct', assetId: 'image-direct' },
+            audioAsset: { type: 'role', role: 'Ambient' },
+          },
+        },
+        {
+          type: 'break',
+          durationSeconds: 30,
+          environment: { audioAsset: { type: 'role', role: 'Ambient' } },
+        },
+      ],
+    });
+
+    const resolved = await resolveWorkflowAssetReferences(workflow, {
+      resolve,
+    });
+
+    expect(resolve).toHaveBeenCalledTimes(2);
+    expect(resolve).toHaveBeenNthCalledWith(1, 'Ambient', 'audio');
+    expect(resolve).toHaveBeenNthCalledWith(2, 'Ambient', 'audio');
+    expect(resolved.phases[0].environment.backgroundAsset).toEqual(
+      workflow.phases[0].environment.backgroundAsset,
+    );
+    expect(
+      resolved.phases.map(({ environment }) => environment.audioAsset),
+    ).toEqual([
+      { type: 'direct', assetId: 'audio-ambient' },
+      { type: 'direct', assetId: 'audio-ambient' },
+    ]);
+  });
 });

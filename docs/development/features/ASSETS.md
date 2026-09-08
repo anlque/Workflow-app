@@ -54,9 +54,9 @@ Consumers import only from `@/features/assets`.
 | Group                      | Exports                                                                                                                                                  |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Domain                     | `Asset`, `AssetId`, `AssetKind`, `AssetRole`, `CreateAssetInput`, `createAsset`, `createAssetId`, `createAssetRole`, `assetRoleKey`                     |
-| Errors                     | `AssetValidationError`, `AssetRoleConflictError`, `ReferencedAssetError`, `ActiveSessionReferencedAssetError`, `AssetStorageError`                     |
+| Errors                     | `AssetValidationError`, `AssetRoleConflictError`, `UnresolvedAssetRoleError`, `WrongKindAssetRoleError`, `ReferencedAssetError`, `ActiveSessionReferencedAssetError`, `AssetStorageError` |
 | Application ports          | `AssetRepository`, `AssetRoleRepository`, `ActiveSessionAssetReferences`, `WorkflowAssetReferences`                                                    |
-| Application behavior       | `importAssetUseCase`, `validateAssetImport`, `deleteAssetUseCase`, `listAssetsUseCase`, `moveAssetRoleUseCase`, `resolveAssetRoleUseCase`              |
+| Application behavior       | `importAssetUseCase`, `validateAssetImport`, `deleteAssetUseCase`, `listAssetsUseCase`, `moveAssetRoleUseCase`, `resolveAssetRoleUseCase`, `AssetImportPolicy`, `AssetKindImportPolicy`, `ImportAssetInput` |
 | Infrastructure composition | `DexieAssetRepository`, `assetDatabaseSchemas`, `BrowserAssetUrlService`                                                                                 |
 | Presentation               | `AssetLibrary`, `AssetPicker`, `AssetPreview` and their prop types                                                                                       |
 

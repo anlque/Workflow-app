@@ -188,9 +188,11 @@ Sources:
 
 Current records store `id`, `schemaVersion: 2`, name, `image | audio` kind, MIME
 type, byte size, creation epoch, optional display `role`, matching `roleKey` and
-Blob. Compatible version-1 records contain no Role fields. Reads rebuild the Asset Domain value
-and verify that Blob size and MIME type equal its metadata. Writes repeat the
-same check. A browser `QuotaExceededError` is normalized to `AssetStorageError`.
+Blob. The reader accepts role-less `AssetRecord` v1 and `AssetRecord` v2 with an
+optional Role; v1 Role fields and inconsistent v2 Role keys are rejected. Reads
+rebuild the Asset Domain value and verify that Blob size and MIME type equal its
+metadata. Writes repeat the same check. A browser `QuotaExceededError` is
+normalized to `AssetStorageError`.
 
 Asset listing is ordered by Domain `createdAt` after mapping. Object URLs are not
 records and must be revoked by Presentation consumers.

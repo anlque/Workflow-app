@@ -48,8 +48,8 @@ does not import feature concepts or decide their transformation.
 
 1. Add a failing repository test that opens the previous schema/data and states
    the expected post-upgrade Domain value and stored shape.
-2. Allocate the next global Dexie version. The current history ends at 3, so the
-   next version is 4 regardless of which feature owns the change.
+2. Allocate the next global Dexie version. The current history ends at 4, so the
+   next version is 5 regardless of which feature owns the change.
 3. Add the feature-owned schema fragment with only its new/changed store
    definitions. `LocusoraDatabase` accumulates prior definitions; never reuse or
    independently number a feature version.
@@ -82,7 +82,7 @@ does not import feature concepts or decide their transformation.
 
 ## Compatibility Checks
 
-- **Version allocation:** is the new number global and strictly greater than 3?
+- **Version allocation:** is the new number global and strictly greater than 4?
 - **All contexts:** can any runtime be the first to open the same database and
   produce the identical schema?
 - **Cumulative stores:** do earlier tables remain defined at the latest version?
