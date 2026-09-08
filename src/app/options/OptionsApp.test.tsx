@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
-import { createAsset } from '@/features/assets';
+import { createAsset, createAssetRole } from '@/features/assets';
 import { defaultSettings } from '@/features/settings';
 import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
 import {
@@ -24,6 +24,23 @@ function dependencies(): OptionsDependencies {
     reorderWorkflows: () => Promise.resolve(),
     importAsset: () => Promise.resolve(),
     deleteAsset: () => Promise.resolve(),
+    inspectAssetRoleChange: (id, value) =>
+      Promise.resolve({
+        target: createAsset({
+          id,
+          name: String(id),
+          kind: 'image',
+          mimeType: 'image/png',
+          byteSize: 1,
+          createdAt: 1,
+        }),
+        role: createAssetRole(value),
+        action: 'create',
+        currentOwner: null,
+        affectedWorkflowCount: 0,
+        expectedKinds: [],
+      }),
+    applyAssetRoleChange: () => Promise.resolve(),
     loadAssetBlob: () => Promise.resolve(null),
     createObjectUrl: () => 'blob:asset',
     revokeObjectUrl: () => undefined,
@@ -37,6 +54,51 @@ function dependencies(): OptionsDependencies {
 }
 
 describe('OptionsApp', () => {
+  test('forwards an approved Role change and reloads the catalog once', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies();
+    const load = vi.fn(() =>
+      Promise.resolve({
+        workflows: [],
+        assets: [asset],
+        settings: defaultSettings,
+      }),
+    );
+    const applyAssetRoleChange = vi.fn(() => Promise.resolve());
+    const asset = createAsset({
+      id: 'image',
+      name: 'Forest',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 1,
+      createdAt: 1,
+    });
+    const preview = {
+      target: asset,
+      role: createAssetRole('Hero'),
+      action: 'create' as const,
+      currentOwner: null,
+      affectedWorkflowCount: 0,
+      expectedKinds: [],
+    };
+    deps.load = load;
+    deps.inspectAssetRoleChange = vi.fn(() => Promise.resolve(preview));
+    deps.applyAssetRoleChange = applyAssetRoleChange;
+    render(<OptionsApp dependencies={deps} />);
+    await user.click(await screen.findByRole('tab', { name: 'Assets' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Manage role for Forest' }),
+    );
+    await user.type(screen.getByLabelText('Role'), 'Hero');
+    await user.click(screen.getByRole('button', { name: 'Review role' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Assign role' }),
+    );
+
+    expect(applyAssetRoleChange).toHaveBeenCalledWith(preview);
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
   test('does not recreate a playing audio preview after importing an image', async () => {
     const user = userEvent.setup();
     const deps = dependencies();

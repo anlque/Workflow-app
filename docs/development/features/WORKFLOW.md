@@ -5,8 +5,9 @@
 Environment background and audio values are a discriminated `direct` Asset ID
 or `role` union. Background Role resolution requires an image; audio resolution
 requires audio. `resolveWorkflowAssetReferences` rebuilds a direct-only Workflow
-before Session creation. The editor remains direct-only until AS-002 but
-preserves an existing Role during unrelated edits.
+before Session creation. The editor draft stores one discriminated reference
+per Environment slot, and its picker explicitly offers direct Asset and Role
+modes. Unrelated Phase edits preserve the selected reference variant.
 
 Workflow record version 2 writes the union. Its mapper reads version-1
 `backgroundAssetId`/`audioAssetId` fields as direct references. The table indexes
@@ -55,8 +56,8 @@ exports:
 | --- | --- |
 | Domain value types | `DiceSide`, `DiceSideInput`, `AssetId`, `AssetReference`, `AssetReferenceInput`, `Environment`, `EnvironmentInput`, `DurationSeconds`, `Phase`, `PhaseInput`, `PhaseType`, `RewardDice`, `RewardDiceInput`, `RewardPhaseType`, `CreateWorkflowInput`, `Workflow`, `WorkflowId` |
 | Domain behavior and errors | `createWorkflowId`, `createWorkflow`, `rollReward`, `isRewardDueAfterPhase`, `WorkflowValidationError` |
-| Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, `WorkflowApplicationError`, `WorkflowPackageV1`, `WorkflowPackageV2`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
-| Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `resolveWorkflowAssetReferences`, `exportWorkflowUseCase`, `importWorkflowUseCase` |
+| Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`, `WorkflowPackageV2`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
+| Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `resolveWorkflowAssetReferences`, `summarizeWorkflowRoleReferences`, `renameWorkflowRoleReferences`, `exportWorkflowUseCase`, `importWorkflowUseCase` |
 | Infrastructure composition | `DexieWorkflowRepository`, `workflowDatabaseSchemas`, `DexieWorkflowPackageUnitOfWork` |
 | Presentation components | `WorkflowLibrary`, `WorkflowLibraryProps`, `WorkflowEditor`, `WorkflowEditorProps`, `RewardDiceEditor`, `RewardDiceEditorProps` |
 | Presentation editor API | `useWorkflowEditor`, `validateWorkflowDraft`, `PhaseDraft`, `RewardDiceDraft`, `RewardSideDraft`, `WorkflowDraft`, `WorkflowDraftErrors`, `WorkflowDraftValidation` |

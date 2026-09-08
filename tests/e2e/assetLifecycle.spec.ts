@@ -81,3 +81,74 @@ test('protects Assets referenced by an immutable active Session snapshot', async
 
   expect(networkRequests).toEqual([]);
 });
+
+test('creates, follows and explicitly moves an Asset Role', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('tab', { name: 'Assets' }).click();
+  for (const name of ['forest.png', 'meadow.png']) {
+    await options
+      .getByLabel('Add local image or audio')
+      .setInputFiles({ name, mimeType: 'image/png', buffer: onePixelPng });
+  }
+  const roleTrigger = options.getByRole('button', {
+    name: 'Manage role for forest.png',
+  });
+  await roleTrigger.focus();
+  await options.keyboard.press('Enter');
+  await options
+    .getByRole('textbox', { name: 'Role' })
+    .pressSequentially('Hero scene');
+  await options.getByRole('button', { name: 'Review role' }).focus();
+  await options.keyboard.press('Enter');
+  await options.getByRole('button', { name: 'Assign role' }).focus();
+  await options.keyboard.press('Enter');
+  await expect(roleTrigger).toBeFocused();
+
+  await options.getByRole('tab', { name: 'Workflows' }).click();
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Role focus');
+  await options
+    .getByLabel('Background image')
+    .selectOption({ label: 'Hero scene — forest.png' });
+  await options.getByRole('button', { name: 'Add phase' }).click();
+  await options
+    .getByLabel('Background image')
+    .nth(1)
+    .selectOption({ label: 'forest.png' });
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+
+  await options.getByRole('tab', { name: 'Assets' }).click();
+  await options
+    .getByRole('button', { name: 'Manage role for meadow.png' })
+    .click();
+  await options.getByRole('textbox', { name: 'Role' }).fill('Hero scene');
+  await options.getByRole('button', { name: 'Review role' }).click();
+  await expect(
+    options.getByText(/currently belongs to forest.png/),
+  ).toBeVisible();
+  await expect(options.getByText(/affects 1 Workflow/)).toBeVisible();
+  await options.getByRole('button', { name: 'Move role' }).click();
+  await expect(
+    options.getByRole('listitem', { name: 'Image: meadow.png' }),
+  ).toContainText('Role: Hero scene');
+
+  await options.getByRole('tab', { name: 'Workflows' }).click();
+  await expect(options.getByLabel('Background image').nth(0)).toHaveValue(
+    'role:hero scene',
+  );
+  await expect(options.getByLabel('Background image').nth(1)).toHaveValue(
+    /^direct:/u,
+  );
+  await options.getByLabel('Background color').nth(0).fill('#112233');
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(options.getByLabel('Background image').nth(0)).toHaveValue(
+    'role:hero scene',
+  );
+  await expect(options.getByLabel('Background image').nth(1)).toHaveValue(
+    /^direct:/u,
+  );
+});

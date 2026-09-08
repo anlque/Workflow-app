@@ -40,6 +40,11 @@ export { updateWorkflowUseCase } from './application/updateWorkflowUseCase';
 export type { AssetReferenceResolver } from './application/AssetReferenceResolver';
 export { resolveWorkflowAssetReferences } from './application/resolveWorkflowAssetReferences';
 export {
+  renameWorkflowRoleReferences,
+  summarizeWorkflowRoleReferences,
+  type WorkflowRoleUsageSummary,
+} from './application/workflowRoleReferences';
+export {
   WorkflowPackageValidationError,
   type WorkflowPackageUnitOfWork,
   type WorkflowPackageV1,

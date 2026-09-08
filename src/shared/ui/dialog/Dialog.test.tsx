@@ -32,4 +32,21 @@ describe('Dialog', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  test('associates an external description with the dialog', () => {
+    render(
+      <Dialog
+        open
+        title="Manage Role"
+        describedBy="role-help"
+        onCancel={() => undefined}
+      >
+        <p id="role-help">Roles are aliases.</p>
+      </Dialog>,
+    );
+    expect(screen.getByRole('dialog')).toHaveAttribute(
+      'aria-describedby',
+      'role-help',
+    );
+  });
 });

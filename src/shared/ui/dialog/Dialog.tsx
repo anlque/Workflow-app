@@ -5,6 +5,7 @@ export type DialogProps = Readonly<{
   title: ReactNode;
   children: ReactNode;
   className?: string;
+  describedBy?: string;
   onCancel(): void;
 }>;
 
@@ -13,6 +14,7 @@ export function Dialog({
   title,
   children,
   className,
+  describedBy,
   onCancel,
 }: DialogProps) {
   const titleId = useId();
@@ -36,6 +38,7 @@ export function Dialog({
       className={['dialog', className].filter(Boolean).join(' ')}
       data-position="viewport-center"
       aria-labelledby={titleId}
+      aria-describedby={describedBy}
       onCancel={(event) => {
         event.preventDefault();
         onCancel();

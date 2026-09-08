@@ -27,3 +27,21 @@ export class AssetRoleConflictError extends Error {
     this.name = 'AssetRoleConflictError';
   }
 }
+
+export class AssetRoleMergeError extends Error {
+  public constructor() {
+    super(
+      'This Asset already has a different Role. Choose another Asset or enter an available Role name.',
+    );
+    this.name = 'AssetRoleMergeError';
+  }
+}
+
+export class StaleAssetRoleChangeError extends Error {
+  public constructor() {
+    super(
+      'Asset Roles changed while this dialog was open. Review the change and try again.',
+    );
+    this.name = 'StaleAssetRoleChangeError';
+  }
+}

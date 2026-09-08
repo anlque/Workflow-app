@@ -1,14 +1,21 @@
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 
 import { Button, Dialog } from '@/shared';
 
 import type { Asset, AssetId, AssetKind } from '../domain/Asset';
+import type { AssetRoleChangePreview } from '../application/AssetRoleChange';
 import { AssetPreview } from './AssetPreview';
+import { AssetRoleDialog } from './AssetRoleDialog';
 
 export type AssetLibraryProps = Readonly<{
   assets: readonly Asset[];
   onImport(file: File, kind: AssetKind): Promise<void>;
   onDelete(id: AssetId): Promise<void>;
+  onInspectRoleChange(
+    id: AssetId,
+    value: string,
+  ): Promise<AssetRoleChangePreview>;
+  onApplyRoleChange(preview: AssetRoleChangePreview): Promise<void>;
   loadBlob(id: AssetId): Promise<Blob | null>;
   createObjectUrl(blob: Blob): string;
   revokeObjectUrl(url: string): void;
@@ -24,11 +31,16 @@ export function AssetLibrary({
   assets,
   onImport,
   onDelete,
+  onInspectRoleChange,
+  onApplyRoleChange,
   loadBlob,
   createObjectUrl,
   revokeObjectUrl,
 }: AssetLibraryProps) {
   const [deleting, setDeleting] = useState<Asset | null>(null);
+  const [managingRole, setManagingRole] = useState<Asset | null>(null);
+  const roleTrigger = useRef<HTMLButtonElement | null>(null);
+  const restoreRoleFocus = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,6 +82,17 @@ export function AssetLibrary({
       setPending(null);
     }
   }
+
+  function closeRoleDialog(): void {
+    restoreRoleFocus.current = true;
+    setManagingRole(null);
+  }
+
+  useEffect(() => {
+    if (managingRole !== null || !restoreRoleFocus.current) return;
+    restoreRoleFocus.current = false;
+    roleTrigger.current?.focus();
+  }, [managingRole]);
 
   return (
     <section className="asset-library" aria-labelledby="asset-library-title">
@@ -126,16 +149,29 @@ export function AssetLibrary({
                     {asset.kind === 'image' ? 'Image' : 'Audio'} ·{' '}
                     {formatBytes(asset.byteSize)}
                   </p>
+                  <p>Role: {asset.role ?? 'No Role'}</p>
                 </div>
-                <Button
-                  variant="quiet"
-                  aria-label={`Delete ${asset.name}`}
-                  onClick={() => {
-                    setDeleting(asset);
-                  }}
-                >
-                  Delete
-                </Button>
+                <div className="asset-item__actions">
+                  <Button
+                    variant="quiet"
+                    aria-label={`Manage role for ${asset.name}`}
+                    onClick={(event) => {
+                      roleTrigger.current = event.currentTarget;
+                      setManagingRole(asset);
+                    }}
+                  >
+                    Role
+                  </Button>
+                  <Button
+                    variant="quiet"
+                    aria-label={`Delete ${asset.name}`}
+                    onClick={() => {
+                      setDeleting(asset);
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </div>
               </div>
             </li>
           ))}
@@ -176,6 +212,15 @@ export function AssetLibrary({
           </Button>
         </div>
       </Dialog>
+      {managingRole === null ? null : (
+        <AssetRoleDialog
+          asset={managingRole}
+          onInspect={onInspectRoleChange}
+          onApply={onApplyRoleChange}
+          onCancel={closeRoleDialog}
+          onSuccess={closeRoleDialog}
+        />
+      )}
     </section>
   );
 }

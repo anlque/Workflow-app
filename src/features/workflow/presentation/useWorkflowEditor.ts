@@ -1,16 +1,15 @@
 import { useState } from 'react';
 
 import type { RewardPhaseType } from '../domain/RewardDice';
+import type { AssetReference } from '../domain/Environment';
 import type { CreateWorkflowInput, Workflow } from '../domain/Workflow';
 
 export type PhaseDraft = Readonly<{
   key: string;
   type: 'focus' | 'break';
   durationMinutes: string;
-  backgroundAssetId: string | undefined;
-  audioAssetId: string | undefined;
-  backgroundAssetRole: string | undefined;
-  audioAssetRole: string | undefined;
+  backgroundAsset: AssetReference | undefined;
+  audioAsset: AssetReference | undefined;
   backgroundColor: string;
 }>;
 
@@ -52,10 +51,8 @@ function newPhase(type: 'focus' | 'break' = 'focus'): PhaseDraft {
     key: key(),
     type,
     durationMinutes: type === 'focus' ? '25' : '5',
-    backgroundAssetId: undefined,
-    audioAssetId: undefined,
-    backgroundAssetRole: undefined,
-    audioAssetRole: undefined,
+    backgroundAsset: undefined,
+    audioAsset: undefined,
     backgroundColor: '',
   };
 }
@@ -78,22 +75,8 @@ function initialDraft(workflowId: string, workflow?: Workflow): WorkflowDraft {
       key: key(),
       type: phase.type,
       durationMinutes: String(phase.durationSeconds / 60),
-      backgroundAssetId:
-        phase.environment.backgroundAsset?.type === 'direct'
-          ? phase.environment.backgroundAsset.assetId
-          : undefined,
-      audioAssetId:
-        phase.environment.audioAsset?.type === 'direct'
-          ? phase.environment.audioAsset.assetId
-          : undefined,
-      backgroundAssetRole:
-        phase.environment.backgroundAsset?.type === 'role'
-          ? phase.environment.backgroundAsset.role
-          : undefined,
-      audioAssetRole:
-        phase.environment.audioAsset?.type === 'role'
-          ? phase.environment.audioAsset.role
-          : undefined,
+      backgroundAsset: phase.environment.backgroundAsset,
+      audioAsset: phase.environment.audioAsset,
       backgroundColor: phase.environment.backgroundColor ?? '',
     })) ?? [newPhase()],
     rewardDice: {
@@ -165,35 +148,12 @@ export function validateWorkflowDraft(
       type: phase.type,
       durationSeconds: durationSeconds ?? 1,
       environment: {
-        ...(phase.backgroundAssetId === undefined &&
-        phase.backgroundAssetRole === undefined
+        ...(phase.backgroundAsset === undefined
           ? {}
-          : {
-              backgroundAsset: {
-                ...(phase.backgroundAssetId === undefined
-                  ? {
-                      type: 'role' as const,
-                      role: phase.backgroundAssetRole ?? '',
-                    }
-                  : {
-                      type: 'direct' as const,
-                      assetId: phase.backgroundAssetId,
-                    }),
-              },
-            }),
-        ...(phase.audioAssetId === undefined &&
-        phase.audioAssetRole === undefined
+          : { backgroundAsset: phase.backgroundAsset }),
+        ...(phase.audioAsset === undefined
           ? {}
-          : {
-              audioAsset: {
-                ...(phase.audioAssetId === undefined
-                  ? { type: 'role' as const, role: phase.audioAssetRole ?? '' }
-                  : {
-                      type: 'direct' as const,
-                      assetId: phase.audioAssetId,
-                    }),
-              },
-            }),
+          : { audioAsset: phase.audioAsset }),
         ...(phase.backgroundColor.trim().length === 0
           ? {}
           : { backgroundColor: phase.backgroundColor.trim() }),

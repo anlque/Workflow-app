@@ -2,6 +2,8 @@ import {
   assetDatabaseSchemas,
   BrowserAssetUrlService,
   deleteAssetUseCase,
+  applyAssetRoleChangeUseCase,
+  inspectAssetRoleChangeUseCase,
   DexieAssetRepository,
   importAssetUseCase,
   type ActiveSessionAssetReferences,
@@ -31,6 +33,8 @@ import {
   importWorkflowUseCase,
   listWorkflowsUseCase,
   reorderWorkflowsUseCase,
+  renameWorkflowRoleReferences,
+  summarizeWorkflowRoleReferences,
   updateWorkflowUseCase,
   workflowDatabaseSchemas,
 } from '@/features/workflow';
@@ -39,6 +43,7 @@ import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 
 import type { OptionsDependencies } from './OptionsApp';
 import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
+import { DexieAssetRoleManagementUnitOfWork } from './DexieAssetRoleManagementUnitOfWork';
 
 const assetPolicy: AssetImportPolicy = {
   image: {
@@ -84,6 +89,7 @@ export function createOptionsDependencies(
   const settings = new ChromeSettingsRepository();
   const urls = new BrowserAssetUrlService();
   const unitOfWork = new DexieWorkflowPackageUnitOfWork(database);
+  const roleUnitOfWork = new DexieAssetRoleManagementUnitOfWork(database);
   const catalogEvents = createChromeWorkflowCatalogEvents();
   const references: WorkflowAssetReferences = {
     async count(assetId) {
@@ -101,6 +107,14 @@ export function createOptionsDependencies(
   };
   const activeSessionReferences: ActiveSessionAssetReferences = {
     has: (assetId) => activeSessionReferencesAsset(sessions, assetId),
+  };
+  const roleUsage = {
+    summarize: (role: Parameters<typeof summarizeWorkflowRoleReferences>[1]) =>
+      summarizeWorkflowRoleReferences(workflows, role),
+    renameReferences: (
+      from: Parameters<typeof renameWorkflowRoleReferences>[1],
+      to: Parameters<typeof renameWorkflowRoleReferences>[2],
+    ) => renameWorkflowRoleReferences(workflows, from, to),
   };
 
   return {
@@ -161,6 +175,20 @@ export function createOptionsDependencies(
     },
     async deleteAsset(id) {
       await deleteAssetUseCase(assets, activeSessionReferences, references, id);
+    },
+    inspectAssetRoleChange: (id, value) =>
+      inspectAssetRoleChangeUseCase(assets, roleUsage, id, value),
+    async applyAssetRoleChange(preview) {
+      await runWorkflowCatalogMutation(
+        () =>
+          applyAssetRoleChangeUseCase(
+            assets,
+            roleUsage,
+            roleUnitOfWork,
+            preview,
+          ),
+        catalogEvents,
+      );
     },
     loadAssetBlob: (id) => assets.getBlob(id),
     createObjectUrl: (blob) => urls.create(blob),

@@ -852,6 +852,13 @@ textarea {
   padding: 0.75rem;
 }
 
+.asset-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
 .asset-item__body p,
 .asset-library__empty p,
 .asset-library__empty h3 {

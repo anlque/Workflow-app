@@ -2,7 +2,12 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
-import { createAsset, type AssetId, type AssetKind } from '../domain/Asset';
+import {
+  createAsset,
+  createAssetRole,
+  type AssetId,
+  type AssetKind,
+} from '../domain/Asset';
 import { AssetLibrary } from './AssetLibrary';
 
 const image = createAsset({
@@ -39,6 +44,19 @@ function setup(
       assets={[image, audio]}
       onImport={onImport}
       onDelete={onDelete}
+      onInspectRoleChange={(assetId, value) => {
+        const target = [image, audio].find(({ id }) => id === assetId);
+        if (target === undefined) return Promise.reject(new Error('missing'));
+        return Promise.resolve({
+          target,
+          role: createAssetRole(value),
+          action: 'create',
+          currentOwner: null,
+          affectedWorkflowCount: 0,
+          expectedKinds: [],
+        });
+      }}
+      onApplyRoleChange={() => Promise.resolve()}
       loadBlob={() => Promise.resolve(null)}
       createObjectUrl={() => 'blob:asset'}
       revokeObjectUrl={() => undefined}
@@ -57,6 +75,8 @@ describe('AssetLibrary', () => {
         assets={[audio]}
         onImport={() => Promise.resolve()}
         onDelete={() => Promise.resolve()}
+        onInspectRoleChange={() => Promise.reject(new Error('unused'))}
+        onApplyRoleChange={() => Promise.resolve()}
         loadBlob={() => Promise.resolve(blob)}
         createObjectUrl={createObjectUrl}
         revokeObjectUrl={revokeObjectUrl}
@@ -70,6 +90,8 @@ describe('AssetLibrary', () => {
         assets={[audio]}
         onImport={() => Promise.resolve()}
         onDelete={() => Promise.resolve()}
+        onInspectRoleChange={() => Promise.reject(new Error('unused'))}
+        onApplyRoleChange={() => Promise.resolve()}
         loadBlob={() => Promise.resolve(blob)}
         createObjectUrl={createObjectUrl}
         revokeObjectUrl={vi.fn()}
@@ -89,6 +111,62 @@ describe('AssetLibrary', () => {
     const audioItem = screen.getByRole('listitem', { name: 'Audio: Rain' });
     expect(imageItem).toHaveTextContent('1 KB');
     expect(audioItem).toHaveTextContent('2 KB');
+  });
+
+  test('opens Role management from an Asset card', async () => {
+    const user = userEvent.setup();
+    setup();
+    expect(screen.getAllByText(/No Role/)).toHaveLength(2);
+    await user.click(
+      screen.getByRole('button', { name: 'Manage role for Forest' }),
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Manage Role for Forest' }),
+    ).toBeVisible();
+  });
+
+  test('restores the invoking Role button after Cancel', async () => {
+    const user = userEvent.setup();
+    setup();
+    const trigger = screen.getByRole('button', {
+      name: 'Manage role for Forest',
+    });
+    await user.click(trigger);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(trigger).toHaveFocus();
+  });
+
+  test('restores the invoking Role button after a successful change', async () => {
+    const user = userEvent.setup();
+    render(
+      <AssetLibrary
+        assets={[image]}
+        onImport={() => Promise.resolve()}
+        onDelete={() => Promise.resolve()}
+        onInspectRoleChange={(_, value) =>
+          Promise.resolve({
+            target: image,
+            role: createAssetRole(value),
+            action: 'create',
+            currentOwner: null,
+            affectedWorkflowCount: 0,
+            expectedKinds: [],
+          })
+        }
+        onApplyRoleChange={() => Promise.resolve()}
+        loadBlob={() => Promise.resolve(null)}
+        createObjectUrl={() => 'blob:asset'}
+        revokeObjectUrl={() => undefined}
+      />,
+    );
+    const trigger = screen.getByRole('button', {
+      name: 'Manage role for Forest',
+    });
+    await user.click(trigger);
+    await user.type(screen.getByRole('textbox', { name: 'Role' }), 'Hero');
+    await user.click(screen.getByRole('button', { name: 'Review role' }));
+    await user.click(screen.getByRole('button', { name: 'Assign role' }));
+    expect(trigger).toHaveFocus();
   });
 
   test('infers the media kind and imports a supported file', async () => {

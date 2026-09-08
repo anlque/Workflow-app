@@ -104,6 +104,11 @@ export class DexieAssetRepository implements AssetRepository {
     return value === undefined ? null : mapRecord(value).blob;
   }
 
+  public async get(id: AssetId): Promise<Asset | null> {
+    const value: unknown = await this.#assets.get(id);
+    return value === undefined ? null : mapRecord(value).asset;
+  }
+
   public async findByRole(role: AssetRole): Promise<Asset | null> {
     const value: unknown = await this.#assets
       .where('roleKey')
@@ -152,6 +157,48 @@ export class DexieAssetRepository implements AssetRepository {
         toRecord(createAsset({ ...target.asset, role }), target.blob),
       );
     });
+  }
+
+  public async renameRole(
+    targetId: AssetId,
+    from: AssetRole,
+    to: AssetRole,
+  ): Promise<void> {
+    try {
+      await this.#database.runReadWrite('assets', async () => {
+        const value: unknown = await this.#assets.get(targetId);
+        if (value === undefined) {
+          throw new AssetValidationError('Target Asset was not found.');
+        }
+        const target = mapRecord(value);
+        if (
+          target.asset.role === undefined ||
+          assetRoleKey(target.asset.role) !== assetRoleKey(from)
+        ) {
+          throw new AssetValidationError(
+            'Target Asset no longer owns this Role.',
+          );
+        }
+        const ownerValue: unknown = await this.#assets
+          .where('roleKey')
+          .equals(assetRoleKey(to))
+          .first();
+        if (
+          ownerValue !== undefined &&
+          mapRecord(ownerValue).asset.id !== targetId
+        ) {
+          throw new AssetRoleConflictError();
+        }
+        await this.#assets.put(
+          toRecord(createAsset({ ...target.asset, role: to }), target.blob),
+        );
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'ConstraintError') {
+        throw new AssetRoleConflictError();
+      }
+      throw error;
+    }
   }
 
   public async save(asset: Asset, blob: Blob): Promise<void> {

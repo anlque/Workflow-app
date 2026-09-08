@@ -49,6 +49,42 @@ test('configuration tabs support keyboard-only navigation', async ({
   await expect(workflows).toBeFocused();
 });
 
+test('Asset Role dialog has no detectable axe violations', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('tab', { name: 'Assets' }).click();
+  await options.getByLabel('Add local image or audio').setInputFiles({
+    name: 'role-image.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  });
+  const trigger = options.getByRole('button', {
+    name: 'Manage role for role-image.png',
+  });
+  await trigger.focus();
+  await options.keyboard.press('Enter');
+  await expect(options.getByRole('textbox', { name: 'Role' })).toBeFocused();
+  await expectNoAccessibilityViolations(options);
+  await options.getByRole('textbox', { name: 'Role' }).fill('Backdrop');
+  await options.getByRole('button', { name: 'Review role' }).click();
+  await options.getByRole('button', { name: 'Assign role' }).click();
+  await expect(
+    options.getByRole('listitem', { name: 'Image: role-image.png' }),
+  ).toContainText('Role: Backdrop');
+  await options.getByRole('tab', { name: 'Workflows' }).click();
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await expect(
+    options.getByRole('option', { name: 'Backdrop — role-image.png' }),
+  ).toHaveCount(1);
+  await expectNoAccessibilityViolations(options);
+});
+
 test('local extension documents become interactive within 500 ms', async ({
   context,
   extensionUrls,

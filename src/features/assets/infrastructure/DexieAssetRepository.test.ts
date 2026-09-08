@@ -66,6 +66,129 @@ describe('DexieAssetRepository', () => {
       repository.findByRole(createAssetRole(' fav\tFOCUS ')),
     ).resolves.toEqual(asset);
     await expect(repository.list()).resolves.toEqual([asset]);
+    await expect(repository.get(asset.id)).resolves.toEqual(asset);
+  });
+
+  test('renames Role display value without changing its owner', async () => {
+    const repository = new DexieAssetRepository(database());
+    const blob = new Blob(['x'], { type: 'image/png' });
+    const target = createAsset({
+      id: 'target',
+      name: 'Target',
+      kind: 'image',
+      mimeType: blob.type,
+      byteSize: blob.size,
+      createdAt: 1,
+      role: 'Backdrop',
+    });
+    await repository.save(target, blob);
+
+    await repository.renameRole(
+      target.id,
+      createAssetRole('backdrop'),
+      createAssetRole('Hero Scene'),
+    );
+
+    await expect(repository.get(target.id)).resolves.toMatchObject({
+      role: 'Hero Scene',
+    });
+    await expect(
+      repository.findByRole(createAssetRole('Backdrop')),
+    ).resolves.toBeNull();
+  });
+
+  test('rejects rename when the target is missing', async () => {
+    const repository = new DexieAssetRepository(database());
+    await expect(
+      repository.renameRole(
+        createAsset({
+          id: 'missing',
+          name: 'Missing',
+          kind: 'image',
+          mimeType: 'image/png',
+          byteSize: 1,
+          createdAt: 1,
+        }).id,
+        createAssetRole('Old'),
+        createAssetRole('New'),
+      ),
+    ).rejects.toThrow('Target Asset was not found.');
+  });
+
+  test('rejects rename when the target no longer owns the current Role', async () => {
+    const repository = new DexieAssetRepository(database());
+    const blob = new Blob(['x'], { type: 'image/png' });
+    const target = createAsset({
+      id: 'target',
+      name: 'Target',
+      kind: 'image',
+      mimeType: blob.type,
+      byteSize: blob.size,
+      createdAt: 1,
+      role: 'Changed',
+    });
+    await repository.save(target, blob);
+    await expect(
+      repository.renameRole(
+        target.id,
+        createAssetRole('Old'),
+        createAssetRole('New'),
+      ),
+    ).rejects.toThrow('no longer owns');
+    await expect(repository.get(target.id)).resolves.toEqual(target);
+  });
+
+  test('rejects rename to a Role owned by another Asset', async () => {
+    const repository = new DexieAssetRepository(database());
+    const blob = new Blob(['x'], { type: 'image/png' });
+    const target = createAsset({
+      id: 'target',
+      name: 'Target',
+      kind: 'image',
+      mimeType: blob.type,
+      byteSize: blob.size,
+      createdAt: 1,
+      role: 'Old',
+    });
+    const owner = createAsset({
+      ...target,
+      id: 'owner',
+      role: 'Occupied',
+      createdAt: 2,
+    });
+    await repository.save(target, blob);
+    await repository.save(owner, blob);
+    await expect(
+      repository.renameRole(
+        target.id,
+        createAssetRole('Old'),
+        createAssetRole('Occupied'),
+      ),
+    ).rejects.toBeInstanceOf(AssetRoleConflictError);
+    await expect(repository.list()).resolves.toEqual([target, owner]);
+  });
+
+  test('allows a canonical rename on the same owner and preserves requested case', async () => {
+    const repository = new DexieAssetRepository(database());
+    const blob = new Blob(['x'], { type: 'image/png' });
+    const target = createAsset({
+      id: 'target',
+      name: 'Target',
+      kind: 'image',
+      mimeType: blob.type,
+      byteSize: blob.size,
+      createdAt: 1,
+      role: 'Hero',
+    });
+    await repository.save(target, blob);
+    await repository.renameRole(
+      target.id,
+      createAssetRole('hero'),
+      createAssetRole('HERO'),
+    );
+    await expect(repository.get(target.id)).resolves.toMatchObject({
+      role: 'HERO',
+    });
   });
 
   test('reads legacy version-1 Assets without a Role', async () => {

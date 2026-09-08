@@ -11,6 +11,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createAsset } from '@/features/assets';
 
 import type { CreateWorkflowInput } from '../domain/Workflow';
+import { createWorkflow } from '../domain/createWorkflow';
 import { useWorkflowEditor, validateWorkflowDraft } from './useWorkflowEditor';
 import { WorkflowEditor } from './WorkflowEditor';
 
@@ -308,7 +309,7 @@ describe('WorkflowEditor', () => {
     await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
     await user.selectOptions(
       screen.getByLabelText('Background image'),
-      image.id,
+      `direct:${image.id}`,
     );
     await user.click(screen.getByRole('button', { name: 'Add phase' }));
     await user.selectOptions(screen.getByLabelText('Phase 2 type'), 'break');
@@ -324,6 +325,94 @@ describe('WorkflowEditor', () => {
       type: 'direct',
       assetId: image.id,
     });
+  });
+
+  test('preserves a Role reference through unrelated edits and save', async () => {
+    const user = userEvent.setup();
+    const roleImage = createAsset({
+      ...image,
+      id: 'role-image',
+      role: 'Hero scene',
+    });
+    const workflow = createWorkflow({
+      id: 'workflow-role',
+      name: 'Original',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 60,
+          environment: {
+            backgroundAsset: { type: 'role', role: 'Hero scene' },
+          },
+        },
+      ],
+    });
+    const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    const view = render(
+      <WorkflowEditor
+        workflowId={workflow.id}
+        workflow={workflow}
+        assets={[roleImage]}
+        onSave={onSave}
+      />,
+    );
+
+    await user.clear(screen.getByLabelText('Background color'));
+    await user.type(screen.getByLabelText('Background color'), '#112233');
+    view.rerender(
+      <WorkflowEditor
+        workflowId={workflow.id}
+        workflow={workflow}
+        assets={[{ ...roleImage }]}
+        onSave={onSave}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+
+    expect(
+      onSave.mock.calls[0]?.[0].phases[0]?.environment.backgroundAsset,
+    ).toEqual({ type: 'role', role: 'Hero scene' });
+  });
+
+  test('preserves a Role reference when its Phase is reordered', async () => {
+    const user = userEvent.setup();
+    const roleImage = createAsset({
+      ...image,
+      id: 'role-image',
+      role: 'Hero scene',
+    });
+    const workflow = createWorkflow({
+      id: 'workflow-role-order',
+      name: 'Ordered',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 60,
+          environment: {
+            backgroundAsset: { type: 'role', role: 'Hero scene' },
+          },
+        },
+        { type: 'break', durationSeconds: 30, environment: {} },
+      ],
+    });
+    const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    render(
+      <WorkflowEditor
+        workflowId={workflow.id}
+        workflow={workflow}
+        assets={[roleImage]}
+        onSave={onSave}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Move Phase 2 up' }));
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+    expect(
+      onSave.mock.calls[0]?.[0].phases[1]?.environment.backgroundAsset,
+    ).toEqual({ type: 'role', role: 'Hero scene' });
   });
 
   test('validates enabled Reward Dice frequency', async () => {

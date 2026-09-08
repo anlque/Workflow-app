@@ -9,8 +9,13 @@ is preserved. Global Dexie version 4 adds the unique `&roleKey` index across
 image and audio Assets. New records are version 2; reads remain compatible with
 role-less version-1 records.
 
-`moveAssetRoleUseCase` transfers a Role in one Asset-table transaction and
-rejects a target that owns another Role. `resolveAssetRoleUseCase` distinguishes
+Role management first returns an authoritative typed preview, including the
+current owner and affected Workflow count. Applying a create, display rename or
+explicitly confirmed move rechecks that preview inside one Assets-plus-Workflows
+transaction. Rename updates every matching Workflow Role reference; move keeps
+the reference string stable and changes its owner. A target that already owns a
+different Role is rejected rather than merging two aliases.
+`resolveAssetRoleUseCase` distinguishes
 missing and wrong-kind Roles. Assets retains the ST-005 injected Session port;
 AS-003 will reuse it for the accepted but not-yet-implemented retirement
 transaction.
@@ -54,11 +59,11 @@ Consumers import only from `@/features/assets`.
 | Group                      | Exports                                                                                                                                                  |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Domain                     | `Asset`, `AssetId`, `AssetKind`, `AssetRole`, `CreateAssetInput`, `createAsset`, `createAssetId`, `createAssetRole`, `assetRoleKey`                     |
-| Errors                     | `AssetValidationError`, `AssetRoleConflictError`, `UnresolvedAssetRoleError`, `WrongKindAssetRoleError`, `ReferencedAssetError`, `ActiveSessionReferencedAssetError`, `AssetStorageError` |
-| Application ports          | `AssetRepository`, `AssetRoleRepository`, `ActiveSessionAssetReferences`, `WorkflowAssetReferences`                                                    |
-| Application behavior       | `importAssetUseCase`, `validateAssetImport`, `deleteAssetUseCase`, `listAssetsUseCase`, `moveAssetRoleUseCase`, `resolveAssetRoleUseCase`, `AssetImportPolicy`, `AssetKindImportPolicy`, `ImportAssetInput` |
+| Errors                     | `AssetValidationError`, `AssetRoleConflictError`, `AssetRoleMergeError`, `StaleAssetRoleChangeError`, `UnresolvedAssetRoleError`, `WrongKindAssetRoleError`, `ReferencedAssetError`, `ActiveSessionReferencedAssetError`, `AssetStorageError` |
+| Application ports          | `AssetRepository`, `AssetRoleRepository`, `AssetRoleManagementRepository`, `AssetRoleWorkflowUsage`, `AssetRoleManagementUnitOfWork`, `ActiveSessionAssetReferences`, `WorkflowAssetReferences` |
+| Application behavior       | `inspectAssetRoleChangeUseCase`, `applyAssetRoleChangeUseCase`, `importAssetUseCase`, `validateAssetImport`, `deleteAssetUseCase`, `listAssetsUseCase`, `moveAssetRoleUseCase`, `resolveAssetRoleUseCase`, `AssetRoleChangePreview`, `AssetRoleUsageSummary`, `AssetImportPolicy`, `AssetKindImportPolicy`, `ImportAssetInput` |
 | Infrastructure composition | `DexieAssetRepository`, `assetDatabaseSchemas`, `BrowserAssetUrlService`                                                                                 |
-| Presentation               | `AssetLibrary`, `AssetPicker`, `AssetPreview` and their prop types                                                                                       |
+| Presentation               | `AssetLibrary`, `AssetPicker`, `AssetPickerValue`, `AssetRoleDialog`, `AssetRoleDialogProps`, `AssetPreview` and their remaining prop types              |
 
 `AssetId` is re-exported from the minimal Shared Kernel. This lets Workflow and
 Assets share one identity contract without either feature importing the other's
@@ -148,17 +153,23 @@ See [Persistence and Compatibility](../PERSISTENCE.md) and
 
 ### `AssetLibrary`
 
-Options uses the library for local import, preview and guarded deletion. It
+Options uses the library for local import, preview, Role management and guarded deletion. It
 infers `image` or `audio` from the selected file's MIME prefix, renders pending
 and accessible error feedback, and confirms deletion. The injected Application
 operation remains the authoritative kind/size/MIME boundary.
 An Application rejection keeps the confirmation dialog open and renders the
 recoverable error inline.
+Each card shows its current Role or `No Role`. The accessible Role dialog
+restores the invoking control on close, previews global impact before mutation
+and labels occupied-Role confirmation `Move role`. Role removal remains
+deferred to AS-003.
 
 ### `AssetPicker`
 
-Workflow editing uses the picker to show only Assets of the requested kind. An
-empty selection maps to `undefined`, so Environments remain identifier-based.
+Workflow editing groups kind-compatible options into `Choose Asset directly`
+and `Follow Role`. It emits the complete discriminated reference union. An empty
+selection maps to `undefined`; a currently selected unresolved or wrong-kind
+Role remains visible as unavailable rather than being silently replaced.
 
 ### `AssetPreview`
 

@@ -5,6 +5,7 @@ import {
   type Asset,
   type AssetId,
   type AssetKind,
+  type AssetRoleChangePreview,
 } from '@/features/assets';
 import { SettingsPage, type Settings } from '@/features/settings';
 import type { DocumentPreferences } from '@/app/document-preferences/DocumentPreferences';
@@ -33,6 +34,11 @@ export type OptionsDependencies = {
   reorderWorkflows(ids: readonly WorkflowId[]): Promise<void>;
   importAsset(file: File, kind: AssetKind): Promise<void>;
   deleteAsset(id: AssetId): Promise<void>;
+  inspectAssetRoleChange(
+    id: AssetId,
+    value: string,
+  ): Promise<AssetRoleChangePreview>;
+  applyAssetRoleChange(preview: AssetRoleChangePreview): Promise<void>;
   loadAssetBlob: (id: AssetId) => Promise<Blob | null>;
   createObjectUrl: (blob: Blob) => string;
   revokeObjectUrl: (url: string) => void;
@@ -263,6 +269,13 @@ export function OptionsApp({
             }}
             onDelete={async (id) => {
               await dependencies.deleteAsset(id);
+              await load(selectedWorkflowId);
+            }}
+            onInspectRoleChange={(id, value) =>
+              dependencies.inspectAssetRoleChange(id, value)
+            }
+            onApplyRoleChange={async (preview) => {
+              await dependencies.applyAssetRoleChange(preview);
               await load(selectedWorkflowId);
             }}
             loadBlob={dependencies.loadAssetBlob}
