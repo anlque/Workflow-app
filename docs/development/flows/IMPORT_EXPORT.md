@@ -31,13 +31,14 @@ configured MIME allowlists.
 
 1. Options resolves the selected Workflow from the repository.
 2. [`exportWorkflowUseCase()`](../../../src/features/workflow/application/exportWorkflowUseCase.ts)
-   collects distinct background/audio Asset IDs and sorts them lexically.
+   resolves distinct background/audio references to their Assets and sorts the
+   embedded Assets lexically by ID.
 3. For each ID it requires matching Asset metadata and Blob content, reads the
    bytes and Base64-encodes them.
 4. [`serializeWorkflow()`](../../../src/features/workflow/application/workflowPackageMapping.ts)
    creates the public Workflow shape, preserving Phase/side order and emitting
    current Reward trigger/reroll fields.
-5. The use case serializes `{ kind: 'locusora/workflow', version: 1, workflow,
+5. The use case serializes `{ kind: 'locusora/workflow', version: 2, workflow,
 assets }`. Sorted Assets and stable property/array order make repeated export
    deterministic for unchanged input.
 6. Options creates a temporary JSON Blob/object URL, clicks a download link and
@@ -48,11 +49,14 @@ assets }`. Sorted Assets and stable property/array order make repeated export
 1. [`importWorkflowUseCase()`](../../../src/features/workflow/application/importWorkflowUseCase.ts)
    checks UTF-8 byte size before parsing JSON as `unknown`.
 2. It requires the exact four-field envelope, kind `locusora/workflow`, version
-   1 and an Asset array.
-3. `parseWorkflow()` validates exact nested keys and reconstructs a trusted
-   Workflow through `createWorkflow()`; accepted legacy package omissions for
+   1 or 2 and an Asset array.
+3. Version 1 accepts only legacy direct Environment IDs and role-less exact-key
+   Assets. Version 2 accepts only exact direct-or-Role unions and optional Asset
+   Roles. Mixed, contradictory or unknown keys are rejected. `parseWorkflow()`
+   reconstructs a trusted Workflow through `createWorkflow()`; accepted omissions for
    Reward trigger/rerolls receive Domain defaults.
-4. Each embedded Asset requires six exact fields. Base64 must decode, decoded
+4. Each v1 embedded Asset requires six exact fields; v2 additionally permits
+   `role`. Base64 must decode, decoded
    length must equal `byteSize`, kind must be `image | audio`, and
    `validateAssetImport()` must accept its content/MIME/size.
 5. Source Asset IDs must be unique. The set must agree exactly with Workflow
@@ -61,8 +65,10 @@ assets }`. Sorted Assets and stable property/array order make repeated export
 6. New Asset IDs are generated without collision against existing or earlier
    imported IDs. A new Workflow ID is generated without collision against the
    current catalog.
-7. Every Environment reference is rewritten from the package ID to its new local
-   Asset ID. The imported Workflow is rebuilt through `createWorkflow()`.
+7. Direct references are rewritten to new local IDs. Role collisions are
+   deterministically renamed to `(imported)`, `(imported 2)`, and so on while
+   the suffix fits the 64-code-point contract; imported Role references receive
+   the same name. The imported Workflow is rebuilt through `createWorkflow()`.
 8. Only after all validation/reads/rewriting succeed,
    [`DexieWorkflowPackageUnitOfWork`](../../../src/features/workflow/infrastructure/DexieWorkflowPackageUnitOfWork.ts)
    writes all Assets and the Workflow in one `workflows + assets` transaction.

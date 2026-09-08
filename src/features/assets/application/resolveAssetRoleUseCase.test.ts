@@ -52,4 +52,29 @@ describe('resolveAssetRoleUseCase', () => {
       ),
     ).rejects.toBeInstanceOf(WrongKindAssetRoleError);
   });
+
+  test('resolves the current owner on every call', async () => {
+    const replacement = createAsset({ ...image, id: 'image-2' });
+    let current = image;
+    const changingRepository: AssetRoleRepository = {
+      findByRole: () => Promise.resolve(current),
+      moveRole: () => Promise.resolve(),
+    };
+
+    await expect(
+      resolveAssetRoleUseCase(
+        changingRepository,
+        createAssetRole('backdrop'),
+        'image',
+      ),
+    ).resolves.toBe(image.id);
+    current = replacement;
+    await expect(
+      resolveAssetRoleUseCase(
+        changingRepository,
+        createAssetRole('backdrop'),
+        'image',
+      ),
+    ).resolves.toBe(replacement.id);
+  });
 });

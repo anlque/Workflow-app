@@ -19,7 +19,7 @@ transaction.
 
 The Assets feature owns reusable local media and its lifecycle. In the MVP an
 Asset is either an image or an audio file stored in the browser. Workflows keep
-only stable Asset identifiers; they never own or embed Blob content at runtime.
+only direct Asset identifiers or Roles; they never own or embed Blob content at runtime.
 
 Source root: [`src/features/assets/`](../../../src/features/assets/).
 
@@ -29,7 +29,7 @@ Source root: [`src/features/assets/`](../../../src/features/assets/).
 - metadata-plus-Blob repository operations;
 - local-file import validation through a caller-supplied policy;
 - reference-aware deletion through an injected Workflow reference counter;
-- the IndexedDB Asset record and version-3 schema fragment;
+- version-2 Asset records and the global Dexie version-4 Role-index fragment;
 - browser object URL creation/revocation;
 - the reusable Asset Library, Picker and Preview components;
 - the root public API in [`index.ts`](../../../src/features/assets/index.ts).
@@ -53,10 +53,10 @@ Consumers import only from `@/features/assets`.
 
 | Group                      | Exports                                                                                                                                                  |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Domain                     | `Asset`, `AssetId`, `AssetKind`, `CreateAssetInput`, `createAsset`, `createAssetId`                                                                      |
-| Errors                     | `AssetValidationError`, `ReferencedAssetError`, `ActiveSessionReferencedAssetError`, `AssetStorageError`                                                 |
-| Application ports          | `AssetRepository`, `ActiveSessionAssetReferences`, `WorkflowAssetReferences`                                                                              |
-| Application behavior       | `importAssetUseCase`, `validateAssetImport`, `deleteAssetUseCase`, `listAssetsUseCase`, `AssetImportPolicy`, `AssetKindImportPolicy`, `ImportAssetInput` |
+| Domain                     | `Asset`, `AssetId`, `AssetKind`, `AssetRole`, `CreateAssetInput`, `createAsset`, `createAssetId`, `createAssetRole`, `assetRoleKey`                     |
+| Errors                     | `AssetValidationError`, `AssetRoleConflictError`, `ReferencedAssetError`, `ActiveSessionReferencedAssetError`, `AssetStorageError`                     |
+| Application ports          | `AssetRepository`, `AssetRoleRepository`, `ActiveSessionAssetReferences`, `WorkflowAssetReferences`                                                    |
+| Application behavior       | `importAssetUseCase`, `validateAssetImport`, `deleteAssetUseCase`, `listAssetsUseCase`, `moveAssetRoleUseCase`, `resolveAssetRoleUseCase`              |
 | Infrastructure composition | `DexieAssetRepository`, `assetDatabaseSchemas`, `BrowserAssetUrlService`                                                                                 |
 | Presentation               | `AssetLibrary`, `AssetPicker`, `AssetPreview` and their prop types                                                                                       |
 
@@ -83,8 +83,8 @@ of Session and Workflow Infrastructure.
 ### Infrastructure
 
 [`infrastructure/`](../../../src/features/assets/infrastructure/) maps and
-validates version-1 Asset records, implements the Dexie repository and wraps the
-browser object URL API.
+validates version-2 and compatible role-less version-1 Asset records, implements
+the Dexie repository and wraps the browser object URL API.
 
 ### Presentation
 
@@ -128,9 +128,11 @@ snapshot after mutations.
 
 ## Persistence
 
-`DexieAssetRepository` stores version-1 records in global Dexie version 3:
-`assets: 'id, createdAt'`. Metadata and Blob content are one record. Reads accept
-`unknown`, validate the envelope, rebuild the Domain value and compare Blob
+`DexieAssetRepository` writes version-2 records in global Dexie version 4:
+`assets: 'id, createdAt, &roleKey'`. Metadata and Blob content are one record;
+the optional normalized Role key is globally unique across Asset kinds. Reads
+accept version 2 and role-less version 1 as `unknown`, validate the envelope,
+rebuild the Domain value and compare Blob
 metadata. Listing sorts mapped Assets by `createdAt`.
 
 A browser `QuotaExceededError` during save becomes `AssetStorageError`; other

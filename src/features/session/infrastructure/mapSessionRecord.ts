@@ -44,7 +44,14 @@ function storedPauseReason(value: unknown): 'user' | 'reward' {
   return invalid();
 }
 
-function parseWorkflow(value: unknown) {
+function hasOnlyKeys(
+  value: Readonly<Record<string, unknown>>,
+  allowed: readonly string[],
+): boolean {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
+function parseWorkflow(value: unknown, schemaVersion: 1 | 2) {
   const input = record(value);
   const phases = input['phases'];
   if (!Array.isArray(phases)) return invalid();
@@ -64,10 +71,17 @@ function parseWorkflow(value: unknown) {
     phases: phases.map((phaseValue) => {
       const phase = record(phaseValue);
       const environment = record(phase['environment']);
+      const allowedEnvironmentKeys =
+        schemaVersion === 1
+          ? ['backgroundAssetId', 'audioAssetId', 'backgroundColor']
+          : ['backgroundAsset', 'audioAsset', 'backgroundColor'];
+      if (!hasOnlyKeys(environment, allowedEnvironmentKeys)) return invalid();
       const backgroundAssetId = optionalString(
-        environment['backgroundAssetId'],
+        schemaVersion === 1 ? environment['backgroundAssetId'] : undefined,
       );
-      const audioAssetId = optionalString(environment['audioAssetId']);
+      const audioAssetId = optionalString(
+        schemaVersion === 1 ? environment['audioAssetId'] : undefined,
+      );
       const parseReference = (value: unknown) => {
         const reference = record(value);
         const keys = Object.keys(reference);
@@ -85,11 +99,11 @@ function parseWorkflow(value: unknown) {
         };
       };
       const backgroundAsset =
-        environment['backgroundAsset'] === undefined
+        schemaVersion === 1 || environment['backgroundAsset'] === undefined
           ? undefined
           : parseReference(environment['backgroundAsset']);
       const audioAsset =
-        environment['audioAsset'] === undefined
+        schemaVersion === 1 || environment['audioAsset'] === undefined
           ? undefined
           : parseReference(environment['audioAsset']);
       const backgroundColor = optionalString(environment['backgroundColor']);
@@ -140,7 +154,7 @@ export function mapSessionRecord(value: unknown): Session {
   const status = stored['status'];
   const common = {
     id: string(stored['id']),
-    workflow: parseWorkflow(stored['workflow']),
+    workflow: parseWorkflow(stored['workflow'], outer['schemaVersion']),
     currentPhaseIndex: number(stored['currentPhaseIndex']),
   };
 

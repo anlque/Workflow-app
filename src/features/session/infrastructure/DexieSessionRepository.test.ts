@@ -97,6 +97,56 @@ describe('DexieSessionRepository', () => {
     await expect(reopenedRepository.getActive()).resolves.toEqual(expected);
   });
 
+  test.each([
+    ['v1 legacy IDs', 1, { backgroundAssetId: 'image-1' }, true],
+    [
+      'v2 direct reference',
+      2,
+      { backgroundAsset: { type: 'direct', assetId: 'image-1' } },
+      true,
+    ],
+    [
+      'v1 with v2 reference',
+      1,
+      { backgroundAsset: { type: 'direct', assetId: 'image-1' } },
+      false,
+    ],
+    ['v2 with legacy IDs', 2, { backgroundAssetId: 'image-1' }, false],
+    [
+      'v2 with Role reference',
+      2,
+      { backgroundAsset: { type: 'role', role: 'Backdrop' } },
+      false,
+    ],
+  ])(
+    'enforces Session snapshot boundary for %s',
+    async (_case, schemaVersion, environment, valid) => {
+      const store = database();
+      const repository = new DexieSessionRepository(store);
+      const session = createSession('session-versioned', workflow(), 1_000);
+      const table = store.table<SessionRecord, string>('sessions');
+      await repository.save(session);
+      const stored = await table.get(session.id);
+      if (stored === undefined) throw new Error('Expected Session record.');
+      const mutable = structuredClone(stored) as unknown as {
+        schemaVersion: 1 | 2;
+        session: { workflow: { phases: { environment: unknown }[] } };
+      };
+      mutable.schemaVersion = schemaVersion as 1 | 2;
+      const firstPhase = mutable.session.workflow.phases[0];
+      if (firstPhase === undefined) throw new Error('Expected first Phase.');
+      firstPhase.environment = environment;
+      await table.put(mutable as unknown as SessionRecord);
+
+      const result = repository.get(session.id);
+      if (valid) {
+        await expect(result).resolves.toMatchObject({ id: session.id });
+      } else {
+        await expect(result).rejects.toBeInstanceOf(SessionValidationError);
+      }
+    },
+  );
+
   test('rejects saving a second active Session transactionally', async () => {
     const repository = new DexieSessionRepository(database());
     const first = createSession('session-1', workflow(), 1_000);
@@ -183,6 +233,7 @@ describe('DexieSessionRepository', () => {
     if (storedReward === undefined) {
       throw new Error('Expected stored Reward Dice.');
     }
+    (stored as { schemaVersion: 1 | 2 }).schemaVersion = 1;
     delete storedReward['rerolls'];
     await table.put(stored);
 

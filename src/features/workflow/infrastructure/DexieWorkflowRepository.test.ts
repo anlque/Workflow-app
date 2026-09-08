@@ -53,6 +53,13 @@ function workflow(id: string, name: string): Workflow {
   });
 }
 
+async function putWorkflowRecord(
+  database: LocusoraDatabase,
+  value: unknown,
+): Promise<void> {
+  await database.table<unknown, WorkflowId>('workflows').put(value);
+}
+
 afterEach(async () => {
   await Promise.all(databases.splice(0).map((database) => database.delete()));
 });
@@ -88,6 +95,58 @@ describe('DexieWorkflowRepository', () => {
       rewardDice: { triggerPhaseType: 'break', rerolls: 3 },
     });
   });
+
+  test('round-trips a version-2 Workflow with a Role reference', async () => {
+    const repository = new DexieWorkflowRepository(createDatabase());
+    const expected = createWorkflow({
+      id: 'role-workflow',
+      name: 'Role workflow',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 600,
+          environment: { audioAsset: { type: 'role', role: 'Deep Sound' } },
+        },
+      ],
+    });
+
+    await repository.save(expected);
+
+    await expect(repository.get(expected.id)).resolves.toEqual(expected);
+  });
+
+  test.each([
+    [1, { backgroundAsset: { type: 'direct', assetId: 'image-1' } }],
+    [1, { backgroundAssetId: 'image-1', extra: true }],
+    [2, { backgroundAssetId: 'image-1' }],
+    [
+      2,
+      { backgroundAsset: { type: 'direct', assetId: 'image-1' }, extra: true },
+    ],
+  ])(
+    'rejects schema v%s Environment fields from another or expanded shape',
+    async (schemaVersion, environment) => {
+      const store = createDatabase();
+      const repository = new DexieWorkflowRepository(store);
+      await putWorkflowRecord(store, {
+        id: 'wrong-environment',
+        schemaVersion,
+        order: 0,
+        name: 'Wrong',
+        phases: [{ type: 'focus', durationSeconds: 10, environment }],
+      });
+
+      await expect(
+        repository.get(
+          createWorkflow({
+            id: 'wrong-environment',
+            name: 'x',
+            phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+          }).id,
+        ),
+      ).rejects.toBeInstanceOf(WorkflowValidationError);
+    },
+  );
 
   test('defaults a legacy stored Reward Dice trigger to focus', async () => {
     const database = createDatabase();

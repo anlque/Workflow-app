@@ -30,6 +30,13 @@ function optionalString(value: unknown): string | undefined {
   return value === undefined ? undefined : stringValue(value);
 }
 
+function hasOnlyKeys(
+  value: Readonly<Record<string, unknown>>,
+  allowed: readonly string[],
+): boolean {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
 function rewardPhaseType(value: unknown): 'focus' | 'break' | undefined {
   if (value === undefined) return undefined;
   if (value === 'focus' || value === 'break') return value;
@@ -66,6 +73,11 @@ function mapEnvironmentRecord(
   schemaVersion: 1 | 2,
 ): EnvironmentInput {
   const record = objectRecord(value);
+  const allowedKeys =
+    schemaVersion === 1
+      ? ['backgroundAssetId', 'audioAssetId', 'backgroundColor']
+      : ['backgroundAsset', 'audioAsset', 'backgroundColor'];
+  if (!hasOnlyKeys(record, allowedKeys)) return invalidRecord();
   const backgroundColor = optionalString(record['backgroundColor']);
 
   if (schemaVersion === 1) {

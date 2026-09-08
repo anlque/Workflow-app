@@ -162,9 +162,14 @@ function importedRole(sourceRole: string, reservedKeys: Set<string>): string {
     reservedKeys.add(assetRoleKey(normalized));
     return normalized;
   }
-  for (let suffix = 1; suffix < 10_000; suffix += 1) {
+  for (let suffix = 1n; ; suffix += 1n) {
     const ending =
-      suffix === 1 ? ' (imported)' : ` (imported ${String(suffix)})`;
+      suffix === 1n ? ' (imported)' : ` (imported ${String(suffix)})`;
+    if (Array.from(ending).length >= 64) {
+      throw new WorkflowPackageValidationError(
+        'Could not generate a unique imported Role.',
+      );
+    }
     const allowedBaseLength = 64 - Array.from(ending).length;
     const base = Array.from(normalized)
       .slice(0, allowedBaseLength)
@@ -177,9 +182,6 @@ function importedRole(sourceRole: string, reservedKeys: Set<string>): string {
       return candidate;
     }
   }
-  throw new WorkflowPackageValidationError(
-    'Could not generate a unique imported Role.',
-  );
 }
 
 function nextUniqueId(createId: () => string, reserved: Set<string>): string {

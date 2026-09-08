@@ -41,25 +41,29 @@ implicitly select or start a Workflow.
 6. [`startSessionUseCase`](../../../src/features/session/application/startSessionUseCase.ts)
    checks `SessionRepository.getActive()`. An existing active Session rejects
    the operation.
-7. [`createSession()`](../../../src/features/session/domain/Session.ts) creates a
+7. The injected Workflow resolver resolves every Role reference to a same-kind
+   direct Asset ID. Failure aborts before any Session write.
+8. [`createSession()`](../../../src/features/session/domain/Session.ts) creates a
    Running Session. `createSessionSnapshot()` deep-copies the complete Workflow
    through its Domain constructor; edits to the source cannot affect execution.
-8. The use case saves the Session. `DexieSessionRepository` repeats the
+9. The use case saves the Session. `DexieSessionRepository` repeats the
    one-active check in its write transaction, protecting against competing
    starts.
-9. The coordinator publishes `session/changed` with the saved Session and then
+10. The coordinator publishes `session/changed` with the saved Session and then
    schedules `locusora.session-phase` for `phaseEndsAt`.
-10. The message bus returns `{ ok: true, result: session }` to the command
+11. The message bus returns `{ ok: true, result: session }` to the command
     sender. `ChromeSessionClient` runtime-validates the result even though its
     public start method returns `void`.
-11. Each connected focus/side-panel document receives the event through
+12. Each connected focus/side-panel document receives the event through
     `connectSessionMessages()` and replaces its local Zustand projection. The
     focus surface renders the first Environment and countdown. A side-panel
     start then opens or activates the focus tab.
 
 ## Authoritative Changes
 
-- A new version-1 Session record becomes the only active record.
+- A new version-2 Session record becomes the only active record.
+- Its Workflow snapshot contains direct Asset IDs only; later Role moves do not
+  change it.
 - Its immutable snapshot, current Phase index 0 and wall-clock start/end anchors
   become authoritative.
 - Each document's React/Zustand state is only a replaceable projection of that

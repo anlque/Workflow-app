@@ -53,10 +53,10 @@ exports:
 
 | Group | Exports |
 | --- | --- |
-| Domain value types | `DiceSide`, `DiceSideInput`, `AssetId`, `Environment`, `EnvironmentInput`, `DurationSeconds`, `Phase`, `PhaseInput`, `PhaseType`, `RewardDice`, `RewardDiceInput`, `RewardPhaseType`, `CreateWorkflowInput`, `Workflow`, `WorkflowId` |
+| Domain value types | `DiceSide`, `DiceSideInput`, `AssetId`, `AssetReference`, `AssetReferenceInput`, `Environment`, `EnvironmentInput`, `DurationSeconds`, `Phase`, `PhaseInput`, `PhaseType`, `RewardDice`, `RewardDiceInput`, `RewardPhaseType`, `CreateWorkflowInput`, `Workflow`, `WorkflowId` |
 | Domain behavior and errors | `createWorkflowId`, `createWorkflow`, `rollReward`, `isRewardDueAfterPhase`, `WorkflowValidationError` |
-| Application contracts and errors | `WorkflowRepository`, `WorkflowApplicationError`, `WorkflowPackageV1`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
-| Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `exportWorkflowUseCase`, `importWorkflowUseCase` |
+| Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, `WorkflowApplicationError`, `WorkflowPackageV1`, `WorkflowPackageV2`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
+| Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `resolveWorkflowAssetReferences`, `exportWorkflowUseCase`, `importWorkflowUseCase` |
 | Infrastructure composition | `DexieWorkflowRepository`, `workflowDatabaseSchemas`, `DexieWorkflowPackageUnitOfWork` |
 | Presentation components | `WorkflowLibrary`, `WorkflowLibraryProps`, `WorkflowEditor`, `WorkflowEditorProps`, `RewardDiceEditor`, `RewardDiceEditorProps` |
 | Presentation editor API | `useWorkflowEditor`, `validateWorkflowDraft`, `PhaseDraft`, `RewardDiceDraft`, `RewardSideDraft`, `WorkflowDraft`, `WorkflowDraftErrors`, `WorkflowDraftValidation` |
@@ -91,7 +91,7 @@ operations.
 ### Infrastructure
 
 [`infrastructure/`](../../../src/features/workflow/infrastructure/) owns the
-version-1 Workflow record/schema, mapping, ordered Dexie repository and the
+versioned Workflow record mapping, global version-1 table schema, ordered Dexie repository and the
 Workflow-plus-Assets transaction adapter.
 
 ### Presentation
@@ -110,8 +110,8 @@ It does not know Dexie or Chrome runtime APIs.
 - A Phase type is exactly `focus` or `break`.
 - `durationSeconds` is a positive integer.
 - Every Phase owns one Environment value, even when all fields are absent.
-- Referenced background/audio Asset identifiers are non-empty strings branded
-  as the shared `AssetId`.
+- Direct background/audio identifiers are non-empty shared `AssetId` values;
+  Role references contain a validated `AssetRole`.
 - A supplied background color must not be whitespace-only; Domain does not
   validate that it is a browser-supported CSS color.
 - The constructor freezes the aggregate, Phase array, values, Reward Dice and
@@ -161,7 +161,7 @@ Reward is Presentation state and resets with each new dialog.
 | `deleteWorkflowUseCase` | Repository, ID | Requires existence, deletes; repository compacts collection order | `void` or not-found error |
 | `listWorkflowsUseCase` | Repository | Returns repository order | Readonly Workflow list |
 | `reorderWorkflowsUseCase` | Repository, complete ordered IDs | Requires an exact permutation of current IDs, delegates atomic replacement | `void` or Application error |
-| `exportWorkflowUseCase` | Workflow, Asset repository | Loads every referenced Asset/Blob, sorts identifiers and creates deterministic version-1 JSON | JSON or package validation error |
+| `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced Assets/Blobs and creates deterministic version-2 JSON | JSON or package validation error |
 | `importWorkflowUseCase` | Repositories, unit of work, JSON, limits/policy/identity | Validates complete package before writes, generates collision-free IDs, rewrites Environment references, atomically writes Assets and Workflow | Imported Workflow or package validation/storage failure |
 
 Composition wraps successful catalog mutations with
@@ -171,11 +171,13 @@ use cases.
 
 ## Persistence
 
-`DexieWorkflowRepository` stores version-1 `WorkflowRecord` rows in the global
-version-1 `workflows: 'id, order'` table definition.
+`DexieWorkflowRepository` writes version-2 `WorkflowRecord` rows in the global
+version-1 `workflows: 'id, order'` table definition and reads versions 1–2.
 
 - Reads treat rows as `unknown`, validate record metadata and reconstruct the
   Domain aggregate.
+- Version 1 accepts only legacy ID Environment fields; version 2 accepts only
+  exact direct-or-Role reference fields. Mixed and unknown fields fail closed.
 - New rows append after the highest order.
 - Updates preserve the current order.
 - Delete compacts remaining order values.

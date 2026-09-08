@@ -233,6 +233,102 @@ describe('DexieAssetRepository', () => {
     expect(assets.find(({ id }) => id === target.id)?.role).toBe('BACKDROP');
   });
 
+  test('assigns an unowned Role to a target', async () => {
+    const repository = new DexieAssetRepository(database());
+    const blob = new Blob(['x'], { type: 'image/png' });
+    const target = createAsset({
+      id: 'target',
+      name: 'Target',
+      kind: 'image',
+      mimeType: blob.type,
+      byteSize: blob.size,
+      createdAt: 1,
+    });
+    await repository.save(target, blob);
+
+    await repository.moveRole(target.id, createAssetRole('Backdrop'));
+
+    await expect(
+      repository.findByRole(createAssetRole('backdrop')),
+    ).resolves.toMatchObject({ id: target.id, role: 'Backdrop' });
+  });
+
+  test('moves a globally unique Role across Asset kinds', async () => {
+    const repository = new DexieAssetRepository(database());
+    const imageBlob = new Blob(['i'], { type: 'image/png' });
+    const audioBlob = new Blob(['a'], { type: 'audio/mpeg' });
+    const source = createAsset({
+      id: 'image',
+      name: 'Image',
+      kind: 'image',
+      mimeType: imageBlob.type,
+      byteSize: imageBlob.size,
+      createdAt: 1,
+      role: 'Primary',
+    });
+    const target = createAsset({
+      id: 'audio',
+      name: 'Audio',
+      kind: 'audio',
+      mimeType: audioBlob.type,
+      byteSize: audioBlob.size,
+      createdAt: 2,
+    });
+    await repository.save(source, imageBlob);
+    await repository.save(target, audioBlob);
+
+    await repository.moveRole(target.id, createAssetRole('Primary'));
+
+    await expect(
+      repository.findByRole(createAssetRole('primary')),
+    ).resolves.toMatchObject({ id: target.id, kind: 'audio' });
+    expect(
+      (await repository.list()).find(({ id }) => id === source.id)?.role,
+    ).toBeUndefined();
+  });
+
+  test('treats moving a Role to its current owner as idempotent', async () => {
+    const repository = new DexieAssetRepository(database());
+    const blob = new Blob(['x'], { type: 'image/png' });
+    const target = createAsset({
+      id: 'target',
+      name: 'Target',
+      kind: 'image',
+      mimeType: blob.type,
+      byteSize: blob.size,
+      createdAt: 1,
+      role: 'Backdrop',
+    });
+    await repository.save(target, blob);
+
+    await repository.moveRole(target.id, createAssetRole('backdrop'));
+
+    await expect(repository.list()).resolves.toEqual([target]);
+  });
+
+  test('rejects a missing Role move target without changing the owner', async () => {
+    const repository = new DexieAssetRepository(database());
+    const blob = new Blob(['x'], { type: 'image/png' });
+    const source = createAsset({
+      id: 'source',
+      name: 'Source',
+      kind: 'image',
+      mimeType: blob.type,
+      byteSize: blob.size,
+      createdAt: 1,
+      role: 'Backdrop',
+    });
+    await repository.save(source, blob);
+
+    await expect(
+      repository.moveRole(
+        createAsset({ ...source, id: 'missing' }).id,
+        createAssetRole('Backdrop'),
+      ),
+    ).rejects.toThrow('Target Asset was not found.');
+    await expect(repository.list()).resolves.toEqual([source]);
+  });
+
   test('leaves both Assets unchanged when a move target owns another Role', async () => {
     const repository = new DexieAssetRepository(database());
     const blob = new Blob(['x'], { type: 'image/png' });

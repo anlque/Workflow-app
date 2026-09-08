@@ -23,7 +23,7 @@ changing them safely.
 | --- | --- | --- | --- | --- |
 | Workflows | IndexedDB database `locusora`, table `workflows` | Primary `id`; index `order` | `DexieWorkflowRepository` | `order` is persistence metadata for the Workflow Library collection, not part of the Domain aggregate |
 | Sessions | IndexedDB database `locusora`, table `sessions` | Primary `id`; indexes `active`, `updatedAt` | `DexieSessionRepository` | Running, Transitioning and Paused use `active = 1`; Completed and Stopped use `active = 0` |
-| Asset metadata and Blob content | IndexedDB database `locusora`, table `assets` | Primary `id`; index `createdAt` | `DexieAssetRepository` | Metadata and Blob are one record; Workflow Environments store only Asset identifiers |
+| Asset metadata and Blob content | IndexedDB database `locusora`, table `assets` | Primary `id`; indexes `createdAt`, unique optional `roleKey` | `DexieAssetRepository` | Metadata and Blob are one record; Workflow Environments store direct IDs or Roles |
 | Settings | `chrome.storage.local`, key `settings` | Chrome Storage key only | `ChromeSettingsRepository` | Theme, reduced motion and optional last-selected Workflow; missing value resolves to defaults |
 | React/Zustand state, countdown text, object URLs and audio state | Not persistent | None | Owning Presentation or `app` module | Reconstructed from durable facts and browser state |
 
@@ -61,13 +61,14 @@ history is:
 | 1 | Workflow | `workflows: 'id, order'` | `workflows` |
 | 2 | Session | `sessions: 'id, active, updatedAt'` | `workflows`, `sessions` |
 | 3 | Assets | `assets: 'id, createdAt'` | `workflows`, `sessions`, `assets` |
+| 4 | Assets | `assets: 'id, createdAt, &roleKey'` | `workflows`, `sessions`, `assets` |
 
 Versions belong to the complete database, not to a feature. The next schema
-change uses global version 4 regardless of which feature owns it. Store
+change uses global version 5 regardless of which feature owns it. Store
 definitions must remain cumulative.
 
 The background, focus, Options and side-panel production composition roots all
-register versions 1–3 in this order. Focus and side panel include tables they do
+register versions 1–4 in this order. Focus and side panel include tables they do
 not currently query so that opening any context creates the same database
 schema. Focused repository tests may compose only the minimum fragments required
 by that test database.
@@ -78,11 +79,11 @@ These version numbers solve different compatibility problems:
 
 | Version | Scope | Current value | Changes when |
 | --- | --- | --- | --- |
-| Dexie database version | Whole `locusora` database structure and upgrade order | 1, 2, 3 history | A table/index changes or existing stored data needs a database migration |
-| `WorkflowRecord.schemaVersion` | One Workflow record serialization shape | 1 | The Workflow record reader/writer needs a new incompatible serialization |
-| `SessionRecord.schemaVersion` | One Session record envelope | 1 | The Session record reader/writer needs a new incompatible serialization |
-| `AssetRecord.schemaVersion` | One Asset record shape | 1 | The Asset record reader/writer needs a new incompatible serialization |
-| Workflow package `version` | Public `locusora/workflow` import/export envelope | 1 | The external Workflow package contract changes |
+| Dexie database version | Whole `locusora` database structure and upgrade order | 1–4 history; current 4 | A table/index changes or existing stored data needs a database migration |
+| `WorkflowRecord.schemaVersion` | One Workflow record serialization shape | Current writes 2; reads 1–2 | The Workflow record reader/writer needs a new incompatible serialization |
+| `SessionRecord.schemaVersion` | One Session record envelope | Current writes 2; reads 1–2 | The Session record reader/writer needs a new incompatible serialization |
+| `AssetRecord.schemaVersion` | One Asset record shape | Current writes 2; reads role-less 1 and 2 | The Asset record reader/writer needs a new incompatible serialization |
+| Workflow package `version` | Public `locusora/workflow` import/export envelope | Current export 2; import 1–2 | The external Workflow package contract changes |
 | Settings package `version` | Public `locusora/settings` import/export envelope | 1 | The external Settings package contract changes |
 
 A database version must not be copied into a record, and a record
@@ -102,14 +103,15 @@ Sources:
 
 The record stores:
 
-- `id`, `schemaVersion: 1`, `order` and `name`;
+- `id`, current `schemaVersion: 2`, `order` and `name`;
 - ordered Phase values with `type`, `durationSeconds` and Environment fields;
 - optional Reward Dice with trigger Phase type, frequency, rerolls and sides;
 - each stored side's normalized Domain probability under `probability`.
 
-Reads reject a record whose version is not 1, whose order is not a non-negative
-integer, or whose nested values cannot be rebuilt by `createWorkflow()`. The
-Domain constructor is the final invariant boundary.
+Reads accept versions 1–2. Version 1 Environment objects accept only legacy
+`backgroundAssetId`, `audioAssetId` and `backgroundColor`; version 2 accepts only
+`backgroundAsset`, `audioAsset` and `backgroundColor`. Mixed, unknown and
+contradictory fields are rejected, as are invalid order and nested Domain data.
 
 Compatibility defaults:
 
@@ -140,14 +142,17 @@ The outer record contains:
 ```ts
 {
   id: string;
-  schemaVersion: 1;
+  schemaVersion: 2;
   active: 0 | 1;
   updatedAt: number;
   session: unknown;
 }
 ```
 
-The nested `session` stores the immutable Workflow snapshot, current Phase index,
+Version 1 snapshots accept only legacy direct ID Environment fields. Version 2
+snapshots accept only exact direct-reference objects; Role references, mixed
+versions and unknown Environment fields are rejected. The nested `session`
+stores the immutable Workflow snapshot, current Phase index,
 state discriminator and the timing fields required by that state. It does not
 store a live reference to the Workflow table.
 
@@ -177,12 +182,13 @@ the current mapper.
 Sources:
 
 - [`AssetRecord.ts`](../../src/features/assets/infrastructure/AssetRecord.ts)
-  owns the record and version-3 database fragment.
+  owns the record and global version-3/version-4 database fragments.
 - [`DexieAssetRepository.ts`](../../src/features/assets/infrastructure/DexieAssetRepository.ts)
   owns validation, Blob mapping and table operations.
 
-Each record stores `id`, `schemaVersion: 1`, name, `image | audio` kind, MIME
-type, byte size, creation epoch and Blob. Reads rebuild the Asset Domain value
+Current records store `id`, `schemaVersion: 2`, name, `image | audio` kind, MIME
+type, byte size, creation epoch, optional display `role`, matching `roleKey` and
+Blob. Compatible version-1 records contain no Role fields. Reads rebuild the Asset Domain value
 and verify that Blob size and MIME type equal its metadata. Writes repeat the
 same check. A browser `QuotaExceededError` is normalized to `AssetStorageError`.
 
@@ -255,16 +261,18 @@ transaction, `importWorkflowUseCase` validates:
 - every Base64 payload, declared size, kind, MIME policy and Domain Asset;
 - unique source Asset identifiers;
 - exact agreement between referenced Assets and embedded Assets, including
-  image/audio kind;
+  image/audio kind, direct-or-Role mode and Role kind resolution;
 - new unique Asset and Workflow identifiers.
 
-It rewrites every Environment Asset reference to its new local identifier. Only
-then does the unit of work save all Assets and the Workflow. Any thrown write
+It rewrites direct references to new local identifiers and collision-renamed
+Roles to their imported names. Role suffix generation continues while the
+suffix fits the 64-code-point Role contract; it has no arbitrary attempt cap.
+Only then does the unit of work save all Assets and the Workflow. Any thrown write
 rolls back both tables, so no partial imported package remains.
 
 Export performs the inverse public operation: it sorts referenced identifiers,
 requires metadata and Blob content for each, Base64-encodes them, and writes a
-`locusora/workflow` version-1 envelope. The package is a transport contract, not
+`locusora/workflow` version-2 envelope. The package is a transport contract, not
 a storage dump.
 
 ### Settings import
@@ -283,7 +291,7 @@ Follow this order for every persistence change:
 
 1. Identify the owning feature record and whether the change affects database
    structure, stored serialization, public packages or several of them.
-2. Allocate the next global Dexie version—currently 4—and never reuse or
+2. Allocate the next global Dexie version—currently 5—and never reuse or
    independently number a feature version.
 3. Keep store definitions cumulative and update every production composition
    root with the identical ordered fragment set.

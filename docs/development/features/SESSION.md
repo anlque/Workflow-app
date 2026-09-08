@@ -78,7 +78,7 @@ internal not-found boundary shared by commands.
 ### Infrastructure
 
 [`infrastructure/`](../../../src/features/session/infrastructure/) owns the
-version-1 Session record, global database version-2 schema fragment, runtime
+versioned Session record, global database version-2 schema fragment, runtime
 mapping and `DexieSessionRepository`.
 
 ### Presentation
@@ -175,8 +175,13 @@ internals. A later lifecycle ADR will supersede ADR-0006 with this boundary.
 
 ## Persistence
 
-`DexieSessionRepository` stores a version-1 envelope in the global version-2
+`DexieSessionRepository` writes a version-2 envelope in the global version-2
 `sessions: 'id, active, updatedAt'` table definition.
+
+The mapper reads versions 1–2 strictly: version 1 snapshots accept only legacy
+Asset ID fields; version 2 snapshots accept only exact direct references. Role,
+mixed-version and unknown Environment fields are rejected because persisted
+Session snapshots must already be resolved and immutable.
 
 - `getActive()` queries `active = 1` and rejects multiple matches.
 - `get()` and `getActive()` validate `unknown` through the record mapper.

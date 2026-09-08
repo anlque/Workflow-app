@@ -348,6 +348,53 @@ describe('Workflow package', () => {
     ).toBe('Backdrop (imported)');
   });
 
+  test('continues deterministic Role collision suffixes beyond 9999', async () => {
+    const sourceAssets = new MemoryAssetRepository();
+    await addAsset(sourceAssets, 'asset-used', 'Backdrop');
+    const source = createWorkflow({
+      id: 'role-workflow',
+      name: 'Role workflow',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 10,
+          environment: { backgroundAsset: { type: 'role', role: 'Backdrop' } },
+        },
+      ],
+    });
+    const data = await exportWorkflowUseCase(source, sourceAssets);
+    const localAssets = new MemoryAssetRepository();
+    await addAsset(localAssets, 'local-0', 'Backdrop');
+    for (let suffix = 1; suffix <= 9_999; suffix += 1) {
+      await addAsset(
+        localAssets,
+        `local-${String(suffix)}`,
+        suffix === 1
+          ? 'Backdrop (imported)'
+          : `Backdrop (imported ${String(suffix)})`,
+      );
+    }
+    localAssets.writes = 0;
+
+    const imported = await importWorkflowUseCase(
+      new MemoryWorkflowRepository(),
+      localAssets,
+      new MemoryUnitOfWork(),
+      data,
+      { maxFileBytes: 10_000, assetPolicy: policy },
+      {
+        createWorkflowId: () => 'workflow-new',
+        createAssetId: () => 'asset-new',
+        now: () => 2_000,
+      },
+    );
+
+    expect(imported.phases[0].environment.backgroundAsset).toEqual({
+      type: 'role',
+      role: 'Backdrop (imported 10000)',
+    });
+  });
+
   test('rejects one Role used as both image and audio before writes', async () => {
     const bytes = new Uint8Array([1]);
     const data = JSON.stringify({
@@ -427,7 +474,7 @@ describe('Workflow package', () => {
     expect(imported.rewardDice?.rerolls).toBe(3);
   });
 
-  test('defaults missing version-1 Reward Dice rerolls during import', async () => {
+  test('defaults missing Reward Dice rerolls in a version-2 package', async () => {
     const exported = await exportWorkflowUseCase(
       rewardedWorkflow(),
       new MemoryAssetRepository(),
