@@ -12,6 +12,7 @@ export type AssetRoleDialogProps = Readonly<{
     value: string,
   ): Promise<AssetRoleChangePreview>;
   onApply(preview: AssetRoleChangePreview): Promise<void>;
+  onSynchronize(): Promise<void>;
   onCancel(): void;
   onSuccess(): void;
 }>;
@@ -19,7 +20,7 @@ export type AssetRoleDialogProps = Readonly<{
 function actionLabel(action: AssetRoleChangePreview['action']): string {
   if (action === 'move') return 'Move role';
   if (action === 'rename') return 'Rename role';
-  if (action === 'unchanged') return 'Done';
+  if (action === 'unchanged') return 'Retry sync';
   return 'Assign role';
 }
 
@@ -27,6 +28,7 @@ export function AssetRoleDialog({
   asset,
   onInspect,
   onApply,
+  onSynchronize,
   onCancel,
   onSuccess,
 }: AssetRoleDialogProps) {
@@ -58,18 +60,15 @@ export function AssetRoleDialog({
 
   async function apply(): Promise<void> {
     if (inFlight.current || preview === null) return;
-    if (preview.action === 'unchanged') {
-      onSuccess();
-      return;
-    }
     inFlight.current = true;
     setPending(true);
     setError(null);
     try {
-      await onApply(preview);
+      if (preview.action === 'unchanged') await onSynchronize();
+      else await onApply(preview);
       onSuccess();
     } catch (cause) {
-      setPreview(null);
+      if (preview.action !== 'unchanged') setPreview(null);
       setError(cause instanceof Error ? cause.message : 'Role change failed.');
     } finally {
       inFlight.current = false;
@@ -135,6 +134,11 @@ export function AssetRoleDialog({
           ) : null}
         </div>
       )}
+      {preview !== null && error !== null ? (
+        <p className="feedback feedback--error" role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className="dialog__actions">
         <Button variant="quiet" disabled={pending} onClick={onCancel}>
           Cancel
@@ -150,7 +154,9 @@ export function AssetRoleDialog({
         ) : (
           <Button
             pending={pending}
-            pendingLabel="Applying…"
+            pendingLabel={
+              preview.action === 'unchanged' ? 'Synchronizing…' : 'Applying…'
+            }
             onClick={() => void apply()}
           >
             {actionLabel(preview.action)}

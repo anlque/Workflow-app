@@ -75,14 +75,14 @@ function downloadJson(data: string, filename: string): void {
 
 export function createOptionsDependencies(
   preferences: OptionsDependencies['preferences'],
-): OptionsDependencies {
-  const database = new LocusoraDatabase({
+  database: LocusoraDatabase = new LocusoraDatabase({
     schemas: [
       ...workflowDatabaseSchemas,
       ...sessionDatabaseSchemas,
       ...assetDatabaseSchemas,
     ],
-  });
+  }),
+): OptionsDependencies {
   const workflows = new DexieWorkflowRepository(database);
   const assets = new DexieAssetRepository(database);
   const sessions = new DexieSessionRepository(database);
@@ -190,6 +190,7 @@ export function createOptionsDependencies(
         catalogEvents,
       );
     },
+    synchronizeAssetRoleChange: () => catalogEvents.publishChanged(),
     loadAssetBlob: (id) => assets.getBlob(id),
     createObjectUrl: (blob) => urls.create(blob),
     revokeObjectUrl: (url) => {

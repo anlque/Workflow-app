@@ -88,7 +88,8 @@ test('creates, follows and explicitly moves an Asset Role', async ({
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('tab', { name: 'Assets' }).click();
+  await options.getByRole('tab', { name: 'Assets' }).focus();
+  await options.keyboard.press('Enter');
   for (const name of ['forest.png', 'meadow.png']) {
     await options
       .getByLabel('Add local image or audio')
@@ -108,18 +109,31 @@ test('creates, follows and explicitly moves an Asset Role', async ({
   await options.keyboard.press('Enter');
   await expect(roleTrigger).toBeFocused();
 
-  await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'Create workflow' }).click();
-  await options.getByLabel('Workflow name').fill('Role focus');
-  await options
-    .getByLabel('Background image')
-    .selectOption({ label: 'Hero scene — forest.png' });
-  await options.getByRole('button', { name: 'Add phase' }).click();
-  await options
-    .getByLabel('Background image')
-    .nth(1)
-    .selectOption({ label: 'forest.png' });
-  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await options.getByRole('tab', { name: 'Workflows' }).focus();
+  await options.keyboard.press('Enter');
+  await options.getByRole('button', { name: 'Create workflow' }).focus();
+  await options.keyboard.press('Enter');
+  await options.getByLabel('Workflow name').focus();
+  await options.keyboard.type('Role focus');
+  await options.getByLabel('Background image').focus();
+  await options.keyboard.type('Hero scene');
+  await expect(options.getByLabel('Background image')).toHaveValue(
+    'role:hero scene',
+  );
+  await options.getByRole('button', { name: 'Add phase' }).focus();
+  await options.keyboard.press('Enter');
+  await options.getByLabel('Background image').nth(1).focus();
+  await options.keyboard.type('forest.png');
+  await options.getByRole('button', { name: 'Save workflow' }).focus();
+  await options.keyboard.press('Enter');
+
+  await options.reload();
+  await expect(options.getByLabel('Background image').nth(0)).toHaveValue(
+    'role:hero scene',
+  );
+  await expect(options.getByLabel('Background image').nth(1)).toHaveValue(
+    /^direct:/u,
+  );
 
   await options.getByRole('tab', { name: 'Assets' }).click();
   await options

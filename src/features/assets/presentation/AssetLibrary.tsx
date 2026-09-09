@@ -16,6 +16,7 @@ export type AssetLibraryProps = Readonly<{
     value: string,
   ): Promise<AssetRoleChangePreview>;
   onApplyRoleChange(preview: AssetRoleChangePreview): Promise<void>;
+  onSynchronizeRoleChange(): Promise<void>;
   loadBlob(id: AssetId): Promise<Blob | null>;
   createObjectUrl(blob: Blob): string;
   revokeObjectUrl(url: string): void;
@@ -33,6 +34,7 @@ export function AssetLibrary({
   onDelete,
   onInspectRoleChange,
   onApplyRoleChange,
+  onSynchronizeRoleChange,
   loadBlob,
   createObjectUrl,
   revokeObjectUrl,
@@ -100,6 +102,7 @@ export function AssetLibrary({
         <div>
           <h2 id="asset-library-title">Local Assets</h2>
           <p>Reusable images and ambient audio stored only in this browser.</p>
+          <p>A Role lets Workflows follow whichever Asset owns that name.</p>
         </div>
         <label className="button button--primary asset-upload">
           {pending === 'import' ? 'Adding…' : 'Add asset'}
@@ -217,6 +220,7 @@ export function AssetLibrary({
           asset={managingRole}
           onInspect={onInspectRoleChange}
           onApply={onApplyRoleChange}
+          onSynchronize={onSynchronizeRoleChange}
           onCancel={closeRoleDialog}
           onSuccess={closeRoleDialog}
         />

@@ -39,6 +39,7 @@ export type OptionsDependencies = {
     value: string,
   ): Promise<AssetRoleChangePreview>;
   applyAssetRoleChange(preview: AssetRoleChangePreview): Promise<void>;
+  synchronizeAssetRoleChange(): Promise<void>;
   loadAssetBlob: (id: AssetId) => Promise<Blob | null>;
   createObjectUrl: (blob: Blob) => string;
   revokeObjectUrl: (url: string) => void;
@@ -276,6 +277,10 @@ export function OptionsApp({
             }
             onApplyRoleChange={async (preview) => {
               await dependencies.applyAssetRoleChange(preview);
+              await load(selectedWorkflowId);
+            }}
+            onSynchronizeRoleChange={async () => {
+              await dependencies.synchronizeAssetRoleChange();
               await load(selectedWorkflowId);
             }}
             loadBlob={dependencies.loadAssetBlob}

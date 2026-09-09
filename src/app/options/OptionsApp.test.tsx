@@ -41,6 +41,7 @@ function dependencies(): OptionsDependencies {
         expectedKinds: [],
       }),
     applyAssetRoleChange: () => Promise.resolve(),
+    synchronizeAssetRoleChange: () => Promise.resolve(),
     loadAssetBlob: () => Promise.resolve(null),
     createObjectUrl: () => 'blob:asset',
     revokeObjectUrl: () => undefined,
@@ -54,6 +55,74 @@ function dependencies(): OptionsDependencies {
 }
 
 describe('OptionsApp', () => {
+  test('recovers an updated snapshot after a post-commit load failure without reapplying the Role change', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies();
+    const initial = createAsset({
+      id: 'image',
+      name: 'Forest',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 1,
+      createdAt: 1,
+    });
+    const updated = createAsset({ ...initial, role: 'Hero' });
+    const snapshot = (assets: readonly (typeof initial)[]) => ({
+      workflows: [],
+      assets,
+      settings: defaultSettings,
+    });
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce(snapshot([initial]))
+      .mockRejectedValueOnce(new Error('Storage reload failed.'))
+      .mockResolvedValueOnce(snapshot([updated]));
+    const apply = vi.fn(() => Promise.resolve());
+    const synchronize = vi.fn(() => Promise.resolve());
+    deps.load = load;
+    deps.applyAssetRoleChange = apply;
+    deps.synchronizeAssetRoleChange = synchronize;
+    deps.inspectAssetRoleChange = vi
+      .fn()
+      .mockResolvedValueOnce({
+        target: initial,
+        role: createAssetRole('Hero'),
+        action: 'create',
+        currentOwner: null,
+        affectedWorkflowCount: 0,
+        expectedKinds: [],
+      })
+      .mockResolvedValueOnce({
+        target: updated,
+        role: createAssetRole('Hero'),
+        action: 'unchanged',
+        currentOwner: updated,
+        affectedWorkflowCount: 0,
+        expectedKinds: [],
+      });
+    render(<OptionsApp dependencies={deps} />);
+    await user.click(await screen.findByRole('tab', { name: 'Assets' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Manage role for Forest' }),
+    );
+    await user.type(screen.getByRole('textbox', { name: 'Role' }), 'Hero');
+    await user.click(screen.getByRole('button', { name: 'Review role' }));
+    await user.click(screen.getByRole('button', { name: 'Assign role' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Storage reload failed.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Review role' }));
+    await user.click(screen.getByRole('button', { name: 'Retry sync' }));
+
+    expect(apply).toHaveBeenCalledOnce();
+    expect(synchronize).toHaveBeenCalledOnce();
+    expect(load).toHaveBeenCalledTimes(3);
+    expect(
+      screen.getByRole('listitem', { name: 'Image: Forest' }),
+    ).toHaveTextContent('Role: Hero');
+  });
+
   test('forwards an approved Role change and reloads the catalog once', async () => {
     const user = userEvent.setup();
     const deps = dependencies();

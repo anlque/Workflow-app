@@ -57,6 +57,7 @@ function setup(
         });
       }}
       onApplyRoleChange={() => Promise.resolve()}
+      onSynchronizeRoleChange={() => Promise.resolve()}
       loadBlob={() => Promise.resolve(null)}
       createObjectUrl={() => 'blob:asset'}
       revokeObjectUrl={() => undefined}
@@ -66,6 +67,14 @@ function setup(
 }
 
 describe('AssetLibrary', () => {
+  test('explains that Workflows follow the Asset owning a Role', () => {
+    setup();
+    expect(
+      screen.getByText(
+        'A Role lets Workflows follow whichever Asset owns that name.',
+      ),
+    ).toBeVisible();
+  });
   test('keeps an audio preview URL across equivalent catalog rerenders', async () => {
     const blob = new Blob(['audio'], { type: 'audio/mpeg' });
     const createObjectUrl = vi.fn(() => 'blob:rain');
@@ -77,6 +86,7 @@ describe('AssetLibrary', () => {
         onDelete={() => Promise.resolve()}
         onInspectRoleChange={() => Promise.reject(new Error('unused'))}
         onApplyRoleChange={() => Promise.resolve()}
+        onSynchronizeRoleChange={() => Promise.resolve()}
         loadBlob={() => Promise.resolve(blob)}
         createObjectUrl={createObjectUrl}
         revokeObjectUrl={revokeObjectUrl}
@@ -92,6 +102,7 @@ describe('AssetLibrary', () => {
         onDelete={() => Promise.resolve()}
         onInspectRoleChange={() => Promise.reject(new Error('unused'))}
         onApplyRoleChange={() => Promise.resolve()}
+        onSynchronizeRoleChange={() => Promise.resolve()}
         loadBlob={() => Promise.resolve(blob)}
         createObjectUrl={createObjectUrl}
         revokeObjectUrl={vi.fn()}
@@ -154,6 +165,7 @@ describe('AssetLibrary', () => {
           })
         }
         onApplyRoleChange={() => Promise.resolve()}
+        onSynchronizeRoleChange={() => Promise.resolve()}
         loadBlob={() => Promise.resolve(null)}
         createObjectUrl={() => 'blob:asset'}
         revokeObjectUrl={() => undefined}
