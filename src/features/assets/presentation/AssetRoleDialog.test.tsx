@@ -146,6 +146,40 @@ test('shows a blocked merge as a recoverable inspection error', async () => {
 });
 
 describe('AssetRoleDialog recovery', () => {
+  test('closes an ordinary unchanged preview with Done without applying or synchronizing', async () => {
+    const user = userEvent.setup();
+    const assigned = createAsset({ ...target, role: 'Hero' });
+    const apply = vi.fn(() => Promise.resolve());
+    const retrySynchronization = vi.fn(() => Promise.resolve());
+    const success = vi.fn();
+    render(
+      <AssetRoleDialog
+        asset={assigned}
+        onInspect={() =>
+          Promise.resolve({
+            target: assigned,
+            role: createAssetRole('Hero'),
+            action: 'unchanged',
+            currentOwner: assigned,
+            affectedWorkflowCount: 0,
+            expectedKinds: [],
+          })
+        }
+        onApply={apply}
+        onSynchronize={retrySynchronization}
+        onCancel={() => undefined}
+        onSuccess={success}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Review role' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect(apply).not.toHaveBeenCalled();
+    expect(retrySynchronization).not.toHaveBeenCalled();
+    expect(success).toHaveBeenCalledOnce();
+  });
+
   test('retries synchronization for an unchanged preview without repeating the mutation', async () => {
     const user = userEvent.setup();
     const committedPreview: AssetRoleChangePreview = {
@@ -200,14 +234,27 @@ describe('AssetRoleDialog recovery', () => {
 
   test('keeps a synchronization storage error visible and allows another retry', async () => {
     const user = userEvent.setup();
-    const unchangedPreview: AssetRoleChangePreview = {
-      target: createAsset({ ...target, role: 'Hero' }),
+    const committedPreview: AssetRoleChangePreview = {
+      target,
       role: createAssetRole('Hero'),
-      action: 'unchanged',
-      currentOwner: createAsset({ ...target, role: 'Hero' }),
+      action: 'create',
+      currentOwner: null,
       affectedWorkflowCount: 0,
       expectedKinds: [],
     };
+    const unchangedPreview: AssetRoleChangePreview = {
+      ...committedPreview,
+      target: createAsset({ ...target, role: 'Hero' }),
+      action: 'unchanged',
+      currentOwner: createAsset({ ...target, role: 'Hero' }),
+    };
+    const inspect = vi
+      .fn()
+      .mockResolvedValueOnce(committedPreview)
+      .mockResolvedValueOnce(unchangedPreview);
+    const apply = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Catalog publication failed.'));
     const retrySynchronization = vi
       .fn()
       .mockRejectedValueOnce(new Error('Storage reload failed.'))
@@ -215,15 +262,19 @@ describe('AssetRoleDialog recovery', () => {
     const success = vi.fn();
     render(
       <AssetRoleDialog
-        asset={unchangedPreview.target}
-        onInspect={() => Promise.resolve(unchangedPreview)}
-        onApply={() => Promise.reject(new Error('must not mutate'))}
+        asset={target}
+        onInspect={inspect}
+        onApply={apply}
         onSynchronize={retrySynchronization}
         onCancel={() => undefined}
         onSuccess={success}
       />,
     );
 
+    await user.type(screen.getByRole('textbox', { name: 'Role' }), 'Hero');
+    await user.click(screen.getByRole('button', { name: 'Review role' }));
+    await user.click(screen.getByRole('button', { name: 'Assign role' }));
+    await screen.findByText('Catalog publication failed.');
     await user.click(screen.getByRole('button', { name: 'Review role' }));
     await user.click(screen.getByRole('button', { name: 'Retry sync' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -234,6 +285,60 @@ describe('AssetRoleDialog recovery', () => {
     await user.click(screen.getByRole('button', { name: 'Retry sync' }));
 
     expect(retrySynchronization).toHaveBeenCalledTimes(2);
+    expect(apply).toHaveBeenCalledOnce();
+    expect(success).toHaveBeenCalledOnce();
+  });
+
+  test('does not offer recovery when the inspected Role changed after an apply failure', async () => {
+    const user = userEvent.setup();
+    const other = createAsset({ ...target, role: 'Other' });
+    const inspect = vi
+      .fn()
+      .mockResolvedValueOnce({
+        target,
+        role: createAssetRole('Hero'),
+        action: 'create',
+        currentOwner: null,
+        affectedWorkflowCount: 0,
+        expectedKinds: [],
+      })
+      .mockResolvedValueOnce({
+        target: other,
+        role: createAssetRole('Other'),
+        action: 'unchanged',
+        currentOwner: other,
+        affectedWorkflowCount: 0,
+        expectedKinds: [],
+      });
+    const apply = vi.fn().mockRejectedValue(new Error('Apply failed.'));
+    const retrySynchronization = vi.fn(() => Promise.resolve());
+    const success = vi.fn();
+    render(
+      <AssetRoleDialog
+        asset={target}
+        onInspect={inspect}
+        onApply={apply}
+        onSynchronize={retrySynchronization}
+        onCancel={() => undefined}
+        onSuccess={success}
+      />,
+    );
+
+    const input = screen.getByRole('textbox', { name: 'Role' });
+    await user.type(input, 'Hero');
+    await user.click(screen.getByRole('button', { name: 'Review role' }));
+    await user.click(screen.getByRole('button', { name: 'Assign role' }));
+    await screen.findByText('Apply failed.');
+    const retryInput = screen.getByRole('textbox', { name: 'Role' });
+    await user.clear(retryInput);
+    await user.type(retryInput, 'Other');
+    await user.click(screen.getByRole('button', { name: 'Review role' }));
+
+    expect(screen.getByRole('button', { name: 'Done' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Retry sync' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(apply).toHaveBeenCalledOnce();
+    expect(retrySynchronization).not.toHaveBeenCalled();
     expect(success).toHaveBeenCalledOnce();
   });
 

@@ -126,6 +126,7 @@ test('creates, follows and explicitly moves an Asset Role', async ({
   await options.keyboard.type('forest.png');
   await options.getByRole('button', { name: 'Save workflow' }).focus();
   await options.keyboard.press('Enter');
+  await expect(options.getByRole('status')).toHaveText('Workflow saved');
 
   await options.reload();
   await expect(options.getByLabel('Background image').nth(0)).toHaveValue(

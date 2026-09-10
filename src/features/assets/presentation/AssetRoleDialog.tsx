@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Button, Dialog, Field } from '@/shared';
 
-import type { Asset } from '../domain/Asset';
+import { assetRoleKey, type Asset, type AssetRole } from '../domain/Asset';
 import type { AssetRoleChangePreview } from '../application/AssetRoleChange';
 
 export type AssetRoleDialogProps = Readonly<{
@@ -17,10 +17,13 @@ export type AssetRoleDialogProps = Readonly<{
   onSuccess(): void;
 }>;
 
-function actionLabel(action: AssetRoleChangePreview['action']): string {
+function actionLabel(
+  action: AssetRoleChangePreview['action'],
+  isRecovery: boolean,
+): string {
   if (action === 'move') return 'Move role';
   if (action === 'rename') return 'Rename role';
-  if (action === 'unchanged') return 'Retry sync';
+  if (action === 'unchanged') return isRecovery ? 'Retry sync' : 'Done';
   return 'Assign role';
 }
 
@@ -36,6 +39,7 @@ export function AssetRoleDialog({
   const [preview, setPreview] = useState<AssetRoleChangePreview | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failedRole, setFailedRole] = useState<AssetRole | null>(null);
   const inFlight = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -60,21 +64,37 @@ export function AssetRoleDialog({
 
   async function apply(): Promise<void> {
     if (inFlight.current || preview === null) return;
+    const isRecovery =
+      preview.action === 'unchanged' &&
+      failedRole !== null &&
+      assetRoleKey(preview.role) === assetRoleKey(failedRole);
+    if (preview.action === 'unchanged' && !isRecovery) {
+      onSuccess();
+      return;
+    }
     inFlight.current = true;
     setPending(true);
     setError(null);
     try {
-      if (preview.action === 'unchanged') await onSynchronize();
+      if (isRecovery) await onSynchronize();
       else await onApply(preview);
       onSuccess();
     } catch (cause) {
-      if (preview.action !== 'unchanged') setPreview(null);
+      if (!isRecovery) {
+        setFailedRole(preview.role);
+        setPreview(null);
+      }
       setError(cause instanceof Error ? cause.message : 'Role change failed.');
     } finally {
       inFlight.current = false;
       setPending(false);
     }
   }
+
+  const isRecovery =
+    preview?.action === 'unchanged' &&
+    failedRole !== null &&
+    assetRoleKey(preview.role) === assetRoleKey(failedRole);
 
   return (
     <Dialog
@@ -154,12 +174,10 @@ export function AssetRoleDialog({
         ) : (
           <Button
             pending={pending}
-            pendingLabel={
-              preview.action === 'unchanged' ? 'Synchronizing…' : 'Applying…'
-            }
+            pendingLabel={isRecovery ? 'Synchronizing…' : 'Applying…'}
             onClick={() => void apply()}
           >
-            {actionLabel(preview.action)}
+            {actionLabel(preview.action, isRecovery)}
           </Button>
         )}
       </div>
