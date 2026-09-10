@@ -16,7 +16,22 @@ export {
 export type { ActiveSessionAssetReferences } from './application/ActiveSessionAssetReferences';
 export { ActiveSessionReferencedAssetError } from './application/ActiveSessionReferencedAssetError';
 export type { WorkflowAssetReferences } from './application/WorkflowAssetReferences';
-export { deleteAssetUseCase } from './application/deleteAssetUseCase';
+export {
+  inspectAssetRetirementUseCase,
+  retireAssetUseCase,
+} from './application/assetRetirementUseCases';
+export type {
+  AssetRetirementChoice,
+  AssetRetirementPreview,
+  AssetRetirementRepository,
+  AssetRetirementUsage,
+} from './application/AssetRetirement';
+export type { AssetRetirementWorkflowReferences } from './application/AssetRetirementWorkflowReferences';
+export type { AssetRetirementUnitOfWork } from './application/AssetRetirementUnitOfWork';
+export {
+  AssetRetirementValidationError,
+  StaleAssetRetirementError,
+} from './application/AssetRetirementErrors';
 export {
   importAssetUseCase,
   validateAssetImport,
@@ -70,3 +85,7 @@ export {
   AssetPreview,
   type AssetPreviewProps,
 } from './presentation/AssetPreview';
+export {
+  AssetRetirementDialog,
+  type AssetRetirementDialogProps,
+} from './presentation/AssetRetirementDialog';

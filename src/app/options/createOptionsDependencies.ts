@@ -1,14 +1,14 @@
 import {
   assetDatabaseSchemas,
   BrowserAssetUrlService,
-  deleteAssetUseCase,
   applyAssetRoleChangeUseCase,
+  inspectAssetRetirementUseCase,
   inspectAssetRoleChangeUseCase,
   DexieAssetRepository,
   importAssetUseCase,
+  retireAssetUseCase,
   type ActiveSessionAssetReferences,
   type AssetImportPolicy,
-  type WorkflowAssetReferences,
 } from '@/features/assets';
 import {
   ChromeSettingsRepository,
@@ -33,7 +33,10 @@ import {
   importWorkflowUseCase,
   listWorkflowsUseCase,
   reorderWorkflowsUseCase,
+  removeOptionalWorkflowAssetReferences,
+  replaceWorkflowAssetReferences,
   renameWorkflowRoleReferences,
+  summarizeWorkflowAssetReferences,
   summarizeWorkflowRoleReferences,
   updateWorkflowUseCase,
   workflowDatabaseSchemas,
@@ -44,6 +47,7 @@ import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 import type { OptionsDependencies } from './OptionsApp';
 import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
 import { DexieAssetRoleManagementUnitOfWork } from './DexieAssetRoleManagementUnitOfWork';
+import { DexieAssetRetirementUnitOfWork } from './DexieAssetRetirementUnitOfWork';
 
 const assetPolicy: AssetImportPolicy = {
   image: {
@@ -90,21 +94,8 @@ export function createOptionsDependencies(
   const urls = new BrowserAssetUrlService();
   const unitOfWork = new DexieWorkflowPackageUnitOfWork(database);
   const roleUnitOfWork = new DexieAssetRoleManagementUnitOfWork(database);
+  const retirementUnitOfWork = new DexieAssetRetirementUnitOfWork(database);
   const catalogEvents = createChromeWorkflowCatalogEvents();
-  const references: WorkflowAssetReferences = {
-    async count(assetId) {
-      const values = await workflows.list();
-      return values.filter((workflow) =>
-        workflow.phases.some(
-          ({ environment }) =>
-            (environment.backgroundAsset?.type === 'direct' &&
-              environment.backgroundAsset.assetId === assetId) ||
-            (environment.audioAsset?.type === 'direct' &&
-              environment.audioAsset.assetId === assetId),
-        ),
-      ).length;
-    },
-  };
   const activeSessionReferences: ActiveSessionAssetReferences = {
     has: (assetId) => activeSessionReferencesAsset(sessions, assetId),
   };
@@ -115,6 +106,11 @@ export function createOptionsDependencies(
       from: Parameters<typeof renameWorkflowRoleReferences>[1],
       to: Parameters<typeof renameWorkflowRoleReferences>[2],
     ) => renameWorkflowRoleReferences(workflows, from, to),
+  };
+  const retirementWorkflows = {
+    summarize: summarizeWorkflowAssetReferences.bind(null, workflows),
+    replace: replaceWorkflowAssetReferences.bind(null, workflows),
+    removeOptional: removeOptionalWorkflowAssetReferences.bind(null, workflows),
   };
 
   return {
@@ -173,8 +169,36 @@ export function createOptionsDependencies(
         createdAt: Date.now(),
       });
     },
-    async deleteAsset(id) {
-      await deleteAssetUseCase(assets, activeSessionReferences, references, id);
+    inspectAssetRetirement: (id) =>
+      inspectAssetRetirementUseCase(
+        assets,
+        activeSessionReferences,
+        retirementWorkflows,
+        id,
+      ),
+    async retireAsset(preview, choice) {
+      await runWorkflowCatalogMutation(
+        () =>
+          retireAssetUseCase(
+            assets,
+            activeSessionReferences,
+            retirementWorkflows,
+            retirementUnitOfWork,
+            assetPolicy,
+            preview,
+            choice,
+          ),
+        catalogEvents,
+      );
+    },
+    createAssetRetirementUploadInput(file, kind) {
+      return {
+        id: crypto.randomUUID(),
+        name: file.name,
+        kind,
+        blob: file,
+        createdAt: Date.now(),
+      };
     },
     inspectAssetRoleChange: (id, value) =>
       inspectAssetRoleChangeUseCase(assets, roleUsage, id, value),

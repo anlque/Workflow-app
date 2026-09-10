@@ -37,11 +37,10 @@ test('protects Assets referenced by an immutable active Session snapshot', async
   await options.getByRole('button', { name: 'Save workflow' }).click();
 
   await options.getByRole('tab', { name: 'Assets' }).click();
-  await options.getByRole('button', { name: 'Delete forest.png' }).click();
-  await options.getByRole('button', { name: 'Delete asset' }).click();
-  await expect(options.getByRole('alert')).toHaveText(
-    'Asset is referenced by 1 Workflow.',
-  );
+  await options.getByRole('button', { name: 'Retire forest.png' }).click();
+  await options.getByRole('button', { name: 'Review usage' }).click();
+  await expect(options.getByText('1 reference in 1 Workflow.')).toBeVisible();
+  await expect(options.getByText(/Forest focus: 1 direct/)).toBeVisible();
   await expect(
     options.getByRole('listitem', { name: 'Image: forest.png' }),
   ).toBeVisible();
@@ -58,13 +57,13 @@ test('protects Assets referenced by an immutable active Session snapshot', async
   await options.getByLabel('Background image').selectOption({ label: 'None' });
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await options.getByRole('tab', { name: 'Assets' }).click();
-  await options.getByRole('button', { name: 'Delete forest.png' }).click();
-  await options.getByRole('button', { name: 'Delete asset' }).click();
+  await options.getByRole('button', { name: 'Retire forest.png' }).click();
+  await options.getByRole('button', { name: 'Review usage' }).click();
   await expect(options.getByRole('alert')).toHaveText(
     'This Asset is used by the active Session. Stop the Session or wait for it to finish before deleting it.',
   );
   await expect(
-    options.getByRole('dialog', { name: 'Delete forest.png?' }),
+    options.getByRole('dialog', { name: 'Retire forest.png' }),
   ).toBeVisible();
   await expect(
     options.getByRole('listitem', { name: 'Image: forest.png' }),
@@ -74,7 +73,12 @@ test('protects Assets referenced by an immutable active Session snapshot', async
   await focus.getByRole('button', { name: 'Stop session' }).click();
   await expect(focus.getByText('Session stopped')).toBeVisible();
 
-  await options.getByRole('button', { name: 'Delete asset' }).click();
+  await options.getByRole('button', { name: 'Review usage' }).click();
+  await options.getByRole('button', { name: 'Continue' }).click();
+  await options
+    .getByRole('radio', { name: 'Remove optional references' })
+    .check();
+  await options.getByRole('button', { name: 'Retire asset' }).click();
   await expect(
     options.getByRole('listitem', { name: 'Image: forest.png' }),
   ).toHaveCount(0);
@@ -166,4 +170,45 @@ test('creates, follows and explicitly moves an Asset Role', async ({
   await expect(options.getByLabel('Background image').nth(1)).toHaveValue(
     /^direct:/u,
   );
+});
+
+test('retires an Asset by replacing direct Workflow references', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('tab', { name: 'Assets' }).click();
+  for (const name of ['old.png', 'new.png']) {
+    await options.getByLabel('Add local image or audio').setInputFiles({
+      name,
+      mimeType: 'image/png',
+      buffer: onePixelPng,
+    });
+  }
+  await options.getByRole('tab', { name: 'Workflows' }).click();
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Replacement focus');
+  await options
+    .getByLabel('Background image')
+    .selectOption({ label: 'old.png' });
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+
+  await options.getByRole('tab', { name: 'Assets' }).click();
+  await options.getByRole('button', { name: 'Retire old.png' }).click();
+  await options.getByRole('button', { name: 'Review usage' }).click();
+  await expect(options.getByText(/Replacement focus: 1 direct/)).toBeVisible();
+  await options.getByRole('button', { name: 'Continue' }).click();
+  await options
+    .getByLabel('Replacement Asset')
+    .selectOption({ label: 'new.png' });
+  await options.getByRole('button', { name: 'Retire asset' }).click();
+  await expect(
+    options.getByRole('listitem', { name: 'Image: old.png' }),
+  ).toHaveCount(0);
+
+  await options.getByRole('tab', { name: 'Workflows' }).click();
+  await expect(
+    options.getByLabel('Background image').locator('option:checked'),
+  ).toHaveText('new.png');
 });

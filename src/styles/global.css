@@ -796,6 +796,21 @@ textarea {
   gap: 1.25rem;
 }
 
+.asset-retirement__choices {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.asset-retirement__choice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 650;
+}
+
 .asset-upload {
   position: relative;
   overflow: hidden;

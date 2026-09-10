@@ -40,6 +40,12 @@ export { updateWorkflowUseCase } from './application/updateWorkflowUseCase';
 export type { AssetReferenceResolver } from './application/AssetReferenceResolver';
 export { resolveWorkflowAssetReferences } from './application/resolveWorkflowAssetReferences';
 export {
+  summarizeWorkflowAssetReferences,
+  replaceWorkflowAssetReferences,
+  removeOptionalWorkflowAssetReferences,
+  type WorkflowAssetRetirementUsage,
+} from './application/assetRetirementReferences';
+export {
   renameWorkflowRoleReferences,
   summarizeWorkflowRoleReferences,
   type WorkflowRoleUsageSummary,

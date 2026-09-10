@@ -8,6 +8,7 @@ import {
   type AssetId,
   type AssetKind,
 } from '../domain/Asset';
+import type { AssetRetirementPreview } from '../application/AssetRetirement';
 import { AssetLibrary } from './AssetLibrary';
 
 const image = createAsset({
@@ -31,6 +32,7 @@ function setup(
   overrides: Partial<{
     onImport(file: File, kind: AssetKind): Promise<void>;
     onDelete(id: AssetId): Promise<void>;
+    onInspectRetirement(id: AssetId): Promise<AssetRetirementPreview>;
   }> = {},
 ) {
   const onImport = vi.fn<(file: File, kind: AssetKind) => Promise<void>>(
@@ -43,7 +45,24 @@ function setup(
     <AssetLibrary
       assets={[image, audio]}
       onImport={onImport}
-      onDelete={onDelete}
+      onInspectRetirement={
+        overrides.onInspectRetirement ??
+        ((id) =>
+          Promise.resolve({
+            asset: [image, audio].find((asset) => asset.id === id) ?? image,
+            usages: [],
+          }))
+      }
+      onRetire={(_, choice) =>
+        onDelete(choice.type === 'existing' ? choice.assetId : image.id)
+      }
+      createRetirementUploadInput={(file, kind) => ({
+        id: 'uploaded',
+        name: file.name,
+        kind,
+        blob: file,
+        createdAt: 1,
+      })}
       onInspectRoleChange={(assetId, value) => {
         const target = [image, audio].find(({ id }) => id === assetId);
         if (target === undefined) return Promise.reject(new Error('missing'));
@@ -83,7 +102,17 @@ describe('AssetLibrary', () => {
       <AssetLibrary
         assets={[audio]}
         onImport={() => Promise.resolve()}
-        onDelete={() => Promise.resolve()}
+        onInspectRetirement={() =>
+          Promise.resolve({ asset: audio, usages: [] })
+        }
+        onRetire={() => Promise.resolve()}
+        createRetirementUploadInput={(file, kind) => ({
+          id: 'uploaded',
+          name: file.name,
+          kind,
+          blob: file,
+          createdAt: 1,
+        })}
         onInspectRoleChange={() => Promise.reject(new Error('unused'))}
         onApplyRoleChange={() => Promise.resolve()}
         onSynchronizeRoleChange={() => Promise.resolve()}
@@ -99,7 +128,17 @@ describe('AssetLibrary', () => {
       <AssetLibrary
         assets={[audio]}
         onImport={() => Promise.resolve()}
-        onDelete={() => Promise.resolve()}
+        onInspectRetirement={() =>
+          Promise.resolve({ asset: audio, usages: [] })
+        }
+        onRetire={() => Promise.resolve()}
+        createRetirementUploadInput={(file, kind) => ({
+          id: 'uploaded',
+          name: file.name,
+          kind,
+          blob: file,
+          createdAt: 1,
+        })}
         onInspectRoleChange={() => Promise.reject(new Error('unused'))}
         onApplyRoleChange={() => Promise.resolve()}
         onSynchronizeRoleChange={() => Promise.resolve()}
@@ -153,7 +192,17 @@ describe('AssetLibrary', () => {
       <AssetLibrary
         assets={[image]}
         onImport={() => Promise.resolve()}
-        onDelete={() => Promise.resolve()}
+        onInspectRetirement={() =>
+          Promise.resolve({ asset: image, usages: [] })
+        }
+        onRetire={() => Promise.resolve()}
+        createRetirementUploadInput={(file, kind) => ({
+          id: 'uploaded',
+          name: file.name,
+          kind,
+          blob: file,
+          createdAt: 1,
+        })}
         onInspectRoleChange={(_, value) =>
           Promise.resolve({
             target: image,
@@ -204,27 +253,36 @@ describe('AssetLibrary', () => {
     );
   });
 
-  test('preserves a referenced Asset and announces deletion failure', async () => {
+  test('shows affected Workflows before retirement', async () => {
     const user = userEvent.setup();
-    const { onDelete } = setup({
-      onDelete: () =>
-        Promise.reject(new Error('Asset is referenced by 1 Workflow.')),
+    setup({
+      onInspectRetirement: () =>
+        Promise.resolve({
+          asset: image,
+          usages: [
+            {
+              workflowId: 'workflow-1',
+              workflowName: 'Deep work',
+              directReferenceCount: 1,
+              roleReferenceCount: 0,
+              optionalReferenceCount: 1,
+              requiredReferenceCount: 0,
+            },
+          ],
+        }),
     });
 
-    await user.click(screen.getByRole('button', { name: 'Delete Forest' }));
-    await user.click(screen.getByRole('button', { name: 'Delete asset' }));
+    await user.click(screen.getByRole('button', { name: 'Retire Forest' }));
+    await user.click(screen.getByRole('button', { name: 'Review usage' }));
 
-    expect(onDelete).toHaveBeenCalledWith(image.id);
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Asset is referenced by 1 Workflow.',
-    );
-    expect(screen.getByText('Forest')).toBeVisible();
+    expect(await screen.findByText(/1 reference in 1 Workflow/)).toBeVisible();
+    expect(screen.getByText(/Deep work: 1 direct/)).toBeVisible();
   });
 
   test('keeps the deletion dialog open with the active Session error', async () => {
     const user = userEvent.setup();
     setup({
-      onDelete: () =>
+      onInspectRetirement: () =>
         Promise.reject(
           new Error(
             'This Asset is used by the active Session. Stop the Session or wait for it to finish before deleting it.',
@@ -232,10 +290,10 @@ describe('AssetLibrary', () => {
         ),
     });
 
-    await user.click(screen.getByRole('button', { name: 'Delete Forest' }));
-    await user.click(screen.getByRole('button', { name: 'Delete asset' }));
+    await user.click(screen.getByRole('button', { name: 'Retire Forest' }));
+    await user.click(screen.getByRole('button', { name: 'Review usage' }));
 
-    const dialog = screen.getByRole('dialog', { name: 'Delete Forest?' });
+    const dialog = screen.getByRole('dialog', { name: 'Retire Forest' });
     expect(dialog).toBeVisible();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This Asset is used by the active Session. Stop the Session or wait for it to finish before deleting it.',
@@ -243,16 +301,21 @@ describe('AssetLibrary', () => {
     expect(screen.getByText('Forest')).toBeVisible();
   });
 
-  test('closes the dialog after successful deletion', async () => {
+  test('retires after explicitly choosing optional-reference removal', async () => {
     const user = userEvent.setup();
     const { onDelete } = setup();
 
-    await user.click(screen.getByRole('button', { name: 'Delete Forest' }));
-    await user.click(screen.getByRole('button', { name: 'Delete asset' }));
+    await user.click(screen.getByRole('button', { name: 'Retire Forest' }));
+    await user.click(screen.getByRole('button', { name: 'Review usage' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(
+      screen.getByRole('radio', { name: 'Remove optional references' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Retire asset' }));
 
     expect(onDelete).toHaveBeenCalledWith(image.id);
     expect(
-      screen.queryByRole('dialog', { name: 'Delete Forest?' }),
+      screen.queryByRole('dialog', { name: 'Retire Forest' }),
     ).not.toBeInTheDocument();
   });
 });

@@ -35,10 +35,14 @@ the same Workflow-and-Assets transaction, never to an existing local owner.
 Assets preserves the ST-005 injected active-Session-reference port and never
 imports Session internals.
 
-For AS-003, retirement will apply the active-Session guard and then combine
-same-kind direct-reference replacement/removal, Role transfer and Asset
-retirement in one transaction. This boundary is accepted but not implemented by
-AS-001.
+Asset retirement first applies the injected active-Session guard and returns an
+authoritative Workflow usage preview. The confirmed operation rechecks that
+preview and performs same-kind direct-reference replacement, optional-reference
+removal, Role transfer, optional replacement upload and source deletion in one
+Assets/Workflows/Sessions transaction. Required references cannot be removed.
+Role references remain stable when the Role transfers; direct references are
+rewritten to the replacement ID. The active immutable Session snapshot is never
+edited.
 
 ## Alternatives Considered
 
@@ -49,9 +53,10 @@ AS-001.
 ## Consequences
 
 Future Sessions follow Role movement while active Sessions remain stable.
-Readers retain explicit legacy paths. Cross-kind movement can make a Workflow
-fail kind validation until corrected. Role UI and retirement remain AS-002 and
-AS-003.
+Readers retain explicit legacy paths. Cross-kind Role movement can make a
+Workflow fail kind validation until corrected. Retirement cannot create an
+orphan uploaded Asset or expose a partially rewritten Workflow catalog because
+all durable writes share the same transaction.
 
 ## Supersedes
 

@@ -75,6 +75,9 @@ does not import feature concepts or decide their transformation.
    - `src/app/side-panel/createSidePanelDependencies.ts`.
 10. Update cross-table transaction scopes when a new table participates in an
     atomic use case.
+    Asset retirement is the reference example: it adds no schema version because
+    it only widens a unit-of-work scope over existing Assets, Workflows and
+    Sessions tables.
 11. Review Workflow/Settings public packages separately. Change their envelope
     versions only when the transport contract requires it.
 12. Build the extension and test both fresh database creation and upgrade from

@@ -210,3 +210,65 @@ describe('createOptionsDependencies Asset Role integration', () => {
     expect(browserMock.runtime.sendMessage).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('createOptionsDependencies Asset retirement integration', () => {
+  test('atomically replaces direct references, transfers Role and deletes source', async () => {
+    const database = createDatabase();
+    const assets = new DexieAssetRepository(database);
+    const workflows = new DexieWorkflowRepository(database);
+    const source = await seedAsset(assets, {
+      id: 'source',
+      name: 'Forest',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 1,
+      createdAt: 1,
+      role: 'Hero',
+    });
+    const replacement = await seedAsset(assets, {
+      id: 'replacement',
+      name: 'Meadow',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 1,
+      createdAt: 2,
+    });
+    await workflows.save(
+      createWorkflow({
+        id: 'retirement-workflow',
+        name: 'Retirement',
+        phases: [
+          {
+            type: 'focus',
+            durationSeconds: 60,
+            environment: {
+              backgroundAsset: { type: 'direct', assetId: source.id },
+            },
+          },
+        ],
+      }),
+    );
+    const dependencies = createOptionsDependencies(
+      createTestDocumentPreferences(),
+      database,
+    );
+
+    const preview = await dependencies.inspectAssetRetirement(source.id);
+    await dependencies.retireAsset(preview, {
+      type: 'existing',
+      assetId: replacement.id,
+    });
+    const snapshot = await dependencies.load();
+
+    expect(snapshot.assets.find(({ id }) => id === source.id)).toBeUndefined();
+    expect(snapshot.assets.find(({ id }) => id === replacement.id)?.role).toBe(
+      'Hero',
+    );
+    expect(
+      snapshot.workflows[0]?.phases[0].environment.backgroundAsset,
+    ).toEqual({
+      type: 'direct',
+      assetId: replacement.id,
+    });
+  });
+});

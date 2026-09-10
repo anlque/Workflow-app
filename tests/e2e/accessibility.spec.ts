@@ -85,6 +85,37 @@ test('Asset Role dialog has no detectable axe violations', async ({
   await expectNoAccessibilityViolations(options);
 });
 
+test('Asset retirement dialog has no detectable axe violations', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('tab', { name: 'Assets' }).click();
+  await options.getByLabel('Add local image or audio').setInputFiles({
+    name: 'retire-image.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  });
+  const trigger = options.getByRole('button', {
+    name: 'Retire retire-image.png',
+  });
+  await trigger.focus();
+  await options.keyboard.press('Enter');
+  await expect(options.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await expectNoAccessibilityViolations(options);
+  await options.keyboard.press('Tab');
+  await options.keyboard.press('Enter');
+  await options.getByRole('button', { name: 'Continue' }).focus();
+  await options.keyboard.press('Enter');
+  await expectNoAccessibilityViolations(options);
+  await options.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+});
+
 test('local extension documents become interactive within 500 ms', async ({
   context,
   extensionUrls,

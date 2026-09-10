@@ -89,7 +89,9 @@ Cross a feature boundary only through its root `index.ts`; see
 - **Copy boundaries:** do duplicate, import, package, snapshot and projection
   preserve the value?
 - **Asset references:** if the field introduces one, validate identity, expected
-  kind, deletion references and package inclusion.
+  kind, retirement summary/patch behavior and package inclusion. Mark whether
+  the reference is optional; required references must never be emptied by Asset
+  retirement.
 - **Unknown keys:** do record/package/message parsers still reject unsupported
   shapes where their contract is exact?
 

@@ -5,6 +5,9 @@ import {
   type Asset,
   type AssetId,
   type AssetKind,
+  type AssetRetirementChoice,
+  type AssetRetirementPreview,
+  type ImportAssetInput,
   type AssetRoleChangePreview,
 } from '@/features/assets';
 import { SettingsPage, type Settings } from '@/features/settings';
@@ -33,7 +36,15 @@ export type OptionsDependencies = {
   deleteWorkflow(id: WorkflowId): Promise<void>;
   reorderWorkflows(ids: readonly WorkflowId[]): Promise<void>;
   importAsset(file: File, kind: AssetKind): Promise<void>;
-  deleteAsset(id: AssetId): Promise<void>;
+  inspectAssetRetirement(id: AssetId): Promise<AssetRetirementPreview>;
+  retireAsset(
+    preview: AssetRetirementPreview,
+    choice: AssetRetirementChoice,
+  ): Promise<void>;
+  createAssetRetirementUploadInput(
+    file: File,
+    kind: AssetKind,
+  ): ImportAssetInput;
   inspectAssetRoleChange(
     id: AssetId,
     value: string,
@@ -268,10 +279,16 @@ export function OptionsApp({
               await dependencies.importAsset(file, kind);
               await load(selectedWorkflowId);
             }}
-            onDelete={async (id) => {
-              await dependencies.deleteAsset(id);
+            onInspectRetirement={(id) =>
+              dependencies.inspectAssetRetirement(id)
+            }
+            onRetire={async (preview, choice) => {
+              await dependencies.retireAsset(preview, choice);
               await load(selectedWorkflowId);
             }}
+            createRetirementUploadInput={(file, kind) =>
+              dependencies.createAssetRetirementUploadInput(file, kind)
+            }
             onInspectRoleChange={(id, value) =>
               dependencies.inspectAssetRoleChange(id, value)
             }

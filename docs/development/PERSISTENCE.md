@@ -253,6 +253,16 @@ choices.
 - Reads map only after the table operation returns and fail rather than returning
   untrusted partial Domain values.
 
+### Asset retirement
+
+`DexieAssetRetirementUnitOfWork` opens one read-write transaction covering
+`assets`, `workflows` and `sessions`. Inside it the Application rechecks active
+Session use and the authoritative Workflow usage preview, then performs any new
+Asset upload, Workflow reference rewrites/removals, Role transfer and source
+deletion. A failure at any participating write aborts every earlier write, so a
+failed upload cannot become orphaned and a Workflow cannot retain a dangling
+direct reference. This changes no stored shape and keeps global Dexie version 4.
+
 ### Workflow package import
 
 [`DexieWorkflowPackageUnitOfWork`](../../src/features/workflow/infrastructure/DexieWorkflowPackageUnitOfWork.ts)

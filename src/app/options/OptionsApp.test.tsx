@@ -23,7 +23,26 @@ function dependencies(): OptionsDependencies {
     deleteWorkflow: () => Promise.resolve(),
     reorderWorkflows: () => Promise.resolve(),
     importAsset: () => Promise.resolve(),
-    deleteAsset: () => Promise.resolve(),
+    inspectAssetRetirement: (id) =>
+      Promise.resolve({
+        asset: createAsset({
+          id,
+          name: String(id),
+          kind: 'image',
+          mimeType: 'image/png',
+          byteSize: 1,
+          createdAt: 1,
+        }),
+        usages: [],
+      }),
+    retireAsset: () => Promise.resolve(),
+    createAssetRetirementUploadInput: (file, kind) => ({
+      id: 'replacement-id',
+      name: file.name,
+      kind,
+      blob: file,
+      createdAt: 1,
+    }),
     inspectAssetRoleChange: (id, value) =>
       Promise.resolve({
         target: createAsset({

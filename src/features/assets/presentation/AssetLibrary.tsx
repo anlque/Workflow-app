@@ -1,16 +1,27 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 
-import { Button, Dialog } from '@/shared';
+import { Button } from '@/shared';
 
 import type { Asset, AssetId, AssetKind } from '../domain/Asset';
 import type { AssetRoleChangePreview } from '../application/AssetRoleChange';
+import type {
+  AssetRetirementChoice,
+  AssetRetirementPreview,
+} from '../application/AssetRetirement';
+import type { ImportAssetInput } from '../application/importAssetUseCase';
 import { AssetPreview } from './AssetPreview';
+import { AssetRetirementDialog } from './AssetRetirementDialog';
 import { AssetRoleDialog } from './AssetRoleDialog';
 
 export type AssetLibraryProps = Readonly<{
   assets: readonly Asset[];
   onImport(file: File, kind: AssetKind): Promise<void>;
-  onDelete(id: AssetId): Promise<void>;
+  onInspectRetirement(id: AssetId): Promise<AssetRetirementPreview>;
+  onRetire(
+    preview: AssetRetirementPreview,
+    choice: AssetRetirementChoice,
+  ): Promise<void>;
+  createRetirementUploadInput(file: File, kind: AssetKind): ImportAssetInput;
   onInspectRoleChange(
     id: AssetId,
     value: string,
@@ -31,7 +42,9 @@ function formatBytes(value: number): string {
 export function AssetLibrary({
   assets,
   onImport,
-  onDelete,
+  onInspectRetirement,
+  onRetire,
+  createRetirementUploadInput,
   onInspectRoleChange,
   onApplyRoleChange,
   onSynchronizeRoleChange,
@@ -40,6 +53,7 @@ export function AssetLibrary({
   revokeObjectUrl,
 }: AssetLibraryProps) {
   const [deleting, setDeleting] = useState<Asset | null>(null);
+  const deleteTrigger = useRef<HTMLButtonElement | null>(null);
   const [managingRole, setManagingRole] = useState<Asset | null>(null);
   const roleTrigger = useRef<HTMLButtonElement | null>(null);
   const restoreRoleFocus = useRef(false);
@@ -72,19 +86,6 @@ export function AssetLibrary({
     }
   }
 
-  async function remove(asset: Asset): Promise<void> {
-    setPending(`delete:${asset.id}`);
-    setError(null);
-    try {
-      await onDelete(asset.id);
-      setDeleting(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Deletion failed.');
-    } finally {
-      setPending(null);
-    }
-  }
-
   function closeRoleDialog(): void {
     restoreRoleFocus.current = true;
     setManagingRole(null);
@@ -95,6 +96,11 @@ export function AssetLibrary({
     restoreRoleFocus.current = false;
     roleTrigger.current?.focus();
   }, [managingRole]);
+
+  function closeRetirementDialog(): void {
+    setDeleting(null);
+    queueMicrotask(() => deleteTrigger.current?.focus());
+  }
 
   return (
     <section className="asset-library" aria-labelledby="asset-library-title">
@@ -167,12 +173,13 @@ export function AssetLibrary({
                   </Button>
                   <Button
                     variant="quiet"
-                    aria-label={`Delete ${asset.name}`}
-                    onClick={() => {
+                    aria-label={`Retire ${asset.name}`}
+                    onClick={(event) => {
+                      deleteTrigger.current = event.currentTarget;
                       setDeleting(asset);
                     }}
                   >
-                    Delete
+                    Retire
                   </Button>
                 </div>
               </div>
@@ -181,40 +188,17 @@ export function AssetLibrary({
         </ul>
       )}
 
-      <Dialog
-        open={deleting !== null}
-        title={`Delete ${deleting?.name ?? 'Asset'}?`}
-        onCancel={() => {
-          setDeleting(null);
-        }}
-      >
-        <p>Referenced Assets must be removed from every Workflow first.</p>
-        {error === null ? null : (
-          <p className="feedback feedback--error" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="dialog__actions">
-          <Button
-            variant="quiet"
-            onClick={() => {
-              setDeleting(null);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            pending={deleting !== null && pending === `delete:${deleting.id}`}
-            pendingLabel="Deleting…"
-            onClick={() => {
-              if (deleting !== null) void remove(deleting);
-            }}
-          >
-            Delete asset
-          </Button>
-        </div>
-      </Dialog>
+      {deleting === null ? null : (
+        <AssetRetirementDialog
+          asset={deleting}
+          assets={assets}
+          onInspect={onInspectRetirement}
+          onRetire={onRetire}
+          createUploadInput={createRetirementUploadInput}
+          onCancel={closeRetirementDialog}
+          onSuccess={closeRetirementDialog}
+        />
+      )}
       {managingRole === null ? null : (
         <AssetRoleDialog
           asset={managingRole}
