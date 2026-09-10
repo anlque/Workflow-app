@@ -35,10 +35,20 @@ const usage: readonly AssetRetirementUsage[] = [
   {
     workflowId: 'workflow',
     workflowName: 'Deep work',
-    directReferenceCount: 1,
-    roleReferenceCount: 1,
-    optionalReferenceCount: 2,
-    requiredReferenceCount: 0,
+    occurrences: [
+      {
+        phaseIndex: 0,
+        location: 'background',
+        referenceMode: 'direct',
+        optional: true,
+      },
+      {
+        phaseIndex: 1,
+        location: 'background',
+        referenceMode: 'role',
+        optional: true,
+      },
+    ],
   },
 ];
 const policy = {
@@ -118,6 +128,20 @@ test('blocks inspection on active Session use before reading Workflows', async (
   expect(deps.workflows.summarize).not.toHaveBeenCalled();
 });
 
+test('rejects inspection when the source Asset is missing', async () => {
+  const deps = setup();
+  deps.values.delete(source.id);
+  await expect(
+    inspectAssetRetirementUseCase(
+      deps.repository,
+      deps.active,
+      deps.workflows,
+      source.id,
+    ),
+  ).rejects.toThrow('Asset was not found.');
+  expect(deps.workflows.summarize).not.toHaveBeenCalled();
+});
+
 describe('retireAssetUseCase', () => {
   test('rechecks active Session use inside the transaction before writes', async () => {
     const deps = setup();
@@ -139,6 +163,45 @@ describe('retireAssetUseCase', () => {
         { type: 'remove' },
       ),
     ).rejects.toBeInstanceOf(ActiveSessionReferencedAssetError);
+    expect(deps.workflows.removeOptional).not.toHaveBeenCalled();
+    expect(deps.writes.deleteAsset).not.toHaveBeenCalled();
+  });
+
+  test('rejects a stale preview before writes', async () => {
+    const deps = setup();
+    const firstUsage = usage[0];
+    if (firstUsage === undefined) throw new Error('Expected test usage.');
+    const preview = await inspectAssetRetirementUseCase(
+      deps.repository,
+      deps.active,
+      deps.workflows,
+      source.id,
+    );
+    deps.workflows.summarize.mockResolvedValue([
+      {
+        ...firstUsage,
+        occurrences: [
+          ...firstUsage.occurrences,
+          {
+            phaseIndex: 2,
+            location: 'background',
+            referenceMode: 'direct',
+            optional: true,
+          },
+        ],
+      },
+    ]);
+    await expect(
+      retireAssetUseCase(
+        deps.repository,
+        deps.active,
+        deps.workflows,
+        deps.unitOfWork,
+        policy,
+        preview,
+        { type: 'remove' },
+      ),
+    ).rejects.toThrow('Asset usage changed');
     expect(deps.workflows.removeOptional).not.toHaveBeenCalled();
     expect(deps.writes.deleteAsset).not.toHaveBeenCalled();
   });
@@ -231,7 +294,18 @@ describe('retireAssetUseCase', () => {
     const firstUsage = usage[0];
     if (firstUsage === undefined) throw new Error('Expected test usage.');
     deps.workflows.summarize.mockResolvedValue([
-      { ...firstUsage, optionalReferenceCount: 1, requiredReferenceCount: 1 },
+      {
+        ...firstUsage,
+        occurrences: [
+          ...firstUsage.occurrences,
+          {
+            phaseIndex: 2,
+            location: 'audio',
+            referenceMode: 'direct',
+            optional: false,
+          },
+        ],
+      },
     ]);
     const preview = await inspectAssetRetirementUseCase(
       deps.repository,
@@ -270,6 +344,37 @@ describe('retireAssetUseCase', () => {
     ).rejects.toThrow('same kind');
     expect(deps.workflows.replace).not.toHaveBeenCalled();
     expect(deps.workflows.removeOptional).not.toHaveBeenCalled();
+    expect(deps.writes.deleteAsset).not.toHaveBeenCalled();
+  });
+
+  test('rejects a conflicting replacement Role before Workflow or Asset writes', async () => {
+    const deps = setup();
+    const occupied = createAsset({
+      ...replacement,
+      id: 'occupied',
+      role: 'Other',
+    });
+    deps.values.set(occupied.id, occupied);
+    const preview = await inspectAssetRetirementUseCase(
+      deps.repository,
+      deps.active,
+      deps.workflows,
+      source.id,
+    );
+    await expect(
+      retireAssetUseCase(
+        deps.repository,
+        deps.active,
+        deps.workflows,
+        deps.unitOfWork,
+        policy,
+        preview,
+        { type: 'existing', assetId: occupied.id },
+      ),
+    ).rejects.toThrow('different Role');
+    expect(deps.writes.save).not.toHaveBeenCalled();
+    expect(deps.workflows.replace).not.toHaveBeenCalled();
+    expect(deps.writes.moveRole).not.toHaveBeenCalled();
     expect(deps.writes.deleteAsset).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -27,14 +27,24 @@ const audio = createAsset({
   byteSize: 2_048,
   createdAt: 2_000,
 });
+const meadow = createAsset({
+  id: 'image-2',
+  name: 'Meadow',
+  kind: 'image',
+  mimeType: 'image/png',
+  byteSize: 1_024,
+  createdAt: 3_000,
+});
 
 function setup(
   overrides: Partial<{
     onImport(file: File, kind: AssetKind): Promise<void>;
     onDelete(id: AssetId): Promise<void>;
     onInspectRetirement(id: AssetId): Promise<AssetRetirementPreview>;
+    assets: readonly (typeof image)[];
   }> = {},
 ) {
+  const assets = overrides.assets ?? [image, audio];
   const onImport = vi.fn<(file: File, kind: AssetKind) => Promise<void>>(
     overrides.onImport ?? (() => Promise.resolve()),
   );
@@ -43,19 +53,20 @@ function setup(
   );
   render(
     <AssetLibrary
-      assets={[image, audio]}
+      assets={assets}
       onImport={onImport}
       onInspectRetirement={
         overrides.onInspectRetirement ??
         ((id) =>
           Promise.resolve({
-            asset: [image, audio].find((asset) => asset.id === id) ?? image,
+            asset: assets.find((asset) => asset.id === id) ?? image,
             usages: [],
           }))
       }
       onRetire={(_, choice) =>
         onDelete(choice.type === 'existing' ? choice.assetId : image.id)
       }
+      onSynchronizeRetirement={() => Promise.resolve()}
       createRetirementUploadInput={(file, kind) => ({
         id: 'uploaded',
         name: file.name,
@@ -64,7 +75,7 @@ function setup(
         createdAt: 1,
       })}
       onInspectRoleChange={(assetId, value) => {
-        const target = [image, audio].find(({ id }) => id === assetId);
+        const target = assets.find(({ id }) => id === assetId);
         if (target === undefined) return Promise.reject(new Error('missing'));
         return Promise.resolve({
           target,
@@ -106,6 +117,7 @@ describe('AssetLibrary', () => {
           Promise.resolve({ asset: audio, usages: [] })
         }
         onRetire={() => Promise.resolve()}
+        onSynchronizeRetirement={() => Promise.resolve()}
         createRetirementUploadInput={(file, kind) => ({
           id: 'uploaded',
           name: file.name,
@@ -132,6 +144,7 @@ describe('AssetLibrary', () => {
           Promise.resolve({ asset: audio, usages: [] })
         }
         onRetire={() => Promise.resolve()}
+        onSynchronizeRetirement={() => Promise.resolve()}
         createRetirementUploadInput={(file, kind) => ({
           id: 'uploaded',
           name: file.name,
@@ -196,6 +209,7 @@ describe('AssetLibrary', () => {
           Promise.resolve({ asset: image, usages: [] })
         }
         onRetire={() => Promise.resolve()}
+        onSynchronizeRetirement={() => Promise.resolve()}
         createRetirementUploadInput={(file, kind) => ({
           id: 'uploaded',
           name: file.name,
@@ -263,10 +277,14 @@ describe('AssetLibrary', () => {
             {
               workflowId: 'workflow-1',
               workflowName: 'Deep work',
-              directReferenceCount: 1,
-              roleReferenceCount: 0,
-              optionalReferenceCount: 1,
-              requiredReferenceCount: 0,
+              occurrences: [
+                {
+                  phaseIndex: 0,
+                  location: 'background',
+                  referenceMode: 'direct',
+                  optional: true,
+                },
+              ],
             },
           ],
         }),
@@ -317,5 +335,39 @@ describe('AssetLibrary', () => {
     expect(
       screen.queryByRole('dialog', { name: 'Retire Forest' }),
     ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Add local image or audio')).toHaveFocus();
+    });
+  });
+
+  test('restores the retirement trigger after Cancel', async () => {
+    const user = userEvent.setup();
+    setup();
+    const trigger = screen.getByRole('button', { name: 'Retire Forest' });
+
+    await user.click(trigger);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(trigger).toHaveFocus();
+  });
+
+  test('focuses the surviving replacement after successful retirement', async () => {
+    const user = userEvent.setup();
+    setup({ assets: [image, meadow] });
+
+    await user.click(screen.getByRole('button', { name: 'Retire Forest' }));
+    await user.click(screen.getByRole('button', { name: 'Review usage' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.selectOptions(
+      screen.getByLabelText('Replacement Asset'),
+      meadow.id,
+    );
+    await user.click(screen.getByRole('button', { name: 'Retire asset' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Retire Meadow' }),
+      ).toHaveFocus();
+    });
   });
 });

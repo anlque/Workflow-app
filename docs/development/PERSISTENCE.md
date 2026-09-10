@@ -262,6 +262,9 @@ Asset upload, Workflow reference rewrites/removals, Role transfer and source
 deletion. A failure at any participating write aborts every earlier write, so a
 failed upload cannot become orphaned and a Workflow cannot retain a dangling
 direct reference. This changes no stored shape and keeps global Dexie version 4.
+Catalog-event publication and Options reload occur after commit. Their failure
+is recoverable through synchronization-only retry and never resubmits the
+durable retirement transaction.
 
 ### Workflow package import
 

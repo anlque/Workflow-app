@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button, Dialog, Field } from '@/shared';
 
@@ -8,6 +8,7 @@ import type {
   AssetRetirementPreview,
 } from '../application/AssetRetirement';
 import type { ImportAssetInput } from '../application/importAssetUseCase';
+import { StaleAssetRetirementError } from '../application/AssetRetirementErrors';
 
 export type AssetRetirementDialogProps = Readonly<{
   asset: Asset;
@@ -17,9 +18,10 @@ export type AssetRetirementDialogProps = Readonly<{
     preview: AssetRetirementPreview,
     choice: AssetRetirementChoice,
   ): Promise<void>;
+  onSynchronize(): Promise<void>;
   createUploadInput(file: File, kind: Asset['kind']): ImportAssetInput;
   onCancel(): void;
-  onSuccess(): void;
+  onSuccess(choice: AssetRetirementChoice): void;
 }>;
 
 export function AssetRetirementDialog({
@@ -27,6 +29,7 @@ export function AssetRetirementDialog({
   assets,
   onInspect,
   onRetire,
+  onSynchronize,
   createUploadInput,
   onCancel,
   onSuccess,
@@ -40,7 +43,15 @@ export function AssetRetirementDialog({
   const [upload, setUpload] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [committedChoice, setCommittedChoice] =
+    useState<AssetRetirementChoice | null>(null);
+  const [focusTarget, setFocusTarget] = useState<
+    'continue' | 'choices' | 'review' | null
+  >(null);
   const inFlight = useRef(false);
+  const continueRef = useRef<HTMLButtonElement>(null);
+  const firstChoiceRef = useRef<HTMLInputElement>(null);
+  const reviewRef = useRef<HTMLButtonElement>(null);
   const candidates = useMemo(
     () =>
       assets.filter(
@@ -52,6 +63,13 @@ export function AssetRetirementDialog({
     [asset, assets],
   );
 
+  useEffect(() => {
+    if (focusTarget === 'continue') continueRef.current?.focus();
+    if (focusTarget === 'choices') firstChoiceRef.current?.focus();
+    if (focusTarget === 'review') reviewRef.current?.focus();
+    if (focusTarget !== null) setFocusTarget(null);
+  }, [focusTarget]);
+
   async function inspect(): Promise<void> {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -59,8 +77,29 @@ export function AssetRetirementDialog({
     setError(null);
     try {
       setPreview(await onInspect(asset.id));
+      setFocusTarget('continue');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Asset review failed.');
+    } finally {
+      inFlight.current = false;
+      setPending(false);
+    }
+  }
+
+  async function synchronize(committed: AssetRetirementChoice): Promise<void> {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setPending(true);
+    setError(null);
+    try {
+      await onSynchronize();
+      onSuccess(committed);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Catalog synchronization failed.',
+      );
     } finally {
       inFlight.current = false;
       setPending(false);
@@ -93,8 +132,16 @@ export function AssetRetirementDialog({
     setError(null);
     try {
       await onRetire(preview, retirementChoice);
-      onSuccess();
+      setCommittedChoice(retirementChoice);
+      inFlight.current = false;
+      setPending(false);
+      await synchronize(retirementChoice);
     } catch (cause) {
+      if (cause instanceof StaleAssetRetirementError) {
+        setPreview(null);
+        setStep(1);
+        setFocusTarget('review');
+      }
       setError(
         cause instanceof Error ? cause.message : 'Asset retirement failed.',
       );
@@ -106,13 +153,12 @@ export function AssetRetirementDialog({
 
   const totalReferences =
     preview?.usages.reduce(
-      (total, usage) =>
-        total + usage.directReferenceCount + usage.roleReferenceCount,
+      (total, usage) => total + usage.occurrences.length,
       0,
     ) ?? 0;
   const canRemove =
-    preview?.usages.every(
-      ({ requiredReferenceCount }) => requiredReferenceCount === 0,
+    preview?.usages.every(({ occurrences }) =>
+      occurrences.every(({ optional }) => optional),
     ) ?? false;
 
   return (
@@ -143,14 +189,33 @@ export function AssetRetirementDialog({
                 <ul>
                   {preview.usages.map((usage) => (
                     <li key={usage.workflowId}>
-                      {usage.workflowName}: {usage.directReferenceCount} direct,{' '}
-                      {usage.roleReferenceCount} by Role
+                      {usage.workflowName}:{' '}
+                      {
+                        usage.occurrences.filter(
+                          ({ referenceMode }) => referenceMode === 'direct',
+                        ).length
+                      }{' '}
+                      direct,{' '}
+                      {
+                        usage.occurrences.filter(
+                          ({ referenceMode }) => referenceMode === 'role',
+                        ).length
+                      }{' '}
+                      by Role
+                      <ul>
+                        {usage.occurrences.map((occurrence) => (
+                          <li
+                            key={`${String(occurrence.phaseIndex)}:${occurrence.location}:${occurrence.referenceMode}`}
+                          >
+                            Phase {String(occurrence.phaseIndex + 1)} ·{' '}
+                            {occurrence.location} · {occurrence.referenceMode} ·{' '}
+                            {occurrence.optional ? 'optional' : 'required'}
+                          </li>
+                        ))}
+                      </ul>
                     </li>
                   ))}
                 </ul>
-              )}
-              {asset.role === undefined ? null : (
-                <p>Role “{asset.role}” will move to the replacement.</p>
               )}
             </div>
           )}
@@ -170,6 +235,7 @@ export function AssetRetirementDialog({
             </Button>
             {preview === null ? (
               <Button
+                buttonRef={reviewRef}
                 pending={pending}
                 pendingLabel="Reviewing…"
                 onClick={() => void inspect()}
@@ -179,8 +245,10 @@ export function AssetRetirementDialog({
             ) : (
               <Button
                 key="continue"
+                buttonRef={continueRef}
                 onClick={() => {
                   setStep(2);
+                  setFocusTarget('choices');
                 }}
               >
                 Continue
@@ -194,6 +262,7 @@ export function AssetRetirementDialog({
             <legend>Resolve references</legend>
             <label className="asset-retirement__choice">
               <input
+                ref={firstChoiceRef}
                 type="radio"
                 name="retirement-choice"
                 checked={choice === 'existing'}
@@ -262,6 +331,11 @@ export function AssetRetirementDialog({
               <p>Required references need a replacement Asset.</p>
             )}
           </fieldset>
+          {asset.role === undefined ? null : choice === 'remove' ? (
+            <p>Role “{asset.role}” will be retired with this Asset.</p>
+          ) : (
+            <p>Role “{asset.role}” will move to the replacement.</p>
+          )}
           {error === null ? null : (
             <p className="feedback feedback--error" role="alert">
               {error}
@@ -273,19 +347,30 @@ export function AssetRetirementDialog({
               disabled={pending}
               onClick={() => {
                 setStep(1);
+                setFocusTarget('continue');
               }}
             >
               Back
             </Button>
-            <Button
-              key="retire"
-              variant="danger"
-              pending={pending}
-              pendingLabel="Retiring…"
-              onClick={() => void retire()}
-            >
-              Retire asset
-            </Button>
+            {committedChoice === null ? (
+              <Button
+                key="retire"
+                variant="danger"
+                pending={pending}
+                pendingLabel="Retiring…"
+                onClick={() => void retire()}
+              >
+                Retire asset
+              </Button>
+            ) : (
+              <Button
+                pending={pending}
+                pendingLabel="Synchronizing…"
+                onClick={() => void synchronize(committedChoice)}
+              >
+                Retry sync
+              </Button>
+            )}
           </div>
         </>
       )}

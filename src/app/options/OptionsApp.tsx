@@ -41,6 +41,7 @@ export type OptionsDependencies = {
     preview: AssetRetirementPreview,
     choice: AssetRetirementChoice,
   ): Promise<void>;
+  synchronizeAssetRetirement(): Promise<void>;
   createAssetRetirementUploadInput(
     file: File,
     kind: AssetKind,
@@ -284,6 +285,9 @@ export function OptionsApp({
             }
             onRetire={async (preview, choice) => {
               await dependencies.retireAsset(preview, choice);
+            }}
+            onSynchronizeRetirement={async () => {
+              await dependencies.synchronizeAssetRetirement();
               await load(selectedWorkflowId);
             }}
             createRetirementUploadInput={(file, kind) =>

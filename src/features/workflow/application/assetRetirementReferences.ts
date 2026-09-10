@@ -1,4 +1,8 @@
-import { assetRoleKey, type Asset } from '@/features/assets';
+import {
+  assetRoleKey,
+  type Asset,
+  type AssetRetirementOccurrence,
+} from '@/features/assets';
 
 import { createWorkflow } from '../domain/createWorkflow';
 import type { AssetReference, EnvironmentInput } from '../domain/Environment';
@@ -8,10 +12,7 @@ import type { WorkflowRepository } from './WorkflowRepository';
 export type WorkflowAssetRetirementUsage = Readonly<{
   workflowId: Workflow['id'];
   workflowName: string;
-  directReferenceCount: number;
-  roleReferenceCount: number;
-  optionalReferenceCount: number;
-  requiredReferenceCount: number;
+  occurrences: readonly AssetRetirementOccurrence[];
 }>;
 
 function referenceKind(reference: AssetReference | undefined, source: Asset) {
@@ -27,18 +28,23 @@ function referenceKind(reference: AssetReference | undefined, source: Asset) {
 }
 
 function occurrences(workflow: Workflow, source: Asset) {
-  let direct = 0;
-  let role = 0;
-  workflow.phases.forEach(({ environment }) => {
-    [environment.backgroundAsset, environment.audioAsset].forEach(
-      (reference) => {
-        const kind = referenceKind(reference, source);
-        if (kind === 'direct') direct += 1;
-        if (kind === 'role') role += 1;
+  const values: AssetRetirementOccurrence[] = [];
+  workflow.phases.forEach(({ environment }, phaseIndex) => {
+    const references = [
+      {
+        location: 'background' as const,
+        reference: environment.backgroundAsset,
       },
-    );
+      { location: 'audio' as const, reference: environment.audioAsset },
+    ];
+    references.forEach(({ location, reference }) => {
+      const referenceMode = referenceKind(reference, source);
+      if (referenceMode !== null) {
+        values.push({ phaseIndex, location, referenceMode, optional: true });
+      }
+    });
   });
-  return { direct, role };
+  return values;
 }
 
 export async function summarizeWorkflowAssetReferences(
@@ -46,18 +52,14 @@ export async function summarizeWorkflowAssetReferences(
   source: Asset,
 ): Promise<readonly WorkflowAssetRetirementUsage[]> {
   return (await repository.list()).flatMap((workflow) => {
-    const { direct, role } = occurrences(workflow, source);
-    const total = direct + role;
-    return total === 0
+    const values = occurrences(workflow, source);
+    return values.length === 0
       ? []
       : [
           {
             workflowId: workflow.id,
             workflowName: workflow.name,
-            directReferenceCount: direct,
-            roleReferenceCount: role,
-            optionalReferenceCount: total,
-            requiredReferenceCount: 0,
+            occurrences: values,
           },
         ];
   });
@@ -116,8 +118,7 @@ async function patch(
   ) => AssetReference | undefined,
 ): Promise<void> {
   for (const workflow of await repository.list()) {
-    const { direct, role } = occurrences(workflow, source);
-    if (direct + role > 0)
+    if (occurrences(workflow, source).length > 0)
       await repository.save(copyWorkflow(workflow, transform));
   }
 }

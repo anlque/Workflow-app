@@ -21,6 +21,7 @@ export type AssetLibraryProps = Readonly<{
     preview: AssetRetirementPreview,
     choice: AssetRetirementChoice,
   ): Promise<void>;
+  onSynchronizeRetirement(): Promise<void>;
   createRetirementUploadInput(file: File, kind: AssetKind): ImportAssetInput;
   onInspectRoleChange(
     id: AssetId,
@@ -44,6 +45,7 @@ export function AssetLibrary({
   onImport,
   onInspectRetirement,
   onRetire,
+  onSynchronizeRetirement,
   createRetirementUploadInput,
   onInspectRoleChange,
   onApplyRoleChange,
@@ -54,6 +56,9 @@ export function AssetLibrary({
 }: AssetLibraryProps) {
   const [deleting, setDeleting] = useState<Asset | null>(null);
   const deleteTrigger = useRef<HTMLButtonElement | null>(null);
+  const library = useRef<HTMLElement | null>(null);
+  const addAssetInput = useRef<HTMLInputElement | null>(null);
+  const retirementFocusTarget = useRef<string | null>(null);
   const [managingRole, setManagingRole] = useState<Asset | null>(null);
   const roleTrigger = useRef<HTMLButtonElement | null>(null);
   const restoreRoleFocus = useRef(false);
@@ -102,8 +107,39 @@ export function AssetLibrary({
     queueMicrotask(() => deleteTrigger.current?.focus());
   }
 
+  function completeRetirement(choice: AssetRetirementChoice): void {
+    retirementFocusTarget.current =
+      choice.type === 'existing'
+        ? choice.assetId
+        : choice.type === 'upload'
+          ? choice.input.id
+          : 'add';
+    setDeleting(null);
+  }
+
+  useEffect(() => {
+    if (deleting !== null || retirementFocusTarget.current === null) return;
+    const target = retirementFocusTarget.current;
+    retirementFocusTarget.current = null;
+    setTimeout(() => {
+      if (target === 'add') addAssetInput.current?.focus();
+      else {
+        const trigger = Array.from(
+          library.current?.querySelectorAll<HTMLButtonElement>(
+            '[data-retirement-asset-id]',
+          ) ?? [],
+        ).find(({ dataset }) => dataset['retirementAssetId'] === target);
+        trigger?.focus();
+      }
+    }, 0);
+  }, [assets, deleting]);
+
   return (
-    <section className="asset-library" aria-labelledby="asset-library-title">
+    <section
+      ref={library}
+      className="asset-library"
+      aria-labelledby="asset-library-title"
+    >
       <header className="section-heading">
         <div>
           <h2 id="asset-library-title">Local Assets</h2>
@@ -113,6 +149,7 @@ export function AssetLibrary({
         <label className="button button--primary asset-upload">
           {pending === 'import' ? 'Adding…' : 'Add asset'}
           <input
+            ref={addAssetInput}
             type="file"
             accept="image/png,image/jpeg,image/webp,audio/mpeg,audio/ogg,audio/wav"
             aria-label="Add local image or audio"
@@ -172,6 +209,7 @@ export function AssetLibrary({
                     Role
                   </Button>
                   <Button
+                    data-retirement-asset-id={asset.id}
                     variant="quiet"
                     aria-label={`Retire ${asset.name}`}
                     onClick={(event) => {
@@ -194,9 +232,10 @@ export function AssetLibrary({
           assets={assets}
           onInspect={onInspectRetirement}
           onRetire={onRetire}
+          onSynchronize={onSynchronizeRetirement}
           createUploadInput={createRetirementUploadInput}
           onCancel={closeRetirementDialog}
-          onSuccess={closeRetirementDialog}
+          onSuccess={completeRetirement}
         />
       )}
       {managingRole === null ? null : (

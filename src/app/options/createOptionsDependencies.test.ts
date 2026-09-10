@@ -271,4 +271,36 @@ describe('createOptionsDependencies Asset retirement integration', () => {
       assetId: replacement.id,
     });
   });
+
+  test('does not repeat committed retirement when catalog publication is retried', async () => {
+    const database = createDatabase();
+    const assets = new DexieAssetRepository(database);
+    const source = await seedAsset(assets, {
+      id: 'source-publish',
+      name: 'Forest',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 1,
+      createdAt: 1,
+    });
+    const dependencies = createOptionsDependencies(
+      createTestDocumentPreferences(),
+      database,
+    );
+    const assetDeletes = vi.spyOn(database.table('assets'), 'delete');
+    browserMock.runtime.sendMessage
+      .mockRejectedValueOnce(new Error('Catalog publication failed.'))
+      .mockResolvedValueOnce(undefined);
+
+    const preview = await dependencies.inspectAssetRetirement(source.id);
+    await dependencies.retireAsset(preview, { type: 'remove' });
+    await expect(dependencies.synchronizeAssetRetirement()).rejects.toThrow(
+      'Catalog publication failed.',
+    );
+    await dependencies.synchronizeAssetRetirement();
+
+    expect(assetDeletes).toHaveBeenCalledOnce();
+    expect(await assets.get(source.id)).toBeNull();
+    expect(browserMock.runtime.sendMessage).toHaveBeenCalledTimes(2);
+  });
 });

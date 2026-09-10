@@ -177,20 +177,17 @@ export function createOptionsDependencies(
         id,
       ),
     async retireAsset(preview, choice) {
-      await runWorkflowCatalogMutation(
-        () =>
-          retireAssetUseCase(
-            assets,
-            activeSessionReferences,
-            retirementWorkflows,
-            retirementUnitOfWork,
-            assetPolicy,
-            preview,
-            choice,
-          ),
-        catalogEvents,
+      await retireAssetUseCase(
+        assets,
+        activeSessionReferences,
+        retirementWorkflows,
+        retirementUnitOfWork,
+        assetPolicy,
+        preview,
+        choice,
       );
     },
+    synchronizeAssetRetirement: () => catalogEvents.publishChanged(),
     createAssetRetirementUploadInput(file, kind) {
       return {
         id: crypto.randomUUID(),

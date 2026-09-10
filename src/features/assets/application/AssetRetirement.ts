@@ -9,10 +9,14 @@ export type AssetRetirementRepository = AssetRepository &
 export type AssetRetirementUsage = Readonly<{
   workflowId: string;
   workflowName: string;
-  directReferenceCount: number;
-  roleReferenceCount: number;
-  optionalReferenceCount: number;
-  requiredReferenceCount: number;
+  occurrences: readonly AssetRetirementOccurrence[];
+}>;
+
+export type AssetRetirementOccurrence = Readonly<{
+  phaseIndex: number;
+  location: 'background' | 'audio';
+  referenceMode: 'direct' | 'role';
+  optional: boolean;
 }>;
 
 export type AssetRetirementPreview = Readonly<{

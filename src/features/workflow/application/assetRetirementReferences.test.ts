@@ -36,6 +36,7 @@ function workflow() {
         durationSeconds: 60,
         environment: {
           backgroundAsset: { type: 'direct', assetId: source.id },
+          audioAsset: { type: 'role', role: 'Hero' },
         },
       },
       {
@@ -47,7 +48,7 @@ function workflow() {
   });
 }
 
-test('summarizes direct and Role references across all Phases once per Workflow', async () => {
+test('reports every direct and Role occurrence with its Phase location and optionality', async () => {
   const repository = new InMemoryWorkflowRepository([workflow()]);
   await expect(
     summarizeWorkflowAssetReferences(repository, source),
@@ -55,10 +56,26 @@ test('summarizes direct and Role references across all Phases once per Workflow'
     {
       workflowId: 'workflow',
       workflowName: 'Deep work',
-      directReferenceCount: 1,
-      roleReferenceCount: 1,
-      optionalReferenceCount: 2,
-      requiredReferenceCount: 0,
+      occurrences: [
+        {
+          phaseIndex: 0,
+          location: 'background',
+          referenceMode: 'direct',
+          optional: true,
+        },
+        {
+          phaseIndex: 0,
+          location: 'audio',
+          referenceMode: 'role',
+          optional: true,
+        },
+        {
+          phaseIndex: 1,
+          location: 'background',
+          referenceMode: 'role',
+          optional: true,
+        },
+      ],
     },
   ]);
 });
@@ -78,6 +95,10 @@ describe('Workflow Asset retirement patches', () => {
       type: 'role',
       role: 'Hero',
     });
+    expect(saved.phases[0].environment.audioAsset).toEqual({
+      type: 'role',
+      role: 'Hero',
+    });
   });
 
   test('removes every optional direct and Role reference', async () => {
@@ -88,5 +109,6 @@ describe('Workflow Asset retirement patches', () => {
     if (saved === undefined) return;
     expect(saved.phases[0].environment.backgroundAsset).toBeUndefined();
     expect(saved.phases[1]?.environment.backgroundAsset).toBeUndefined();
+    expect(saved.phases[0].environment.audioAsset).toBeUndefined();
   });
 });

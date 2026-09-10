@@ -61,7 +61,7 @@ Consumers import only from `@/features/assets`.
 | Domain                     | `Asset`, `AssetId`, `AssetKind`, `AssetRole`, `CreateAssetInput`, `createAsset`, `createAssetId`, `createAssetRole`, `assetRoleKey`                     |
 | Errors                     | `AssetValidationError`, `AssetRoleConflictError`, `AssetRoleMergeError`, `StaleAssetRoleChangeError`, `AssetRetirementValidationError`, `StaleAssetRetirementError`, `UnresolvedAssetRoleError`, `WrongKindAssetRoleError`, `ActiveSessionReferencedAssetError`, `AssetStorageError` |
 | Application ports          | `AssetRepository`, `AssetRoleRepository`, `AssetRoleManagementRepository`, `AssetRoleWorkflowUsage`, `AssetRoleManagementUnitOfWork`, `ActiveSessionAssetReferences`, `AssetRetirementWorkflowReferences`, `AssetRetirementUnitOfWork` |
-| Application behavior       | `inspectAssetRoleChangeUseCase`, `applyAssetRoleChangeUseCase`, `inspectAssetRetirementUseCase`, `retireAssetUseCase`, `importAssetUseCase`, `validateAssetImport`, `listAssetsUseCase`, `moveAssetRoleUseCase`, `resolveAssetRoleUseCase`, `AssetRetirementChoice`, `AssetRetirementPreview`, `AssetRetirementUsage` and Role/import policy types |
+| Application behavior       | `inspectAssetRoleChangeUseCase`, `applyAssetRoleChangeUseCase`, `inspectAssetRetirementUseCase`, `retireAssetUseCase`, `importAssetUseCase`, `validateAssetImport`, `listAssetsUseCase`, `moveAssetRoleUseCase`, `resolveAssetRoleUseCase`, `AssetRetirementChoice`, `AssetRetirementPreview`, `AssetRetirementUsage`, `AssetRetirementOccurrence` and Role/import policy types |
 | Infrastructure composition | `DexieAssetRepository`, `assetDatabaseSchemas`, `BrowserAssetUrlService`                                                                                 |
 | Presentation               | `AssetLibrary`, `AssetPicker`, `AssetPickerValue`, `AssetRoleDialog`, `AssetRetirementDialog`, `AssetRetirementDialogProps`, `AssetPreview` and their remaining prop types |
 
@@ -158,10 +158,13 @@ See [Persistence and Compatibility](../PERSISTENCE.md) and
 
 Options uses the library for local import, preview, Role management and a
 two-step retirement dialog. The first step lists affected Workflows and direct/
-Role usage; the second chooses an existing same-kind Asset, a new upload or
+Role occurrences with phase, location and optionality; the second chooses an
+existing same-kind Asset, a new upload or
 optional-reference removal. The injected Application operation remains the
 authoritative kind/size/MIME and transaction boundary. Rejections remain inline
-and retryable without nesting another modal.
+and retryable without nesting another modal. A post-commit catalog publication
+or reload failure offers synchronization-only retry and cannot repeat the
+retirement mutation.
 Each card shows its current Role or `No Role`. The accessible Role dialog
 restores the invoking control on close, previews global impact before mutation
 and labels occupied-Role confirmation `Move role`.
@@ -226,7 +229,8 @@ channel policy remains deferred to AU-001.
 | Corrupt record or mismatched Blob metadata | Infrastructure     | Throws `AssetValidationError` at the read/write boundary     |
 | Browser quota exhausted                    | Infrastructure     | Throws normalized `AssetStorageError`                        |
 | Missing preview Blob                       | Presentation       | Shows `Preview unavailable`                                  |
-| Import/retirement dependency failure       | Presentation       | Preserves the consistent catalog and displays accessible retry feedback |
+| Retirement transaction failure             | Presentation       | Keeps the choice step open for safe mutation retry                       |
+| Post-commit publication/reload failure      | Presentation       | Retries synchronization only; never repeats retirement                   |
 
 ## Tests
 

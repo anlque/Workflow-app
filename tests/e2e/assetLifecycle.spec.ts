@@ -212,3 +212,50 @@ test('retires an Asset by replacing direct Workflow references', async ({
     options.getByLabel('Background image').locator('option:checked'),
   ).toHaveText('new.png');
 });
+
+test('retires an Asset with an uploaded replacement', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('tab', { name: 'Assets' }).click();
+  await options.getByLabel('Add local image or audio').setInputFiles({
+    name: 'source.png',
+    mimeType: 'image/png',
+    buffer: onePixelPng,
+  });
+  await options.getByRole('tab', { name: 'Workflows' }).click();
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Uploaded replacement');
+  await options
+    .getByLabel('Background image')
+    .selectOption({ label: 'source.png' });
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+
+  await options.getByRole('tab', { name: 'Assets' }).click();
+  await options.getByRole('button', { name: 'Retire source.png' }).click();
+  await options.getByRole('button', { name: 'Review usage' }).click();
+  await options.getByRole('button', { name: 'Continue' }).click();
+  await options.getByRole('radio', { name: 'Upload a replacement' }).check();
+  await options.getByLabel('Replacement file').setInputFiles({
+    name: 'uploaded.png',
+    mimeType: 'image/png',
+    buffer: onePixelPng,
+  });
+  await options.getByRole('button', { name: 'Retire asset' }).click();
+
+  await expect(
+    options.getByRole('listitem', { name: 'Image: source.png' }),
+  ).toHaveCount(0);
+  await expect(
+    options.getByRole('listitem', { name: 'Image: uploaded.png' }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('button', { name: 'Retire uploaded.png' }),
+  ).toBeFocused();
+  await options.getByRole('tab', { name: 'Workflows' }).click();
+  await expect(
+    options.getByLabel('Background image').locator('option:checked'),
+  ).toHaveText('uploaded.png');
+});

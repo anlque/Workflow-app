@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
 import { createAsset } from '../domain/Asset';
+import { StaleAssetRetirementError } from '../application/AssetRetirementErrors';
 import { AssetRetirementDialog } from './AssetRetirementDialog';
 
 const source = createAsset({
@@ -28,10 +29,20 @@ const preview = {
     {
       workflowId: 'workflow',
       workflowName: 'Deep work',
-      directReferenceCount: 1,
-      roleReferenceCount: 1,
-      optionalReferenceCount: 2,
-      requiredReferenceCount: 0,
+      occurrences: [
+        {
+          phaseIndex: 0,
+          location: 'background',
+          referenceMode: 'direct',
+          optional: true,
+        },
+        {
+          phaseIndex: 1,
+          location: 'background',
+          referenceMode: 'role',
+          optional: true,
+        },
+      ],
     },
   ],
 } as const;
@@ -46,6 +57,7 @@ function setup(
       assets={[source, replacement]}
       onInspect={() => Promise.resolve(preview)}
       onRetire={onRetire}
+      onSynchronize={() => Promise.resolve()}
       createUploadInput={(file, kind) => ({
         id: 'uploaded',
         name: file.name,
@@ -67,6 +79,27 @@ async function continueToChoice(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('AssetRetirementDialog', () => {
+  test('moves focus through Review, Continue, choices and Back naturally', async () => {
+    const user = userEvent.setup();
+    setup();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Review usage' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(
+      await screen.findByRole('button', { name: 'Continue' }),
+    ).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(
+      screen.getByRole('radio', { name: 'Use an existing Asset' }),
+    ).toHaveFocus();
+    await user.tab();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus();
+  });
+
   test('keeps a pending review open on Escape', async () => {
     const user = userEvent.setup();
     let resolveInspection: ((value: typeof preview) => void) | undefined;
@@ -135,13 +168,84 @@ describe('AssetRetirementDialog', () => {
     expect(onRetire).toHaveBeenCalledTimes(2);
   });
 
+  test('retries synchronization without repeating a committed retirement', async () => {
+    const user = userEvent.setup();
+    const onRetire = vi.fn(() => Promise.resolve());
+    const onSynchronize = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Catalog reload failed'))
+      .mockResolvedValueOnce(undefined);
+    const onSuccess = vi.fn();
+    setup({ onRetire, onSynchronize, onSuccess });
+    await continueToChoice(user);
+    await user.click(
+      screen.getByRole('radio', { name: 'Remove optional references' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Retire asset' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Catalog reload failed',
+    );
+    await user.click(screen.getByRole('button', { name: 'Retry sync' }));
+    expect(onRetire).toHaveBeenCalledOnce();
+    expect(onSynchronize).toHaveBeenCalledTimes(2);
+    expect(onSuccess).toHaveBeenCalledWith({ type: 'remove' });
+  });
+
+  test('returns a stale retirement to Review usage', async () => {
+    const user = userEvent.setup();
+    const onRetire = vi.fn(() =>
+      Promise.reject(new StaleAssetRetirementError()),
+    );
+    setup({ onRetire });
+    await continueToChoice(user);
+    await user.click(
+      screen.getByRole('radio', { name: 'Remove optional references' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Retire asset' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Asset usage changed',
+    );
+    expect(screen.getByRole('button', { name: 'Review usage' })).toBeVisible();
+    expect(
+      screen.queryByRole('radio', { name: 'Remove optional references' }),
+    ).not.toBeInTheDocument();
+  });
+
+  test('describes Role transfer only for replacement and Role retirement for removal', async () => {
+    const user = userEvent.setup();
+    setup();
+    await continueToChoice(user);
+    expect(
+      screen.getByText('Role “Hero” will move to the replacement.'),
+    ).toBeVisible();
+    await user.click(
+      screen.getByRole('radio', { name: 'Remove optional references' }),
+    );
+    expect(
+      screen.getByText('Role “Hero” will be retired with this Asset.'),
+    ).toBeVisible();
+  });
+
   test('disables removal when the usage contains a required reference', async () => {
     const user = userEvent.setup();
     setup({
       onInspect: () =>
         Promise.resolve({
           asset: source,
-          usages: [{ ...preview.usages[0], requiredReferenceCount: 1 }],
+          usages: [
+            {
+              ...preview.usages[0],
+              occurrences: [
+                ...preview.usages[0].occurrences,
+                {
+                  phaseIndex: 2,
+                  location: 'audio',
+                  referenceMode: 'direct',
+                  optional: false,
+                },
+              ],
+            },
+          ],
         }),
     });
     await continueToChoice(user);

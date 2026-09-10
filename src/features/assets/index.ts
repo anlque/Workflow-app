@@ -22,6 +22,7 @@ export {
 } from './application/assetRetirementUseCases';
 export type {
   AssetRetirementChoice,
+  AssetRetirementOccurrence,
   AssetRetirementPreview,
   AssetRetirementRepository,
   AssetRetirementUsage,

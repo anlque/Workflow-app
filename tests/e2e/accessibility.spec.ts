@@ -67,8 +67,7 @@ test('Asset Role dialog has no detectable axe violations', async ({
   const trigger = options.getByRole('button', {
     name: 'Manage role for role-image.png',
   });
-  await trigger.focus();
-  await options.keyboard.press('Enter');
+  await trigger.click();
   await expect(options.getByRole('textbox', { name: 'Role' })).toBeFocused();
   await expectNoAccessibilityViolations(options);
   await options.getByRole('textbox', { name: 'Role' }).fill('Backdrop');
@@ -103,14 +102,16 @@ test('Asset retirement dialog has no detectable axe violations', async ({
   const trigger = options.getByRole('button', {
     name: 'Retire retire-image.png',
   });
-  await trigger.focus();
-  await options.keyboard.press('Enter');
+  await trigger.click();
   await expect(options.getByRole('button', { name: 'Cancel' })).toBeFocused();
   await expectNoAccessibilityViolations(options);
   await options.keyboard.press('Tab');
   await options.keyboard.press('Enter');
-  await options.getByRole('button', { name: 'Continue' }).focus();
+  await expect(options.getByRole('button', { name: 'Continue' })).toBeFocused();
   await options.keyboard.press('Enter');
+  await expect(
+    options.getByRole('radio', { name: 'Use an existing Asset' }),
+  ).toBeFocused();
   await expectNoAccessibilityViolations(options);
   await options.keyboard.press('Escape');
   await expect(trigger).toBeFocused();

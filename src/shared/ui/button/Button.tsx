@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
 
@@ -11,6 +11,7 @@ export type ButtonProps = Omit<
     pending?: boolean;
     pendingLabel?: string;
     variant?: ButtonVariant;
+    buttonRef?: Ref<HTMLButtonElement>;
   }>;
 
 export function Button({
@@ -20,6 +21,7 @@ export function Button({
   variant = 'secondary',
   className,
   disabled,
+  buttonRef,
   type = 'button',
   ...props
 }: ButtonProps) {
@@ -29,6 +31,7 @@ export function Button({
 
   return (
     <button
+      ref={buttonRef}
       {...props}
       type={type}
       className={classes}

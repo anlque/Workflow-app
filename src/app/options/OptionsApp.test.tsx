@@ -36,6 +36,7 @@ function dependencies(): OptionsDependencies {
         usages: [],
       }),
     retireAsset: () => Promise.resolve(),
+    synchronizeAssetRetirement: () => Promise.resolve(),
     createAssetRetirementUploadInput: (file, kind) => ({
       id: 'replacement-id',
       name: file.name,
@@ -74,6 +75,77 @@ function dependencies(): OptionsDependencies {
 }
 
 describe('OptionsApp', () => {
+  test.each(['publication', 'load'] as const)(
+    'retries %s after committed retirement without repeating the mutation',
+    async (failure) => {
+      const user = userEvent.setup();
+      const deps = dependencies();
+      const source = createAsset({
+        id: 'source',
+        name: 'Forest',
+        kind: 'image',
+        mimeType: 'image/png',
+        byteSize: 1,
+        createdAt: 1,
+      });
+      const populated = {
+        workflows: [],
+        assets: [source],
+        settings: defaultSettings,
+      };
+      const retired = {
+        workflows: [],
+        assets: [],
+        settings: defaultSettings,
+      };
+      const load =
+        failure === 'load'
+          ? vi
+              .fn()
+              .mockResolvedValueOnce(populated)
+              .mockRejectedValueOnce(new Error('Catalog reload failed.'))
+              .mockResolvedValueOnce(retired)
+          : vi
+              .fn()
+              .mockResolvedValueOnce(populated)
+              .mockResolvedValueOnce(retired);
+      const retire = vi.fn(() => Promise.resolve());
+      const synchronize =
+        failure === 'publication'
+          ? vi
+              .fn()
+              .mockRejectedValueOnce(new Error('Catalog publication failed.'))
+              .mockResolvedValueOnce(undefined)
+          : vi.fn(() => Promise.resolve());
+      deps.load = load;
+      deps.retireAsset = retire;
+      deps.synchronizeAssetRetirement = synchronize;
+      deps.inspectAssetRetirement = () =>
+        Promise.resolve({ asset: source, usages: [] });
+      render(<OptionsApp dependencies={deps} />);
+
+      await user.click(await screen.findByRole('tab', { name: 'Assets' }));
+      await user.click(screen.getByRole('button', { name: 'Retire Forest' }));
+      await user.click(screen.getByRole('button', { name: 'Review usage' }));
+      await user.click(screen.getByRole('button', { name: 'Continue' }));
+      await user.click(
+        screen.getByRole('radio', { name: 'Remove optional references' }),
+      );
+      await user.click(screen.getByRole('button', { name: 'Retire asset' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        failure === 'publication'
+          ? 'Catalog publication failed.'
+          : 'Catalog reload failed.',
+      );
+      await user.click(screen.getByRole('button', { name: 'Retry sync' }));
+
+      expect(retire).toHaveBeenCalledOnce();
+      expect(synchronize).toHaveBeenCalledTimes(2);
+      expect(load).toHaveBeenCalledTimes(failure === 'load' ? 3 : 2);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    },
+  );
+
   test('recovers an updated snapshot after a post-commit load failure without reapplying the Role change', async () => {
     const user = userEvent.setup();
     const deps = dependencies();

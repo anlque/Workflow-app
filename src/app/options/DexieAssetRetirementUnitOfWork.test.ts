@@ -112,6 +112,33 @@ async function setup() {
 }
 
 describe('DexieAssetRetirementUnitOfWork', () => {
+  test('commits an uploaded replacement without leaving the source', async () => {
+    const value = await setup();
+    await value.run({
+      type: 'upload',
+      input: {
+        id: 'uploaded',
+        name: 'Uploaded',
+        kind: 'image',
+        blob: new Blob(['y'], { type: 'image/png' }),
+        createdAt: 3,
+      },
+    });
+    const catalog = await value.assets.list();
+    expect(catalog.find(({ id }) => id === value.source.id)).toBeUndefined();
+    expect(catalog.find(({ id }) => id === 'uploaded')?.role).toBe('Hero');
+  });
+
+  test('commits optional-reference removal and source retirement', async () => {
+    const value = await setup();
+    await value.run({ type: 'remove' });
+    expect(await value.assets.get(value.source.id)).toBeNull();
+    expect(
+      (await new DexieWorkflowRepository(value.database).list())[0]?.phases[0]
+        .environment.backgroundAsset,
+    ).toBeUndefined();
+  });
+
   test('rolls back a failed uploaded-Asset write', async () => {
     const value = await setup();
     vi.spyOn(value.database.table('assets'), 'put').mockRejectedValueOnce(

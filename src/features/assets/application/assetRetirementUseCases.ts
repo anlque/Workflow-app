@@ -11,6 +11,7 @@ import {
 } from './AssetRetirementErrors';
 import type { AssetRetirementUnitOfWork } from './AssetRetirementUnitOfWork';
 import type { AssetRetirementWorkflowReferences } from './AssetRetirementWorkflowReferences';
+import { assetRoleKey } from '../domain/Asset';
 import {
   validateAssetImport,
   type AssetImportPolicy,
@@ -58,8 +59,8 @@ export async function retireAssetUseCase(
 
     if (choice.type === 'remove') {
       if (
-        current.usages.some(
-          ({ requiredReferenceCount }) => requiredReferenceCount > 0,
+        current.usages.some(({ occurrences }) =>
+          occurrences.some(({ optional }) => !optional),
         )
       ) {
         throw new AssetRetirementValidationError(
@@ -88,6 +89,15 @@ export async function retireAssetUseCase(
     if (replacement.kind !== current.asset.kind) {
       throw new AssetRetirementValidationError(
         'Replacement Asset must have the same kind.',
+      );
+    }
+    if (
+      current.asset.role !== undefined &&
+      replacement.role !== undefined &&
+      assetRoleKey(current.asset.role) !== assetRoleKey(replacement.role)
+    ) {
+      throw new AssetRetirementValidationError(
+        'Replacement Asset already owns a different Role.',
       );
     }
     if (choice.type === 'upload')

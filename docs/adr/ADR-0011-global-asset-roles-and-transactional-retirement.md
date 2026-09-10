@@ -36,13 +36,18 @@ Assets preserves the ST-005 injected active-Session-reference port and never
 imports Session internals.
 
 Asset retirement first applies the injected active-Session guard and returns an
-authoritative Workflow usage preview. The confirmed operation rechecks that
-preview and performs same-kind direct-reference replacement, optional-reference
+authoritative occurrence-level Workflow usage preview with phase, location,
+reference mode and optionality. The confirmed operation rechecks that preview
+and performs same-kind direct-reference replacement, optional-reference
 removal, Role transfer, optional replacement upload and source deletion in one
 Assets/Workflows/Sessions transaction. Required references cannot be removed.
 Role references remain stable when the Role transfers; direct references are
 rewritten to the replacement ID. The active immutable Session snapshot is never
 edited.
+
+Catalog publication and UI reload are post-commit synchronization, not part of
+the durable transaction. If either fails, the UI retries synchronization without
+repeating the retirement command.
 
 ## Alternatives Considered
 
