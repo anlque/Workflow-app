@@ -107,8 +107,7 @@ export async function renameWorkflowRoleReferences(
           ? {}
           : {
               rewardDice: {
-                triggerPhaseType: workflow.rewardDice.triggerPhaseType,
-                frequency: workflow.rewardDice.frequency,
+                schedule: workflow.rewardDice.schedule,
                 rerolls: workflow.rewardDice.rerolls,
                 sides: workflow.rewardDice.sides.map((side) => ({
                   icon: side.icon,

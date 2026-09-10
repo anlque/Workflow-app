@@ -155,9 +155,63 @@ describe('createWorkflow', () => {
       },
     });
 
-    expect(workflow.rewardDice?.triggerPhaseType).toBe('focus');
+    expect(workflow.rewardDice?.schedule).toEqual({
+      type: 'frequency',
+      triggerPhaseType: 'focus',
+      frequency: 1,
+    });
     expect(workflow.rewardDice?.rerolls).toBe(0);
   });
+
+  test('creates a sorted immutable custom Reward schedule', () => {
+    const workflow = createWorkflow({
+      id: 'workflow-1',
+      name: 'Deep work',
+      phases: [validPhase, validPhase, validPhase, validPhase],
+      rewardDice: {
+        schedule: { type: 'custom', phaseIndexes: [3, 1] },
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+
+    expect(workflow.rewardDice?.schedule).toEqual({
+      type: 'custom',
+      phaseIndexes: [1, 3],
+    });
+    expect(Object.isFrozen(workflow.rewardDice?.schedule)).toBe(true);
+    expect(
+      Object.isFrozen(
+        workflow.rewardDice?.schedule.type === 'custom'
+          ? workflow.rewardDice.schedule.phaseIndexes
+          : undefined,
+      ),
+    ).toBe(true);
+  });
+
+  test.each([[[1, 1]], [[-1]], [[0.5]], [[4]]])(
+    'rejects invalid custom Reward indexes %j',
+    (phaseIndexes) => {
+      expect(() =>
+        createWorkflow({
+          id: 'workflow-1',
+          name: 'Deep work',
+          phases: [validPhase, validPhase, validPhase, validPhase],
+          rewardDice: {
+            schedule: { type: 'custom', phaseIndexes },
+            sides: [
+              { icon: 'tea', title: 'Tea' },
+              { icon: 'walk', title: 'Walk' },
+            ],
+          },
+        }),
+      ).toThrow(
+        'Custom Reward phase indexes must be unique in-range integers.',
+      );
+    },
+  );
 
   test.each([0, 1, 2, 3])('accepts %s Reward Dice rerolls', (rerolls) => {
     const workflow = createWorkflow({
@@ -213,7 +267,11 @@ describe('createWorkflow', () => {
       },
     });
 
-    expect(workflow.rewardDice?.triggerPhaseType).toBe('break');
+    expect(workflow.rewardDice?.schedule).toEqual({
+      type: 'frequency',
+      triggerPhaseType: 'break',
+      frequency: 1,
+    });
   });
 
   test('assigns equal probabilities when all custom weights are omitted', () => {

@@ -104,7 +104,7 @@ function packageReferences(workflow: Workflow): PackageReferences {
 
 function parseAsset(
   value: unknown,
-  version: 1 | 2,
+  version: 1 | 2 | 3,
   policy: AssetImportPolicy,
   identity: WorkflowImportIdentity,
 ): DecodedAsset {
@@ -121,7 +121,7 @@ function parseAsset(
   if (
     !requiredKeys.every((key) => Object.hasOwn(input, key)) ||
     !keys.every(
-      (key) => requiredKeys.includes(key) || (version === 2 && key === 'role'),
+      (key) => requiredKeys.includes(key) || (version >= 2 && key === 'role'),
     )
   ) {
     throw new WorkflowPackageValidationError();
@@ -220,7 +220,9 @@ export async function importWorkflowUseCase(
   if (
     Object.keys(envelope).length !== 4 ||
     envelope['kind'] !== 'locusora/workflow' ||
-    (envelope['version'] !== 1 && envelope['version'] !== 2) ||
+    (envelope['version'] !== 1 &&
+      envelope['version'] !== 2 &&
+      envelope['version'] !== 3) ||
     !Array.isArray(envelope['assets'])
   ) {
     throw new WorkflowPackageValidationError();
@@ -347,8 +349,7 @@ export async function importWorkflowUseCase(
         ? {}
         : {
             rewardDice: {
-              triggerPhaseType: sourceWorkflow.rewardDice.triggerPhaseType,
-              frequency: sourceWorkflow.rewardDice.frequency,
+              schedule: sourceWorkflow.rewardDice.schedule,
               rerolls: sourceWorkflow.rewardDice.rerolls,
               sides: sourceWorkflow.rewardDice.sides.map((side) => ({
                 icon: side.icon,

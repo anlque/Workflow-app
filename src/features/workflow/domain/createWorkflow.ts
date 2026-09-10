@@ -13,6 +13,7 @@ import type {
   RewardDice,
   RewardDiceInput,
   RewardPhaseType,
+  RewardSchedule,
 } from './RewardDice';
 import {
   createWorkflowId,
@@ -150,14 +151,56 @@ function createRewardPhaseType(value: unknown): RewardPhaseType {
   );
 }
 
-function createRewardDice(input: RewardDiceInput): RewardDice {
-  const triggerPhaseType = createRewardPhaseType(input.triggerPhaseType);
-  const rerolls = input.rerolls ?? 0;
-  if (!Number.isInteger(input.frequency) || input.frequency < 1) {
+function createRewardSchedule(
+  input: RewardDiceInput,
+  phaseCount: number,
+): RewardSchedule {
+  if (input.schedule?.type === 'custom') {
+    const phaseIndexes = [...input.schedule.phaseIndexes];
+    if (
+      phaseIndexes.some(
+        (index) => !Number.isInteger(index) || index < 0 || index >= phaseCount,
+      ) ||
+      new Set(phaseIndexes).size !== phaseIndexes.length
+    ) {
+      throw new WorkflowValidationError(
+        'Custom Reward phase indexes must be unique in-range integers.',
+      );
+    }
+    return Object.freeze({
+      type: 'custom',
+      phaseIndexes: Object.freeze(
+        phaseIndexes.sort((left, right) => left - right),
+      ),
+    });
+  }
+  const triggerPhaseType = createRewardPhaseType(
+    input.schedule?.type === 'frequency'
+      ? input.schedule.triggerPhaseType
+      : input.triggerPhaseType,
+  );
+  const frequency =
+    input.schedule?.type === 'frequency'
+      ? input.schedule.frequency
+      : input.frequency;
+  if (
+    typeof frequency !== 'number' ||
+    !Number.isInteger(frequency) ||
+    frequency < 1
+  ) {
     throw new WorkflowValidationError(
       'Reward Dice frequency must be a positive integer.',
     );
   }
+  return Object.freeze({ type: 'frequency', triggerPhaseType, frequency });
+}
+
+function createRewardDice(
+  input: RewardDiceInput,
+  phaseCount: number,
+): RewardDice {
+  const schedule = createRewardSchedule(input, phaseCount);
+  const rerolls = input.rerolls ?? 0;
   if (!Number.isInteger(rerolls) || rerolls < 0 || rerolls > 3) {
     throw new WorkflowValidationError(
       'Reward Dice rerolls must be an integer from 0 through 3.',
@@ -216,8 +259,7 @@ function createRewardDice(input: RewardDiceInput): RewardDice {
   ];
 
   return Object.freeze({
-    triggerPhaseType,
-    frequency: input.frequency,
+    schedule,
     rerolls,
     sides: Object.freeze(sides),
   });
@@ -242,7 +284,7 @@ export function createWorkflow(input: CreateWorkflowInput): Workflow {
   const rewardDice =
     input.rewardDice === undefined
       ? undefined
-      : createRewardDice(input.rewardDice);
+      : createRewardDice(input.rewardDice, phases.length);
 
   return Object.freeze({
     id: createWorkflowId(input.id),

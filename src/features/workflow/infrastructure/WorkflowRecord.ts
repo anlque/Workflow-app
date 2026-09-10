@@ -13,17 +13,7 @@ type WorkflowRecordBase = Readonly<{
     durationSeconds: number;
     environment: Readonly<Record<string, unknown>>;
   }>[];
-  rewardDice?: Readonly<{
-    triggerPhaseType?: string;
-    frequency: number;
-    rerolls?: number;
-    sides: readonly Readonly<{
-      icon: string;
-      title: string;
-      description?: string;
-      probability: number;
-    }>[];
-  }>;
+  rewardDice?: unknown;
 }>;
 
 export type WorkflowRecordV1 = WorkflowRecordBase &
@@ -43,7 +33,14 @@ export type WorkflowRecordV2 = WorkflowRecordBase &
     }>[];
   }>;
 
-export type WorkflowRecord = WorkflowRecordV1 | WorkflowRecordV2;
+export type WorkflowRecordV3 = WorkflowRecordBase &
+  Readonly<{
+    schemaVersion: 3;
+    phases: WorkflowRecordV2['phases'];
+  }>;
+
+export type WorkflowRecord =
+  WorkflowRecordV1 | WorkflowRecordV2 | WorkflowRecordV3;
 
 export const workflowDatabaseSchemas: readonly DatabaseSchema[] = [
   {

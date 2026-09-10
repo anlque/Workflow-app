@@ -71,4 +71,27 @@ describe('isRewardDueAfterPhase', () => {
     expect(isRewardDueAfterPhase(value, 1)).toBe(false);
     expect(isRewardDueAfterPhase(value, 3)).toBe(true);
   });
+
+  test('matches every configured custom Phase index', () => {
+    const value = createWorkflow({
+      id: 'custom',
+      name: 'Custom',
+      phases: Array.from({ length: 6 }, () => ({
+        type: 'focus' as const,
+        durationSeconds: 10,
+        environment: {},
+      })),
+      rewardDice: {
+        schedule: { type: 'custom', phaseIndexes: [1, 2, 3, 5] },
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+
+    expect(
+      value.phases.map((_, index) => isRewardDueAfterPhase(value, index)),
+    ).toEqual([false, true, true, true, false, true]);
+  });
 });

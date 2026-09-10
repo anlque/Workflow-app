@@ -23,8 +23,10 @@ export type RewardSideDraft = Readonly<{
 
 export type RewardDiceDraft = Readonly<{
   enabled: boolean;
+  scheduleMode: 'frequency' | 'custom';
   triggerPhaseType: RewardPhaseType;
   frequency: string;
+  customPhaseKeys: readonly string[];
   rerolls: string;
   sides: readonly RewardSideDraft[];
 }>;
@@ -68,21 +70,33 @@ function newSide(): RewardSideDraft {
 }
 
 function initialDraft(workflowId: string, workflow?: Workflow): WorkflowDraft {
+  const phases = workflow?.phases.map((phase) => ({
+    key: key(),
+    type: phase.type,
+    durationMinutes: String(phase.durationSeconds / 60),
+    backgroundAsset: phase.environment.backgroundAsset,
+    audioAsset: phase.environment.audioAsset,
+    backgroundColor: phase.environment.backgroundColor ?? '',
+  })) ?? [newPhase()];
+  const schedule = workflow?.rewardDice?.schedule;
   return {
     id: workflow?.id ?? workflowId,
     name: workflow?.name ?? '',
-    phases: workflow?.phases.map((phase) => ({
-      key: key(),
-      type: phase.type,
-      durationMinutes: String(phase.durationSeconds / 60),
-      backgroundAsset: phase.environment.backgroundAsset,
-      audioAsset: phase.environment.audioAsset,
-      backgroundColor: phase.environment.backgroundColor ?? '',
-    })) ?? [newPhase()],
+    phases,
     rewardDice: {
       enabled: workflow?.rewardDice !== undefined,
-      triggerPhaseType: workflow?.rewardDice?.triggerPhaseType ?? 'focus',
-      frequency: String(workflow?.rewardDice?.frequency ?? 1),
+      scheduleMode: schedule?.type ?? 'frequency',
+      triggerPhaseType:
+        schedule?.type === 'frequency' ? schedule.triggerPhaseType : 'focus',
+      frequency: String(
+        schedule?.type === 'frequency' ? schedule.frequency : 1,
+      ),
+      customPhaseKeys:
+        schedule?.type === 'custom'
+          ? schedule.phaseIndexes.flatMap((index) =>
+              phases[index] === undefined ? [] : [phases[index].key],
+            )
+          : [],
       rerolls: String(workflow?.rewardDice?.rerolls ?? 0),
       sides: workflow?.rewardDice?.sides.map((side) => ({
         key: key(),
@@ -133,6 +147,16 @@ function steppedDurationMinutes(
   return String(Math.max(0.5, Number(current) + direction * 0.5));
 }
 
+function frequencyPhaseKeys(draft: WorkflowDraft): readonly string[] {
+  const frequency = positiveInteger(draft.rewardDice.frequency) ?? 1;
+  let matching = 0;
+  return draft.phases.flatMap((phase) => {
+    if (phase.type !== draft.rewardDice.triggerPhaseType) return [];
+    matching += 1;
+    return matching % frequency === 0 ? [phase.key] : [];
+  });
+}
+
 export function validateWorkflowDraft(
   draft: WorkflowDraft,
 ): WorkflowDraftValidation {
@@ -165,7 +189,7 @@ export function validateWorkflowDraft(
   if (draft.rewardDice.enabled) {
     const frequency = positiveInteger(draft.rewardDice.frequency);
     const rerolls = rerollCount(draft.rewardDice.rerolls);
-    if (frequency === null) {
+    if (draft.rewardDice.scheduleMode === 'frequency' && frequency === null) {
       errors['reward:frequency'] = 'Frequency must be a positive whole number.';
     }
     if (rerolls === null) {
@@ -204,8 +228,22 @@ export function validateWorkflowDraft(
       };
     });
     rewardDice = {
-      triggerPhaseType: draft.rewardDice.triggerPhaseType,
-      frequency: frequency ?? 1,
+      schedule:
+        draft.rewardDice.scheduleMode === 'custom'
+          ? {
+              type: 'custom',
+              phaseIndexes: draft.rewardDice.customPhaseKeys.flatMap((key) => {
+                const index = draft.phases.findIndex(
+                  (phase) => phase.key === key,
+                );
+                return index < 0 ? [] : [index];
+              }),
+            }
+          : {
+              type: 'frequency',
+              triggerPhaseType: draft.rewardDice.triggerPhaseType,
+              frequency: frequency ?? 1,
+            },
       rerolls: rerolls ?? 0,
       sides,
     };
@@ -225,6 +263,10 @@ export function validateWorkflowDraft(
 
 export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
   const [draft, setDraft] = useState(() => initialDraft(workflowId, workflow));
+  const rewardAfterPhaseKeys =
+    draft.rewardDice.scheduleMode === 'custom'
+      ? draft.rewardDice.customPhaseKeys
+      : frequencyPhaseKeys(draft);
 
   const updatePhase = (phaseKey: string, patch: Partial<PhaseDraft>): void => {
     setDraft((current) => ({
@@ -237,6 +279,7 @@ export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
 
   return {
     draft,
+    rewardAfterPhaseKeys,
     setName(name: string): void {
       setDraft((current) => ({ ...current, name }));
     },
@@ -270,7 +313,34 @@ export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
       setDraft((current) => ({
         ...current,
         phases: current.phases.filter(({ key: value }) => value !== phaseKey),
+        rewardDice: {
+          ...current.rewardDice,
+          customPhaseKeys: current.rewardDice.customPhaseKeys.filter(
+            (value) => value !== phaseKey,
+          ),
+        },
       }));
+    },
+    duplicatePhase(index: number): void {
+      setDraft((current) => {
+        const source = current.phases[index];
+        if (source === undefined) return current;
+        const duplicate = { ...source, key: key() };
+        const phases = [...current.phases];
+        phases.splice(index + 1, 0, duplicate);
+        const marked = current.rewardDice.customPhaseKeys.includes(source.key);
+        return {
+          ...current,
+          phases,
+          rewardDice: {
+            ...current.rewardDice,
+            customPhaseKeys:
+              current.rewardDice.scheduleMode === 'custom' && marked
+                ? [...current.rewardDice.customPhaseKeys, duplicate.key]
+                : current.rewardDice.customPhaseKeys,
+          },
+        };
+      });
     },
     movePhase(index: number, offset: -1 | 1): void {
       setDraft((current) => {
@@ -295,6 +365,38 @@ export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
         ...current,
         rewardDice: { ...current.rewardDice, frequency },
       }));
+    },
+    setRewardScheduleMode(scheduleMode: 'frequency' | 'custom'): void {
+      setDraft((current) => ({
+        ...current,
+        rewardDice: {
+          ...current.rewardDice,
+          scheduleMode,
+          customPhaseKeys:
+            scheduleMode === 'custom' &&
+            current.rewardDice.scheduleMode === 'frequency'
+              ? frequencyPhaseKeys(current)
+              : current.rewardDice.customPhaseKeys,
+        },
+      }));
+    },
+    toggleRewardAfterPhase(phaseKey: string): void {
+      setDraft((current) => {
+        const selected =
+          current.rewardDice.scheduleMode === 'custom'
+            ? current.rewardDice.customPhaseKeys
+            : frequencyPhaseKeys(current);
+        return {
+          ...current,
+          rewardDice: {
+            ...current.rewardDice,
+            scheduleMode: 'custom',
+            customPhaseKeys: selected.includes(phaseKey)
+              ? selected.filter((key) => key !== phaseKey)
+              : [...selected, phaseKey],
+          },
+        };
+      });
     },
     setRewardRerolls(rerolls: string): void {
       setDraft((current) => ({

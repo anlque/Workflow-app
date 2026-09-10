@@ -106,6 +106,12 @@ describe('DexieSessionRepository', () => {
       true,
     ],
     [
+      'v3 direct reference',
+      3,
+      { backgroundAsset: { type: 'direct', assetId: 'image-1' } },
+      true,
+    ],
+    [
       'v1 with v2 reference',
       1,
       { backgroundAsset: { type: 'direct', assetId: 'image-1' } },
@@ -129,10 +135,10 @@ describe('DexieSessionRepository', () => {
       const stored = await table.get(session.id);
       if (stored === undefined) throw new Error('Expected Session record.');
       const mutable = structuredClone(stored) as unknown as {
-        schemaVersion: 1 | 2;
+        schemaVersion: 1 | 2 | 3;
         session: { workflow: { phases: { environment: unknown }[] } };
       };
-      mutable.schemaVersion = schemaVersion as 1 | 2;
+      mutable.schemaVersion = schemaVersion as 1 | 2 | 3;
       const firstPhase = mutable.session.workflow.phases[0];
       if (firstPhase === undefined) throw new Error('Expected first Phase.');
       firstPhase.environment = environment;
@@ -152,6 +158,34 @@ describe('DexieSessionRepository', () => {
       }
     },
   );
+
+  test('round-trips a canonical custom Reward schedule in the snapshot', async () => {
+    const repository = new DexieSessionRepository(database());
+    const customWorkflow = createWorkflow({
+      id: 'custom-reward-workflow',
+      name: 'Custom reward',
+      phases: [
+        { type: 'focus', durationSeconds: 10, environment: {} },
+        { type: 'break', durationSeconds: 5, environment: {} },
+      ],
+      rewardDice: {
+        schedule: { type: 'custom', phaseIndexes: [1] },
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const expected = createSession(
+      'custom-reward-session',
+      customWorkflow,
+      1_000,
+    );
+
+    await repository.save(expected);
+
+    await expect(repository.get(expected.id)).resolves.toEqual(expected);
+  });
 
   test('rejects saving a second active Session transactionally', async () => {
     const repository = new DexieSessionRepository(database());
@@ -239,7 +273,14 @@ describe('DexieSessionRepository', () => {
     if (storedReward === undefined) {
       throw new Error('Expected stored Reward Dice.');
     }
-    (stored as { schemaVersion: 1 | 2 }).schemaVersion = 1;
+    (stored as { schemaVersion: 1 | 2 | 3 }).schemaVersion = 1;
+    const schedule = storedReward['schedule'] as {
+      triggerPhaseType?: unknown;
+      frequency?: unknown;
+    };
+    storedReward['triggerPhaseType'] = schedule.triggerPhaseType;
+    storedReward['frequency'] = schedule.frequency;
+    delete storedReward['schedule'];
     delete storedReward['rerolls'];
     await table.put(stored);
 

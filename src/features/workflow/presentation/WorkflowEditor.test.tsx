@@ -276,6 +276,26 @@ describe('WorkflowEditor', () => {
     expect(result.current.draft.rewardDice.sides).toHaveLength(2);
   });
 
+  test('shows frequency markers and converts a manual toggle to custom', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflowId="workflow-1"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    await user.click(screen.getByLabelText('Enable Reward Dice'));
+    const marker = screen.getByLabelText('Reward after Phase 1');
+    expect(marker).toBeChecked();
+
+    await user.click(marker);
+
+    expect(marker).not.toBeChecked();
+    expect(screen.getByLabelText('Reward schedule')).toHaveValue('custom');
+  });
+
   test('defaults rerolls to zero and rejects drafts outside the allowed range', () => {
     const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
 
@@ -454,8 +474,85 @@ describe('WorkflowEditor', () => {
     await user.type(screen.getByLabelText('Reward side 2 title'), 'Walk');
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
 
-    expect(onSave.mock.calls[0]?.[0].rewardDice?.triggerPhaseType).toBe(
-      'break',
+    expect(onSave.mock.calls[0]?.[0].rewardDice?.schedule).toEqual({
+      type: 'frequency',
+      triggerPhaseType: 'break',
+      frequency: 1,
+    });
+  });
+
+  test('serializes six-Phase custom markers from stable draft keys', () => {
+    const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
+    act(() => {
+      for (let index = 0; index < 5; index += 1) result.current.addPhase();
+    });
+    const phaseKeys = result.current.draft.phases.map(({ key }) => key);
+    act(() => {
+      result.current.toggleRewardAfterPhase(phaseKeys[0] ?? 'missing');
+      result.current.toggleRewardAfterPhase(phaseKeys[4] ?? 'missing');
+    });
+
+    const validation = validateWorkflowDraft({
+      ...result.current.draft,
+      name: 'Custom',
+      rewardDice: {
+        ...result.current.draft.rewardDice,
+        enabled: true,
+        sides: [
+          {
+            key: 'tea',
+            icon: '☕',
+            title: 'Tea',
+            description: '',
+            weight: '',
+          },
+          {
+            key: 'walk',
+            icon: '🚶',
+            title: 'Walk',
+            description: '',
+            weight: '',
+          },
+        ],
+      },
+    });
+
+    expect(validation.valid && validation.input.rewardDice?.schedule).toEqual({
+      type: 'custom',
+      phaseIndexes: [1, 2, 3, 5],
+    });
+  });
+
+  test('moves, deletes and duplicates custom markers with stable Phase keys', () => {
+    const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
+    act(() => {
+      result.current.addPhase();
+      result.current.addPhase();
+    });
+    const firstKey = result.current.draft.phases[0]?.key ?? 'missing-first';
+    const sourceKey = result.current.draft.phases[1]?.key ?? 'missing-source';
+    act(() => {
+      result.current.toggleRewardAfterPhase(firstKey);
+      result.current.movePhase(1, 1);
+      result.current.duplicatePhase(2);
+    });
+    expect(result.current.draft.rewardDice.customPhaseKeys).toHaveLength(3);
+    const duplicateKey =
+      result.current.draft.phases[3]?.key ?? 'missing-duplicate';
+    expect(result.current.draft.rewardDice.customPhaseKeys).toContain(
+      sourceKey,
+    );
+    expect(result.current.draft.rewardDice.customPhaseKeys).toContain(
+      duplicateKey,
+    );
+    act(() => {
+      result.current.removePhase(sourceKey);
+    });
+    expect(result.current.draft.rewardDice.customPhaseKeys).not.toContain(
+      sourceKey,
+    );
+    expect(result.current.draft.rewardDice.customPhaseKeys).toContain(
+      duplicateKey,
     );
   });
 

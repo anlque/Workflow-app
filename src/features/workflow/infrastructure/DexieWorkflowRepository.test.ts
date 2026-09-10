@@ -92,8 +92,38 @@ describe('DexieWorkflowRepository', () => {
 
     await expect(repository.get(expected.id)).resolves.toEqual(expected);
     await expect(repository.get(expected.id)).resolves.toMatchObject({
-      rewardDice: { triggerPhaseType: 'break', rerolls: 3 },
+      rewardDice: {
+        schedule: {
+          type: 'frequency',
+          triggerPhaseType: 'break',
+          frequency: 2,
+        },
+        rerolls: 3,
+      },
     });
+  });
+
+  test('round-trips a canonical custom Reward schedule', async () => {
+    const repository = new DexieWorkflowRepository(createDatabase());
+    const expected = createWorkflow({
+      id: 'custom-reward',
+      name: 'Custom reward',
+      phases: [
+        { type: 'focus', durationSeconds: 10, environment: {} },
+        { type: 'break', durationSeconds: 10, environment: {} },
+      ],
+      rewardDice: {
+        schedule: { type: 'custom', phaseIndexes: [1] },
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+
+    await repository.save(expected);
+
+    await expect(repository.get(expected.id)).resolves.toEqual(expected);
   });
 
   test('round-trips a version-2 Workflow with a Role reference', async () => {
@@ -169,7 +199,14 @@ describe('DexieWorkflowRepository', () => {
     await expect(
       repository.get(workflow('legacy', 'Fixture').id),
     ).resolves.toMatchObject({
-      rewardDice: { triggerPhaseType: 'focus', rerolls: 0 },
+      rewardDice: {
+        schedule: {
+          type: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: 1,
+        },
+        rerolls: 0,
+      },
     });
   });
 

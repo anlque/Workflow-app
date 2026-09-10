@@ -4,11 +4,12 @@
 
 Global Dexie version 4 defines `assets: 'id, createdAt, &roleKey'`. The optional
 normalized key is globally unique; role-less rows are not indexed. Asset,
-Workflow and Session writers emit record version 2 while readers accept their
-compatible version-1 rows. Workflow and Session indexes are unchanged.
+Workflow and Session writers emit record version 3 while readers accept their
+compatible version-1 and version-2 rows. Workflow and Session indexes are unchanged.
 
-Workflow package export emits version 2 with direct-or-Role references and
-optional Asset Roles; import accepts versions 1–2. Local collisions become
+Workflow package export emits version 3 with canonical Reward schedules,
+direct-or-Role references and optional Asset Roles; import accepts versions
+1–3. Local collisions become
 `<role> (imported)`, `<role> (imported 2)`, and so on. ID/Role reservation,
 reference remapping and every Asset/Workflow write occur in one transaction.
 
@@ -80,10 +81,10 @@ These version numbers solve different compatibility problems:
 | Version | Scope | Current value | Changes when |
 | --- | --- | --- | --- |
 | Dexie database version | Whole `locusora` database structure and upgrade order | 1–4 history; current 4 | A table/index changes or existing stored data needs a database migration |
-| `WorkflowRecord.schemaVersion` | One Workflow record serialization shape | Current writes 2; reads 1–2 | The Workflow record reader/writer needs a new incompatible serialization |
-| `SessionRecord.schemaVersion` | One Session record envelope | Current writes 2; reads 1–2 | The Session record reader/writer needs a new incompatible serialization |
+| `WorkflowRecord.schemaVersion` | One Workflow record serialization shape | Current writes 3; reads 1–3 | The Workflow record reader/writer needs a new incompatible serialization |
+| `SessionRecord.schemaVersion` | One Session record envelope | Current writes 3; reads 1–3 | The Session record reader/writer needs a new incompatible serialization |
 | `AssetRecord.schemaVersion` | One Asset record shape | Current writes 2; reads role-less 1 and 2 | The Asset record reader/writer needs a new incompatible serialization |
-| Workflow package `version` | Public `locusora/workflow` import/export envelope | Current export 2; import 1–2 | The external Workflow package contract changes |
+| Workflow package `version` | Public `locusora/workflow` import/export envelope | Current export 3; import 1–3 | The external Workflow package contract changes |
 | Settings package `version` | Public `locusora/settings` import/export envelope | 1 | The external Settings package contract changes |
 
 A database version must not be copied into a record, and a record
@@ -103,24 +104,26 @@ Sources:
 
 The record stores:
 
-- `id`, current `schemaVersion: 2`, `order` and `name`;
+- `id`, current `schemaVersion: 3`, `order` and `name`;
 - ordered Phase values with `type`, `durationSeconds` and Environment fields;
-- optional Reward Dice with trigger Phase type, frequency, rerolls and sides;
+- optional Reward Dice with one canonical `frequency | custom` schedule,
+  rerolls and sides;
 - each stored side's normalized Domain probability under `probability`.
 
-Reads accept versions 1–2. Version 1 Environment objects accept only legacy
+Reads accept versions 1–3. Version 1 Environment objects accept only legacy
 `backgroundAssetId`, `audioAssetId` and `backgroundColor`; version 2 accepts only
-`backgroundAsset`, `audioAsset` and `backgroundColor`. Mixed, unknown and
+the direct-or-Role reference fields and legacy frequency configuration. Version
+3 keeps those Environment references and stores the canonical schedule. Mixed, unknown and
 contradictory fields are rejected, as are invalid order and nested Domain data.
 
 Compatibility defaults:
 
-- missing `rewardDice.triggerPhaseType` is accepted and Domain defaults it to
+- missing legacy `rewardDice.triggerPhaseType` is accepted and Domain defaults it to
   `focus`;
 - missing `rewardDice.rerolls` is accepted and Domain defaults it to `0`.
 
-Current writes always include both fields. The optional record properties exist
-only for backward compatibility.
+Current writes use the canonical schedule. Legacy properties exist only at read
+boundaries.
 
 `save()` preserves an existing row's `order` or appends after the last row.
 `delete()` compacts the remaining order indexes. `replaceOrder()` requires every

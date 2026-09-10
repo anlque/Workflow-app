@@ -68,8 +68,7 @@ export function serializeWorkflow(workflow: Workflow): unknown {
       ? {}
       : {
           rewardDice: {
-            triggerPhaseType: workflow.rewardDice.triggerPhaseType,
-            frequency: workflow.rewardDice.frequency,
+            schedule: workflow.rewardDice.schedule,
             rerolls: workflow.rewardDice.rerolls,
             sides: workflow.rewardDice.sides.map((side) => ({
               icon: side.icon,
@@ -84,7 +83,7 @@ export function serializeWorkflow(workflow: Workflow): unknown {
   };
 }
 
-export function parseWorkflow(value: unknown, version: 1 | 2): Workflow {
+export function parseWorkflow(value: unknown, version: 1 | 2 | 3): Workflow {
   try {
     const input = record(value);
     if (!hasExactKeys(input, ['id', 'name', 'phases'], ['rewardDice'])) {
@@ -95,22 +94,57 @@ export function parseWorkflow(value: unknown, version: 1 | 2): Workflow {
     const rewardValue = input['rewardDice'];
     const reward = rewardValue === undefined ? undefined : record(rewardValue);
     const sideValues = reward?.['sides'];
-    const triggerPhaseType = optionalRewardPhaseType(
-      reward?.['triggerPhaseType'],
-    );
     const rerolls =
       reward?.['rerolls'] === undefined ? undefined : number(reward['rerolls']);
     if (reward !== undefined && !Array.isArray(sideValues)) return invalid();
-    if (
-      reward !== undefined &&
-      !hasExactKeys(
-        reward,
-        ['frequency', 'sides'],
-        ['triggerPhaseType', 'rerolls'],
-      )
-    ) {
+    const schedule = (() => {
+      if (reward === undefined) return undefined;
+      if (version !== 3) {
+        if (
+          !hasExactKeys(
+            reward,
+            ['frequency', 'sides'],
+            ['triggerPhaseType', 'rerolls'],
+          )
+        )
+          return invalid();
+        const triggerPhaseType = optionalRewardPhaseType(
+          reward['triggerPhaseType'],
+        );
+        return {
+          type: 'frequency' as const,
+          ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+          frequency: number(reward['frequency']),
+        };
+      }
+      if (!hasExactKeys(reward, ['schedule', 'sides'], ['rerolls']))
+        return invalid();
+      const raw = record(reward['schedule']);
+      if (
+        raw['type'] === 'frequency' &&
+        hasExactKeys(raw, ['type', 'triggerPhaseType', 'frequency'])
+      ) {
+        const triggerPhaseType = optionalRewardPhaseType(
+          raw['triggerPhaseType'],
+        );
+        return {
+          type: 'frequency' as const,
+          ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+          frequency: number(raw['frequency']),
+        };
+      }
+      if (
+        raw['type'] === 'custom' &&
+        hasExactKeys(raw, ['type', 'phaseIndexes']) &&
+        Array.isArray(raw['phaseIndexes'])
+      ) {
+        return {
+          type: 'custom' as const,
+          phaseIndexes: raw['phaseIndexes'].map(number),
+        };
+      }
       return invalid();
-    }
+    })();
 
     return createWorkflow({
       id: string(input['id']),
@@ -182,8 +216,7 @@ export function parseWorkflow(value: unknown, version: 1 | 2): Workflow {
         ? {}
         : {
             rewardDice: {
-              ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
-              frequency: number(reward['frequency']),
+              schedule: schedule ?? invalid(),
               ...(rerolls === undefined ? {} : { rerolls }),
               sides: (sideValues as unknown[]).map((sideValue) => {
                 const side = record(sideValue);

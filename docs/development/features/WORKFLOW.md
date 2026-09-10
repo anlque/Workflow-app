@@ -125,9 +125,11 @@ seconds. This is not the more general Domain duration rule.
 ### Reward Dice
 
 - Reward Dice is absent or owned by exactly one Workflow.
-- `triggerPhaseType` is `focus | break`; omitted legacy input defaults to
-  `focus`.
-- `frequency` is an integer of at least 1 matching completed Phase.
+- `schedule` is exactly one of `frequency | custom`.
+- A frequency schedule has `triggerPhaseType: focus | break` and a positive
+  integer `frequency`; omitted legacy trigger type defaults to `focus`.
+- A custom schedule stores unique, zero-based Phase indexes in ascending order;
+  every index must be an integer within the Workflow.
 - `rerolls` is an integer from 0 through 3; omitted legacy input defaults to 0.
 - At least two Dice Sides exist.
 - Each side has a non-empty trimmed icon and title; optional descriptions are
@@ -137,9 +139,9 @@ seconds. This is not the more general Domain duration rule.
 - Domain stores normalized `probability`, not the original arbitrary weight.
 - If weights are omitted, every side receives equal probability.
 
-`isRewardDueAfterPhase()` returns false for an invalid index, absent Reward Dice
-or a non-matching Phase type. Otherwise it counts matching Phases from index 0
-through the completed index and checks divisibility by `frequency`.
+`isRewardDueAfterPhase()` returns false for an invalid index or absent Reward
+Dice. Custom schedules use exact Phase membership; frequency schedules preserve
+the matching-type ordinal rule.
 
 `rollReward()` accepts an injected random value only in `[0, 1)`, walks
 cumulative normalized probability and returns a Dice Side. Randomness and
@@ -162,7 +164,7 @@ Reward is Presentation state and resets with each new dialog.
 | `deleteWorkflowUseCase` | Repository, ID | Requires existence, deletes; repository compacts collection order | `void` or not-found error |
 | `listWorkflowsUseCase` | Repository | Returns repository order | Readonly Workflow list |
 | `reorderWorkflowsUseCase` | Repository, complete ordered IDs | Requires an exact permutation of current IDs, delegates atomic replacement | `void` or Application error |
-| `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced Assets/Blobs and creates deterministic version-2 JSON | JSON or package validation error |
+| `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced Assets/Blobs and creates deterministic version-3 JSON | JSON or package validation error |
 | `importWorkflowUseCase` | Repositories, unit of work, JSON, limits/policy/identity | Validates complete package before writes, generates collision-free IDs, rewrites Environment references, atomically writes Assets and Workflow | Imported Workflow or package validation/storage failure |
 
 Composition wraps successful catalog mutations with
@@ -172,13 +174,14 @@ use cases.
 
 ## Persistence
 
-`DexieWorkflowRepository` writes version-2 `WorkflowRecord` rows in the global
-version-1 `workflows: 'id, order'` table definition and reads versions 1–2.
+`DexieWorkflowRepository` writes version-3 `WorkflowRecord` rows in the global
+version-1 `workflows: 'id, order'` table definition and reads versions 1–3.
 
 - Reads treat rows as `unknown`, validate record metadata and reconstruct the
   Domain aggregate.
-- Version 1 accepts only legacy ID Environment fields; version 2 accepts only
-  exact direct-or-Role reference fields. Mixed and unknown fields fail closed.
+- Version 1 accepts only legacy ID Environment fields; versions 2–3 accept only
+  exact direct-or-Role reference fields. Versions 1–2 read legacy frequency
+  fields; version 3 reads the canonical schedule union.
 - New rows append after the highest order.
 - Updates preserve the current order.
 - Delete compacts remaining order values.
@@ -209,8 +212,10 @@ does not choose create versus update. It prevents removing the last Phase.
 
 ### `RewardDiceEditor`
 
-Edits enablement, trigger Phase type, frequency, 0–3 rerolls and sides. It
-disables side removal at two sides. UI weights remain strings until draft
+Edits enablement, frequency or custom marker schedule, 0–3 rerolls and sides.
+Custom markers bind to stable Phase draft keys: reorder moves them, delete
+removes them and duplicate copies them. Save converts keys to current indexes.
+It disables side removal at two sides. UI weights remain strings until draft
 validation converts them to numeric constructor input.
 
 ### Hooks

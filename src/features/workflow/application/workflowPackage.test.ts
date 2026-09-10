@@ -299,7 +299,7 @@ describe('Workflow package', () => {
       packageWith({ type: 'direct', assetId: 'a' }, { ...asset, extra: true }),
     );
   });
-  test('exports version 2 and remaps a colliding imported Role to its imported Asset', async () => {
+  test('exports version 3 and remaps a colliding imported Role to its imported Asset', async () => {
     const sourceAssets = new MemoryAssetRepository();
     await addAsset(sourceAssets, 'source-image', 'Backdrop');
     const source = createWorkflow({
@@ -335,7 +335,7 @@ describe('Workflow package', () => {
       },
     );
 
-    expect(parsed.version).toBe(2);
+    expect(parsed.version).toBe(3);
     expect(parsed.assets).toEqual([
       expect.objectContaining({ role: 'Backdrop' }),
     ]);
@@ -468,9 +468,18 @@ describe('Workflow package', () => {
 
     expect(JSON.parse(data)).toMatchObject({
       kind: 'locusora/workflow',
-      workflow: { rewardDice: { triggerPhaseType: 'break', rerolls: 3 } },
+      version: 3,
+      workflow: {
+        rewardDice: {
+          schedule: { type: 'frequency', triggerPhaseType: 'break' },
+          rerolls: 3,
+        },
+      },
     });
-    expect(imported.rewardDice?.triggerPhaseType).toBe('break');
+    expect(imported.rewardDice?.schedule).toMatchObject({
+      type: 'frequency',
+      triggerPhaseType: 'break',
+    });
     expect(imported.rewardDice?.rerolls).toBe(3);
   });
 
@@ -480,12 +489,21 @@ describe('Workflow package', () => {
       new MemoryAssetRepository(),
     );
     const legacyPackage = JSON.parse(exported) as {
+      version: number;
       workflow: { rewardDice?: Record<string, unknown> };
     };
     const legacyReward = legacyPackage.workflow.rewardDice;
     if (legacyReward === undefined) {
       throw new Error('Expected exported Reward Dice.');
     }
+    const schedule = legacyReward['schedule'] as {
+      triggerPhaseType?: unknown;
+      frequency?: unknown;
+    };
+    legacyPackage.version = 2;
+    legacyReward['triggerPhaseType'] = schedule.triggerPhaseType;
+    legacyReward['frequency'] = schedule.frequency;
+    delete legacyReward['schedule'];
     delete legacyReward['rerolls'];
 
     const imported = await importWorkflowUseCase(
@@ -502,6 +520,54 @@ describe('Workflow package', () => {
     );
 
     expect(imported.rewardDice?.rerolls).toBe(0);
+  });
+
+  test('round-trips a canonical custom Reward schedule in version 3', async () => {
+    const source = createWorkflow({
+      id: 'custom-reward-workflow',
+      name: 'Custom reward',
+      phases: [
+        { type: 'focus', durationSeconds: 10, environment: {} },
+        { type: 'break', durationSeconds: 10, environment: {} },
+      ],
+      rewardDice: {
+        schedule: { type: 'custom', phaseIndexes: [1] },
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const data = await exportWorkflowUseCase(
+      source,
+      new MemoryAssetRepository(),
+    );
+
+    const imported = await importWorkflowUseCase(
+      new MemoryWorkflowRepository(),
+      new MemoryAssetRepository(),
+      new MemoryUnitOfWork(),
+      data,
+      { maxFileBytes: 10_000, assetPolicy: policy },
+      {
+        createWorkflowId: () => 'custom-imported',
+        createAssetId: () => 'unused',
+        now: () => 2_000,
+      },
+    );
+
+    expect(JSON.parse(data)).toMatchObject({
+      version: 3,
+      workflow: {
+        rewardDice: {
+          schedule: { type: 'custom', phaseIndexes: [1] },
+        },
+      },
+    });
+    expect(imported.rewardDice?.schedule).toEqual({
+      type: 'custom',
+      phaseIndexes: [1],
+    });
   });
 
   test('exports only referenced Assets with deterministic transport-safe encoding', async () => {

@@ -51,19 +51,73 @@ function hasOnlyKeys(
   return Object.keys(value).every((key) => allowed.includes(key));
 }
 
-function parseWorkflow(value: unknown, schemaVersion: 1 | 2) {
+function hasExactKeys(
+  value: Readonly<Record<string, unknown>>,
+  required: readonly string[],
+  optional: readonly string[] = [],
+): boolean {
+  return (
+    required.every((key) => Object.hasOwn(value, key)) &&
+    hasOnlyKeys(value, [...required, ...optional])
+  );
+}
+
+function parseWorkflow(value: unknown, schemaVersion: 1 | 2 | 3) {
   const input = record(value);
   const phases = input['phases'];
   if (!Array.isArray(phases)) return invalid();
   const rewardValue = input['rewardDice'];
   const reward = rewardValue === undefined ? undefined : record(rewardValue);
   const sides = reward?.['sides'];
-  const triggerPhaseType = optionalRewardPhaseType(
-    reward?.['triggerPhaseType'],
-  );
   const rerolls =
     reward?.['rerolls'] === undefined ? undefined : number(reward['rerolls']);
   if (reward !== undefined && !Array.isArray(sides)) return invalid();
+  const schedule = (() => {
+    if (reward === undefined) return undefined;
+    if (schemaVersion !== 3) {
+      if (
+        !hasExactKeys(
+          reward,
+          ['frequency', 'sides'],
+          ['triggerPhaseType', 'rerolls'],
+        )
+      )
+        return invalid();
+      const triggerPhaseType = optionalRewardPhaseType(
+        reward['triggerPhaseType'],
+      );
+      return {
+        type: 'frequency' as const,
+        ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+        frequency: number(reward['frequency']),
+      };
+    }
+    if (!hasExactKeys(reward, ['schedule', 'sides'], ['rerolls']))
+      return invalid();
+    const raw = record(reward['schedule']);
+    if (
+      raw['type'] === 'frequency' &&
+      hasExactKeys(raw, ['type', 'triggerPhaseType', 'frequency'])
+    ) {
+      const triggerPhaseType = optionalRewardPhaseType(raw['triggerPhaseType']);
+      return {
+        type: 'frequency' as const,
+        ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+        frequency: number(raw['frequency']),
+      };
+    }
+    if (
+      raw['type'] === 'custom' &&
+      hasExactKeys(raw, ['type', 'phaseIndexes']) &&
+      Array.isArray(raw['phaseIndexes'])
+    ) {
+      return {
+        type: 'custom' as const,
+        phaseIndexes: raw['phaseIndexes'].map(number),
+      };
+    }
+    return invalid();
+  })();
 
   return createWorkflow({
     id: string(input['id']),
@@ -123,8 +177,7 @@ function parseWorkflow(value: unknown, schemaVersion: 1 | 2) {
       ? {}
       : {
           rewardDice: {
-            ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
-            frequency: number(reward['frequency']),
+            schedule: schedule ?? invalid(),
             ...(rerolls === undefined ? {} : { rerolls }),
             sides: (sides as unknown[]).map((sideValue) => {
               const side = record(sideValue);
@@ -144,7 +197,9 @@ function parseWorkflow(value: unknown, schemaVersion: 1 | 2) {
 export function mapSessionRecord(value: unknown): Session {
   const outer = record(value);
   if (
-    (outer['schemaVersion'] !== 1 && outer['schemaVersion'] !== 2) ||
+    (outer['schemaVersion'] !== 1 &&
+      outer['schemaVersion'] !== 2 &&
+      outer['schemaVersion'] !== 3) ||
     (outer['active'] !== 0 && outer['active'] !== 1)
   ) {
     return invalid();
@@ -218,7 +273,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
             : session.stoppedAt;
   return {
     id: session.id,
-    schemaVersion: 2,
+    schemaVersion: 3,
     active,
     updatedAt,
     session: {

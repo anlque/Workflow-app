@@ -138,6 +138,43 @@ test('creates and controls a Workflow across extension contexts', async ({
   await expect(focus.getByText('Session stopped')).toBeVisible();
 });
 
+test('persists a six-phase custom Reward schedule by phase marker', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Custom rewards');
+  for (let index = 0; index < 5; index += 1) {
+    await options.getByRole('button', { name: 'Add phase' }).click();
+  }
+  await options.getByLabel('Enable Reward Dice').check();
+  await options.getByLabel('Reward side 1 icon').fill('☕');
+  await options.getByLabel('Reward side 1 title').fill('Tea');
+  await options.getByLabel('Reward side 2 icon').fill('🌿');
+  await options.getByLabel('Reward side 2 title').fill('Fresh air');
+
+  await options.getByLabel('Reward after Phase 1').uncheck();
+  await options.getByLabel('Reward after Phase 5').uncheck();
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(options.getByRole('status')).toHaveText('Workflow saved');
+
+  await options.reload();
+  await options.getByRole('button', { name: 'Open Custom rewards' }).click();
+  await expect(options.getByLabel('Reward schedule')).toHaveValue('custom');
+  for (const index of [1, 2, 3, 5]) {
+    await expect(
+      options.getByLabel(`Reward after Phase ${String(index + 1)}`),
+    ).toBeChecked();
+  }
+  for (const index of [0, 4]) {
+    await expect(
+      options.getByLabel(`Reward after Phase ${String(index + 1)}`),
+    ).not.toBeChecked();
+  }
+});
+
 test('completes a Workflow with a local environment and Reward Dice', async ({
   context,
   extensionUrls,

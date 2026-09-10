@@ -12,6 +12,7 @@ export type RewardDiceEditorProps = Readonly<{
   draft: RewardDiceDraft;
   errors: WorkflowDraftErrors;
   onEnabledChange(enabled: boolean): void;
+  onScheduleModeChange(value: 'frequency' | 'custom'): void;
   onTriggerPhaseTypeChange(value: RewardPhaseType): void;
   onFrequencyChange(value: string): void;
   onRerollsChange(value: string): void;
@@ -24,6 +25,7 @@ export function RewardDiceEditor({
   draft,
   errors,
   onEnabledChange,
+  onScheduleModeChange,
   onTriggerPhaseTypeChange,
   onFrequencyChange,
   onRerollsChange,
@@ -50,33 +52,55 @@ export function RewardDiceEditor({
         <details open>
           <summary>Reward Dice configuration</summary>
           <div className="reward-editor__content">
-            <Field label="Reward after">
+            <Field label="Reward schedule">
               <select
                 className="select"
-                value={draft.triggerPhaseType}
+                value={draft.scheduleMode}
                 onChange={(event) => {
-                  onTriggerPhaseTypeChange(
-                    event.target.value as RewardPhaseType,
+                  onScheduleModeChange(
+                    event.target.value === 'custom' ? 'custom' : 'frequency',
                   );
                 }}
               >
-                <option value="focus">Focus phases</option>
-                <option value="break">Break phases</option>
+                <option value="frequency">Frequency</option>
+                <option value="custom">Custom Phase markers</option>
               </select>
             </Field>
-            <Field
-              label="Reward frequency"
-              hint={`Completed ${draft.triggerPhaseType} phases between rolls.`}
-              error={errors['reward:frequency']}
-            >
-              <input
-                inputMode="numeric"
-                value={draft.frequency}
-                onChange={(event) => {
-                  onFrequencyChange(event.target.value);
-                }}
-              />
-            </Field>
+            {draft.scheduleMode === 'frequency' ? (
+              <>
+                <Field label="Reward after">
+                  <select
+                    className="select"
+                    value={draft.triggerPhaseType}
+                    onChange={(event) => {
+                      onTriggerPhaseTypeChange(
+                        event.target.value as RewardPhaseType,
+                      );
+                    }}
+                  >
+                    <option value="focus">Focus phases</option>
+                    <option value="break">Break phases</option>
+                  </select>
+                </Field>
+                <Field
+                  label="Reward frequency"
+                  hint={`Completed ${draft.triggerPhaseType} phases between rolls.`}
+                  error={errors['reward:frequency']}
+                >
+                  <input
+                    inputMode="numeric"
+                    value={draft.frequency}
+                    onChange={(event) => {
+                      onFrequencyChange(event.target.value);
+                    }}
+                  />
+                </Field>
+              </>
+            ) : (
+              <p className="field__hint">
+                Choose Reward markers in the Phase list.
+              </p>
+            )}
             <Field
               label="Available rerolls"
               hint="Additional rolls available after the first roll."

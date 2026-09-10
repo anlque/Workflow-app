@@ -5,8 +5,9 @@
 Session start receives a Workflow resolver through its Application boundary.
 Roles resolve to same-kind direct IDs before construction, and
 `createSessionSnapshot` rejects any remaining Role. Moving a Role affects only
-future Sessions. New Session records use envelope version 2; the mapper still
-reads version-1 legacy ID fields. Timing never depends on Role lookup after start.
+future Sessions. New Session records use envelope version 3; the mapper reads
+versions 1–2 with legacy frequency fields. Timing never depends on Role lookup
+after start.
 
 ## Purpose
 
@@ -100,7 +101,7 @@ Every Session contains:
 - exactly one discriminated state variant.
 
 `createSessionSnapshot()` rebuilds the Workflow with `createWorkflow()`, copying
-Phases, Environments, Reward Dice, trigger Phase type, frequency, rerolls and
+Phases, Environments, Reward Dice schedule, rerolls and
 side values. Source Workflow edits or deletion cannot affect execution.
 
 ### State Variants
@@ -175,11 +176,12 @@ internals. A later lifecycle ADR will supersede ADR-0006 with this boundary.
 
 ## Persistence
 
-`DexieSessionRepository` writes a version-2 envelope in the global version-2
+`DexieSessionRepository` writes a version-3 envelope in the global version-2
 `sessions: 'id, active, updatedAt'` table definition.
 
-The mapper reads versions 1–2 strictly: version 1 snapshots accept only legacy
-Asset ID fields; version 2 snapshots accept only exact direct references. Role,
+The mapper reads versions 1–3 strictly: version 1 snapshots accept only legacy
+Asset ID fields; versions 2–3 accept only exact direct references. Versions 1–2
+map legacy frequency fields; version 3 reads canonical schedules. Role,
 mixed-version and unknown Environment fields are rejected because persisted
 Session snapshots must already be resolved and immutable.
 

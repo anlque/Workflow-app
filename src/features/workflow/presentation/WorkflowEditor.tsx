@@ -189,8 +189,29 @@ export function WorkflowEditor({
                   >
                     Remove
                   </Button>
+                  <Button
+                    variant="quiet"
+                    aria-label={`Duplicate Phase ${String(index + 1)}`}
+                    onClick={() => {
+                      editor.duplicatePhase(index);
+                    }}
+                  >
+                    Duplicate
+                  </Button>
                 </div>
               </div>
+              {editor.draft.rewardDice.enabled ? (
+                <label className="check-control">
+                  <input
+                    type="checkbox"
+                    checked={editor.rewardAfterPhaseKeys.includes(phase.key)}
+                    onChange={() => {
+                      editor.toggleRewardAfterPhase(phase.key);
+                    }}
+                  />
+                  Reward after Phase {String(index + 1)}
+                </label>
+              ) : null}
               <div className="form-grid">
                 <Select
                   label={`Phase ${String(index + 1)} type`}
@@ -282,6 +303,9 @@ export function WorkflowEditor({
         errors={errors}
         onEnabledChange={(enabled) => {
           editor.setRewardEnabled(enabled);
+        }}
+        onScheduleModeChange={(scheduleMode) => {
+          editor.setRewardScheduleMode(scheduleMode);
         }}
         onTriggerPhaseTypeChange={(triggerPhaseType) => {
           editor.setRewardTriggerPhaseType(triggerPhaseType);

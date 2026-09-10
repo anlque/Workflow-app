@@ -37,6 +37,17 @@ function hasOnlyKeys(
   return Object.keys(value).every((key) => allowed.includes(key));
 }
 
+function hasExactKeys(
+  value: Readonly<Record<string, unknown>>,
+  required: readonly string[],
+  optional: readonly string[] = [],
+): boolean {
+  return (
+    required.every((key) => Object.hasOwn(value, key)) &&
+    hasOnlyKeys(value, [...required, ...optional])
+  );
+}
+
 function rewardPhaseType(value: unknown): 'focus' | 'break' | undefined {
   if (value === undefined) return undefined;
   if (value === 'focus' || value === 'break') return value;
@@ -70,7 +81,7 @@ function mapAssetReference(value: unknown) {
 
 function mapEnvironmentRecord(
   value: unknown,
-  schemaVersion: 1 | 2,
+  schemaVersion: 1 | 2 | 3,
 ): EnvironmentInput {
   const record = objectRecord(value);
   const allowedKeys =
@@ -106,7 +117,7 @@ function mapEnvironmentRecord(
   };
 }
 
-function mapPhaseRecord(value: unknown, schemaVersion: 1 | 2): PhaseInput {
+function mapPhaseRecord(value: unknown, schemaVersion: 1 | 2 | 3): PhaseInput {
   const record = objectRecord(value);
   return {
     type: stringValue(record['type']),
@@ -115,10 +126,12 @@ function mapPhaseRecord(value: unknown, schemaVersion: 1 | 2): PhaseInput {
   };
 }
 
-function mapRewardDiceRecord(value: unknown): RewardDiceInput {
+function mapRewardDiceRecord(
+  value: unknown,
+  schemaVersion: 1 | 2 | 3,
+): RewardDiceInput {
   const record = objectRecord(value);
   const sides = record['sides'];
-  const triggerPhaseType = rewardPhaseType(record['triggerPhaseType']);
   const rerolls =
     record['rerolls'] === undefined
       ? undefined
@@ -127,9 +140,52 @@ function mapRewardDiceRecord(value: unknown): RewardDiceInput {
     return invalidRecord();
   }
 
+  const schedule = (() => {
+    if (schemaVersion !== 3) {
+      if (
+        !hasExactKeys(
+          record,
+          ['frequency', 'sides'],
+          ['triggerPhaseType', 'rerolls'],
+        )
+      )
+        return invalidRecord();
+      const triggerPhaseType = rewardPhaseType(record['triggerPhaseType']);
+      return {
+        type: 'frequency' as const,
+        ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+        frequency: numberValue(record['frequency']),
+      };
+    }
+    if (!hasExactKeys(record, ['schedule', 'sides'], ['rerolls']))
+      return invalidRecord();
+    const raw = objectRecord(record['schedule']);
+    if (
+      raw['type'] === 'frequency' &&
+      hasExactKeys(raw, ['type', 'triggerPhaseType', 'frequency'])
+    ) {
+      const triggerPhaseType = rewardPhaseType(raw['triggerPhaseType']);
+      return {
+        type: 'frequency' as const,
+        ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+        frequency: numberValue(raw['frequency']),
+      };
+    }
+    if (
+      raw['type'] === 'custom' &&
+      hasExactKeys(raw, ['type', 'phaseIndexes']) &&
+      Array.isArray(raw['phaseIndexes'])
+    ) {
+      return {
+        type: 'custom' as const,
+        phaseIndexes: raw['phaseIndexes'].map(numberValue),
+      };
+    }
+    return invalidRecord();
+  })();
+
   return {
-    ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
-    frequency: numberValue(record['frequency']),
+    schedule,
     ...(rerolls === undefined ? {} : { rerolls }),
     sides: sides.map((sideValue) => {
       const side = objectRecord(sideValue);
@@ -146,7 +202,11 @@ function mapRewardDiceRecord(value: unknown): RewardDiceInput {
 
 export function mapWorkflowRecord(value: unknown): Workflow {
   const record = objectRecord(value);
-  if (record['schemaVersion'] !== 1 && record['schemaVersion'] !== 2) {
+  if (
+    record['schemaVersion'] !== 1 &&
+    record['schemaVersion'] !== 2 &&
+    record['schemaVersion'] !== 3
+  ) {
     return invalidRecord();
   }
 
@@ -160,17 +220,16 @@ export function mapWorkflowRecord(value: unknown): Workflow {
     return invalidRecord();
   }
 
+  const schemaVersion = record['schemaVersion'];
   const rewardDice =
     record['rewardDice'] === undefined
       ? undefined
-      : mapRewardDiceRecord(record['rewardDice']);
+      : mapRewardDiceRecord(record['rewardDice'], schemaVersion);
 
   return createWorkflow({
     id: stringValue(record['id']),
     name: stringValue(record['name']),
-    phases: phases.map((phase) =>
-      mapPhaseRecord(phase, record['schemaVersion'] as 1 | 2),
-    ),
+    phases: phases.map((phase) => mapPhaseRecord(phase, schemaVersion)),
     ...(rewardDice === undefined ? {} : { rewardDice }),
   });
 }
@@ -181,7 +240,7 @@ export function mapWorkflowToRecord(
 ): WorkflowRecord {
   return {
     id: workflow.id,
-    schemaVersion: 2,
+    schemaVersion: 3,
     order,
     name: workflow.name,
     phases: workflow.phases.map((phase) => ({
@@ -203,8 +262,7 @@ export function mapWorkflowToRecord(
       ? {}
       : {
           rewardDice: {
-            triggerPhaseType: workflow.rewardDice.triggerPhaseType,
-            frequency: workflow.rewardDice.frequency,
+            schedule: workflow.rewardDice.schedule,
             rerolls: workflow.rewardDice.rerolls,
             sides: workflow.rewardDice.sides.map((side) => ({
               icon: side.icon,

@@ -2,8 +2,9 @@
 
 ## Trigger
 
-A Phase of the Workflow-configured `triggerPhaseType` finishes, and its ordinal
-among matching completed Phases is divisible by Reward Dice `frequency`.
+A Phase selected by the Workflow's Reward schedule finishes. A frequency
+schedule uses the configured Phase type and matching ordinal; a custom schedule
+uses explicit zero-based Phase indexes.
 Eligibility is calculated from the immutable Workflow snapshot and the completed
 Phase index; it is not a timer or random event.
 
@@ -121,7 +122,7 @@ create inconsistent replay behavior.
 
 ## Proof in Tests
 
-- eligibility by Phase type/frequency: `src/features/workflow/domain/isRewardDueAfterPhase.test.ts`.
+- frequency and custom eligibility: `src/features/workflow/domain/isRewardDueAfterPhase.test.ts`.
 - weighted selection and random bounds: `src/features/workflow/domain/rollReward.test.ts`.
 - Reward pause/continue transitions: `src/features/session/domain/Session.test.ts`
   and `application/sessionUseCases.test.ts`.

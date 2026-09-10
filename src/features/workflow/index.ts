@@ -15,6 +15,10 @@ export type {
 export type {
   RewardDice,
   RewardDiceInput,
+  RewardSchedule,
+  RewardScheduleInput,
+  FrequencyRewardSchedule,
+  CustomRewardSchedule,
   RewardPhaseType,
 } from './domain/RewardDice';
 export type {

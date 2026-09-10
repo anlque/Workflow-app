@@ -12,13 +12,16 @@ describe('RewardDiceEditor', () => {
       <RewardDiceEditor
         draft={{
           enabled: false,
+          scheduleMode: 'frequency',
           triggerPhaseType: 'focus',
           frequency: '1',
+          customPhaseKeys: [],
           rerolls: '0',
           sides: [],
         }}
         errors={{}}
         onEnabledChange={onEnabledChange}
+        onScheduleModeChange={() => undefined}
         onTriggerPhaseTypeChange={() => undefined}
         onFrequencyChange={() => undefined}
         onRerollsChange={() => undefined}
@@ -38,8 +41,10 @@ describe('RewardDiceEditor', () => {
       <RewardDiceEditor
         draft={{
           enabled: true,
+          scheduleMode: 'frequency',
           triggerPhaseType: 'focus',
           frequency: '1',
+          customPhaseKeys: [],
           rerolls: '0',
           sides: [
             {
@@ -60,6 +65,7 @@ describe('RewardDiceEditor', () => {
         }}
         errors={{}}
         onEnabledChange={() => undefined}
+        onScheduleModeChange={() => undefined}
         onTriggerPhaseTypeChange={() => undefined}
         onFrequencyChange={() => undefined}
         onRerollsChange={() => undefined}
@@ -86,13 +92,16 @@ describe('RewardDiceEditor', () => {
       <RewardDiceEditor
         draft={{
           enabled: true,
+          scheduleMode: 'frequency',
           triggerPhaseType: 'focus',
           frequency: '1',
+          customPhaseKeys: [],
           rerolls: '0',
           sides: [],
         }}
         errors={{}}
         onEnabledChange={() => undefined}
+        onScheduleModeChange={() => undefined}
         onTriggerPhaseTypeChange={onTriggerPhaseTypeChange}
         onFrequencyChange={() => undefined}
         onRerollsChange={() => undefined}
@@ -119,13 +128,16 @@ describe('RewardDiceEditor', () => {
       <RewardDiceEditor
         draft={{
           enabled: true,
+          scheduleMode: 'frequency',
           triggerPhaseType: 'focus',
           frequency: '1',
+          customPhaseKeys: [],
           rerolls: '0',
           sides: [],
         }}
         errors={{ 'reward:rerolls': 'Choose between 0 and 3 rerolls.' }}
         onEnabledChange={() => undefined}
+        onScheduleModeChange={() => undefined}
         onTriggerPhaseTypeChange={() => undefined}
         onFrequencyChange={() => undefined}
         onRerollsChange={onRerollsChange}
