@@ -164,7 +164,9 @@ optional-reference removal. The injected Application operation remains the
 authoritative kind/size/MIME and transaction boundary. Rejections remain inline
 and retryable without nesting another modal. A post-commit catalog publication
 or reload failure offers synchronization-only retry and cannot repeat the
-retirement mutation.
+retirement mutation. Because the source is already retired, that committed
+recovery state cannot be cancelled or navigated Back; Retry sync is its only
+available action.
 Each card shows its current Role or `No Role`. The accessible Role dialog
 restores the invoking control on close, previews global impact before mutation
 and labels occupied-Role confirmation `Move role`.

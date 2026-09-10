@@ -824,6 +824,11 @@ textarea {
   opacity: 0;
 }
 
+.asset-upload:has(input:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 .asset-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));

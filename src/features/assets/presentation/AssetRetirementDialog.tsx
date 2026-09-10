@@ -167,7 +167,7 @@ export function AssetRetirementDialog({
       title={`Retire ${asset.name}`}
       describedBy="asset-retirement-description"
       onCancel={() => {
-        if (!inFlight.current) onCancel();
+        if (!inFlight.current && committedChoice === null) onCancel();
       }}
     >
       <p id="asset-retirement-description">
@@ -258,7 +258,10 @@ export function AssetRetirementDialog({
         </>
       ) : (
         <>
-          <fieldset className="asset-retirement__choices">
+          <fieldset
+            className="asset-retirement__choices"
+            disabled={pending || committedChoice !== null}
+          >
             <legend>Resolve references</legend>
             <label className="asset-retirement__choice">
               <input
@@ -342,26 +345,28 @@ export function AssetRetirementDialog({
             </p>
           )}
           <div className="dialog__actions">
-            <Button
-              variant="quiet"
-              disabled={pending}
-              onClick={() => {
-                setStep(1);
-                setFocusTarget('continue');
-              }}
-            >
-              Back
-            </Button>
             {committedChoice === null ? (
-              <Button
-                key="retire"
-                variant="danger"
-                pending={pending}
-                pendingLabel="Retiring…"
-                onClick={() => void retire()}
-              >
-                Retire asset
-              </Button>
+              <>
+                <Button
+                  variant="quiet"
+                  disabled={pending}
+                  onClick={() => {
+                    setStep(1);
+                    setFocusTarget('continue');
+                  }}
+                >
+                  Back
+                </Button>
+                <Button
+                  key="retire"
+                  variant="danger"
+                  pending={pending}
+                  pendingLabel="Retiring…"
+                  onClick={() => void retire()}
+                >
+                  Retire asset
+                </Button>
+              </>
             ) : (
               <Button
                 pending={pending}

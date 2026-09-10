@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -112,7 +112,10 @@ describe('AssetRetirementDialog', () => {
         }),
     });
     await user.click(screen.getByRole('button', { name: 'Review usage' }));
-    await user.keyboard('{Escape}');
+    fireEvent(
+      screen.getByRole('dialog', { name: 'Retire Forest' }),
+      new Event('cancel', { bubbles: false, cancelable: true }),
+    );
     expect(onCancel).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog', { name: 'Retire Forest' })).toBeVisible();
     resolveInspection?.(preview);
@@ -189,6 +192,54 @@ describe('AssetRetirementDialog', () => {
     expect(onRetire).toHaveBeenCalledOnce();
     expect(onSynchronize).toHaveBeenCalledTimes(2);
     expect(onSuccess).toHaveBeenCalledWith({ type: 'remove' });
+  });
+
+  test('keeps committed recovery open on Escape', async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    setup({
+      onCancel,
+      onSynchronize: () => Promise.reject(new Error('Catalog reload failed')),
+    });
+    await continueToChoice(user);
+    await user.click(
+      screen.getByRole('radio', { name: 'Remove optional references' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Retire asset' }));
+    await screen.findByRole('button', { name: 'Retry sync' });
+
+    fireEvent(
+      screen.getByRole('dialog', { name: 'Retire Forest' }),
+      new Event('cancel', { bubbles: false, cancelable: true }),
+    );
+
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Retire Forest' })).toBeVisible();
+  });
+
+  test('exposes only Retry sync actions after retirement commits', async () => {
+    const user = userEvent.setup();
+    setup({
+      onSynchronize: () => Promise.reject(new Error('Catalog reload failed')),
+    });
+    await continueToChoice(user);
+    await user.click(
+      screen.getByRole('radio', { name: 'Remove optional references' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Retire asset' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Retry sync' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Back' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Cancel' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('radio', { name: 'Remove optional references' }),
+    ).toBeDisabled();
   });
 
   test('returns a stale retirement to Review usage', async () => {
