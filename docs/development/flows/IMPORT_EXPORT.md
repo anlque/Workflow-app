@@ -38,9 +38,9 @@ configured MIME allowlists.
    bytes and Base64-encodes them.
 4. [`serializeWorkflow()`](../../../src/features/workflow/application/workflowPackageMapping.ts)
    creates the public Workflow shape, preserving Phase/side order and emitting
-   current Reward trigger/reroll fields.
-5. The use case serializes `{ kind: 'locusora/workflow', version: 2, workflow,
-assets }`. Sorted Assets and stable property/array order make repeated export
+   the canonical Reward schedule and reroll fields.
+5. The use case serializes `{ kind: 'locusora/workflow', version: 3, workflow,
+   assets }`. Sorted Assets and stable property/array order make repeated export
    deterministic for unchanged input.
 6. Options creates a temporary JSON Blob/object URL, clicks a download link and
    revokes the URL.
@@ -50,13 +50,14 @@ assets }`. Sorted Assets and stable property/array order make repeated export
 1. [`importWorkflowUseCase()`](../../../src/features/workflow/application/importWorkflowUseCase.ts)
    checks UTF-8 byte size before parsing JSON as `unknown`.
 2. It requires the exact four-field envelope, kind `locusora/workflow`, version
-   1 or 2 and an Asset array.
+   1, 2 or 3 and an Asset array.
 3. Version 1 accepts only legacy direct Environment IDs and role-less exact-key
-   Assets. Version 2 accepts only exact direct-or-Role unions and optional Asset
-   Roles. Mixed, contradictory or unknown keys are rejected. `parseWorkflow()`
-   reconstructs a trusted Workflow through `createWorkflow()`; accepted omissions for
-   Reward trigger/rerolls receive Domain defaults.
-4. Each v1 embedded Asset requires six exact fields; v2 additionally permits
+   Assets. Versions 2–3 accept only exact direct-or-Role unions and optional
+   Asset Roles. Versions 1–2 read legacy frequency fields; version 3 requires a
+   canonical `frequency | custom` Reward schedule. Mixed, contradictory or
+   unknown keys are rejected. `parseWorkflow()` reconstructs a trusted Workflow
+   through `createWorkflow()`; accepted legacy omissions receive Domain defaults.
+4. Each v1 embedded Asset requires six exact fields; v2–v3 additionally permit
    `role`. Base64 must decode, decoded
    length must equal `byteSize`, kind must be `image | audio`, and
    `validateAssetImport()` must accept its content/MIME/size.

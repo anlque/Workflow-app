@@ -162,33 +162,58 @@ function createRewardSchedule(
   input: RewardDiceInput,
   phaseCount: number,
 ): RewardSchedule {
-  if (input.schedule?.type === 'custom') {
-    const phaseIndexes = [...input.schedule.phaseIndexes];
-    if (
-      phaseIndexes.some(
-        (index) => !Number.isInteger(index) || index < 0 || index >= phaseCount,
-      ) ||
-      new Set(phaseIndexes).size !== phaseIndexes.length
-    ) {
+  if (input.schedule !== undefined) {
+    const schedule = input.schedule as unknown as Readonly<
+      Record<string, unknown>
+    >;
+    if (schedule['type'] === 'custom') {
+      const rawPhaseIndexes = schedule['phaseIndexes'];
+      if (!Array.isArray(rawPhaseIndexes)) {
+        throw new WorkflowValidationError(
+          'Custom Reward phase indexes must be unique in-range integers.',
+        );
+      }
+      const phaseIndexes = [...(rawPhaseIndexes as number[])];
+      if (
+        phaseIndexes.some(
+          (index) =>
+            !Number.isInteger(index) || index < 0 || index >= phaseCount,
+        ) ||
+        new Set(phaseIndexes).size !== phaseIndexes.length
+      ) {
+        throw new WorkflowValidationError(
+          'Custom Reward phase indexes must be unique in-range integers.',
+        );
+      }
+      return Object.freeze({
+        type: 'custom',
+        phaseIndexes: Object.freeze(
+          phaseIndexes.sort((left, right) => left - right),
+        ),
+      });
+    }
+    if (schedule['type'] !== 'frequency') {
       throw new WorkflowValidationError(
-        'Custom Reward phase indexes must be unique in-range integers.',
+        'Reward Dice schedule must be frequency or custom.',
       );
     }
-    return Object.freeze({
-      type: 'custom',
-      phaseIndexes: Object.freeze(
-        phaseIndexes.sort((left, right) => left - right),
-      ),
-    });
+    const triggerPhaseType = createCanonicalRewardPhaseType(
+      schedule['triggerPhaseType'],
+    );
+    const frequency = schedule['frequency'];
+    if (
+      typeof frequency !== 'number' ||
+      !Number.isInteger(frequency) ||
+      frequency < 1
+    ) {
+      throw new WorkflowValidationError(
+        'Reward Dice frequency must be a positive integer.',
+      );
+    }
+    return Object.freeze({ type: 'frequency', triggerPhaseType, frequency });
   }
-  const triggerPhaseType =
-    input.schedule?.type === 'frequency'
-      ? createCanonicalRewardPhaseType(input.schedule.triggerPhaseType)
-      : createRewardPhaseType(input.triggerPhaseType);
-  const frequency =
-    input.schedule?.type === 'frequency'
-      ? input.schedule.frequency
-      : input.frequency;
+  const triggerPhaseType = createRewardPhaseType(input.triggerPhaseType);
+  const frequency = input.frequency;
   if (
     typeof frequency !== 'number' ||
     !Number.isInteger(frequency) ||

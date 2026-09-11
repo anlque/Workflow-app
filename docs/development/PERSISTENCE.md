@@ -3,9 +3,10 @@
 ## AS-001 compatibility update
 
 Global Dexie version 4 defines `assets: 'id, createdAt, &roleKey'`. The optional
-normalized key is globally unique; role-less rows are not indexed. Asset,
-Workflow and Session writers emit record version 3 while readers accept their
-compatible version-1 and version-2 rows. Workflow and Session indexes are unchanged.
+normalized key is globally unique; role-less rows are not indexed. Asset writers
+remain at record version 2; Workflow and Session writers emit record version 3.
+Their readers retain the compatible older versions documented below. Workflow
+and Session indexes are unchanged.
 
 Workflow package export emits version 3 with canonical Reward schedules,
 direct-or-Role references and optional Asset Roles; import accepts versions
@@ -145,16 +146,19 @@ The outer record contains:
 ```ts
 {
   id: string;
-  schemaVersion: 2;
+  schemaVersion: 3;
   active: 0 | 1;
   updatedAt: number;
   session: unknown;
 }
 ```
 
-Version 1 snapshots accept only legacy direct ID Environment fields. Version 2
-snapshots accept only exact direct-reference objects; Role references, mixed
-versions and unknown Environment fields are rejected. The nested `session`
+Version 1 snapshots accept only legacy direct ID Environment fields. Versions 2
+and 3 accept only exact direct-reference objects; Role references, mixed
+versions and unknown Environment fields are rejected. Versions 1–2 read legacy
+top-level Reward `triggerPhaseType + frequency` fields and default a missing
+trigger type to `focus`; version 3 requires the canonical `frequency | custom`
+schedule union, including `triggerPhaseType` for frequency. The nested `session`
 stores the immutable Workflow snapshot, current Phase index,
 state discriminator and the timing fields required by that state. It does not
 store a live reference to the Workflow table.
@@ -169,7 +173,7 @@ The mapper rebuilds the Workflow with `createWorkflow()` and the Session with
 
 Compatibility defaults apply inside stored snapshots:
 
-- missing Reward Dice trigger Phase type defaults to `focus`;
+- missing legacy Reward Dice trigger Phase type defaults to `focus`;
 - missing Reward Dice rerolls defaults to `0`;
 - missing Paused Session `pauseReason` defaults to `user`.
 

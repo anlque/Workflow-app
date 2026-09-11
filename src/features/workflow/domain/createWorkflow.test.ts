@@ -180,6 +180,25 @@ describe('createWorkflow', () => {
     ).toThrow('Reward Dice trigger Phase type must be focus or break.');
   });
 
+  test('rejects a malformed present schedule instead of using valid legacy fields', () => {
+    expect(() =>
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [validPhase],
+        rewardDice: {
+          schedule: { type: 'sometimes' },
+          triggerPhaseType: 'focus',
+          frequency: 1,
+          sides: [
+            { icon: 'tea', title: 'Tea' },
+            { icon: 'walk', title: 'Walk' },
+          ],
+        } as never,
+      }),
+    ).toThrow('Reward Dice schedule must be frequency or custom.');
+  });
+
   test('creates a sorted immutable custom Reward schedule', () => {
     const workflow = createWorkflow({
       id: 'workflow-1',
