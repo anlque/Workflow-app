@@ -206,11 +206,6 @@ function createRewardSchedule(
           'Custom Reward phase indexes must be unique in-range integers.',
         );
       }
-      if (!hasExactOwnKeys(schedule, ['type', 'phaseIndexes'])) {
-        throw new WorkflowValidationError(
-          'Reward Dice schedule must use canonical fields.',
-        );
-      }
       const phaseIndexes = [...(rawPhaseIndexes as number[])];
       if (
         phaseIndexes.some(
@@ -221,6 +216,11 @@ function createRewardSchedule(
       ) {
         throw new WorkflowValidationError(
           'Custom Reward phase indexes must be unique in-range integers.',
+        );
+      }
+      if (!hasExactOwnKeys(schedule, ['type', 'phaseIndexes'])) {
+        throw new WorkflowValidationError(
+          'Reward Dice schedule must use canonical fields.',
         );
       }
       return Object.freeze({

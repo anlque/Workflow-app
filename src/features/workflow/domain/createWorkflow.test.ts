@@ -318,6 +318,23 @@ describe('createWorkflow', () => {
     ).toThrow(WorkflowValidationError);
   });
 
+  test('validates custom index values before extra own fields', () => {
+    expect(() =>
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [validPhase],
+        rewardDice: {
+          schedule: { type: 'custom', phaseIndexes: [-1], extra: true },
+          sides: [
+            { icon: 'tea', title: 'Tea' },
+            { icon: 'walk', title: 'Walk' },
+          ],
+        } as never,
+      }),
+    ).toThrow('Custom Reward phase indexes must be unique in-range integers.');
+  });
+
   test('creates a sorted immutable custom Reward schedule', () => {
     const workflow = createWorkflow({
       id: 'workflow-1',
