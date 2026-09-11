@@ -158,15 +158,53 @@ function createCanonicalRewardPhaseType(value: unknown): RewardPhaseType {
   );
 }
 
+function hasExactOwnKeys(
+  value: Readonly<Record<string, unknown>>,
+  expected: readonly string[],
+): boolean {
+  const keys = Object.keys(value);
+  return (
+    keys.length === expected.length &&
+    expected.every((key) => Object.hasOwn(value, key))
+  );
+}
+
 function createRewardSchedule(
   input: RewardDiceInput,
   phaseCount: number,
 ): RewardSchedule {
-  if (input.schedule !== undefined) {
-    const schedule = input.schedule as unknown as Readonly<
-      Record<string, unknown>
-    >;
+  if (Object.hasOwn(input, 'schedule')) {
+    const rawInput = input as unknown as Readonly<Record<string, unknown>>;
+    const rawSchedule = rawInput['schedule'];
+    if (
+      typeof rawSchedule !== 'object' ||
+      rawSchedule === null ||
+      Array.isArray(rawSchedule)
+    ) {
+      throw new WorkflowValidationError(
+        'Reward Dice schedule must be frequency or custom.',
+      );
+    }
+    const schedule = rawSchedule as Readonly<Record<string, unknown>>;
+    if (schedule['type'] !== 'custom' && schedule['type'] !== 'frequency') {
+      throw new WorkflowValidationError(
+        'Reward Dice schedule must be frequency or custom.',
+      );
+    }
+    if (
+      Object.hasOwn(rawInput, 'triggerPhaseType') ||
+      Object.hasOwn(rawInput, 'frequency')
+    ) {
+      throw new WorkflowValidationError(
+        'Reward Dice schedule cannot be combined with legacy timing fields.',
+      );
+    }
     if (schedule['type'] === 'custom') {
+      if (!hasExactOwnKeys(schedule, ['type', 'phaseIndexes'])) {
+        throw new WorkflowValidationError(
+          'Reward Dice schedule must use canonical fields.',
+        );
+      }
       const rawPhaseIndexes = schedule['phaseIndexes'];
       if (!Array.isArray(rawPhaseIndexes)) {
         throw new WorkflowValidationError(
@@ -192,14 +230,14 @@ function createRewardSchedule(
         ),
       });
     }
-    if (schedule['type'] !== 'frequency') {
-      throw new WorkflowValidationError(
-        'Reward Dice schedule must be frequency or custom.',
-      );
-    }
     const triggerPhaseType = createCanonicalRewardPhaseType(
       schedule['triggerPhaseType'],
     );
+    if (!hasExactOwnKeys(schedule, ['type', 'triggerPhaseType', 'frequency'])) {
+      throw new WorkflowValidationError(
+        'Reward Dice schedule must use canonical fields.',
+      );
+    }
     const frequency = schedule['frequency'];
     if (
       typeof frequency !== 'number' ||

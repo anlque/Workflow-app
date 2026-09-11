@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { createWorkflow } from './createWorkflow';
+import { WorkflowValidationError } from './WorkflowErrors';
 
 const validPhase = {
   type: 'focus',
@@ -197,6 +198,93 @@ describe('createWorkflow', () => {
         } as never,
       }),
     ).toThrow('Reward Dice schedule must be frequency or custom.');
+  });
+
+  test.each([null, 1, 'frequency', []])(
+    'rejects non-object schedule %j with a Workflow validation error',
+    (schedule) => {
+      expect(() =>
+        createWorkflow({
+          id: 'workflow-1',
+          name: 'Deep work',
+          phases: [validPhase],
+          rewardDice: {
+            schedule,
+            sides: [
+              { icon: 'tea', title: 'Tea' },
+              { icon: 'walk', title: 'Walk' },
+            ],
+          } as never,
+        }),
+      ).toThrow(WorkflowValidationError);
+    },
+  );
+
+  test('does not use legacy fallback when schedule is an own undefined property', () => {
+    expect(() =>
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [validPhase],
+        rewardDice: {
+          schedule: undefined,
+          triggerPhaseType: 'focus',
+          frequency: 1,
+          sides: [
+            { icon: 'tea', title: 'Tea' },
+            { icon: 'walk', title: 'Walk' },
+          ],
+        } as never,
+      }),
+    ).toThrow(WorkflowValidationError);
+  });
+
+  test('rejects canonical schedule combined with top-level legacy timing fields', () => {
+    expect(() =>
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [validPhase],
+        rewardDice: {
+          schedule: {
+            type: 'frequency',
+            triggerPhaseType: 'focus',
+            frequency: 1,
+          },
+          triggerPhaseType: 'break',
+          frequency: 2,
+          sides: [
+            { icon: 'tea', title: 'Tea' },
+            { icon: 'walk', title: 'Walk' },
+          ],
+        } as never,
+      }),
+    ).toThrow(WorkflowValidationError);
+  });
+
+  test.each([
+    {
+      type: 'frequency',
+      triggerPhaseType: 'focus',
+      frequency: 1,
+      extra: true,
+    },
+    { type: 'custom', phaseIndexes: [0], extra: true },
+  ])('rejects schedule with extra own fields %#', (schedule) => {
+    expect(() =>
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [validPhase],
+        rewardDice: {
+          schedule,
+          sides: [
+            { icon: 'tea', title: 'Tea' },
+            { icon: 'walk', title: 'Walk' },
+          ],
+        } as never,
+      }),
+    ).toThrow(WorkflowValidationError);
   });
 
   test('creates a sorted immutable custom Reward schedule', () => {
