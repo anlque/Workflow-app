@@ -107,7 +107,7 @@ Each workflow may include:
 Users may configure:
 
 - reward dice;
-- reward frequency;
+- frequency or custom Phase-marker schedule;
 - reward probability;
 - reward content.
 
@@ -228,8 +228,8 @@ Users can configure:
 - icon for each side;
 - description for each side;
 - probability of each side;
-- reward frequency;
-- whether completed focus or break Phases count toward that frequency.
+- a frequency schedule based on completed focus or break Phases, or a custom
+  schedule selecting exact Phase positions;
 - zero to three optional rerolls after the initial roll.
 
 If probabilities are not customized, all sides must have equal probability.
@@ -307,9 +307,11 @@ Successful Workflow catalog mutations invalidate open side-panel and idle focus
 lists, which reload from IndexedDB automatically. The invalidation carries no
 Workflow data, does not poll and never changes an active Session snapshot.
 
-Reward Dice is optional. Each Workflow selects whether completed `focus` or
-`break` Phases count toward its integer frequency of one or more matching
-Phases; legacy configurations default to `focus`. Each dice configures zero to
+Reward Dice is optional. Each Workflow has one schedule: `frequency` selects
+completed `focus` or `break` Phases and an integer cadence of one or more, while
+`custom` selects exact zero-based Phase positions. Canonical frequency schedules
+always include the Phase type; only legacy configurations may omit it and
+default to `focus`. Each dice configures zero to
 three optional rerolls after its initial roll; missing legacy values default to
 zero. The allowance starts fresh for every Reward, unused rerolls do not carry
 over, and the last displayed result is accepted when the user continues. It

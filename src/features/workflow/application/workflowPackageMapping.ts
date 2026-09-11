@@ -113,7 +113,7 @@ export function parseWorkflow(value: unknown, version: 1 | 2 | 3): Workflow {
         );
         return {
           type: 'frequency' as const,
-          ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+          triggerPhaseType: triggerPhaseType ?? 'focus',
           frequency: number(reward['frequency']),
         };
       }
@@ -127,9 +127,10 @@ export function parseWorkflow(value: unknown, version: 1 | 2 | 3): Workflow {
         const triggerPhaseType = optionalRewardPhaseType(
           raw['triggerPhaseType'],
         );
+        if (triggerPhaseType === undefined) return invalid();
         return {
           type: 'frequency' as const,
-          ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+          triggerPhaseType,
           frequency: number(raw['frequency']),
         };
       }

@@ -9,9 +9,10 @@ before Session creation. The editor draft stores one discriminated reference
 per Environment slot, and its picker explicitly offers direct Asset and Role
 modes. Unrelated Phase edits preserve the selected reference variant.
 
-Workflow record version 2 writes the union. Its mapper reads version-1
+Workflow record version 3 writes the reference union and canonical Reward
+schedule. Its mapper reads version-1
 `backgroundAssetId`/`audioAssetId` fields as direct references. The table indexes
-are unchanged. Package export writes version 2; import supports versions 1–2.
+are unchanged. Package export writes version 3; import supports versions 1–3.
 
 ## Purpose
 

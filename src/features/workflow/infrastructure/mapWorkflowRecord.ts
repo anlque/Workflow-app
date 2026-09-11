@@ -153,7 +153,7 @@ function mapRewardDiceRecord(
       const triggerPhaseType = rewardPhaseType(record['triggerPhaseType']);
       return {
         type: 'frequency' as const,
-        ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+        triggerPhaseType: triggerPhaseType ?? 'focus',
         frequency: numberValue(record['frequency']),
       };
     }
@@ -165,9 +165,10 @@ function mapRewardDiceRecord(
       hasExactKeys(raw, ['type', 'triggerPhaseType', 'frequency'])
     ) {
       const triggerPhaseType = rewardPhaseType(raw['triggerPhaseType']);
+      if (triggerPhaseType === undefined) return invalidRecord();
       return {
         type: 'frequency' as const,
-        ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+        triggerPhaseType,
         frequency: numberValue(raw['frequency']),
       };
     }

@@ -192,6 +192,18 @@ export function validateWorkflowDraft(
     if (draft.rewardDice.scheduleMode === 'frequency' && frequency === null) {
       errors['reward:frequency'] = 'Frequency must be a positive whole number.';
     }
+    const customPhaseIndexes = draft.rewardDice.customPhaseKeys.map((key) =>
+      draft.phases.findIndex((phase) => phase.key === key),
+    );
+    if (
+      draft.rewardDice.scheduleMode === 'custom' &&
+      (customPhaseIndexes.some((index) => index < 0) ||
+        new Set(draft.rewardDice.customPhaseKeys).size !==
+          draft.rewardDice.customPhaseKeys.length)
+    ) {
+      errors['reward:schedule'] =
+        'Choose valid Reward markers for this Workflow.';
+    }
     if (rerolls === null) {
       errors['reward:rerolls'] = 'Choose between 0 and 3 rerolls.';
     }
@@ -232,12 +244,7 @@ export function validateWorkflowDraft(
         draft.rewardDice.scheduleMode === 'custom'
           ? {
               type: 'custom',
-              phaseIndexes: draft.rewardDice.customPhaseKeys.flatMap((key) => {
-                const index = draft.phases.findIndex(
-                  (phase) => phase.key === key,
-                );
-                return index < 0 ? [] : [index];
-              }),
+              phaseIndexes: customPhaseIndexes,
             }
           : {
               type: 'frequency',

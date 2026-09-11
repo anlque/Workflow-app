@@ -31,6 +31,13 @@ describe('resolveWorkflowAssetReferences', () => {
           },
         },
       ],
+      rewardDice: {
+        schedule: { type: 'custom', phaseIndexes: [1] },
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
     });
 
     const resolved = await resolveWorkflowAssetReferences(workflow, {
@@ -56,6 +63,10 @@ describe('resolveWorkflowAssetReferences', () => {
     expect(secondPhase.environment.backgroundAsset).toEqual(
       sourceSecondPhase.environment.backgroundAsset,
     );
+    expect(resolved.rewardDice?.schedule).toEqual({
+      type: 'custom',
+      phaseIndexes: [1],
+    });
   });
 
   test('propagates resolution failure without returning a partial Workflow', async () => {

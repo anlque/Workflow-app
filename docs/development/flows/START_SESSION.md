@@ -61,7 +61,7 @@ implicitly select or start a Workflow.
 
 ## Authoritative Changes
 
-- A new version-2 Session record becomes the only active record.
+- A new version-3 Session record becomes the only active record.
 - Its Workflow snapshot contains direct Asset IDs only; later Role moves do not
   change it.
 - Its immutable snapshot, current Phase index 0 and wall-clock start/end anchors

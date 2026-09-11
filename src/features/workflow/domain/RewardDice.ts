@@ -17,7 +17,7 @@ export type RewardSchedule = FrequencyRewardSchedule | CustomRewardSchedule;
 export type RewardScheduleInput =
   | Readonly<{
       type: 'frequency';
-      triggerPhaseType?: RewardPhaseType;
+      triggerPhaseType: RewardPhaseType;
       frequency: number;
     }>
   | Readonly<{ type: 'custom'; phaseIndexes: readonly number[] }>;

@@ -97,9 +97,16 @@ export function RewardDiceEditor({
                 </Field>
               </>
             ) : (
-              <p className="field__hint">
-                Choose Reward markers in the Phase list.
-              </p>
+              <>
+                <p className="field__hint">
+                  Choose Reward markers in the Phase list.
+                </p>
+                {errors['reward:schedule'] === undefined ? null : (
+                  <p className="field__error" role="alert">
+                    {errors['reward:schedule']}
+                  </p>
+                )}
+              </>
             )}
             <Field
               label="Available rerolls"

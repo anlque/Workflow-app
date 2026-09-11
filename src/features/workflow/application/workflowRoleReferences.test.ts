@@ -79,6 +79,13 @@ describe('Workflow Role references', () => {
           },
         },
       ],
+      rewardDice: {
+        schedule: { type: 'custom', phaseIndexes: [1] },
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
     });
     const untouched = createWorkflow({
       id: 'two',
@@ -104,5 +111,9 @@ describe('Workflow Role references', () => {
       { type: 'role', role: 'Deep Work' },
     ]);
     expect(stillUntouched).toBe(untouched);
+    expect(renamed?.rewardDice?.schedule).toEqual({
+      type: 'custom',
+      phaseIndexes: [1],
+    });
   });
 });

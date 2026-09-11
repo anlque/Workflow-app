@@ -255,9 +255,9 @@ It defines:
 
 - probabilities;
 
-- trigger frequency;
-
-- trigger Phase type (`focus` or `break`).
+- one Reward schedule: frequency with a required Phase type (`focus` or
+  `break`) and positive integer cadence, or custom with unique in-range Phase
+  indexes;
 
 - zero to three optional rerolls after the initial roll.
 
@@ -445,10 +445,11 @@ Deleting a Workflow must never automatically delete shared Assets.
 
 A Workflow owns zero or one Reward Dice configuration.
 
-Reward Dice may be disabled. When enabled it contains at least two Dice Sides,
-has a trigger frequency of at least one completed Phase of its configured
-`focus` or `break` type and is evaluated only after a completed Phase of that
-type. Missing legacy trigger types default to `focus`. Each Reward Dice permits
+Reward Dice may be disabled. When enabled it contains at least two Dice Sides
+and exactly one `frequency | custom` schedule. Frequency schedules require a
+`focus` or `break` type and positive integer cadence. Custom schedules contain
+unique, zero-based indexes within the Workflow. Only missing legacy frequency
+trigger types default to `focus`. Each Reward Dice permits
 zero to three rerolls after its initial roll; missing legacy values default to
 zero. The allowance resets for every Reward opportunity, unused rerolls do not
 accumulate, and the last displayed result is the accepted Reward.

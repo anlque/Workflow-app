@@ -163,6 +163,23 @@ describe('createWorkflow', () => {
     expect(workflow.rewardDice?.rerolls).toBe(0);
   });
 
+  test('rejects a canonical frequency schedule without a trigger Phase type', () => {
+    expect(() =>
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [validPhase],
+        rewardDice: {
+          schedule: { type: 'frequency', frequency: 1 } as never,
+          sides: [
+            { icon: 'tea', title: 'Tea' },
+            { icon: 'walk', title: 'Walk' },
+          ],
+        },
+      }),
+    ).toThrow('Reward Dice trigger Phase type must be focus or break.');
+  });
+
   test('creates a sorted immutable custom Reward schedule', () => {
     const workflow = createWorkflow({
       id: 'workflow-1',

@@ -43,6 +43,18 @@ function pauseReason(value: unknown): 'user' | 'reward' {
   return invalid();
 }
 
+function hasExactKeys(
+  value: Readonly<Record<string, unknown>>,
+  required: readonly string[],
+  optional: readonly string[] = [],
+): boolean {
+  const keys = Object.keys(value);
+  return (
+    required.every((key) => Object.hasOwn(value, key)) &&
+    keys.every((key) => required.includes(key) || optional.includes(key))
+  );
+}
+
 function workflow(value: unknown) {
   const input = record(value);
   const phases = input['phases'];
@@ -61,20 +73,28 @@ function workflow(value: unknown) {
       );
       return {
         type: 'frequency' as const,
-        ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+        triggerPhaseType: triggerPhaseType ?? 'focus',
         frequency: number(dice['frequency']),
       };
     }
     const raw = record(dice['schedule']);
-    if (raw['type'] === 'frequency') {
+    if (
+      raw['type'] === 'frequency' &&
+      hasExactKeys(raw, ['type', 'triggerPhaseType', 'frequency'])
+    ) {
       const triggerPhaseType = optionalRewardPhaseType(raw['triggerPhaseType']);
+      if (triggerPhaseType === undefined) return invalid();
       return {
         type: 'frequency' as const,
-        ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+        triggerPhaseType,
         frequency: number(raw['frequency']),
       };
     }
-    if (raw['type'] === 'custom' && Array.isArray(raw['phaseIndexes'])) {
+    if (
+      raw['type'] === 'custom' &&
+      hasExactKeys(raw, ['type', 'phaseIndexes']) &&
+      Array.isArray(raw['phaseIndexes'])
+    ) {
       return {
         type: 'custom' as const,
         phaseIndexes: raw['phaseIndexes'].map(number),

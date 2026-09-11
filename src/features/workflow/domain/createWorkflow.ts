@@ -151,6 +151,13 @@ function createRewardPhaseType(value: unknown): RewardPhaseType {
   );
 }
 
+function createCanonicalRewardPhaseType(value: unknown): RewardPhaseType {
+  if (value === 'focus' || value === 'break') return value;
+  throw new WorkflowValidationError(
+    'Reward Dice trigger Phase type must be focus or break.',
+  );
+}
+
 function createRewardSchedule(
   input: RewardDiceInput,
   phaseCount: number,
@@ -174,11 +181,10 @@ function createRewardSchedule(
       ),
     });
   }
-  const triggerPhaseType = createRewardPhaseType(
+  const triggerPhaseType =
     input.schedule?.type === 'frequency'
-      ? input.schedule.triggerPhaseType
-      : input.triggerPhaseType,
-  );
+      ? createCanonicalRewardPhaseType(input.schedule.triggerPhaseType)
+      : createRewardPhaseType(input.triggerPhaseType);
   const frequency =
     input.schedule?.type === 'frequency'
       ? input.schedule.frequency

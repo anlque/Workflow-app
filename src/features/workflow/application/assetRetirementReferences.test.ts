@@ -45,6 +45,13 @@ function workflow() {
         environment: { backgroundAsset: { type: 'role', role: 'Hero' } },
       },
     ],
+    rewardDice: {
+      schedule: { type: 'custom', phaseIndexes: [1] },
+      sides: [
+        { icon: 'tea', title: 'Tea' },
+        { icon: 'walk', title: 'Walk' },
+      ],
+    },
   });
 }
 
@@ -98,6 +105,10 @@ describe('Workflow Asset retirement patches', () => {
     expect(saved.phases[0].environment.audioAsset).toEqual({
       type: 'role',
       role: 'Hero',
+    });
+    expect(saved.rewardDice?.schedule).toEqual({
+      type: 'custom',
+      phaseIndexes: [1],
     });
   });
 

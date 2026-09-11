@@ -570,6 +570,31 @@ describe('Workflow package', () => {
     });
   });
 
+  test('rejects a version-3 frequency schedule without triggerPhaseType', async () => {
+    const parsed = JSON.parse(
+      await exportWorkflowUseCase(
+        rewardedWorkflow(),
+        new MemoryAssetRepository(),
+      ),
+    ) as { workflow: { rewardDice: { schedule: Record<string, unknown> } } };
+    delete parsed.workflow.rewardDice.schedule['triggerPhaseType'];
+
+    await expect(
+      importWorkflowUseCase(
+        new MemoryWorkflowRepository(),
+        new MemoryAssetRepository(),
+        new MemoryUnitOfWork(),
+        JSON.stringify(parsed),
+        { maxFileBytes: 10_000, assetPolicy: policy },
+        {
+          createWorkflowId: () => 'invalid-import',
+          createAssetId: () => 'unused',
+          now: () => 2_000,
+        },
+      ),
+    ).rejects.toThrow();
+  });
+
   test('exports only referenced Assets with deterministic transport-safe encoding', async () => {
     const assets = new MemoryAssetRepository();
     await addAsset(assets, 'asset-unused');

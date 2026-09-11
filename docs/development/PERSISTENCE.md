@@ -290,7 +290,7 @@ rolls back both tables, so no partial imported package remains.
 
 Export performs the inverse public operation: it sorts referenced identifiers,
 requires metadata and Blob content for each, Base64-encodes them, and writes a
-`locusora/workflow` version-2 envelope. The package is a transport contract, not
+`locusora/workflow` version-3 envelope. The package is a transport contract, not
 a storage dump.
 
 ### Settings import

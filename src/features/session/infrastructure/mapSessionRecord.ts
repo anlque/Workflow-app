@@ -88,7 +88,7 @@ function parseWorkflow(value: unknown, schemaVersion: 1 | 2 | 3) {
       );
       return {
         type: 'frequency' as const,
-        ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+        triggerPhaseType: triggerPhaseType ?? 'focus',
         frequency: number(reward['frequency']),
       };
     }
@@ -100,9 +100,10 @@ function parseWorkflow(value: unknown, schemaVersion: 1 | 2 | 3) {
       hasExactKeys(raw, ['type', 'triggerPhaseType', 'frequency'])
     ) {
       const triggerPhaseType = optionalRewardPhaseType(raw['triggerPhaseType']);
+      if (triggerPhaseType === undefined) return invalid();
       return {
         type: 'frequency' as const,
-        ...(triggerPhaseType === undefined ? {} : { triggerPhaseType }),
+        triggerPhaseType,
         frequency: number(raw['frequency']),
       };
     }

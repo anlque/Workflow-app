@@ -210,6 +210,62 @@ describe('DexieWorkflowRepository', () => {
     });
   });
 
+  test('maps a real raw version-2 Reward Dice record to frequency schedule', async () => {
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
+    await database.table<unknown, WorkflowId>('workflows').put({
+      id: 'version-2-reward',
+      schemaVersion: 2,
+      order: 0,
+      name: 'Version 2 reward',
+      phases: [{ type: 'break', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        triggerPhaseType: 'break',
+        frequency: 2,
+        sides: [
+          { icon: 'tea', title: 'Tea', probability: 0.5 },
+          { icon: 'walk', title: 'Walk', probability: 0.5 },
+        ],
+      },
+    });
+
+    await expect(
+      repository.get(workflow('version-2-reward', 'Fixture').id),
+    ).resolves.toMatchObject({
+      rewardDice: {
+        schedule: {
+          type: 'frequency',
+          triggerPhaseType: 'break',
+          frequency: 2,
+        },
+      },
+    });
+  });
+
+  test('rejects a version-3 frequency schedule without triggerPhaseType', async () => {
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
+    await database.table<unknown, WorkflowId>('workflows').put({
+      id: 'invalid-canonical',
+      schemaVersion: 3,
+      order: 0,
+      name: 'Invalid canonical',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        schedule: { type: 'frequency', frequency: 1 },
+        rerolls: 0,
+        sides: [
+          { icon: 'tea', title: 'Tea', probability: 0.5 },
+          { icon: 'walk', title: 'Walk', probability: 0.5 },
+        ],
+      },
+    });
+
+    await expect(
+      repository.get(workflow('invalid-canonical', 'Fixture').id),
+    ).rejects.toBeInstanceOf(WorkflowValidationError);
+  });
+
   test('appends new Workflows and lists them in stable order', async () => {
     const repository = new DexieWorkflowRepository(createDatabase());
     const first = workflow('one', 'First');

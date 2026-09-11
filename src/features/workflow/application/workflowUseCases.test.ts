@@ -73,7 +73,7 @@ describe('Workflow use cases', () => {
     const source = createWorkflow({
       ...workflowInput('one', 'Deep work'),
       rewardDice: {
-        frequency: 1,
+        schedule: { type: 'custom', phaseIndexes: [0] },
         rerolls: 3,
         sides: [
           { icon: 'tea', title: 'Tea' },
@@ -93,6 +93,10 @@ describe('Workflow use cases', () => {
     expect(duplicate.name).toBe(source.name);
     expect(duplicate.phases).toEqual(source.phases);
     expect(duplicate.rewardDice).toEqual(source.rewardDice);
+    expect(duplicate.rewardDice?.schedule).toEqual({
+      type: 'custom',
+      phaseIndexes: [0],
+    });
     expect(duplicate.rewardDice?.rerolls).toBe(3);
     await expect(repository.list()).resolves.toEqual([source, duplicate]);
   });

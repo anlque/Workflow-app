@@ -187,6 +187,41 @@ describe('DexieSessionRepository', () => {
     await expect(repository.get(expected.id)).resolves.toEqual(expected);
   });
 
+  test('rejects a version-3 snapshot frequency schedule without triggerPhaseType', async () => {
+    const store = database();
+    const repository = new DexieSessionRepository(store);
+    const rewardedWorkflow = createWorkflow({
+      id: 'canonical-workflow',
+      name: 'Canonical',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const session = createSession('canonical-session', rewardedWorkflow, 1_000);
+    await repository.save(session);
+    const table = store.table<SessionRecord, string>('sessions');
+    const stored = await table.get(session.id);
+    if (stored === undefined) throw new Error('Expected Session record.');
+    const reward = (
+      stored as unknown as {
+        session: {
+          workflow: { rewardDice: { schedule: Record<string, unknown> } };
+        };
+      }
+    ).session.workflow.rewardDice;
+    delete reward.schedule['triggerPhaseType'];
+    await table.put(stored);
+
+    await expect(repository.get(session.id)).rejects.toBeInstanceOf(
+      SessionValidationError,
+    );
+  });
+
   test('rejects saving a second active Session transactionally', async () => {
     const repository = new DexieSessionRepository(database());
     const first = createSession('session-1', workflow(), 1_000);

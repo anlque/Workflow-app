@@ -523,6 +523,42 @@ describe('WorkflowEditor', () => {
     });
   });
 
+  test.each([
+    ['missing', ['missing-key']],
+    ['duplicate', ['phase-key', 'phase-key']],
+  ])('rejects %s custom marker keys', (_case, customPhaseKeys) => {
+    const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
+    const phaseKey = result.current.draft.phases[0]?.key ?? 'missing';
+    const validation = validateWorkflowDraft({
+      ...result.current.draft,
+      name: 'Custom',
+      rewardDice: {
+        ...result.current.draft.rewardDice,
+        enabled: true,
+        scheduleMode: 'custom',
+        customPhaseKeys: customPhaseKeys.map((key) =>
+          key === 'phase-key' ? phaseKey : key,
+        ),
+        sides: [
+          { key: 'tea', icon: '☕', title: 'Tea', description: '', weight: '' },
+          {
+            key: 'walk',
+            icon: '🚶',
+            title: 'Walk',
+            description: '',
+            weight: '',
+          },
+        ],
+      },
+    });
+
+    expect(validation.valid).toBe(false);
+    if (validation.valid) throw new Error('Expected invalid draft.');
+    expect(validation.errors['reward:schedule']).toBe(
+      'Choose valid Reward markers for this Workflow.',
+    );
+  });
+
   test('moves, deletes and duplicates custom markers with stable Phase keys', () => {
     const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
     act(() => {
