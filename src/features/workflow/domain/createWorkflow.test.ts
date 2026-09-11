@@ -239,28 +239,59 @@ describe('createWorkflow', () => {
     ).toThrow(WorkflowValidationError);
   });
 
-  test('rejects canonical schedule combined with top-level legacy timing fields', () => {
-    expect(() =>
-      createWorkflow({
-        id: 'workflow-1',
-        name: 'Deep work',
-        phases: [validPhase],
-        rewardDice: {
-          schedule: {
-            type: 'frequency',
-            triggerPhaseType: 'focus',
-            frequency: 1,
-          },
-          triggerPhaseType: 'break',
-          frequency: 2,
-          sides: [
-            { icon: 'tea', title: 'Tea' },
-            { icon: 'walk', title: 'Walk' },
-          ],
-        } as never,
-      }),
-    ).toThrow(WorkflowValidationError);
-  });
+  test.each([{ triggerPhaseType: 'break' }, { frequency: 2 }])(
+    'rejects canonical schedule combined with top-level legacy timing fields %#',
+    (legacyField) => {
+      expect(() =>
+        createWorkflow({
+          id: 'workflow-1',
+          name: 'Deep work',
+          phases: [validPhase],
+          rewardDice: {
+            schedule: {
+              type: 'frequency',
+              triggerPhaseType: 'focus',
+              frequency: 1,
+            },
+            ...legacyField,
+            sides: [
+              { icon: 'tea', title: 'Tea' },
+              { icon: 'walk', title: 'Walk' },
+            ],
+          } as never,
+        }),
+      ).toThrow(WorkflowValidationError);
+    },
+  );
+
+  test.each([
+    {
+      schedule: { type: 'custom' },
+      message: 'Custom Reward phase indexes must be unique in-range integers.',
+    },
+    {
+      schedule: { type: 'frequency', triggerPhaseType: 'focus' },
+      message: 'Reward Dice frequency must be a positive integer.',
+    },
+  ])(
+    'preserves the required-value error for $schedule.type',
+    ({ schedule, message }) => {
+      expect(() =>
+        createWorkflow({
+          id: 'workflow-1',
+          name: 'Deep work',
+          phases: [validPhase],
+          rewardDice: {
+            schedule,
+            sides: [
+              { icon: 'tea', title: 'Tea' },
+              { icon: 'walk', title: 'Walk' },
+            ],
+          } as never,
+        }),
+      ).toThrow(message);
+    },
+  );
 
   test.each([
     {

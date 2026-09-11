@@ -200,15 +200,15 @@ function createRewardSchedule(
       );
     }
     if (schedule['type'] === 'custom') {
-      if (!hasExactOwnKeys(schedule, ['type', 'phaseIndexes'])) {
-        throw new WorkflowValidationError(
-          'Reward Dice schedule must use canonical fields.',
-        );
-      }
       const rawPhaseIndexes = schedule['phaseIndexes'];
       if (!Array.isArray(rawPhaseIndexes)) {
         throw new WorkflowValidationError(
           'Custom Reward phase indexes must be unique in-range integers.',
+        );
+      }
+      if (!hasExactOwnKeys(schedule, ['type', 'phaseIndexes'])) {
+        throw new WorkflowValidationError(
+          'Reward Dice schedule must use canonical fields.',
         );
       }
       const phaseIndexes = [...(rawPhaseIndexes as number[])];
@@ -233,11 +233,6 @@ function createRewardSchedule(
     const triggerPhaseType = createCanonicalRewardPhaseType(
       schedule['triggerPhaseType'],
     );
-    if (!hasExactOwnKeys(schedule, ['type', 'triggerPhaseType', 'frequency'])) {
-      throw new WorkflowValidationError(
-        'Reward Dice schedule must use canonical fields.',
-      );
-    }
     const frequency = schedule['frequency'];
     if (
       typeof frequency !== 'number' ||
@@ -246,6 +241,11 @@ function createRewardSchedule(
     ) {
       throw new WorkflowValidationError(
         'Reward Dice frequency must be a positive integer.',
+      );
+    }
+    if (!hasExactOwnKeys(schedule, ['type', 'triggerPhaseType', 'frequency'])) {
+      throw new WorkflowValidationError(
+        'Reward Dice schedule must use canonical fields.',
       );
     }
     return Object.freeze({ type: 'frequency', triggerPhaseType, frequency });
