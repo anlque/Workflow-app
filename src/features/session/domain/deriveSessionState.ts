@@ -9,7 +9,7 @@ import type {
 } from './Session';
 import { validateEpochMilliseconds } from './validateEpochMilliseconds';
 
-export function deriveSessionState(session: Pick<Session, 'tets'>, now: number): Session {
+export function deriveSessionState(session: Session, now: number): Session {
   validateEpochMilliseconds(now);
   let current = session;
   while (current.status === 'running' || current.status === 'transitioning') {

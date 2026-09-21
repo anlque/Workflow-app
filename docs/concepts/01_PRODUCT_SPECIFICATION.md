@@ -317,7 +317,12 @@ zero. The allowance starts fresh for every Reward, unused rerolls do not carry
 over, and the last displayed result is accepted when the user continues. It
 contains at least two sides. Side probabilities are positive decimal weights
 normalized by the Domain; equal weights are used when custom weights are
-omitted. After the one-second Phase transition, an eligible non-final Reward
+omitted. Each side has an `any`, `early` or `late` availability. The Domain
+orders the Reward opportunities produced by the canonical schedule: the first
+half admits `early` and `any` sides, the second half admits `late` and `any`
+sides, and the middle opportunity of an odd count belongs to both halves. Every
+configured opportunity must have at least one eligible side. After the
+one-second Phase transition, an eligible non-final Reward
 pauses the full next Phase until the user clicks `Roll dice`, sees the result
 and clicks `Continue`.
 The cube, result and current action use a centered composition with deliberate

@@ -294,7 +294,8 @@ A Dice Side represents one possible reward outcome.
 Each side defines:
 - icon;
 - title;
-- probability.
+- probability;
+- availability: `any`, `early` or `late`.
 
 Dice Sides belong exclusively to a Reward Dice.
 
@@ -456,6 +457,11 @@ accumulate, and the last displayed result is the accepted Reward.
 
 Dice Side probabilities are positive decimal weights. The Domain normalizes
 custom weights; when weights are omitted, all sides receive equal weight.
+The canonical schedule determines the ordered Reward opportunities. The first
+half of those opportunities admits `early` and `any` sides, while the second
+half admits `late` and `any` sides. For an odd number of opportunities, the
+middle opportunity belongs to both halves. Every configured opportunity must
+have at least one eligible Dice Side.
 
 Reward Dice owns its Dice Sides.
 
