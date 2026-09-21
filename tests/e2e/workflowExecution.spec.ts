@@ -289,6 +289,17 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
     'mixing',
   );
   await expect(reward).toContainText(/Tea|Stretch/u);
+  const persistedResult = await reward
+    .locator('.reward-result h3')
+    .textContent();
+  expect(persistedResult).not.toBeNull();
+  await focus.reload();
+  await expect(
+    focus.getByRole('dialog', { name: 'Reward unlocked' }),
+  ).toContainText(persistedResult ?? '');
+  await expect(
+    focus.getByRole('button', { name: 'Roll again · 1 left' }),
+  ).toBeVisible();
   await focus.getByRole('button', { name: 'Roll again · 1 left' }).click();
   await expect(focus.getByTestId('reward-cube')).toHaveAttribute(
     'data-state',

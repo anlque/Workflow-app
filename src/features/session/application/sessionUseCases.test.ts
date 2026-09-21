@@ -7,6 +7,7 @@ import { continueRewardSessionUseCase } from './continueRewardSessionUseCase';
 import { getActiveSessionUseCase } from './getActiveSessionUseCase';
 import { pauseSessionUseCase } from './pauseSessionUseCase';
 import { resumeSessionUseCase } from './resumeSessionUseCase';
+import { rollSessionRewardUseCase } from './rollSessionRewardUseCase';
 import { startSessionUseCase } from './startSessionUseCase';
 import type { SessionWorkflowResolver } from './SessionWorkflowResolver';
 import { stopSessionUseCase } from './stopSessionUseCase';
@@ -278,6 +279,7 @@ describe('Session use cases', () => {
     );
     clock.set(12_000);
     await advanceSessionUseCase(repository, clock, started.id);
+    await rollSessionRewardUseCase(repository, started.id, () => 0);
 
     clock.set(20_000);
     const continued = await continueRewardSessionUseCase(
@@ -293,5 +295,59 @@ describe('Session use cases', () => {
       phaseEndsAt: 25_000,
     });
     await expect(repository.get(started.id)).resolves.toEqual(continued);
+  });
+
+  test('deduplicates a persisted reroll command after coordinator restart', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const rewarded = createWorkflow({
+      id: 'reward-retry',
+      name: 'Reward retry',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        rerolls: 1,
+        sides: [
+          { icon: 'a', title: 'A' },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'retry-session',
+      rewarded,
+    );
+    clock.set(3_000);
+    await advanceSessionUseCase(repository, clock, started.id);
+    await rollSessionRewardUseCase(
+      repository,
+      started.id,
+      () => 0,
+      false,
+      'roll-1',
+    );
+    const random = vi.fn(() => 0.99);
+    const first = await rollSessionRewardUseCase(
+      repository,
+      started.id,
+      random,
+      true,
+      'reroll-1',
+    );
+    const retried = await rollSessionRewardUseCase(
+      repository,
+      started.id,
+      random,
+      true,
+      'reroll-1',
+    );
+    expect(retried).toEqual(first);
+    expect(random).toHaveBeenCalledTimes(1);
+    expect(retried.rewardRitual?.rerollsUsed).toBe(1);
   });
 });

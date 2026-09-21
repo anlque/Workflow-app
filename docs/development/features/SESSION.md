@@ -5,7 +5,7 @@
 Session start receives a Workflow resolver through its Application boundary.
 Roles resolve to same-kind direct IDs before construction, and
 `createSessionSnapshot` rejects any remaining Role. Moving a Role affects only
-future Sessions. New Session records use envelope version 4; the mapper reads
+future Sessions. New Session records use envelope version 5; the mapper reads
 versions 1–2 with legacy frequency fields. Timing never depends on Role lookup
 after start.
 
@@ -40,7 +40,7 @@ Source root: [`src/features/session/`](../../../src/features/session/).
   composition owns it;
 - Chrome runtime transport or alarm implementation;
 - focus Environment media, completion sound synthesis or side-panel navigation;
-- persisted Reward outcomes, reroll history or statistics.
+- long-term Reward statistics.
 
 ## Public API
 
@@ -227,9 +227,8 @@ interval only refreshes `now`; it does not decrement or persist Session state.
 - hides all controls during Transitioning and terminal states;
 - confirms Stop in a Dialog and reports command errors.
 
-Focus provides Reward interaction and sound callbacks. Side panel uses the same
-view without Reward interaction, so the focus view is the place that resolves a
-Reward pause.
+Focus and Side Panel provide the same authoritative Reward commands. Focus also
+provides the production Dice sound; either surface can resolve a Reward pause.
 
 ### Non-final Reward
 
@@ -237,46 +236,35 @@ After the background derives a Reward pause, focus detects that authoritative
 projection. Initial hydration of an already Reward-paused Session also opens the
 dialog. The dialog:
 
-1. waits for **Roll dice** before selecting a side;
-2. selects synchronously through injected `rollReward()` randomness;
+1. waits for **Roll dice** before requesting a side;
+2. sends an authoritative command; background injects randomness and persists;
 3. displays mixing for 2500 ms, or 600 ms with reduced motion;
-4. permits the configured number of local rerolls and replaces the displayed
+4. permits the configured number of persisted rerolls and replaces the displayed
    result each time;
 5. sends `session/continue-reward` only after **Continue**;
 6. stays open and displays an error if continuation fails.
 
 The Session remains authoritatively paused throughout selection and mixing.
-Rerolls used and the selected Dice Side are local dialog state; they are not
-persisted or broadcast. Reopening a non-final Reward pause starts a fresh UI
-roll opportunity for the same unresolved pause.
-
-**Current implementation limitation:** reopening resets `usedRerolls` for the
-same pending Reward, although the product rule resets the allowance for a new
-Reward rather than a new document. Correcting this requires an explicit owner
-and persistence/message contract for Reward interaction progress; it must not be
-implemented by making Zustand authoritative.
+Rerolls used and the selected Dice Side are authoritative Session ritual state;
+the dialog keeps only animation and transient error state. Reward opportunity
+identity and its `phase | complete` continuation target are persisted so reload
+or cross-surface hydration cannot select again or lose a final Reward.
+The ritual is persisted and broadcast. Reopening a Reward pause hydrates the
+same selected result and used-reroll count.
 
 ### Final Reward
 
-After the final transition, Domain returns Completed. Presentation detects one
-eligible transition into Completed and overlays the same Reward dialog without
-sending a continuation command. The completion record is already terminal;
-**Continue** closes the dialog and lets focus schedule the normal completion cue.
+After the final transition, Domain creates a Reward pause whose continuation is
+`complete`. Presentation hydrates it like any other ritual; **Continue** sends
+the authoritative command and only then produces Completed state.
 
 This distinction is deliberate:
 
 - non-final Reward → authoritative `Paused(reason: reward)` and background
   continuation;
-- final Reward → Completed Session plus transient focus-view ritual.
+- final Reward → authoritative Reward pause targeting Session completion.
 
-A final Reward is detected from the observed previous/current projection pair;
-hydrating a document after that Completed transition does not reconstruct an
-unseen final dialog because no pending Reward state is persisted.
-
-**Current implementation limitation:** if no focus document observes the final
-transition, that Reward can be missed. Persisting whether a final Reward was
-offered or acknowledged needs a Domain/persistence decision so restoration does
-not either lose the Reward or replay it after every reload.
+A final Reward is reconstructed from persisted Session state after any reload.
 
 ## Dependencies
 

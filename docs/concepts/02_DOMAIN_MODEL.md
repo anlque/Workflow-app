@@ -362,6 +362,12 @@ Each Phase owns exactly one Environment.
 
 Reward Dice owns its Dice Sides.
 
+A reward-paused Session owns one Reward ritual: opportunity identity, completed
+Phase index, optional selected Side index, rerolls used, acknowledgment and a
+`phase | complete` continuation target. The background Application layer invokes
+pure Session transitions with injected randomness. A final opportunity remains
+paused until the ritual has a result and is explicitly continued.
+
 Assets may be referenced by multiple Workflows.
 
 Each Session is created from a single Workflow. It retains the source Workflow

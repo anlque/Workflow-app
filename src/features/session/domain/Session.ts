@@ -1,4 +1,8 @@
-import type { Workflow, WorkflowId } from '@/features/workflow';
+import {
+  rollReward,
+  type Workflow,
+  type WorkflowId,
+} from '@/features/workflow';
 
 import {
   SessionTransitionError,
@@ -17,6 +21,21 @@ type SessionBase = Readonly<{
   sourceWorkflowId: WorkflowId;
   snapshot: SessionSnapshot;
   currentPhaseIndex: number;
+  rewardRitual?: RewardRitual;
+}>;
+
+export type RewardContinuationTarget =
+  | Readonly<{ type: 'phase'; phaseIndex: number }>
+  | Readonly<{ type: 'complete' }>;
+
+export type RewardRitual = Readonly<{
+  id: string;
+  completedPhaseIndex: number;
+  selectedSideIndex?: number;
+  rerollsUsed: number;
+  acknowledged: boolean;
+  lastCommandId?: string;
+  continuation: RewardContinuationTarget;
 }>;
 
 export type RunningSession = SessionBase &
@@ -64,6 +83,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
+      rewardRitual?: RewardRitual;
       status: 'running';
       phaseStartedAt: number;
       phaseEndsAt: number;
@@ -72,6 +92,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
+      rewardRitual?: RewardRitual;
       status: 'transitioning';
       transitionEndsAt: number;
     }>
@@ -79,6 +100,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
+      rewardRitual?: RewardRitual;
       status: 'paused';
       pauseReason?: 'user' | 'reward';
       pausedAt: number;
@@ -88,6 +110,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
+      rewardRitual?: RewardRitual;
       status: 'completed';
       completedAt: number;
     }>
@@ -95,6 +118,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
+      rewardRitual?: RewardRitual;
       status: 'stopped';
       stoppedAt: number;
     }>;
@@ -141,7 +165,13 @@ export function restoreSession(input: RestoreSessionInput): Session {
     sourceWorkflowId: input.workflow.id,
     snapshot: createSessionSnapshot(input.workflow),
     currentPhaseIndex: input.currentPhaseIndex,
+    ...(input.rewardRitual === undefined
+      ? {}
+      : { rewardRitual: Object.freeze(input.rewardRitual) }),
   };
+  if (input.status !== 'paused' && input.rewardRitual !== undefined) {
+    validateRewardRitual(input, input.rewardRitual);
+  }
 
   if (input.status === 'running') {
     validateEpochMilliseconds(input.phaseStartedAt);
@@ -162,11 +192,28 @@ export function restoreSession(input: RestoreSessionInput): Session {
     validateEpochMilliseconds(input.pausedAt);
     if (
       !Number.isFinite(input.remainingMilliseconds) ||
-      input.remainingMilliseconds <= 0
+      input.remainingMilliseconds < 0 ||
+      (input.remainingMilliseconds === 0 && input.pauseReason !== 'reward')
     ) {
       throw new SessionValidationError(
         'Paused Session remaining time is invalid.',
       );
+    }
+    const rewardRitual =
+      input.pauseReason === 'reward'
+        ? (input.rewardRitual ?? {
+            id: `${input.id}:${String(Math.max(0, input.currentPhaseIndex - 1))}`,
+            completedPhaseIndex: Math.max(0, input.currentPhaseIndex - 1),
+            rerollsUsed: 0,
+            acknowledged: false,
+            continuation: {
+              type: 'phase' as const,
+              phaseIndex: input.currentPhaseIndex,
+            },
+          })
+        : undefined;
+    if (input.rewardRitual !== undefined) {
+      validateRewardRitual(input, input.rewardRitual);
     }
     return Object.freeze({
       ...base,
@@ -174,6 +221,9 @@ export function restoreSession(input: RestoreSessionInput): Session {
       pauseReason: input.pauseReason ?? 'user',
       pausedAt: input.pausedAt,
       remainingMilliseconds: input.remainingMilliseconds,
+      ...(rewardRitual === undefined
+        ? {}
+        : { rewardRitual: Object.freeze(rewardRitual) }),
     });
   }
   if (input.status === 'transitioning') {
@@ -238,10 +288,28 @@ export function resumeSession(session: Session, now: number): RunningSession {
 export function continueRewardSession(
   session: Session,
   now: number,
-): RunningSession {
+): RunningSession | CompletedSession {
   validateEpochMilliseconds(now);
-  if (session.status !== 'paused' || session.pauseReason !== 'reward') {
+  if (
+    session.status !== 'paused' ||
+    session.pauseReason !== 'reward' ||
+    session.rewardRitual?.selectedSideIndex === undefined
+  ) {
     throw new SessionTransitionError();
+  }
+  if (session.rewardRitual.continuation.type === 'complete') {
+    return Object.freeze({
+      id: session.id,
+      sourceWorkflowId: session.sourceWorkflowId,
+      snapshot: session.snapshot,
+      currentPhaseIndex: session.currentPhaseIndex,
+      status: 'completed',
+      completedAt: now,
+      rewardRitual: Object.freeze({
+        ...session.rewardRitual,
+        acknowledged: true,
+      }),
+    });
   }
   return Object.freeze({
     id: session.id,
@@ -251,7 +319,114 @@ export function continueRewardSession(
     status: 'running',
     phaseStartedAt: now,
     phaseEndsAt: now + session.remainingMilliseconds,
+    rewardRitual: Object.freeze({
+      ...session.rewardRitual,
+      acknowledged: true,
+    }),
   });
+}
+
+function selectReward(
+  session: Session,
+  random: () => number,
+  reroll: boolean,
+  commandId?: string,
+): PausedSession {
+  if (
+    session.status !== 'paused' ||
+    session.pauseReason !== 'reward' ||
+    session.rewardRitual === undefined
+  ) {
+    throw new SessionTransitionError();
+  }
+  const dice = session.snapshot.workflow.rewardDice;
+  if (dice === undefined) throw new SessionTransitionError();
+  const current = session.rewardRitual;
+  if (reroll) {
+    if (
+      current.selectedSideIndex === undefined ||
+      current.rerollsUsed >= dice.rerolls
+    )
+      throw new SessionTransitionError();
+  } else if (current.selectedSideIndex !== undefined) {
+    return session;
+  }
+  const selected = rollReward(
+    session.snapshot.workflow,
+    current.completedPhaseIndex,
+    random,
+  );
+  const selectedSideIndex = dice.sides.indexOf(selected);
+  if (selectedSideIndex < 0) throw new SessionTransitionError();
+  return Object.freeze({
+    ...session,
+    rewardRitual: Object.freeze({
+      ...current,
+      selectedSideIndex,
+      rerollsUsed: current.rerollsUsed + (reroll ? 1 : 0),
+      ...(commandId === undefined ? {} : { lastCommandId: commandId }),
+    }),
+  });
+}
+
+export function rollSessionReward(
+  session: Session,
+  random: () => number,
+  commandId?: string,
+): PausedSession {
+  return selectReward(session, random, false, commandId);
+}
+
+export function rerollSessionReward(
+  session: Session,
+  random: () => number,
+  commandId?: string,
+): PausedSession {
+  return selectReward(session, random, true, commandId);
+}
+
+function validateRewardRitual(
+  input: RestoreSessionInput,
+  ritual: RewardRitual,
+): void {
+  const dice = input.workflow.rewardDice;
+  const selected = ritual.selectedSideIndex;
+  const validCompleted =
+    Number.isInteger(ritual.completedPhaseIndex) &&
+    ritual.completedPhaseIndex >= 0 &&
+    ritual.completedPhaseIndex < input.workflow.phases.length;
+  const validSelected =
+    selected === undefined ||
+    (Number.isInteger(selected) &&
+      selected >= 0 &&
+      dice !== undefined &&
+      selected < dice.sides.length);
+  const validRerolls =
+    dice !== undefined &&
+    Number.isInteger(ritual.rerollsUsed) &&
+    ritual.rerollsUsed >= 0 &&
+    ritual.rerollsUsed <= dice.rerolls &&
+    (selected !== undefined || ritual.rerollsUsed === 0);
+  const validTarget =
+    ritual.continuation.type === 'complete'
+      ? ritual.completedPhaseIndex === input.workflow.phases.length - 1 &&
+        input.currentPhaseIndex === ritual.completedPhaseIndex
+      : Number.isInteger(ritual.continuation.phaseIndex) &&
+        ritual.continuation.phaseIndex === input.currentPhaseIndex &&
+        ritual.continuation.phaseIndex === ritual.completedPhaseIndex + 1 &&
+        input.workflow.phases[ritual.continuation.phaseIndex] !== undefined;
+  if (
+    !validCompleted ||
+    ritual.id !== `${input.id}:${String(ritual.completedPhaseIndex)}` ||
+    !validSelected ||
+    !validRerolls ||
+    !validTarget ||
+    (input.status === 'paused' && ritual.acknowledged) ||
+    (ritual.acknowledged && selected === undefined) ||
+    ritual.lastCommandId?.trim() === ''
+  ) {
+    throw new SessionValidationError('Session Reward ritual is invalid.');
+  }
 }
 
 export function stopSession(session: Session, now: number): StoppedSession {

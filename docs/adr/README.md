@@ -16,6 +16,7 @@ records remain available if they are later Superseded or Archived.
 | [ADR-0009](ADR-0009-minimal-shared-kernel.md) | Accepted | Keep a minimal Shared Kernel for cross-feature identity |
 | [ADR-0010](ADR-0010-indexeddb-schema-composition.md) | Accepted | Compose one IndexedDB schema from feature-owned fragments |
 | [ADR-0011](ADR-0011-global-asset-roles-and-transactional-retirement.md) | Accepted | Add global Asset Roles and define transactional retirement |
+| [ADR-0012](ADR-0012-authoritative-reward-ritual-and-bonus-reward-phases.md) | Accepted | Persist Reward ritual state in the authoritative Session aggregate |
 
 Create and evolve records according to
 [`docs/concepts/09_ADR_GUIDELINES.md`](../concepts/09_ADR_GUIDELINES.md).

@@ -107,3 +107,46 @@ test('shows terminal completion from the authoritative alarm transition', async 
   });
   await expect(focus.getByRole('button', { name: 'Stop' })).toHaveCount(0);
 });
+
+test('restores an unacknowledged final Reward after reload', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Final reward restore');
+  await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
+  await options.getByLabel('Enable Reward Dice').check();
+  await options.getByLabel('Reward side 1 icon').fill('☕');
+  await options.getByLabel('Reward side 1 title').fill('Tea');
+  await options.getByLabel('Reward side 2 icon').fill('🧘');
+  await options.getByLabel('Reward side 2 title').fill('Stretch');
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(
+    options.getByRole('button', { name: 'Open Final reward restore' }),
+  ).toBeVisible();
+  const sidePanel = await context.newPage();
+  await sidePanel.goto(extensionUrls.sidePanel);
+  await expect(
+    sidePanel.getByRole('button', { name: 'Start Final reward restore' }),
+  ).toBeVisible();
+  const focus = await startWorkflow(context, sidePanel, 'Final reward restore');
+  await expireActiveSessionDeadline(focus);
+  await expect(
+    focus.getByText('Transitioning to the next phase…'),
+  ).toBeVisible();
+  await expireActiveSessionDeadline(focus);
+  await expect(
+    focus.getByRole('dialog', { name: 'Reward unlocked' }),
+  ).toBeVisible();
+  await focus.getByRole('button', { name: 'Roll dice' }).click();
+  const title = await focus.locator('.reward-result h3').textContent();
+  expect(title).not.toBeNull();
+  await focus.reload();
+  await expect(
+    focus.getByRole('dialog', { name: 'Reward unlocked' }),
+  ).toContainText(title ?? '');
+  await focus.getByRole('button', { name: 'Continue' }).click();
+  await expect(focus.getByText('Session complete')).toBeVisible();
+});

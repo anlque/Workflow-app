@@ -5,7 +5,9 @@ import { StrictMode } from 'react';
 
 import {
   createSession,
+  continueRewardSession,
   deriveSessionState,
+  rollSessionReward,
   type Session,
   type SessionProjectionClient,
 } from '@/features/session';
@@ -35,6 +37,8 @@ function dependencies(session: Session | null): FocusDependencies {
     pause: vi.fn(() => Promise.resolve()),
     resume: vi.fn(() => Promise.resolve()),
     continueReward: vi.fn(() => Promise.resolve()),
+    rollReward: vi.fn(() => Promise.resolve()),
+    rerollReward: vi.fn(() => Promise.resolve()),
     stop: vi.fn(() => Promise.resolve()),
     loadAssetUrl: vi.fn(() => Promise.resolve(null)),
     releaseAssetUrl: vi.fn(),
@@ -401,6 +405,15 @@ describe('FocusApp', () => {
       publish = listener;
       return vi.fn();
     });
+    const rolled = rollSessionReward(completed, () => 0);
+    vi.mocked(deps.rollReward).mockImplementation(() => {
+      publish?.(rolled);
+      return Promise.resolve();
+    });
+    vi.mocked(deps.continueReward).mockImplementation(() => {
+      publish?.(continueRewardSession(rolled, 4_000));
+      return Promise.resolve();
+    });
     render(<FocusApp dependencies={deps} />);
     await act(async () => {
       await Promise.resolve();
@@ -415,11 +428,17 @@ describe('FocusApp', () => {
     expect(deps.sounds.playRewardUnlocked).toHaveBeenCalledOnce();
     expect(deps.sounds.playSessionComplete).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+      await Promise.resolve();
+    });
     act(() => {
       vi.advanceTimersByTime(2_500);
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+      await Promise.resolve();
+    });
     expect(screen.getByText('Session complete')).toBeVisible();
     act(() => {
       vi.advanceTimersByTime(999);

@@ -61,6 +61,9 @@ export function createSidePanelDependencies(
     startSession: (id) => sessions.start(id),
     pauseSession: (id) => sessions.pause(id),
     resumeSession: (id) => sessions.resume(id),
+    rollReward: (id) => sessions.rollReward(id),
+    rerollReward: (id) => sessions.rerollReward(id),
+    continueReward: (id) => sessions.continueReward(id),
     stopSession: (id) => sessions.stop(id),
     async openFocusView() {
       await focusTabs.openOrActivate();

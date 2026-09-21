@@ -48,6 +48,50 @@ function pauseReason(value: unknown): 'user' | 'reward' {
   return invalid();
 }
 
+function rewardRitual(value: unknown) {
+  if (value === undefined) return undefined;
+  const input = record(value);
+  const continuation = record(input['continuation']);
+  if (
+    !hasExactKeys(
+      input,
+      [
+        'id',
+        'completedPhaseIndex',
+        'rerollsUsed',
+        'acknowledged',
+        'continuation',
+      ],
+      ['selectedSideIndex', 'lastCommandId'],
+    ) ||
+    typeof input['acknowledged'] !== 'boolean'
+  )
+    return invalid();
+  const target =
+    continuation['type'] === 'complete' && hasExactKeys(continuation, ['type'])
+      ? ({ type: 'complete' } as const)
+      : continuation['type'] === 'phase' &&
+          hasExactKeys(continuation, ['type', 'phaseIndex'])
+        ? ({
+            type: 'phase',
+            phaseIndex: number(continuation['phaseIndex']),
+          } as const)
+        : invalid();
+  return {
+    id: string(input['id']),
+    completedPhaseIndex: number(input['completedPhaseIndex']),
+    ...(input['selectedSideIndex'] === undefined
+      ? {}
+      : { selectedSideIndex: number(input['selectedSideIndex']) }),
+    rerollsUsed: number(input['rerollsUsed']),
+    acknowledged: input['acknowledged'],
+    ...(input['lastCommandId'] === undefined
+      ? {}
+      : { lastCommandId: string(input['lastCommandId']) }),
+    continuation: target,
+  };
+}
+
 function hasExactKeys(
   value: Readonly<Record<string, unknown>>,
   required: readonly string[],
@@ -184,10 +228,12 @@ export function parseSessionProjection(value: unknown): Session | null {
   if (value === null) return null;
   const input = record(value);
   const snapshot = record(input['snapshot']);
+  const ritual = rewardRitual(input['rewardRitual']);
   const common = {
     id: string(input['id']),
     workflow: workflow(snapshot['workflow']),
     currentPhaseIndex: number(input['currentPhaseIndex']),
+    ...(ritual === undefined ? {} : { rewardRitual: ritual }),
   };
   const status = input['status'];
   let restored: RestoreSessionInput;

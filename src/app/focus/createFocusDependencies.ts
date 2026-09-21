@@ -65,6 +65,8 @@ export function createFocusDependencies(
     pause: (id) => sessions.pause(id),
     resume: (id) => sessions.resume(id),
     continueReward: (id) => sessions.continueReward(id),
+    rollReward: (id) => sessions.rollReward(id),
+    rerollReward: (id) => sessions.rerollReward(id),
     stop: (id) => sessions.stop(id),
     async loadAssetUrl(id) {
       const blob = await assets.getBlob(id);

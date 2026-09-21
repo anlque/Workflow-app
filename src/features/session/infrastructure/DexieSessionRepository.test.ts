@@ -9,6 +9,7 @@ import { createWorkflow, workflowDatabaseSchemas } from '@/features/workflow';
 import {
   createSession,
   pauseSession,
+  rollSessionReward,
   stopSession,
   type Session,
 } from '../domain/Session';
@@ -47,6 +48,56 @@ afterEach(async () => {
 });
 
 describe('DexieSessionRepository', () => {
+  test('round-trips authoritative Reward ritual state in v5', async () => {
+    const store = database();
+    const repository = new DexieSessionRepository(store);
+    const rewarded = createWorkflow({
+      id: 'reward-v5',
+      name: 'Reward v5',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        rerolls: 1,
+        sides: [
+          { icon: 'a', title: 'A' },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('reward-session', rewarded, 1_000),
+      3_000,
+    );
+    const rolled = rollSessionReward(paused, () => 0.99);
+    await repository.save(rolled);
+
+    await expect(repository.get(rolled.id)).resolves.toEqual(rolled);
+    await expect(
+      store.table<SessionRecord, string>('sessions').get(rolled.id),
+    ).resolves.toMatchObject({
+      schemaVersion: 5,
+      session: {
+        rewardRitual: {
+          id: 'reward-session:0',
+          selectedSideIndex: 1,
+          rerollsUsed: 0,
+        },
+      },
+    });
+    const corrupt = structuredClone(
+      await store.table<SessionRecord, string>('sessions').get(rolled.id),
+    ) as { session: { rewardRitual: { selectedSideIndex: number } } };
+    corrupt.session.rewardRitual.selectedSideIndex = 99;
+    await store
+      .table<SessionRecord, string>('sessions')
+      .put(corrupt as unknown as SessionRecord);
+    await expect(repository.get(rolled.id)).rejects.toThrow(
+      'Session Reward ritual is invalid.',
+    );
+  });
   test.each([
     ['running', () => createSession('running', workflow(), 1_000)],
     [
@@ -189,7 +240,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(expected.id),
     ).resolves.toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: 5,
       session: {
         workflow: {
           rewardDice: {

@@ -6,6 +6,7 @@ import {
   getActiveSessionUseCase,
   pauseSessionUseCase,
   resumeSessionUseCase,
+  rollSessionRewardUseCase,
   startSessionUseCase,
   stopSessionUseCase,
   type Clock,
@@ -25,6 +26,7 @@ export type SessionCoordinatorDependencies = Readonly<{
   alarms: AlarmScheduler;
   createSessionId(): string;
   workflowResolver: SessionWorkflowResolver;
+  random?: () => number;
 }>;
 
 export type SessionCoordinator = Readonly<{
@@ -39,8 +41,10 @@ export function createSessionCoordinator({
   alarms,
   createSessionId,
   workflowResolver,
+  random = Math.random,
 }: SessionCoordinatorDependencies): SessionCoordinator {
   const handledCommands = new Map<string, Promise<Session>>();
+  let commandTail: Promise<void> = Promise.resolve();
 
   async function publishAndSchedule(session: Session | null): Promise<void> {
     await messages.publishSessionChanged({ type: 'session/changed', session });
@@ -79,6 +83,17 @@ export function createSessionCoordinator({
         clock,
         command.sessionId,
       );
+    } else if (
+      command.type === 'session/roll-reward' ||
+      command.type === 'session/reroll-reward'
+    ) {
+      session = await rollSessionRewardUseCase(
+        sessions,
+        command.sessionId,
+        random,
+        command.type === 'session/reroll-reward',
+        command.commandId,
+      );
     } else {
       session = await stopSessionUseCase(sessions, clock, command.sessionId);
     }
@@ -89,7 +104,11 @@ export function createSessionCoordinator({
   function handle(command: SessionCommand): Promise<Session> {
     const existing = handledCommands.get(command.commandId);
     if (existing !== undefined) return existing;
-    const pending = execute(command);
+    const pending = commandTail.then(() => execute(command));
+    commandTail = pending.then(
+      () => undefined,
+      () => undefined,
+    );
     handledCommands.set(command.commandId, pending);
     return pending;
   }

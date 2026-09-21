@@ -84,7 +84,7 @@ These version numbers solve different compatibility problems:
 | --- | --- | --- | --- |
 | Dexie database version | Whole `locusora` database structure and upgrade order | 1–4 history; current 4 | A table/index changes or existing stored data needs a database migration |
 | `WorkflowRecord.schemaVersion` | One Workflow record serialization shape | Current writes 4; reads 1–4 | The Workflow record reader/writer needs a new incompatible serialization |
-| `SessionRecord.schemaVersion` | One Session record envelope | Current writes 4; reads 1–4 | The Session record reader/writer needs a new incompatible serialization |
+| `SessionRecord.schemaVersion` | One Session record envelope | Current writes 5; reads 1–5 | The Session record reader/writer needs a new incompatible serialization |
 | `AssetRecord.schemaVersion` | One Asset record shape | Current writes 2; reads role-less 1 and 2 | The Asset record reader/writer needs a new incompatible serialization |
 | Workflow package `version` | Public `locusora/workflow` import/export envelope | Current export 4; import 1–4 | The external Workflow package contract changes |
 | Settings package `version` | Public `locusora/settings` import/export envelope | 1 | The external Settings package contract changes |

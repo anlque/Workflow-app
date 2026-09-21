@@ -35,6 +35,9 @@ export type SidePanelDependencies = Readonly<{
   startSession(id: WorkflowId): Promise<void>;
   pauseSession(id: SessionId): Promise<void>;
   resumeSession(id: SessionId): Promise<void>;
+  rollReward(id: SessionId): Promise<void>;
+  rerollReward(id: SessionId): Promise<void>;
+  continueReward(id: SessionId): Promise<void>;
   stopSession(id: SessionId): Promise<void>;
   openFocusView(): Promise<void>;
   closeSidePanel(): Promise<void>;
@@ -162,6 +165,12 @@ export function SidePanelApp({
           <ActiveSessionView
             session={activeSession}
             reducedMotion={effectiveReducedMotion}
+            rewardInteraction={{
+              onRoll: () => undefined,
+              rollReward: dependencies.rollReward,
+              rerollReward: dependencies.rerollReward,
+              continueReward: dependencies.continueReward,
+            }}
             onPause={dependencies.pauseSession}
             onResume={dependencies.resumeSession}
             onStop={dependencies.stopSession}

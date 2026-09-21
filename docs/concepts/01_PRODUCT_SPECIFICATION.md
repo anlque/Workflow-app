@@ -330,6 +330,12 @@ separation. Ordinary Resume cannot bypass this pause. Mixing lasts 2.5 seconds,
 or 0.6 seconds with reduced motion. Reward Dice Templates are not part of the
 MVP.
 
+Reward opportunity identity, selected Side, used rerolls, acknowledgment and
+the normal continuation target are authoritative Session state. Background
+commands select and persist results with injected randomness; UI documents own
+only animation and sound. Reloading or switching surfaces preserves a result,
+and a final Reward remains actionable until explicit acknowledgment.
+
 Every completed Phase enters an authoritative one-second transition before the
 next Phase or Session completion. During it the complete timer card receives a
 light blur, controls are unavailable, the boundary bell plays and outgoing

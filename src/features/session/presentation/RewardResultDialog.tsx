@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { rollReward, type DiceSide, type Workflow } from '@/features/workflow';
+import type { DiceSide } from '@/features/workflow';
 import { Button, Dialog } from '@/shared';
 
 import { RewardCube, type RewardCubeStage } from './RewardCube';
@@ -9,32 +9,34 @@ type MixingDuration = 600 | 2500;
 type RewardStage = 'ready' | 'mixing' | 'result';
 
 export type RewardResultDialogProps = Readonly<{
-  workflow: Workflow;
-  completedPhaseIndex: number;
-  random: () => number;
+  reward: DiceSide | null;
+  usedRerolls: number;
+  rerolls: number;
   reducedMotion: boolean;
   onRoll(durationMs: MixingDuration): void;
+  requestRoll(): Promise<void>;
+  requestReroll(): Promise<void>;
   onContinue(): Promise<void>;
 }>;
 
 export function RewardResultDialog({
-  workflow,
-  completedPhaseIndex,
-  random,
+  reward,
+  usedRerolls,
+  rerolls,
   reducedMotion,
   onRoll,
+  requestRoll,
+  requestReroll,
   onContinue,
 }: RewardResultDialogProps) {
   const [stage, setStage] = useState<RewardStage>('ready');
-  const [reward, setReward] = useState<DiceSide | null>(null);
-  const [usedRerolls, setUsedRerolls] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
   const duration: MixingDuration = reducedMotion ? 600 : 2_500;
-  const dice = workflow.rewardDice;
-  if (dice === undefined) throw new Error('Reward Dice is required.');
-  const rerolls = dice.rerolls;
+  useEffect(() => {
+    if (reward !== null && stage === 'ready') setStage('result');
+  }, [reward, stage]);
 
   useEffect(() => {
     if (stage !== 'mixing') return;
@@ -69,17 +71,26 @@ export function RewardResultDialog({
     }
   }
 
-  function roll(): void {
+  async function roll(reroll: boolean): Promise<void> {
     setError(null);
-    setReward(rollReward(workflow, completedPhaseIndex, random));
+    setPending(true);
     setStage('mixing');
     onRoll(duration);
+    try {
+      await (reroll ? requestReroll() : requestRoll());
+    } catch (cause) {
+      setStage(reward === null ? 'ready' : 'result');
+      setError(
+        cause instanceof Error ? cause.message : 'Rolling Reward failed.',
+      );
+    } finally {
+      setPending(false);
+    }
   }
 
   function reroll(): void {
     if (stage !== 'result' || usedRerolls >= rerolls) return;
-    setUsedRerolls((count) => count + 1);
-    roll();
+    void roll(true);
   }
 
   const rerollsLeft = rerolls - usedRerolls;
@@ -138,7 +149,7 @@ export function RewardResultDialog({
             disabled={stage !== 'ready'}
             onClick={() => {
               if (stage !== 'ready') return;
-              roll();
+              void roll(false);
             }}
           >
             Roll dice

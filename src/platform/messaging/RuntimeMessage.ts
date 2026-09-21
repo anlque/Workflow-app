@@ -7,6 +7,11 @@ export type SessionCommand =
       commandId: string;
       sessionId: string;
     }>
+  | Readonly<{
+      type: 'session/roll-reward' | 'session/reroll-reward';
+      commandId: string;
+      sessionId: string;
+    }>
   | Readonly<{ type: 'session/stop'; commandId: string; sessionId: string }>;
 
 export type SessionChangedMessage = Readonly<{

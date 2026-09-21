@@ -30,18 +30,6 @@ export function deriveSessionState(session: Session, now: number): Session {
     if (now < current.transitionEndsAt) return current;
     const nextPhaseIndex = current.currentPhaseIndex + 1;
     const nextPhase = current.snapshot.workflow.phases[nextPhaseIndex];
-    if (nextPhase === undefined) {
-      const completed: CompletedSession = Object.freeze({
-        id: current.id,
-        sourceWorkflowId: current.sourceWorkflowId,
-        snapshot: current.snapshot,
-        currentPhaseIndex: current.currentPhaseIndex,
-        status: 'completed',
-        completedAt: current.transitionEndsAt,
-      });
-      return completed;
-    }
-
     if (
       isRewardDueAfterPhase(
         current.snapshot.workflow,
@@ -52,13 +40,39 @@ export function deriveSessionState(session: Session, now: number): Session {
         id: current.id,
         sourceWorkflowId: current.sourceWorkflowId,
         snapshot: current.snapshot,
-        currentPhaseIndex: nextPhaseIndex,
+        currentPhaseIndex:
+          nextPhase === undefined ? current.currentPhaseIndex : nextPhaseIndex,
         status: 'paused',
         pauseReason: 'reward',
         pausedAt: current.transitionEndsAt,
-        remainingMilliseconds: nextPhase.durationSeconds * 1_000,
+        remainingMilliseconds:
+          nextPhase === undefined ? 0 : nextPhase.durationSeconds * 1_000,
+        rewardRitual: Object.freeze({
+          id: `${current.id}:${String(current.currentPhaseIndex)}`,
+          completedPhaseIndex: current.currentPhaseIndex,
+          rerollsUsed: 0,
+          acknowledged: false,
+          continuation:
+            nextPhase === undefined
+              ? Object.freeze({ type: 'complete' as const })
+              : Object.freeze({
+                  type: 'phase' as const,
+                  phaseIndex: nextPhaseIndex,
+                }),
+        }),
       });
       return paused;
+    }
+    if (nextPhase === undefined) {
+      const completed: CompletedSession = Object.freeze({
+        id: current.id,
+        sourceWorkflowId: current.sourceWorkflowId,
+        snapshot: current.snapshot,
+        currentPhaseIndex: current.currentPhaseIndex,
+        status: 'completed',
+        completedAt: current.transitionEndsAt,
+      });
+      return completed;
     }
 
     const running: RunningSession = Object.freeze({

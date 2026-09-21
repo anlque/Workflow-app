@@ -51,6 +51,18 @@ describe('parseActiveSessionRequest', () => {
 });
 
 describe('parseSessionCommand', () => {
+  test.each(['session/roll-reward', 'session/reroll-reward'] as const)(
+    'accepts exact %s commands',
+    (type) => {
+      expect(
+        parseSessionCommand({
+          type,
+          commandId: 'command-1',
+          sessionId: 'session-1',
+        }),
+      ).toEqual({ type, commandId: 'command-1', sessionId: 'session-1' });
+    },
+  );
   test.each([
     [
       {

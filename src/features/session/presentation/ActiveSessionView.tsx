@@ -1,12 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { RewardDice, Workflow } from '@/features/workflow';
-
 import type { Session, SessionId } from '../domain/Session';
 import { SessionControls } from './SessionControls';
 import { RewardResultDialog } from './RewardResultDialog';
 import { didCrossPhaseBoundary } from './didCrossPhaseBoundary';
-import { rewardOpportunityForSessionTransition } from './rewardTransitions';
 import { formatSessionCountdown } from './sessionCountdown';
 
 export type ActiveSessionViewProps = Readonly<{
@@ -18,6 +15,8 @@ export type ActiveSessionViewProps = Readonly<{
   onFinalRewardContinued?(): void;
   rewardInteraction?: Readonly<{
     onRoll(durationMs: 600 | 2500): void;
+    rollReward?(id: SessionId): Promise<void>;
+    rerollReward?(id: SessionId): Promise<void>;
     continueReward(id: SessionId): Promise<void>;
   }>;
   onPause(id: SessionId): Promise<void>;
@@ -26,37 +25,9 @@ export type ActiveSessionViewProps = Readonly<{
 }>;
 
 const systemNow = (): number => Date.now();
-const systemRandom = (): number => Math.random();
-
-type RewardOpportunity = Readonly<{
-  key: string;
-  sessionId: SessionId;
-  dice: RewardDice;
-  workflow: Workflow;
-  completedPhaseIndex: number;
-}>;
-
-function rewardOpportunity(
-  session: Session,
-  dice: RewardDice,
-): RewardOpportunity {
-  const status = session.status === 'completed' ? 'completed' : 'paused';
-  return {
-    key: `${session.id}:${String(session.currentPhaseIndex)}:${status}`,
-    sessionId: session.id,
-    dice,
-    workflow: session.snapshot.workflow,
-    completedPhaseIndex:
-      session.status === 'completed'
-        ? session.currentPhaseIndex
-        : session.currentPhaseIndex - 1,
-  };
-}
-
 export function ActiveSessionView({
   session,
   now = systemNow,
-  random = systemRandom,
   reducedMotion = false,
   onPhaseBoundary,
   onFinalRewardContinued,
@@ -66,29 +37,13 @@ export function ActiveSessionView({
   onStop,
 }: ActiveSessionViewProps) {
   const [displayNow, setDisplayNow] = useState(now);
-  const [reward, setReward] = useState<RewardOpportunity | null>(() => {
-    if (rewardInteraction === undefined) return null;
-    const dice = rewardOpportunityForSessionTransition(null, session);
-    return dice === null ? null : rewardOpportunity(session, dice);
-  });
   const previousSession = useRef(session);
 
   useEffect(() => {
     const previous = previousSession.current;
-    const rewardBaseline = previous.id === session.id ? previous : null;
-    const nextReward = rewardOpportunityForSessionTransition(
-      rewardBaseline,
-      session,
-    );
     previousSession.current = session;
     if (didCrossPhaseBoundary(previous, session)) {
       onPhaseBoundary?.();
-    }
-    if (previous.id !== session.id) {
-      setReward(null);
-    }
-    if (nextReward !== null && rewardInteraction !== undefined) {
-      setReward(rewardOpportunity(session, nextReward));
     }
   }, [onPhaseBoundary, rewardInteraction, session]);
 
@@ -104,22 +59,35 @@ export function ActiveSessionView({
   }, [now, session.status]);
 
   const workflow = session.snapshot.workflow;
+  const ritual =
+    session.status === 'paused' && session.pauseReason === 'reward'
+      ? session.rewardRitual
+      : undefined;
+  const dice = workflow.rewardDice;
+  const selectedReward =
+    ritual?.selectedSideIndex === undefined || dice === undefined
+      ? null
+      : (dice.sides[ritual.selectedSideIndex] ?? null);
   const rewardResult =
-    reward?.sessionId !== session.id ||
+    ritual === undefined ||
+    dice === undefined ||
     rewardInteraction === undefined ? null : (
       <RewardResultDialog
-        key={reward.key}
-        workflow={reward.workflow}
-        completedPhaseIndex={reward.completedPhaseIndex}
-        random={random}
+        key={ritual.id}
+        reward={selectedReward}
+        usedRerolls={ritual.rerollsUsed}
+        rerolls={dice.rerolls}
         reducedMotion={reducedMotion}
         onRoll={rewardInteraction.onRoll}
+        requestRoll={() =>
+          rewardInteraction.rollReward?.(session.id) ?? Promise.resolve()
+        }
+        requestReroll={() =>
+          rewardInteraction.rerollReward?.(session.id) ?? Promise.resolve()
+        }
         onContinue={async () => {
-          const isFinalReward = session.status === 'completed';
-          if (session.status === 'paused' && session.pauseReason === 'reward') {
-            await rewardInteraction.continueReward(session.id);
-          }
-          setReward(null);
+          const isFinalReward = ritual.continuation.type === 'complete';
+          await rewardInteraction.continueReward(session.id);
           if (isFinalReward) onFinalRewardContinued?.();
         }}
       />

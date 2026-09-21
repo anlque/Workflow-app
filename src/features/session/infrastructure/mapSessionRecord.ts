@@ -8,6 +8,8 @@ import {
 import { SessionValidationError } from '../domain/SessionErrors';
 import type { SessionRecord } from './SessionRecord';
 
+type SessionSchemaVersion = 1 | 2 | 3 | 4 | 5;
+
 function invalid(): never {
   throw new SessionValidationError('Stored Session record is invalid.');
 }
@@ -67,7 +69,7 @@ function hasExactKeys(
   );
 }
 
-function parseWorkflow(value: unknown, schemaVersion: 1 | 2 | 3 | 4) {
+function parseWorkflow(value: unknown, schemaVersion: SessionSchemaVersion) {
   const input = record(value);
   const phases = input['phases'];
   if (!Array.isArray(phases)) return invalid();
@@ -214,13 +216,58 @@ function parseWorkflow(value: unknown, schemaVersion: 1 | 2 | 3 | 4) {
   });
 }
 
+function parseRewardRitual(value: unknown) {
+  if (value === undefined) return undefined;
+  const ritual = record(value);
+  const continuation = record(ritual['continuation']);
+  if (
+    !hasExactKeys(
+      ritual,
+      [
+        'id',
+        'completedPhaseIndex',
+        'rerollsUsed',
+        'acknowledged',
+        'continuation',
+      ],
+      ['selectedSideIndex', 'lastCommandId'],
+    ) ||
+    typeof ritual['acknowledged'] !== 'boolean'
+  )
+    return invalid();
+  const parsedContinuation =
+    continuation['type'] === 'complete' && hasExactKeys(continuation, ['type'])
+      ? ({ type: 'complete' } as const)
+      : continuation['type'] === 'phase' &&
+          hasExactKeys(continuation, ['type', 'phaseIndex'])
+        ? ({
+            type: 'phase',
+            phaseIndex: number(continuation['phaseIndex']),
+          } as const)
+        : invalid();
+  return {
+    id: string(ritual['id']),
+    completedPhaseIndex: number(ritual['completedPhaseIndex']),
+    ...(ritual['selectedSideIndex'] === undefined
+      ? {}
+      : { selectedSideIndex: number(ritual['selectedSideIndex']) }),
+    rerollsUsed: number(ritual['rerollsUsed']),
+    acknowledged: ritual['acknowledged'],
+    ...(ritual['lastCommandId'] === undefined
+      ? {}
+      : { lastCommandId: string(ritual['lastCommandId']) }),
+    continuation: parsedContinuation,
+  };
+}
+
 export function mapSessionRecord(value: unknown): Session {
   const outer = record(value);
   if (
     (outer['schemaVersion'] !== 1 &&
       outer['schemaVersion'] !== 2 &&
       outer['schemaVersion'] !== 3 &&
-      outer['schemaVersion'] !== 4) ||
+      outer['schemaVersion'] !== 4 &&
+      outer['schemaVersion'] !== 5) ||
     (outer['active'] !== 0 && outer['active'] !== 1)
   ) {
     return invalid();
@@ -228,10 +275,15 @@ export function mapSessionRecord(value: unknown): Session {
   number(outer['updatedAt']);
   const stored = record(outer['session']);
   const status = stored['status'];
+  const rewardRitual =
+    outer['schemaVersion'] < 5
+      ? undefined
+      : parseRewardRitual(stored['rewardRitual']);
   const common = {
     id: string(stored['id']),
     workflow: parseWorkflow(stored['workflow'], outer['schemaVersion']),
     currentPhaseIndex: number(stored['currentPhaseIndex']),
+    ...(rewardRitual === undefined ? {} : { rewardRitual }),
   };
 
   let input: RestoreSessionInput;
@@ -249,6 +301,13 @@ export function mapSessionRecord(value: unknown): Session {
       transitionEndsAt: number(stored['transitionEndsAt']),
     };
   } else if (status === 'paused') {
+    if (
+      outer['schemaVersion'] === 5 &&
+      storedPauseReason(stored['pauseReason']) === 'reward' &&
+      rewardRitual === undefined
+    ) {
+      return invalid();
+    }
     input = {
       ...common,
       status,
@@ -294,7 +353,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
             : session.stoppedAt;
   return {
     id: session.id,
-    schemaVersion: 4,
+    schemaVersion: 5,
     active,
     updatedAt,
     session: {
@@ -302,6 +361,9 @@ export function mapSessionToRecord(session: Session): SessionRecord {
       workflow: session.snapshot.workflow,
       currentPhaseIndex: session.currentPhaseIndex,
       status: session.status,
+      ...(session.rewardRitual === undefined
+        ? {}
+        : { rewardRitual: session.rewardRitual }),
       ...(session.status === 'running'
         ? {
             phaseStartedAt: session.phaseStartedAt,

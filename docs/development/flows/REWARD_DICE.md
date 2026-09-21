@@ -16,8 +16,8 @@ Phase index; it is not a timer or random event.
   even halves use early then late, and an odd middle belongs to both.
 - The completed Phase is eligible according to
   [`isRewardDueAfterPhase()`](../../../src/features/workflow/domain/isRewardDueAfterPhase.ts).
-- Reward interaction is composed in the focus view. Other surfaces can project
-  Reward-paused state but do not roll the Dice.
+- Reward interaction is composed in Focus and Side Panel from the same
+  authoritative commands; Focus additionally owns Dice sound.
 - UI audio must have been unlocked by a user gesture for synthesized cues to be
   audible.
 
@@ -33,30 +33,27 @@ Phase index; it is not a timer or random event.
    Phase time elapses while the Reward is pending.
 3. Background persists and broadcasts this authoritative state and clears the
    Session alarm.
-4. [`rewardOpportunityForSessionTransition()`](../../../src/features/session/presentation/rewardTransitions.ts)
-   recognizes a new Reward pause. Hydrating focus directly into a pending
-   Reward pause also restores the dialog.
+4. The persisted ritual contains opportunity identity, completed Phase,
+   rerolls, optional result and a `phase` continuation target.
 5. [`ActiveSessionView`](../../../src/features/session/presentation/ActiveSessionView.tsx)
-   mounts `RewardResultDialog`; side panel instead shows `Reward pending — open
-focus view`.
+   renders `RewardResultDialog` directly from that projection on either Session
+   surface; remount does not create or select another opportunity.
 
 ### Final Reward
 
-1. After the last Phase transition, Domain state becomes Completed regardless of
-   reward eligibility; there is no next Phase to pause.
-2. Presentation compares the previous and current projections. If it observed a
-   non-terminal → Completed transition and the final Phase is eligible, it shows
-   the same Reward dialog over the terminal card.
-3. One second after that observed completion, focus plays the distinct
-   reward-unlocked cue. It does not play the ordinary completion cue yet.
+1. After the last Phase transition, an eligible Reward creates the same
+   authoritative Reward pause with a `complete` continuation target.
+2. Any newly opened Session surface reconstructs the dialog from that state.
+3. Focus plays the distinct reward-unlocked cue. The ordinary completion cue is
+   delayed until Continue persists the Completed transition.
 
 ### Roll, Reroll and Continue
 
 1. The dialog opens in `ready`; no result is chosen automatically.
-2. Clicking **Roll dice** calls
-   `rollReward(workflow, completedPhaseIndex, random)`. Domain filters and
-   renormalizes eligible Sides, then Presentation stores the result and enters
-   `mixing`. The result is hidden while the cube moves.
+2. Clicking **Roll dice** sends `session/roll-reward`. The serialized background
+   command invokes Domain selection with injected randomness, persists the
+   result and broadcasts the updated Session. Presentation enters `mixing` and
+   hides the authoritative result while the cube moves.
 3. Focus starts the synthesized Dice sound for the same duration: 2.5 seconds,
    or 0.6 seconds when reduced motion is active.
 4. When the duration ends, the cube and selected side enter `result`.
@@ -68,19 +65,18 @@ focus view`.
    `session/continue-reward`; Domain resumes the waiting Phase from the current
    wall clock with its stored full duration, then background saves, broadcasts
    and schedules its deadline.
-7. For a final Reward, Continue only dismisses the Presentation dialog and
-   reveals the already-Completed state. It schedules the ordinary
-   session-complete cue one second later.
+7. For a final Reward, Continue sends the same authoritative command, follows
+   the stored `complete` target and only then reveals Completed state.
 
-The selected Dice Side and reroll history are not Session Domain state. They are
-not stored, broadcast or used by later business behavior.
+The selected Dice Side and reroll history are Session Domain state. They are
+stored and broadcast as part of the authoritative projection.
 
 ## Authoritative Changes
 
 - Non-final eligibility changes persisted Session state to Reward-paused; Continue
   changes it back to Running with new start/end anchors.
-- Final eligibility does not alter the Completed record.
-- Random result, animation stage, used rerolls and dialog visibility are local
+- Final eligibility creates a Reward pause with a `complete` continuation target.
+- Animation stage, sound and dialog focus are local
   Presentation state.
 - Reward Dice configuration remains part of the immutable Session snapshot.
 
@@ -92,27 +88,17 @@ not stored, broadcast or used by later business behavior.
 | `session/continue-reward`            | Continue after a non-final result    | Requests the only valid transition out of Reward pause |
 | command response + `session/changed` | Continue succeeds                    | Validates and replaces projections with Running state  |
 
-No message contains the selected side or reroll count.
+Messages do not carry caller-selected outcomes. `session/roll-reward` and
+`session/reroll-reward` ask the serialized background coordinator to select and
+persist the outcome using injected randomness; `session/changed` returns the
+complete authoritative projection.
 
 ## Persistence
 
-Persisted Session data contains `pauseReason: 'reward'`, remaining next-Phase
-time and the snapshotted Reward Dice configuration. It does not contain a
-pending-final-Reward flag, selected side, acknowledgment or used-reroll count.
-
-Current implementation limitations:
-
-- used rerolls live only in `RewardResultDialog` React state. Closing/reloading
-  the focus document during the same non-final Reward remounts the dialog and
-  resets the allowance, although the product rule intends the allowance to reset
-  only for each new Reward;
-- a final Reward is detected only from an observed projection transition to
-  Completed. Hydrating after that transition cannot reconstruct the unobserved
-  final dialog, so the Reward may be missed.
-
-Fixing either limitation requires an explicit Domain/persistence decision about
-Reward occurrence, result and acknowledgment; a component-only workaround would
-create inconsistent replay behavior.
+Session record v5 persists `pauseReason: 'reward'`, the opportunity identity,
+completed Phase index, selected Side index, rerolls used, acknowledgment and
+the `phase | complete` continuation target. Versions 1–4 remain readable and
+restore their historical state without inventing a selected result.
 
 ## Failure and Recovery
 
@@ -120,8 +106,8 @@ create inconsistent replay behavior.
 | ------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------- |
 | Audio context remains locked          | Dice/reward/completion sounds are silent; Session flow still works | Click `Enable sounds` or another focus control that unlocks audio    |
 | Continue command fails                | Dialog stays open and shows an error                               | Retry after diagnosing runtime/background/storage failure            |
-| Focus reloads during non-final Reward | Dialog restores but reroll usage resets                            | Known limitation; do not treat reload as a supported allowance reset |
-| Focus misses final transition         | Completed card appears without final Reward                        | Known persistence limitation                                         |
+| Focus reloads during Reward           | Dialog hydrates the same result and reroll allowance                | Retry only a failed command; remount does not roll                    |
+| Focus misses final transition         | Final Reward remains persisted and actionable                       | Open either Session surface                                           |
 | Invalid random value                  | Workflow Domain throws before a result                             | Fix the injected random source; production uses `Math.random()`      |
 | UI sound synthesis fails              | Sound player swallows the cue failure                              | Interaction and Session authority remain unaffected                  |
 

@@ -9,6 +9,7 @@ export { continueRewardSessionUseCase } from './application/continueRewardSessio
 export { getActiveSessionUseCase } from './application/getActiveSessionUseCase';
 export { pauseSessionUseCase } from './application/pauseSessionUseCase';
 export { resumeSessionUseCase } from './application/resumeSessionUseCase';
+export { rollSessionRewardUseCase } from './application/rollSessionRewardUseCase';
 export { startSessionUseCase } from './application/startSessionUseCase';
 export { stopSessionUseCase } from './application/stopSessionUseCase';
 export {
@@ -17,11 +18,15 @@ export {
   continueRewardSession,
   getRemainingSeconds,
   pauseSession,
+  rerollSessionReward,
   resumeSession,
+  rollSessionReward,
   restoreSession,
   stopSession,
   type CompletedSession,
   type PausedSession,
+  type RewardContinuationTarget,
+  type RewardRitual,
   type RunningSession,
   type RestoreSessionInput,
   type Session,

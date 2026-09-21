@@ -7,7 +7,9 @@ import {
   continueRewardSession,
   getRemainingSeconds,
   pauseSession,
+  rerollSessionReward,
   resumeSession,
+  rollSessionReward,
   stopSession,
 } from './Session';
 import { deriveSessionState } from './deriveSessionState';
@@ -25,6 +27,88 @@ function workflow() {
 }
 
 describe('Session', () => {
+  test('owns Reward selection, rerolls and continuation in the Session aggregate', () => {
+    const rewarded = createWorkflow({
+      id: 'workflow-authoritative-reward',
+      name: 'Rewarded work',
+      phases: [
+        { type: 'focus', durationSeconds: 10, environment: {} },
+        { type: 'break', durationSeconds: 5, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        rerolls: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('session-1', rewarded, 1_000),
+      12_000,
+    );
+
+    const rolled = rollSessionReward(paused, () => 0);
+    const rerolled = rerollSessionReward(rolled, () => 0.99);
+
+    expect(rolled).toMatchObject({
+      rewardRitual: {
+        id: 'session-1:0',
+        completedPhaseIndex: 0,
+        selectedSideIndex: 0,
+        rerollsUsed: 0,
+        acknowledged: false,
+        continuation: { type: 'phase', phaseIndex: 1 },
+      },
+    });
+    expect(rerolled).toMatchObject({
+      rewardRitual: { selectedSideIndex: 1, rerollsUsed: 1 },
+    });
+    expect(() => rerollSessionReward(rerolled, () => 0)).toThrow();
+    expect(continueRewardSession(rerolled, 20_000)).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+      phaseEndsAt: 25_000,
+      rewardRitual: { acknowledged: true, selectedSideIndex: 1 },
+    });
+  });
+
+  test('keeps a final Reward actionable until it is rolled and acknowledged', () => {
+    const rewarded = createWorkflow({
+      id: 'workflow-final-reward',
+      name: 'Final reward',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'tea', title: 'Tea' },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('session-final', rewarded, 1_000),
+      12_000,
+    );
+
+    expect(paused).toMatchObject({
+      status: 'paused',
+      pauseReason: 'reward',
+      rewardRitual: { continuation: { type: 'complete' } },
+    });
+    expect(() => continueRewardSession(paused, 20_000)).toThrow();
+    expect(
+      continueRewardSession(
+        rollSessionReward(paused, () => 0),
+        20_000,
+      ),
+    ).toMatchObject({
+      status: 'completed',
+      completedAt: 20_000,
+      rewardRitual: { acknowledged: true, continuation: { type: 'complete' } },
+    });
+  });
   test('starts from a deeply immutable independent Workflow snapshot', () => {
     const source = createWorkflow({
       id: 'workflow-rewarded',
@@ -260,7 +344,7 @@ describe('Session', () => {
     });
   });
 
-  test('completes a final eligible Phase only after its transition', () => {
+  test('offers a final eligible Reward only after its transition', () => {
     const rewarded = createWorkflow({
       id: 'workflow-rewarded',
       name: 'Rewarded work',
@@ -277,9 +361,10 @@ describe('Session', () => {
 
     expect(deriveSessionState(running, 11_999).status).toBe('transitioning');
     expect(deriveSessionState(running, 12_000)).toMatchObject({
-      status: 'completed',
+      status: 'paused',
+      pauseReason: 'reward',
       currentPhaseIndex: 0,
-      completedAt: 12_000,
+      rewardRitual: { continuation: { type: 'complete' } },
     });
   });
 
@@ -304,7 +389,10 @@ describe('Session', () => {
       12_000,
     );
 
-    const continued = continueRewardSession(paused, 20_000);
+    const continued = continueRewardSession(
+      rollSessionReward(paused, () => 0),
+      20_000,
+    );
 
     expect(continued).toMatchObject({
       status: 'running',

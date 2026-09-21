@@ -31,6 +31,8 @@ export type FocusDependencies = Readonly<{
   pause(id: SessionId): Promise<void>;
   resume(id: SessionId): Promise<void>;
   continueReward(id: SessionId): Promise<void>;
+  rollReward(id: SessionId): Promise<void>;
+  rerollReward(id: SessionId): Promise<void>;
   stop(id: SessionId): Promise<void>;
   loadAssetUrl(id: AssetId): Promise<string | null>;
   releaseAssetUrl(url: string): void;
@@ -248,6 +250,8 @@ export function FocusApp({
           onFinalRewardContinued={scheduleCompletionReveal}
           rewardInteraction={{
             onRoll: dependencies.sounds.playDiceRoll,
+            rollReward: dependencies.rollReward,
+            rerollReward: dependencies.rerollReward,
             continueReward: dependencies.continueReward,
           }}
           onPause={async (id) => {

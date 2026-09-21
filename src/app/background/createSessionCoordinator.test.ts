@@ -338,6 +338,7 @@ describe('createSessionCoordinator', () => {
       ],
       rewardDice: {
         frequency: 1,
+        rerolls: 1,
         sides: [
           { icon: 'tea', title: 'Tea' },
           { icon: 'walk', title: 'Walk' },
@@ -381,6 +382,30 @@ describe('createSessionCoordinator', () => {
     ).rejects.toThrow();
 
     clock.set(20_000);
+    await messages.dispatch({
+      type: 'session/roll-reward',
+      commandId: 'command-roll',
+      sessionId: 'session-1',
+    });
+    const concurrentRerolls = await Promise.allSettled([
+      messages.dispatch({
+        type: 'session/reroll-reward',
+        commandId: 'command-reroll-1',
+        sessionId: 'session-1',
+      }),
+      messages.dispatch({
+        type: 'session/reroll-reward',
+        commandId: 'command-reroll-2',
+        sessionId: 'session-1',
+      }),
+    ]);
+    expect(concurrentRerolls.map(({ status }) => status).sort()).toEqual([
+      'fulfilled',
+      'rejected',
+    ]);
+    expect(messages.events.at(-1)?.session).toMatchObject({
+      rewardRitual: { rerollsUsed: 1 },
+    });
     await messages.dispatch({
       type: 'session/continue-reward',
       commandId: 'command-3',
