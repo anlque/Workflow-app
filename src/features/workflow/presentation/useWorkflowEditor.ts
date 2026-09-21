@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import type { DiceSideAvailability } from '../domain/DiceSide';
 import type { RewardPhaseType } from '../domain/RewardDice';
 import type { AssetReference } from '../domain/Environment';
 import type { CreateWorkflowInput, Workflow } from '../domain/Workflow';
@@ -19,6 +20,7 @@ export type RewardSideDraft = Readonly<{
   title: string;
   description: string;
   weight: string;
+  availability: DiceSideAvailability;
 }>;
 
 export type RewardDiceDraft = Readonly<{
@@ -66,6 +68,7 @@ function newSide(): RewardSideDraft {
     title: '',
     description: '',
     weight: '',
+    availability: 'any',
   };
 }
 
@@ -104,6 +107,7 @@ function initialDraft(workflowId: string, workflow?: Workflow): WorkflowDraft {
         title: side.title,
         description: side.description ?? '',
         weight: String(side.probability),
+        availability: side.availability,
       })) ?? [newSide(), newSide()],
     },
   };
@@ -237,8 +241,37 @@ export function validateWorkflowDraft(
           ? {}
           : { description: side.description.trim() }),
         ...(weight === undefined ? {} : { weight }),
+        availability: side.availability,
       };
     });
+    const opportunityPhaseIndexes =
+      draft.rewardDice.scheduleMode === 'custom'
+        ? customPhaseIndexes
+        : (() => {
+            let matching = 0;
+            return draft.phases.flatMap((phase, index) => {
+              if (phase.type !== draft.rewardDice.triggerPhaseType) return [];
+              matching += 1;
+              return matching % (frequency ?? 1) === 0 ? [index] : [];
+            });
+          })();
+    const lastOpportunityIndex = opportunityPhaseIndexes.length - 1;
+    const unavailableOpportunity = opportunityPhaseIndexes.findIndex(
+      (_, index) => {
+        const early = index * 2 <= lastOpportunityIndex;
+        const late = index * 2 >= lastOpportunityIndex;
+        return !sides.some(
+          ({ availability }) =>
+            availability === 'any' ||
+            (availability === 'early' && early) ||
+            (availability === 'late' && late),
+        );
+      },
+    );
+    if (unavailableOpportunity >= 0 && errors['reward:sides'] === undefined) {
+      errors['reward:sides'] =
+        `Reward opportunity ${String(unavailableOpportunity + 1)} needs at least one available Side.`;
+    }
     rewardDice = {
       schedule:
         draft.rewardDice.scheduleMode === 'custom'

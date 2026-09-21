@@ -85,7 +85,8 @@ describe('DexieWorkflowRepository', () => {
   });
 
   test('stores and restores a complete Workflow', async () => {
-    const repository = new DexieWorkflowRepository(createDatabase());
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
     const expected = workflow('one', 'Deep work');
 
     await repository.save(expected);
@@ -99,6 +100,17 @@ describe('DexieWorkflowRepository', () => {
           frequency: 2,
         },
         rerolls: 3,
+      },
+    });
+    await expect(
+      database.table<unknown, string>('workflows').get(expected.id),
+    ).resolves.toMatchObject({
+      schemaVersion: 4,
+      rewardDice: {
+        sides: [
+          expect.objectContaining({ availability: 'any' }),
+          expect.objectContaining({ availability: 'any' }),
+        ],
       },
     });
   });
@@ -206,6 +218,10 @@ describe('DexieWorkflowRepository', () => {
           frequency: 1,
         },
         rerolls: 0,
+        sides: [
+          expect.objectContaining({ availability: 'any' }),
+          expect.objectContaining({ availability: 'any' }),
+        ],
       },
     });
   });
@@ -238,8 +254,65 @@ describe('DexieWorkflowRepository', () => {
           triggerPhaseType: 'break',
           frequency: 2,
         },
+        sides: [
+          expect.objectContaining({ availability: 'any' }),
+          expect.objectContaining({ availability: 'any' }),
+        ],
       },
     });
+  });
+
+  test('defaults version-3 Side availability and rejects malformed version-4 availability', async () => {
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
+    const base = {
+      order: 0,
+      name: 'Canonical reward',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        schedule: {
+          type: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: 1,
+        },
+        rerolls: 0,
+        sides: [
+          { icon: 'tea', title: 'Tea', probability: 0.5 },
+          { icon: 'walk', title: 'Walk', probability: 0.5 },
+        ],
+      },
+    };
+    await putWorkflowRecord(database, {
+      ...base,
+      id: 'version-3',
+      schemaVersion: 3,
+    });
+    await expect(
+      repository.get(workflow('version-3', 'Fixture').id),
+    ).resolves.toMatchObject({
+      rewardDice: {
+        sides: [
+          expect.objectContaining({ availability: 'any' }),
+          expect.objectContaining({ availability: 'any' }),
+        ],
+      },
+    });
+
+    await putWorkflowRecord(database, {
+      ...base,
+      id: 'version-4-invalid',
+      schemaVersion: 4,
+      rewardDice: {
+        ...base.rewardDice,
+        sides: [
+          { ...base.rewardDice.sides[0], availability: 'sometimes' },
+          { ...base.rewardDice.sides[1], availability: 'any' },
+        ],
+      },
+    });
+    await expect(
+      repository.get(workflow('version-4-invalid', 'Fixture').id),
+    ).rejects.toBeInstanceOf(WorkflowValidationError);
   });
 
   test('rejects a version-3 frequency schedule without triggerPhaseType', async () => {

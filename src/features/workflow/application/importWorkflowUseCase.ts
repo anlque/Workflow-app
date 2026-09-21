@@ -104,7 +104,7 @@ function packageReferences(workflow: Workflow): PackageReferences {
 
 function parseAsset(
   value: unknown,
-  version: 1 | 2 | 3,
+  version: 1 | 2 | 3 | 4,
   policy: AssetImportPolicy,
   identity: WorkflowImportIdentity,
 ): DecodedAsset {
@@ -222,7 +222,8 @@ export async function importWorkflowUseCase(
     envelope['kind'] !== 'locusora/workflow' ||
     (envelope['version'] !== 1 &&
       envelope['version'] !== 2 &&
-      envelope['version'] !== 3) ||
+      envelope['version'] !== 3 &&
+      envelope['version'] !== 4) ||
     !Array.isArray(envelope['assets'])
   ) {
     throw new WorkflowPackageValidationError();
@@ -357,6 +358,7 @@ export async function importWorkflowUseCase(
                 ...(side.description === undefined
                   ? {}
                   : { description: side.description }),
+                availability: side.availability,
                 weight: side.probability,
               })),
             },

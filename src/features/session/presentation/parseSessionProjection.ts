@@ -38,6 +38,11 @@ function optionalRewardPhaseType(
   return invalid();
 }
 
+function sideAvailability(value: unknown): 'any' | 'early' | 'late' {
+  if (value === 'any' || value === 'early' || value === 'late') return value;
+  return invalid();
+}
+
 function pauseReason(value: unknown): 'user' | 'reward' {
   if (value === 'user' || value === 'reward') return value;
   return invalid();
@@ -158,11 +163,16 @@ function workflow(value: unknown) {
             sides: (sides as unknown[]).map((value) => {
               const side = record(value);
               const description = optionalString(side['description']);
+              const availability =
+                side['availability'] === undefined
+                  ? 'any'
+                  : sideAvailability(side['availability']);
               return {
                 icon: string(side['icon']),
                 title: string(side['title']),
                 ...(description === undefined ? {} : { description }),
                 weight: number(side['probability']),
+                availability,
               };
             }),
           },

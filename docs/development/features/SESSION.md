@@ -5,7 +5,7 @@
 Session start receives a Workflow resolver through its Application boundary.
 Roles resolve to same-kind direct IDs before construction, and
 `createSessionSnapshot` rejects any remaining Role. Moving a Role affects only
-future Sessions. New Session records use envelope version 3; the mapper reads
+future Sessions. New Session records use envelope version 4; the mapper reads
 versions 1–2 with legacy frequency fields. Timing never depends on Role lookup
 after start.
 
@@ -176,12 +176,13 @@ internals. A later lifecycle ADR will supersede ADR-0006 with this boundary.
 
 ## Persistence
 
-`DexieSessionRepository` writes a version-3 envelope in the global version-2
+`DexieSessionRepository` writes a version-4 envelope in the global version-2
 `sessions: 'id, active, updatedAt'` table definition.
 
-The mapper reads versions 1–3 strictly: version 1 snapshots accept only legacy
-Asset ID fields; versions 2–3 accept only exact direct references. Versions 1–2
-map legacy frequency fields; version 3 reads canonical schedules. Role,
+The mapper reads versions 1–4 strictly: version 1 snapshots accept only legacy
+Asset ID fields; versions 2–4 accept only exact direct references. Versions 1–2
+map legacy frequency fields; versions 3–4 read canonical schedules. Version 4
+requires Side availability while versions 1–3 default it to `any`. Role,
 mixed-version and unknown Environment fields are rejected because persisted
 Session snapshots must already be resolved and immutable.
 

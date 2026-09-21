@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { RewardDice } from '@/features/workflow';
+import type { RewardDice, Workflow } from '@/features/workflow';
 
 import type { Session, SessionId } from '../domain/Session';
 import { SessionControls } from './SessionControls';
@@ -32,6 +32,8 @@ type RewardOpportunity = Readonly<{
   key: string;
   sessionId: SessionId;
   dice: RewardDice;
+  workflow: Workflow;
+  completedPhaseIndex: number;
 }>;
 
 function rewardOpportunity(
@@ -43,6 +45,11 @@ function rewardOpportunity(
     key: `${session.id}:${String(session.currentPhaseIndex)}:${status}`,
     sessionId: session.id,
     dice,
+    workflow: session.snapshot.workflow,
+    completedPhaseIndex:
+      session.status === 'completed'
+        ? session.currentPhaseIndex
+        : session.currentPhaseIndex - 1,
   };
 }
 
@@ -102,7 +109,8 @@ export function ActiveSessionView({
     rewardInteraction === undefined ? null : (
       <RewardResultDialog
         key={reward.key}
-        dice={reward.dice}
+        workflow={reward.workflow}
+        completedPhaseIndex={reward.completedPhaseIndex}
         random={random}
         reducedMotion={reducedMotion}
         onRoll={rewardInteraction.onRoll}

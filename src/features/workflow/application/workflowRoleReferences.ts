@@ -115,6 +115,7 @@ export async function renameWorkflowRoleReferences(
                   ...(side.description === undefined
                     ? {}
                     : { description: side.description }),
+                  availability: side.availability,
                   weight: side.probability,
                 })),
               },

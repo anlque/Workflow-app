@@ -11,6 +11,9 @@ Phase index; it is not a timer or random event.
 ## Preconditions
 
 - The Session snapshot contains a valid Reward Dice with at least two sides.
+- Each configured opportunity has at least one eligible Side. Domain code
+  derives its position from the canonical schedule; `any` is always eligible,
+  even halves use early then late, and an odd middle belongs to both.
 - The completed Phase is eligible according to
   [`isRewardDueAfterPhase()`](../../../src/features/workflow/domain/isRewardDueAfterPhase.ts).
 - Reward interaction is composed in the focus view. Other surfaces can project
@@ -50,8 +53,10 @@ focus view`.
 ### Roll, Reroll and Continue
 
 1. The dialog opens in `ready`; no result is chosen automatically.
-2. Clicking **Roll dice** calls `rollReward(dice, random)`, stores the selected
-   side locally and enters `mixing`. The result is hidden while the cube moves.
+2. Clicking **Roll dice** calls
+   `rollReward(workflow, completedPhaseIndex, random)`. Domain filters and
+   renormalizes eligible Sides, then Presentation stores the result and enters
+   `mixing`. The result is hidden while the cube moves.
 3. Focus starts the synthesized Dice sound for the same duration: 2.5 seconds,
    or 0.6 seconds when reduced motion is active.
 4. When the duration ends, the cube and selected side enter `result`.

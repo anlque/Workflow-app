@@ -140,7 +140,29 @@ describe('createWorkflow', () => {
     ).toEqual([0.75, 0.25]);
     expect(Object.isFrozen(workflow.rewardDice)).toBe(true);
     expect(Object.isFrozen(workflow.rewardDice?.sides)).toBe(true);
+    expect(workflow.rewardDice?.sides[0]?.availability).toBe('any');
+    expect(Object.isFrozen(workflow.rewardDice?.sides[0])).toBe(true);
   });
+
+  test.each(['sometimes', '', null])(
+    'rejects invalid Dice Side availability %j',
+    (availability) => {
+      expect(() =>
+        createWorkflow({
+          id: 'workflow-1',
+          name: 'Deep work',
+          phases: [validPhase],
+          rewardDice: {
+            frequency: 1,
+            sides: [
+              { icon: 'tea', title: 'Tea', availability } as never,
+              { icon: 'walk', title: 'Walk' },
+            ],
+          },
+        }),
+      ).toThrow('Dice Side availability must be any, early or late.');
+    },
+  );
 
   test('defaults legacy Reward Dice to focus phases', () => {
     const workflow = createWorkflow({

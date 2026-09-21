@@ -34,6 +34,7 @@ export function createSessionSnapshot(source: Workflow): SessionSnapshot {
               ...(side.description === undefined
                 ? {}
                 : { description: side.description }),
+              availability: side.availability,
               weight: side.probability,
             })),
           },

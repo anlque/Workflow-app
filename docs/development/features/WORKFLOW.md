@@ -9,10 +9,11 @@ before Session creation. The editor draft stores one discriminated reference
 per Environment slot, and its picker explicitly offers direct Asset and Role
 modes. Unrelated Phase edits preserve the selected reference variant.
 
-Workflow record version 3 writes the reference union and canonical Reward
-schedule. Its mapper reads version-1
-`backgroundAssetId`/`audioAssetId` fields as direct references. The table indexes
-are unchanged. Package export writes version 3; import supports versions 1–3.
+Workflow record version 4 writes the reference union, canonical Reward schedule
+and Side availability. Its mapper reads version-1
+`backgroundAssetId`/`audioAssetId` fields as direct references. Table indexes
+remain `id, order`. Package export writes version 4; import supports versions
+1–4.
 
 ## Purpose
 
@@ -55,8 +56,8 @@ exports:
 
 | Group | Exports |
 | --- | --- |
-| Domain value types | `DiceSide`, `DiceSideInput`, `AssetId`, `AssetReference`, `AssetReferenceInput`, `Environment`, `EnvironmentInput`, `DurationSeconds`, `Phase`, `PhaseInput`, `PhaseType`, `RewardDice`, `RewardDiceInput`, `RewardPhaseType`, `CreateWorkflowInput`, `Workflow`, `WorkflowId` |
-| Domain behavior and errors | `createWorkflowId`, `createWorkflow`, `rollReward`, `isRewardDueAfterPhase`, `WorkflowValidationError` |
+| Domain value types | `DiceSide`, `DiceSideInput`, `DiceSideAvailability`, `AssetId`, `AssetReference`, `AssetReferenceInput`, `Environment`, `EnvironmentInput`, `DurationSeconds`, `Phase`, `PhaseInput`, `PhaseType`, `RewardDice`, `RewardDiceInput`, `RewardPhaseType`, `CreateWorkflowInput`, `Workflow`, `WorkflowId` |
+| Domain behavior and errors | `createWorkflowId`, `createWorkflow`, `rollReward`, `eligibleDiceSides`, `rewardOpportunityPhaseIndexes`, `isRewardDueAfterPhase`, `WorkflowValidationError` |
 | Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`, `WorkflowPackageV2`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
 | Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `resolveWorkflowAssetReferences`, Role-summary/rename and Asset-retirement summary/patch operations, `exportWorkflowUseCase`, `importWorkflowUseCase` |
 | Infrastructure composition | `DexieWorkflowRepository`, `workflowDatabaseSchemas`, `DexieWorkflowPackageUnitOfWork` |
@@ -133,6 +134,11 @@ seconds. This is not the more general Domain duration rule.
   every index must be an integer within the Workflow.
 - `rerolls` is an integer from 0 through 3; omitted legacy input defaults to 0.
 - At least two Dice Sides exist.
+- Every Side has `availability: any | early | late`; legacy inputs default to
+  `any`.
+- Actual opportunity indexes come from the canonical schedule. Early and late
+  each cover one half; an odd middle opportunity belongs to both, while `any`
+  always remains eligible. Every opportunity must have an eligible Side.
 - Each side has a non-empty trimmed icon and title; optional descriptions are
   trimmed.
 - Weights are supplied for every side or none.
@@ -145,7 +151,8 @@ Dice. Custom schedules use exact Phase membership; frequency schedules preserve
 the matching-type ordinal rule.
 
 `rollReward()` accepts an injected random value only in `[0, 1)`, walks
-cumulative normalized probability and returns a Dice Side. Randomness and
+cumulative probability after filtering and renormalizing eligible Side weights,
+then returns a Dice Side. Randomness and
 presentation animation are not part of the aggregate.
 
 ### Copy Boundaries
@@ -165,7 +172,7 @@ Reward is Presentation state and resets with each new dialog.
 | `deleteWorkflowUseCase` | Repository, ID | Requires existence, deletes; repository compacts collection order | `void` or not-found error |
 | `listWorkflowsUseCase` | Repository | Returns repository order | Readonly Workflow list |
 | `reorderWorkflowsUseCase` | Repository, complete ordered IDs | Requires an exact permutation of current IDs, delegates atomic replacement | `void` or Application error |
-| `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced Assets/Blobs and creates deterministic version-3 JSON | JSON or package validation error |
+| `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced Assets/Blobs and creates deterministic version-4 JSON | JSON or package validation error |
 | `importWorkflowUseCase` | Repositories, unit of work, JSON, limits/policy/identity | Validates complete package before writes, generates collision-free IDs, rewrites Environment references, atomically writes Assets and Workflow | Imported Workflow or package validation/storage failure |
 
 Composition wraps successful catalog mutations with
@@ -175,14 +182,15 @@ use cases.
 
 ## Persistence
 
-`DexieWorkflowRepository` writes version-3 `WorkflowRecord` rows in the global
-version-1 `workflows: 'id, order'` table definition and reads versions 1–3.
+`DexieWorkflowRepository` writes version-4 `WorkflowRecord` rows in the global
+version-1 `workflows: 'id, order'` table definition and reads versions 1–4.
 
 - Reads treat rows as `unknown`, validate record metadata and reconstruct the
   Domain aggregate.
-- Version 1 accepts only legacy ID Environment fields; versions 2–3 accept only
+- Version 1 accepts only legacy ID Environment fields; versions 2–4 accept only
   exact direct-or-Role reference fields. Versions 1–2 read legacy frequency
-  fields; version 3 reads the canonical schedule union.
+  fields; versions 3–4 read the canonical schedule union. Versions 1–3 default
+  missing Side availability to `any`; version 4 requires it.
 - New rows append after the highest order.
 - Updates preserve the current order.
 - Delete compacts remaining order values.

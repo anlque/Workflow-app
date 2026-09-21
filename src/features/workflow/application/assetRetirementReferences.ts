@@ -102,6 +102,7 @@ function copyWorkflow(
               ...(side.description === undefined
                 ? {}
                 : { description: side.description }),
+              availability: side.availability,
               weight: side.probability,
             })),
           },

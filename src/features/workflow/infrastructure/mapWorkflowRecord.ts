@@ -81,7 +81,7 @@ function mapAssetReference(value: unknown) {
 
 function mapEnvironmentRecord(
   value: unknown,
-  schemaVersion: 1 | 2 | 3,
+  schemaVersion: 1 | 2 | 3 | 4,
 ): EnvironmentInput {
   const record = objectRecord(value);
   const allowedKeys =
@@ -117,7 +117,10 @@ function mapEnvironmentRecord(
   };
 }
 
-function mapPhaseRecord(value: unknown, schemaVersion: 1 | 2 | 3): PhaseInput {
+function mapPhaseRecord(
+  value: unknown,
+  schemaVersion: 1 | 2 | 3 | 4,
+): PhaseInput {
   const record = objectRecord(value);
   return {
     type: stringValue(record['type']),
@@ -128,7 +131,7 @@ function mapPhaseRecord(value: unknown, schemaVersion: 1 | 2 | 3): PhaseInput {
 
 function mapRewardDiceRecord(
   value: unknown,
-  schemaVersion: 1 | 2 | 3,
+  schemaVersion: 1 | 2 | 3 | 4,
 ): RewardDiceInput {
   const record = objectRecord(value);
   const sides = record['sides'];
@@ -141,7 +144,7 @@ function mapRewardDiceRecord(
   }
 
   const schedule = (() => {
-    if (schemaVersion !== 3) {
+    if (schemaVersion < 3) {
       if (
         !hasExactKeys(
           record,
@@ -191,11 +194,24 @@ function mapRewardDiceRecord(
     sides: sides.map((sideValue) => {
       const side = objectRecord(sideValue);
       const description = optionalString(side['description']);
+      const availability =
+        schemaVersion < 4 ? 'any' : stringValue(side['availability']);
+      const required = ['icon', 'title', 'probability'];
+      if (
+        !hasExactKeys(
+          side,
+          schemaVersion < 4 ? required : [...required, 'availability'],
+          ['description'],
+        )
+      ) {
+        return invalidRecord();
+      }
       return {
         icon: stringValue(side['icon']),
         title: stringValue(side['title']),
         ...(description === undefined ? {} : { description }),
         weight: numberValue(side['probability']),
+        availability: availability as 'any' | 'early' | 'late',
       };
     }),
   };
@@ -206,7 +222,8 @@ export function mapWorkflowRecord(value: unknown): Workflow {
   if (
     record['schemaVersion'] !== 1 &&
     record['schemaVersion'] !== 2 &&
-    record['schemaVersion'] !== 3
+    record['schemaVersion'] !== 3 &&
+    record['schemaVersion'] !== 4
   ) {
     return invalidRecord();
   }
@@ -241,7 +258,7 @@ export function mapWorkflowToRecord(
 ): WorkflowRecord {
   return {
     id: workflow.id,
-    schemaVersion: 3,
+    schemaVersion: 4,
     order,
     name: workflow.name,
     phases: workflow.phases.map((phase) => ({
@@ -272,6 +289,7 @@ export function mapWorkflowToRecord(
                 ? {}
                 : { description: side.description }),
               probability: side.probability,
+              availability: side.availability,
             })),
           },
         }),

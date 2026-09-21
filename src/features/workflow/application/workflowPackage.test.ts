@@ -98,8 +98,8 @@ function rewardedWorkflow(): Workflow {
       frequency: 1,
       rerolls: 3,
       sides: [
-        { icon: 'tea', title: 'Tea' },
-        { icon: 'walk', title: 'Walk' },
+        { icon: 'tea', title: 'Tea', availability: 'early' },
+        { icon: 'walk', title: 'Walk', availability: 'late' },
       ],
     },
   });
@@ -299,7 +299,7 @@ describe('Workflow package', () => {
       packageWith({ type: 'direct', assetId: 'a' }, { ...asset, extra: true }),
     );
   });
-  test('exports version 3 and remaps a colliding imported Role to its imported Asset', async () => {
+  test('exports version 4 and remaps a colliding imported Role to its imported Asset', async () => {
     const sourceAssets = new MemoryAssetRepository();
     await addAsset(sourceAssets, 'source-image', 'Backdrop');
     const source = createWorkflow({
@@ -335,7 +335,7 @@ describe('Workflow package', () => {
       },
     );
 
-    expect(parsed.version).toBe(3);
+    expect(parsed.version).toBe(4);
     expect(parsed.assets).toEqual([
       expect.objectContaining({ role: 'Backdrop' }),
     ]);
@@ -468,7 +468,7 @@ describe('Workflow package', () => {
 
     expect(JSON.parse(data)).toMatchObject({
       kind: 'locusora/workflow',
-      version: 3,
+      version: 4,
       workflow: {
         rewardDice: {
           schedule: { type: 'frequency', triggerPhaseType: 'break' },
@@ -481,6 +481,9 @@ describe('Workflow package', () => {
       triggerPhaseType: 'break',
     });
     expect(imported.rewardDice?.rerolls).toBe(3);
+    expect(
+      imported.rewardDice?.sides.map(({ availability }) => availability),
+    ).toEqual(['early', 'late']);
   });
 
   test('defaults missing Reward Dice rerolls in a version-2 package', async () => {
@@ -505,6 +508,9 @@ describe('Workflow package', () => {
     legacyReward['frequency'] = schedule.frequency;
     delete legacyReward['schedule'];
     delete legacyReward['rerolls'];
+    for (const side of legacyReward['sides'] as Record<string, unknown>[]) {
+      delete side['availability'];
+    }
 
     const imported = await importWorkflowUseCase(
       new MemoryWorkflowRepository(),
@@ -522,7 +528,7 @@ describe('Workflow package', () => {
     expect(imported.rewardDice?.rerolls).toBe(0);
   });
 
-  test('round-trips a canonical custom Reward schedule in version 3', async () => {
+  test('round-trips a canonical custom Reward schedule in version 4', async () => {
     const source = createWorkflow({
       id: 'custom-reward-workflow',
       name: 'Custom reward',
@@ -557,7 +563,7 @@ describe('Workflow package', () => {
     );
 
     expect(JSON.parse(data)).toMatchObject({
-      version: 3,
+      version: 4,
       workflow: {
         rewardDice: {
           schedule: { type: 'custom', phaseIndexes: [1] },
@@ -738,6 +744,93 @@ describe('Workflow package', () => {
     );
     expect(unitOfWork.runs).toBe(0);
   });
+
+  test('rejects malformed version-4 Side availability before writes', async () => {
+    const data = JSON.parse(
+      await exportWorkflowUseCase(
+        rewardedWorkflow(),
+        new MemoryAssetRepository(),
+      ),
+    ) as {
+      workflow: { rewardDice: { sides: Record<string, unknown>[] } };
+    };
+    const firstSide = data.workflow.rewardDice.sides[0];
+    if (firstSide === undefined) throw new Error('Expected first Dice Side.');
+    firstSide['availability'] = 'sometimes';
+    const workflows = new MemoryWorkflowRepository();
+    const assets = new MemoryAssetRepository();
+    const unitOfWork = new MemoryUnitOfWork();
+
+    await expect(
+      importWorkflowUseCase(
+        workflows,
+        assets,
+        unitOfWork,
+        JSON.stringify(data),
+        { maxFileBytes: 10_000, assetPolicy: policy },
+        {
+          createWorkflowId: () => 'workflow-new',
+          createAssetId: () => 'asset-new',
+          now: () => 2_000,
+        },
+      ),
+    ).rejects.toThrow();
+    expect(workflows.writes).toBe(0);
+    expect(unitOfWork.runs).toBe(0);
+  });
+
+  test.each([1, 2, 3] as const)(
+    'defaults missing Side availability in a real raw version-%s package',
+    async (version) => {
+      const rewardDice =
+        version < 3
+          ? {
+              triggerPhaseType: 'focus',
+              frequency: 1,
+              sides: [
+                { icon: 'tea', title: 'Tea', weight: 1 },
+                { icon: 'walk', title: 'Walk', weight: 1 },
+              ],
+            }
+          : {
+              schedule: {
+                type: 'frequency',
+                triggerPhaseType: 'focus',
+                frequency: 1,
+              },
+              sides: [
+                { icon: 'tea', title: 'Tea', weight: 1 },
+                { icon: 'walk', title: 'Walk', weight: 1 },
+              ],
+            };
+      const imported = await importWorkflowUseCase(
+        new MemoryWorkflowRepository(),
+        new MemoryAssetRepository(),
+        new MemoryUnitOfWork(),
+        JSON.stringify({
+          kind: 'locusora/workflow',
+          version,
+          workflow: {
+            id: 'legacy',
+            name: 'Legacy',
+            phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+            rewardDice,
+          },
+          assets: [],
+        }),
+        { maxFileBytes: 10_000, assetPolicy: policy },
+        {
+          createWorkflowId: () => 'workflow-new',
+          createAssetId: () => 'asset-new',
+          now: () => 2_000,
+        },
+      );
+
+      expect(
+        imported.rewardDice?.sides.map(({ availability }) => availability),
+      ).toEqual(['any', 'any']);
+    },
+  );
 
   test('rejects oversized decoded Assets before starting the transaction', async () => {
     const sourceAssets = new MemoryAssetRepository();

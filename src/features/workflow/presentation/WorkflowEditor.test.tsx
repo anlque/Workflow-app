@@ -276,6 +276,79 @@ describe('WorkflowEditor', () => {
     expect(result.current.draft.rewardDice.sides).toHaveLength(2);
   });
 
+  test('loads and saves Side availability in the editor draft', () => {
+    const workflow = createWorkflow({
+      id: 'workflow-1',
+      name: 'Timed rewards',
+      phases: [
+        { type: 'focus', durationSeconds: 60, environment: {} },
+        { type: 'focus', durationSeconds: 60, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'e', title: 'Early', availability: 'early' },
+          { icon: 'l', title: 'Late', availability: 'late' },
+        ],
+      },
+    });
+    const { result } = renderHook(() =>
+      useWorkflowEditor('workflow-1', workflow),
+    );
+
+    expect(
+      result.current.draft.rewardDice.sides.map(
+        ({ availability }) => availability,
+      ),
+    ).toEqual(['early', 'late']);
+    const validation = validateWorkflowDraft(result.current.draft);
+    expect(validation.valid).toBe(true);
+    if (validation.valid) {
+      expect(
+        validation.input.rewardDice?.sides.map(
+          ({ availability }) => availability,
+        ),
+      ).toEqual(['early', 'late']);
+    }
+  });
+
+  test('identifies the first Reward opportunity without an available Side', () => {
+    const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
+    act(() => {
+      result.current.addPhase();
+      result.current.setRewardEnabled(true);
+      for (const side of result.current.draft.rewardDice.sides) {
+        result.current.updateRewardSide(side.key, { availability: 'late' });
+      }
+    });
+
+    const validation = validateWorkflowDraft(result.current.draft);
+
+    expect(validation.valid).toBe(false);
+    if (validation.valid) throw new Error('Expected invalid draft.');
+    expect(validation.errors['reward:sides']).toBe(
+      'Reward opportunity 1 needs at least one available Side.',
+    );
+  });
+
+  test('keeps the minimum Side error ahead of availability coverage', () => {
+    const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
+    const validation = validateWorkflowDraft({
+      ...result.current.draft,
+      rewardDice: {
+        ...result.current.draft.rewardDice,
+        enabled: true,
+        sides: [],
+      },
+    });
+
+    expect(validation.valid).toBe(false);
+    if (validation.valid) throw new Error('Expected invalid draft.');
+    expect(validation.errors['reward:sides']).toBe(
+      'Reward Dice needs at least two sides.',
+    );
+  });
+
   test('shows frequency markers and converts a manual toggle to custom', async () => {
     const user = userEvent.setup();
     render(
@@ -505,6 +578,7 @@ describe('WorkflowEditor', () => {
             title: 'Tea',
             description: '',
             weight: '',
+            availability: 'any',
           },
           {
             key: 'walk',
@@ -512,6 +586,7 @@ describe('WorkflowEditor', () => {
             title: 'Walk',
             description: '',
             weight: '',
+            availability: 'any',
           },
         ],
       },
@@ -540,13 +615,21 @@ describe('WorkflowEditor', () => {
           key === 'phase-key' ? phaseKey : key,
         ),
         sides: [
-          { key: 'tea', icon: '☕', title: 'Tea', description: '', weight: '' },
+          {
+            key: 'tea',
+            icon: '☕',
+            title: 'Tea',
+            description: '',
+            weight: '',
+            availability: 'any',
+          },
           {
             key: 'walk',
             icon: '🚶',
             title: 'Walk',
             description: '',
             weight: '',
+            availability: 'any',
           },
         ],
       },

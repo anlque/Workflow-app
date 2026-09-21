@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { createWorkflow } from './createWorkflow';
 import { rollReward } from './rollReward';
 
-const rewardDice = createWorkflow({
+const workflow = createWorkflow({
   id: 'workflow-1',
   name: 'Deep work',
   phases: [
@@ -20,11 +20,7 @@ const rewardDice = createWorkflow({
       { icon: 'walk', title: 'Walk', weight: 1 },
     ],
   },
-}).rewardDice;
-
-if (rewardDice === undefined) {
-  throw new Error('Test fixture must contain Reward Dice.');
-}
+});
 
 describe('rollReward', () => {
   test.each([
@@ -33,13 +29,15 @@ describe('rollReward', () => {
     [0.75, 'Walk'],
     [0.999_999, 'Walk'],
   ] as const)('maps random value %s to %s', (randomValue, expectedTitle) => {
-    expect(rollReward(rewardDice, () => randomValue).title).toBe(expectedTitle);
+    expect(rollReward(workflow, 0, () => randomValue).title).toBe(
+      expectedTitle,
+    );
   });
 
   test.each([-0.1, 1, Number.NaN, Number.POSITIVE_INFINITY])(
     'rejects random value outside [0, 1): %s',
     (randomValue) => {
-      expect(() => rollReward(rewardDice, () => randomValue)).toThrow(
+      expect(() => rollReward(workflow, 0, () => randomValue)).toThrow(
         'Random source must return a finite number in [0, 1).',
       );
     },

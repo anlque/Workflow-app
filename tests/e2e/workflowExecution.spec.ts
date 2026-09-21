@@ -152,8 +152,10 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
   await options.getByLabel('Enable Reward Dice').check();
   await options.getByLabel('Reward side 1 icon').fill('☕');
   await options.getByLabel('Reward side 1 title').fill('Tea');
+  await options.getByLabel('Reward side 1 availability').selectOption('early');
   await options.getByLabel('Reward side 2 icon').fill('🌿');
   await options.getByLabel('Reward side 2 title').fill('Fresh air');
+  await options.getByLabel('Reward side 2 availability').selectOption('late');
 
   await options.getByLabel('Reward after Phase 1').uncheck();
   await options.getByLabel('Reward after Phase 5').uncheck();
@@ -163,6 +165,12 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
   await options.reload();
   await options.getByRole('button', { name: 'Open Custom rewards' }).click();
   await expect(options.getByLabel('Reward schedule')).toHaveValue('custom');
+  await expect(options.getByLabel('Reward side 1 availability')).toHaveValue(
+    'early',
+  );
+  await expect(options.getByLabel('Reward side 2 availability')).toHaveValue(
+    'late',
+  );
   for (const index of [1, 2, 3, 5]) {
     await expect(
       options.getByLabel(`Reward after Phase ${String(index + 1)}`),

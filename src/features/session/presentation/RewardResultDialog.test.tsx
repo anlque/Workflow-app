@@ -5,7 +5,7 @@ import { createWorkflow } from '@/features/workflow';
 
 import { RewardResultDialog } from './RewardResultDialog';
 
-const dice = createWorkflow({
+const workflow = createWorkflow({
   id: 'workflow-1',
   name: 'Rewarded work',
   phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
@@ -16,11 +16,9 @@ const dice = createWorkflow({
       { icon: '🌿', title: 'Fresh air' },
     ],
   },
-}).rewardDice;
+});
 
-if (dice === undefined) throw new Error('Expected Reward Dice fixture.');
-
-const rerollDice = createWorkflow({
+const rerollWorkflow = createWorkflow({
   id: 'workflow-rerolls',
   name: 'Rewarded work',
   phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
@@ -32,11 +30,7 @@ const rerollDice = createWorkflow({
       { icon: '🌿', title: 'Fresh air' },
     ],
   },
-}).rewardDice;
-
-if (rerollDice === undefined) {
-  throw new Error('Expected reroll Reward Dice fixture.');
-}
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -48,7 +42,8 @@ describe('RewardResultDialog', () => {
     const onRoll = vi.fn();
     render(
       <RewardResultDialog
-        dice={dice}
+        workflow={workflow}
+        completedPhaseIndex={0}
         random={random}
         reducedMotion={false}
         onRoll={onRoll}
@@ -77,7 +72,8 @@ describe('RewardResultDialog', () => {
     const onRoll = vi.fn();
     render(
       <RewardResultDialog
-        dice={dice}
+        workflow={workflow}
+        completedPhaseIndex={0}
         random={random}
         reducedMotion={false}
         onRoll={onRoll}
@@ -121,7 +117,8 @@ describe('RewardResultDialog', () => {
     const onRoll = vi.fn();
     render(
       <RewardResultDialog
-        dice={rerollDice}
+        workflow={rerollWorkflow}
+        completedPhaseIndex={0}
         random={random}
         reducedMotion
         onRoll={onRoll}
@@ -174,7 +171,8 @@ describe('RewardResultDialog', () => {
     vi.useFakeTimers();
     render(
       <RewardResultDialog
-        dice={rerollDice}
+        workflow={rerollWorkflow}
+        completedPhaseIndex={0}
         random={() => 0}
         reducedMotion
         onRoll={vi.fn()}
@@ -207,7 +205,8 @@ describe('RewardResultDialog', () => {
       .mockReturnValueOnce(0.75);
     render(
       <RewardResultDialog
-        dice={rerollDice}
+        workflow={rerollWorkflow}
+        completedPhaseIndex={0}
         random={random}
         reducedMotion
         onRoll={vi.fn()}
@@ -234,7 +233,8 @@ describe('RewardResultDialog', () => {
     vi.useFakeTimers();
     render(
       <RewardResultDialog
-        dice={rerollDice}
+        workflow={rerollWorkflow}
+        completedPhaseIndex={0}
         random={() => 0}
         reducedMotion
         onRoll={vi.fn()}
@@ -273,7 +273,8 @@ describe('RewardResultDialog', () => {
     const onRoll = vi.fn();
     render(
       <RewardResultDialog
-        dice={dice}
+        workflow={workflow}
+        completedPhaseIndex={0}
         random={() => 0.75}
         reducedMotion
         onRoll={onRoll}
@@ -297,7 +298,8 @@ describe('RewardResultDialog', () => {
   test('cannot be dismissed with Escape', () => {
     render(
       <RewardResultDialog
-        dice={dice}
+        workflow={workflow}
+        completedPhaseIndex={0}
         random={() => 0}
         reducedMotion={false}
         onRoll={vi.fn()}
@@ -319,7 +321,8 @@ describe('RewardResultDialog', () => {
     vi.useFakeTimers();
     render(
       <RewardResultDialog
-        dice={dice}
+        workflow={workflow}
+        completedPhaseIndex={0}
         random={() => 0}
         reducedMotion
         onRoll={vi.fn()}

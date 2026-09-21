@@ -38,6 +38,11 @@ function optionalRewardPhaseType(
   return invalid();
 }
 
+function sideAvailability(value: unknown): 'any' | 'early' | 'late' {
+  if (value === 'any' || value === 'early' || value === 'late') return value;
+  return invalid();
+}
+
 function storedPauseReason(value: unknown): 'user' | 'reward' {
   if (value === undefined || value === 'user') return 'user';
   if (value === 'reward') return 'reward';
@@ -62,7 +67,7 @@ function hasExactKeys(
   );
 }
 
-function parseWorkflow(value: unknown, schemaVersion: 1 | 2 | 3) {
+function parseWorkflow(value: unknown, schemaVersion: 1 | 2 | 3 | 4) {
   const input = record(value);
   const phases = input['phases'];
   if (!Array.isArray(phases)) return invalid();
@@ -74,7 +79,7 @@ function parseWorkflow(value: unknown, schemaVersion: 1 | 2 | 3) {
   if (reward !== undefined && !Array.isArray(sides)) return invalid();
   const schedule = (() => {
     if (reward === undefined) return undefined;
-    if (schemaVersion !== 3) {
+    if (schemaVersion < 3) {
       if (
         !hasExactKeys(
           reward,
@@ -183,11 +188,25 @@ function parseWorkflow(value: unknown, schemaVersion: 1 | 2 | 3) {
             sides: (sides as unknown[]).map((sideValue) => {
               const side = record(sideValue);
               const description = optionalString(side['description']);
+              const required = ['icon', 'title', 'probability'];
+              if (
+                !hasExactKeys(
+                  side,
+                  schemaVersion < 4 ? required : [...required, 'availability'],
+                  ['description'],
+                )
+              ) {
+                return invalid();
+              }
               return {
                 icon: string(side['icon']),
                 title: string(side['title']),
                 ...(description === undefined ? {} : { description }),
                 weight: number(side['probability']),
+                availability:
+                  schemaVersion < 4
+                    ? 'any'
+                    : sideAvailability(side['availability']),
               };
             }),
           },
@@ -200,7 +219,8 @@ export function mapSessionRecord(value: unknown): Session {
   if (
     (outer['schemaVersion'] !== 1 &&
       outer['schemaVersion'] !== 2 &&
-      outer['schemaVersion'] !== 3) ||
+      outer['schemaVersion'] !== 3 &&
+      outer['schemaVersion'] !== 4) ||
     (outer['active'] !== 0 && outer['active'] !== 1)
   ) {
     return invalid();
@@ -274,7 +294,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
             : session.stoppedAt;
   return {
     id: session.id,
-    schemaVersion: 3,
+    schemaVersion: 4,
     active,
     updatedAt,
     session: {

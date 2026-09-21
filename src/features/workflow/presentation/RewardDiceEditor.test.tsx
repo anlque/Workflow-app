@@ -53,6 +53,7 @@ describe('RewardDiceEditor', () => {
               title: 'Tea',
               description: '',
               weight: '',
+              availability: 'any',
             },
             {
               key: 'walk',
@@ -60,6 +61,7 @@ describe('RewardDiceEditor', () => {
               title: 'Walk',
               description: '',
               weight: '',
+              availability: 'any',
             },
           ],
         }}
@@ -83,6 +85,59 @@ describe('RewardDiceEditor', () => {
     expect(
       screen.getByText('A Reward Dice needs at least two sides.'),
     ).toBeVisible();
+  });
+
+  test('changes a Side availability through an accessible select', async () => {
+    const user = userEvent.setup();
+    const onSideChange = vi.fn();
+    render(
+      <RewardDiceEditor
+        draft={{
+          enabled: true,
+          scheduleMode: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: '1',
+          customPhaseKeys: [],
+          rerolls: '0',
+          sides: [
+            {
+              key: 'tea',
+              icon: '☕',
+              title: 'Tea',
+              description: '',
+              weight: '',
+              availability: 'any',
+            },
+            {
+              key: 'walk',
+              icon: '🚶',
+              title: 'Walk',
+              description: '',
+              weight: '',
+              availability: 'late',
+            },
+          ],
+        }}
+        errors={{}}
+        onEnabledChange={() => undefined}
+        onScheduleModeChange={() => undefined}
+        onTriggerPhaseTypeChange={() => undefined}
+        onFrequencyChange={() => undefined}
+        onRerollsChange={() => undefined}
+        onSideChange={onSideChange}
+        onAddSide={() => undefined}
+        onRemoveSide={() => undefined}
+      />,
+    );
+
+    await user.selectOptions(
+      screen.getByLabelText('Reward side 1 availability'),
+      'early',
+    );
+
+    expect(onSideChange).toHaveBeenCalledWith('tea', {
+      availability: 'early',
+    });
   });
 
   test('selects the phase type used for Reward Dice cadence', async () => {

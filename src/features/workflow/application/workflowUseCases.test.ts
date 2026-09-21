@@ -76,8 +76,8 @@ describe('Workflow use cases', () => {
         schedule: { type: 'custom', phaseIndexes: [0] },
         rerolls: 3,
         sides: [
-          { icon: 'tea', title: 'Tea' },
-          { icon: 'walk', title: 'Walk' },
+          { icon: 'tea', title: 'Tea', availability: 'early' },
+          { icon: 'walk', title: 'Walk', availability: 'late' },
         ],
       },
     });
@@ -98,6 +98,9 @@ describe('Workflow use cases', () => {
       phaseIndexes: [0],
     });
     expect(duplicate.rewardDice?.rerolls).toBe(3);
+    expect(
+      duplicate.rewardDice?.sides.map(({ availability }) => availability),
+    ).toEqual(['early', 'late']);
     await expect(repository.list()).resolves.toEqual([source, duplicate]);
   });
 

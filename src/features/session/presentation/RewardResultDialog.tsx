@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import {
-  rollReward,
-  type DiceSide,
-  type RewardDice,
-} from '@/features/workflow';
+import { rollReward, type DiceSide, type Workflow } from '@/features/workflow';
 import { Button, Dialog } from '@/shared';
 
 import { RewardCube, type RewardCubeStage } from './RewardCube';
@@ -13,7 +9,8 @@ type MixingDuration = 600 | 2500;
 type RewardStage = 'ready' | 'mixing' | 'result';
 
 export type RewardResultDialogProps = Readonly<{
-  dice: RewardDice;
+  workflow: Workflow;
+  completedPhaseIndex: number;
   random: () => number;
   reducedMotion: boolean;
   onRoll(durationMs: MixingDuration): void;
@@ -21,7 +18,8 @@ export type RewardResultDialogProps = Readonly<{
 }>;
 
 export function RewardResultDialog({
-  dice,
+  workflow,
+  completedPhaseIndex,
   random,
   reducedMotion,
   onRoll,
@@ -34,6 +32,9 @@ export function RewardResultDialog({
   const [error, setError] = useState<string | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
   const duration: MixingDuration = reducedMotion ? 600 : 2_500;
+  const dice = workflow.rewardDice;
+  if (dice === undefined) throw new Error('Reward Dice is required.');
+  const rerolls = dice.rerolls;
 
   useEffect(() => {
     if (stage !== 'mixing') return;
@@ -46,10 +47,10 @@ export function RewardResultDialog({
   }, [duration, stage]);
 
   useEffect(() => {
-    if (stage === 'result' && usedRerolls > 0 && usedRerolls >= dice.rerolls) {
+    if (stage === 'result' && usedRerolls > 0 && usedRerolls >= rerolls) {
       actionsRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
     }
-  }, [dice.rerolls, stage, usedRerolls]);
+  }, [rerolls, stage, usedRerolls]);
 
   const cubeStage: RewardCubeStage =
     stage === 'mixing' && reducedMotion ? 'mixing-reduced' : stage;
@@ -70,18 +71,18 @@ export function RewardResultDialog({
 
   function roll(): void {
     setError(null);
-    setReward(rollReward(dice, random));
+    setReward(rollReward(workflow, completedPhaseIndex, random));
     setStage('mixing');
     onRoll(duration);
   }
 
   function reroll(): void {
-    if (stage !== 'result' || usedRerolls >= dice.rerolls) return;
+    if (stage !== 'result' || usedRerolls >= rerolls) return;
     setUsedRerolls((count) => count + 1);
     roll();
   }
 
-  const rerollsLeft = dice.rerolls - usedRerolls;
+  const rerollsLeft = rerolls - usedRerolls;
 
   return (
     <Dialog

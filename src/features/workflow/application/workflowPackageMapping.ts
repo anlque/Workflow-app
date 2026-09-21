@@ -77,13 +77,17 @@ export function serializeWorkflow(workflow: Workflow): unknown {
                 ? {}
                 : { description: side.description }),
               weight: side.probability,
+              availability: side.availability,
             })),
           },
         }),
   };
 }
 
-export function parseWorkflow(value: unknown, version: 1 | 2 | 3): Workflow {
+export function parseWorkflow(
+  value: unknown,
+  version: 1 | 2 | 3 | 4,
+): Workflow {
   try {
     const input = record(value);
     if (!hasExactKeys(input, ['id', 'name', 'phases'], ['rewardDice'])) {
@@ -99,7 +103,7 @@ export function parseWorkflow(value: unknown, version: 1 | 2 | 3): Workflow {
     if (reward !== undefined && !Array.isArray(sideValues)) return invalid();
     const schedule = (() => {
       if (reward === undefined) return undefined;
-      if (version !== 3) {
+      if (version < 3) {
         if (
           !hasExactKeys(
             reward,
@@ -221,10 +225,11 @@ export function parseWorkflow(value: unknown, version: 1 | 2 | 3): Workflow {
               ...(rerolls === undefined ? {} : { rerolls }),
               sides: (sideValues as unknown[]).map((sideValue) => {
                 const side = record(sideValue);
+                const required = ['icon', 'title', 'weight'];
                 if (
                   !hasExactKeys(
                     side,
-                    ['icon', 'title', 'weight'],
+                    version < 4 ? required : [...required, 'availability'],
                     ['description'],
                   )
                 ) {
@@ -236,6 +241,11 @@ export function parseWorkflow(value: unknown, version: 1 | 2 | 3): Workflow {
                   title: string(side['title']),
                   ...(description === undefined ? {} : { description }),
                   weight: number(side['weight']),
+                  availability:
+                    version < 4
+                      ? 'any'
+                      : (string(side['availability']) as
+                          'any' | 'early' | 'late'),
                 };
               }),
             },

@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { createWorkflow } from '@/features/workflow';
 
-import { createSession } from '../domain/Session';
+import { continueRewardSession, createSession } from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
 import { ActiveSessionView } from './ActiveSessionView';
 
@@ -170,6 +170,77 @@ describe('ActiveSessionView', () => {
     expect(screen.getByText('Tea')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(continueReward).toHaveBeenCalledWith(initial.id);
+    vi.useRealTimers();
+  });
+
+  test('uses paused and final opportunity indexes for Side eligibility', () => {
+    vi.useFakeTimers();
+    const eligibleWorkflow = createWorkflow({
+      id: 'eligible-rewards',
+      name: 'Eligible rewards',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'focus', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        schedule: { type: 'custom', phaseIndexes: [0, 1] },
+        sides: [
+          { icon: 'E', title: 'Early reward', availability: 'early' },
+          { icon: 'L', title: 'Late reward', availability: 'late' },
+        ],
+      },
+    });
+    const initial = createSession('eligible-session', eligibleWorkflow, 1_000);
+    const paused = deriveSessionState(initial, 3_000);
+    const rewardInteraction = {
+      onRoll: vi.fn(),
+      continueReward: vi.fn(() => Promise.resolve()),
+    };
+    const firstView = render(
+      <ActiveSessionView
+        session={paused}
+        now={() => 3_000}
+        random={() => 0.5}
+        reducedMotion
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.getByText('Early reward')).toBeVisible();
+    firstView.unmount();
+
+    if (paused.status !== 'paused') throw new Error('Expected Reward pause.');
+    const continued = continueRewardSession(paused, 3_000);
+    const completed = deriveSessionState(continued, 5_000);
+    const finalView = render(
+      <ActiveSessionView
+        session={continued}
+        now={() => 3_000}
+        random={() => 0.5}
+        reducedMotion
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+    finalView.rerender(
+      <ActiveSessionView
+        session={completed}
+        now={() => 5_000}
+        random={() => 0.5}
+        reducedMotion
+        rewardInteraction={rewardInteraction}
+        {...actions}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.getByText('Late reward')).toBeVisible();
     vi.useRealTimers();
   });
 

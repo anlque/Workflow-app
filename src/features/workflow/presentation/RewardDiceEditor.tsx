@@ -1,6 +1,7 @@
 import { Button, Field } from '@/shared';
 
 import type { RewardPhaseType } from '../domain/RewardDice';
+import type { DiceSideAvailability } from '../domain/DiceSide';
 
 import type {
   RewardDiceDraft,
@@ -169,6 +170,24 @@ export function RewardDiceEditor({
                           });
                         }}
                       />
+                    </Field>
+                    <Field
+                      label={`Reward side ${String(index + 1)} availability`}
+                    >
+                      <select
+                        className="select"
+                        value={side.availability}
+                        onChange={(event) => {
+                          onSideChange(side.key, {
+                            availability: event.target
+                              .value as DiceSideAvailability,
+                          });
+                        }}
+                      >
+                        <option value="any">Any</option>
+                        <option value="early">Early</option>
+                        <option value="late">Late</option>
+                      </select>
                     </Field>
                     <Field
                       label={`Reward side ${String(index + 1)} weight`}

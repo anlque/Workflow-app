@@ -60,6 +60,7 @@ export async function resolveWorkflowAssetReferences(
               ...(side.description === undefined
                 ? {}
                 : { description: side.description }),
+              availability: side.availability,
               weight: side.probability,
             })),
           },

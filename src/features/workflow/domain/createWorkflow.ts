@@ -21,6 +21,8 @@ import {
   type Workflow,
 } from './Workflow';
 import { WorkflowValidationError } from './WorkflowErrors';
+import { eligibleDiceSides } from './eligibleDiceSides';
+import { rewardOpportunityPhaseIndexes } from './rewardOpportunityPhaseIndexes';
 
 function createAssetId(value: string): AssetId {
   if (value.trim().length === 0) {
@@ -140,6 +142,18 @@ function validateDiceSide(input: DiceSideInput): void {
 
   if (input.title.trim().length === 0) {
     throw new WorkflowValidationError('Dice Side title must not be empty.');
+  }
+  const availability = (input as Readonly<{ availability?: unknown }>)
+    .availability;
+  if (
+    availability !== undefined &&
+    availability !== 'any' &&
+    availability !== 'early' &&
+    availability !== 'late'
+  ) {
+    throw new WorkflowValidationError(
+      'Dice Side availability must be any, early or late.',
+    );
   }
 }
 
@@ -316,6 +330,7 @@ function createRewardDice(
         ? {}
         : { description: sideInput.description.trim() }),
       probability: (sideInput.weight ?? 1) / totalWeight,
+      availability: sideInput.availability ?? 'any',
     });
 
   const firstSide = createSide(firstInput);
@@ -354,6 +369,17 @@ export function createWorkflow(input: CreateWorkflowInput): Workflow {
     input.rewardDice === undefined
       ? undefined
       : createRewardDice(input.rewardDice, phases.length);
+
+  if (rewardDice !== undefined) {
+    const workflow = { phases, rewardDice };
+    rewardOpportunityPhaseIndexes(workflow).forEach((phaseIndex, index) => {
+      if (eligibleDiceSides(workflow, phaseIndex).length === 0) {
+        throw new WorkflowValidationError(
+          `Reward opportunity ${String(index + 1)} must have at least one eligible Dice Side.`,
+        );
+      }
+    });
+  }
 
   return Object.freeze({
     id: createWorkflowId(input.id),

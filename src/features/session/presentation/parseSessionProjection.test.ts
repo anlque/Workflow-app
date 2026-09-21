@@ -61,10 +61,35 @@ describe('parseSessionProjection', () => {
       throw new Error('Expected projected Reward Dice.');
     }
     delete legacyReward['rerolls'];
+    for (const side of legacyReward['sides'] as Record<string, unknown>[]) {
+      delete side['availability'];
+    }
 
     const restored = parseSessionProjection(legacyProjection);
 
     expect(restored?.snapshot.workflow.rewardDice?.rerolls).toBe(0);
+    expect(
+      restored?.snapshot.workflow.rewardDice?.sides.map(
+        ({ availability }) => availability,
+      ),
+    ).toEqual(['any', 'any']);
+  });
+
+  test('rejects malformed runtime Side availability', () => {
+    const value = structuredClone(
+      createSession('invalid-side', workflowWithReward(), 1_000),
+    ) as unknown as {
+      snapshot: {
+        workflow: { rewardDice: { sides: Record<string, unknown>[] } };
+      };
+    };
+    const firstSide = value.snapshot.workflow.rewardDice.sides[0];
+    if (firstSide === undefined) throw new Error('Expected first Dice Side.');
+    firstSide['availability'] = 'sometimes';
+
+    expect(() => parseSessionProjection(value)).toThrow(
+      'Session projection is invalid.',
+    );
   });
 
   test('reads canonical custom and legacy frequency schedules', () => {

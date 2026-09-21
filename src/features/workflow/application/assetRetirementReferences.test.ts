@@ -48,8 +48,8 @@ function workflow() {
     rewardDice: {
       schedule: { type: 'custom', phaseIndexes: [1] },
       sides: [
-        { icon: 'tea', title: 'Tea' },
-        { icon: 'walk', title: 'Walk' },
+        { icon: 'tea', title: 'Tea', availability: 'early' },
+        { icon: 'walk', title: 'Walk', availability: 'late' },
       ],
     },
   });
@@ -110,6 +110,9 @@ describe('Workflow Asset retirement patches', () => {
       type: 'custom',
       phaseIndexes: [1],
     });
+    expect(
+      saved.rewardDice?.sides.map(({ availability }) => availability),
+    ).toEqual(['early', 'late']);
   });
 
   test('removes every optional direct and Role reference', async () => {
