@@ -20,6 +20,7 @@ export function deriveSessionState(session: Session, now: number): Session {
         sourceWorkflowId: current.sourceWorkflowId,
         snapshot: current.snapshot,
         currentPhaseIndex: current.currentPhaseIndex,
+        rewardCommandReceipts: current.rewardCommandReceipts,
         status: 'transitioning',
         transitionEndsAt: current.phaseEndsAt + 1_000,
       });
@@ -42,6 +43,7 @@ export function deriveSessionState(session: Session, now: number): Session {
         snapshot: current.snapshot,
         currentPhaseIndex:
           nextPhase === undefined ? current.currentPhaseIndex : nextPhaseIndex,
+        rewardCommandReceipts: current.rewardCommandReceipts,
         status: 'paused',
         pauseReason: 'reward',
         pausedAt: current.transitionEndsAt,
@@ -69,6 +71,7 @@ export function deriveSessionState(session: Session, now: number): Session {
         sourceWorkflowId: current.sourceWorkflowId,
         snapshot: current.snapshot,
         currentPhaseIndex: current.currentPhaseIndex,
+        rewardCommandReceipts: current.rewardCommandReceipts,
         status: 'completed',
         completedAt: current.transitionEndsAt,
       });
@@ -80,6 +83,7 @@ export function deriveSessionState(session: Session, now: number): Session {
       sourceWorkflowId: current.sourceWorkflowId,
       snapshot: current.snapshot,
       currentPhaseIndex: nextPhaseIndex,
+      rewardCommandReceipts: current.rewardCommandReceipts,
       status: 'running',
       phaseStartedAt: current.transitionEndsAt,
       phaseEndsAt: current.transitionEndsAt + nextPhase.durationSeconds * 1_000,

@@ -1,4 +1,6 @@
 import {
+  eligibleDiceSides,
+  isRewardDueAfterPhase,
   rollReward,
   type Workflow,
   type WorkflowId,
@@ -21,6 +23,7 @@ type SessionBase = Readonly<{
   sourceWorkflowId: WorkflowId;
   snapshot: SessionSnapshot;
   currentPhaseIndex: number;
+  rewardCommandReceipts: readonly RewardCommandReceipt[];
   rewardRitual?: RewardRitual;
 }>;
 
@@ -28,13 +31,19 @@ export type RewardContinuationTarget =
   | Readonly<{ type: 'phase'; phaseIndex: number }>
   | Readonly<{ type: 'complete' }>;
 
+export type RewardCommandReceipt = Readonly<{
+  commandId: string;
+  type: 'roll' | 'reroll' | 'continue';
+}>;
+
+export const MAX_REWARD_COMMAND_RECEIPTS = 16;
+
 export type RewardRitual = Readonly<{
   id: string;
   completedPhaseIndex: number;
   selectedSideIndex?: number;
   rerollsUsed: number;
   acknowledged: boolean;
-  lastCommandId?: string;
   continuation: RewardContinuationTarget;
 }>;
 
@@ -83,6 +92,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
+      rewardCommandReceipts?: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
       status: 'running';
       phaseStartedAt: number;
@@ -92,6 +102,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
+      rewardCommandReceipts?: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
       status: 'transitioning';
       transitionEndsAt: number;
@@ -100,6 +111,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
+      rewardCommandReceipts?: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
       status: 'paused';
       pauseReason?: 'user' | 'reward';
@@ -110,6 +122,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
+      rewardCommandReceipts?: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
       status: 'completed';
       completedAt: number;
@@ -118,6 +131,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
+      rewardCommandReceipts?: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
       status: 'stopped';
       stoppedAt: number;
@@ -145,6 +159,7 @@ export function createSession(
     sourceWorkflowId: workflow.id,
     snapshot,
     currentPhaseIndex: 0,
+    rewardCommandReceipts: Object.freeze([]),
     status: 'running',
     phaseStartedAt: now,
     phaseEndsAt: now + firstPhase.durationSeconds * 1_000,
@@ -160,18 +175,22 @@ export function restoreSession(input: RestoreSessionInput): Session {
     throw new SessionValidationError('Session current Phase index is invalid.');
   }
 
+  const rewardCommandReceipts = input.rewardCommandReceipts ?? [];
+  validateRewardCommandReceipts(rewardCommandReceipts);
+  if (input.rewardRitual !== undefined) {
+    validateRewardRitual(input, input.rewardRitual, rewardCommandReceipts);
+  }
+
   const base = {
     id: createSessionId(input.id),
     sourceWorkflowId: input.workflow.id,
     snapshot: createSessionSnapshot(input.workflow),
     currentPhaseIndex: input.currentPhaseIndex,
+    rewardCommandReceipts: freezeRewardCommandReceipts(rewardCommandReceipts),
     ...(input.rewardRitual === undefined
       ? {}
-      : { rewardRitual: Object.freeze(input.rewardRitual) }),
+      : { rewardRitual: freezeRewardRitual(input.rewardRitual) }),
   };
-  if (input.status !== 'paused' && input.rewardRitual !== undefined) {
-    validateRewardRitual(input, input.rewardRitual);
-  }
 
   if (input.status === 'running') {
     validateEpochMilliseconds(input.phaseStartedAt);
@@ -212,9 +231,6 @@ export function restoreSession(input: RestoreSessionInput): Session {
             },
           })
         : undefined;
-    if (input.rewardRitual !== undefined) {
-      validateRewardRitual(input, input.rewardRitual);
-    }
     return Object.freeze({
       ...base,
       status: input.status,
@@ -223,7 +239,7 @@ export function restoreSession(input: RestoreSessionInput): Session {
       remainingMilliseconds: input.remainingMilliseconds,
       ...(rewardRitual === undefined
         ? {}
-        : { rewardRitual: Object.freeze(rewardRitual) }),
+        : { rewardRitual: freezeRewardRitual(rewardRitual) }),
     });
   }
   if (input.status === 'transitioning') {
@@ -261,6 +277,7 @@ export function pauseSession(session: Session, now: number): PausedSession {
     sourceWorkflowId: reconciled.sourceWorkflowId,
     snapshot: reconciled.snapshot,
     currentPhaseIndex: reconciled.currentPhaseIndex,
+    rewardCommandReceipts: reconciled.rewardCommandReceipts,
     status: 'paused',
     pauseReason: 'user',
     pausedAt: now,
@@ -279,6 +296,7 @@ export function resumeSession(session: Session, now: number): RunningSession {
     sourceWorkflowId: session.sourceWorkflowId,
     snapshot: session.snapshot,
     currentPhaseIndex: session.currentPhaseIndex,
+    rewardCommandReceipts: session.rewardCommandReceipts,
     status: 'running',
     phaseStartedAt: now,
     phaseEndsAt: now + session.remainingMilliseconds,
@@ -288,6 +306,7 @@ export function resumeSession(session: Session, now: number): RunningSession {
 export function continueRewardSession(
   session: Session,
   now: number,
+  commandId: string,
 ): RunningSession | CompletedSession {
   validateEpochMilliseconds(now);
   if (
@@ -303,9 +322,14 @@ export function continueRewardSession(
       sourceWorkflowId: session.sourceWorkflowId,
       snapshot: session.snapshot,
       currentPhaseIndex: session.currentPhaseIndex,
+      rewardCommandReceipts: appendRewardCommandReceipt(
+        session.rewardCommandReceipts,
+        commandId,
+        'continue',
+      ),
       status: 'completed',
       completedAt: now,
-      rewardRitual: Object.freeze({
+      rewardRitual: freezeRewardRitual({
         ...session.rewardRitual,
         acknowledged: true,
       }),
@@ -316,10 +340,15 @@ export function continueRewardSession(
     sourceWorkflowId: session.sourceWorkflowId,
     snapshot: session.snapshot,
     currentPhaseIndex: session.currentPhaseIndex,
+    rewardCommandReceipts: appendRewardCommandReceipt(
+      session.rewardCommandReceipts,
+      commandId,
+      'continue',
+    ),
     status: 'running',
     phaseStartedAt: now,
     phaseEndsAt: now + session.remainingMilliseconds,
-    rewardRitual: Object.freeze({
+    rewardRitual: freezeRewardRitual({
       ...session.rewardRitual,
       acknowledged: true,
     }),
@@ -360,11 +389,15 @@ function selectReward(
   if (selectedSideIndex < 0) throw new SessionTransitionError();
   return Object.freeze({
     ...session,
-    rewardRitual: Object.freeze({
+    rewardCommandReceipts: appendRewardCommandReceipt(
+      session.rewardCommandReceipts,
+      commandId,
+      reroll ? 'reroll' : 'roll',
+    ),
+    rewardRitual: freezeRewardRitual({
       ...current,
       selectedSideIndex,
       rerollsUsed: current.rerollsUsed + (reroll ? 1 : 0),
-      ...(commandId === undefined ? {} : { lastCommandId: commandId }),
     }),
   });
 }
@@ -388,6 +421,7 @@ export function rerollSessionReward(
 function validateRewardRitual(
   input: RestoreSessionInput,
   ritual: RewardRitual,
+  rewardCommandReceipts: readonly RewardCommandReceipt[],
 ): void {
   const dice = input.workflow.rewardDice;
   const selected = ritual.selectedSideIndex;
@@ -401,6 +435,19 @@ function validateRewardRitual(
       selected >= 0 &&
       dice !== undefined &&
       selected < dice.sides.length);
+  const selectedSide =
+    selected === undefined || dice === undefined
+      ? undefined
+      : dice.sides[selected];
+  const rewardIsDue =
+    validCompleted &&
+    isRewardDueAfterPhase(input.workflow, ritual.completedPhaseIndex);
+  const validEligibility =
+    rewardIsDue &&
+    (selectedSide === undefined ||
+      eligibleDiceSides(input.workflow, ritual.completedPhaseIndex).includes(
+        selectedSide,
+      ));
   const validRerolls =
     dice !== undefined &&
     Number.isInteger(ritual.rerollsUsed) &&
@@ -415,18 +462,73 @@ function validateRewardRitual(
         ritual.continuation.phaseIndex === input.currentPhaseIndex &&
         ritual.continuation.phaseIndex === ritual.completedPhaseIndex + 1 &&
         input.workflow.phases[ritual.continuation.phaseIndex] !== undefined;
+  const validState =
+    input.status === 'paused'
+      ? input.pauseReason === 'reward' && !ritual.acknowledged
+      : input.status === 'running'
+        ? ritual.acknowledged && ritual.continuation.type === 'phase'
+        : input.status === 'completed'
+          ? ritual.acknowledged && ritual.continuation.type === 'complete'
+          : false;
   if (
     !validCompleted ||
     ritual.id !== `${input.id}:${String(ritual.completedPhaseIndex)}` ||
     !validSelected ||
+    !validEligibility ||
     !validRerolls ||
     !validTarget ||
-    (input.status === 'paused' && ritual.acknowledged) ||
+    !validState ||
     (ritual.acknowledged && selected === undefined) ||
-    ritual.lastCommandId?.trim() === ''
+    (ritual.acknowledged &&
+      !rewardCommandReceipts.some(({ type }) => type === 'continue'))
   ) {
     throw new SessionValidationError('Session Reward ritual is invalid.');
   }
+}
+
+function validateRewardCommandReceipts(
+  receipts: readonly RewardCommandReceipt[],
+): void {
+  if (
+    receipts.length > MAX_REWARD_COMMAND_RECEIPTS ||
+    new Set(receipts.map(({ commandId }) => commandId)).size !==
+      receipts.length ||
+    receipts.some((receipt) => {
+      const type: unknown = receipt.type;
+      return (
+        receipt.commandId.trim() === '' ||
+        (type !== 'roll' && type !== 'reroll' && type !== 'continue')
+      );
+    })
+  ) {
+    throw new SessionValidationError('Session Reward receipts are invalid.');
+  }
+}
+
+function appendRewardCommandReceipt(
+  receipts: readonly RewardCommandReceipt[],
+  commandId: string | undefined,
+  type: RewardCommandReceipt['type'],
+): readonly RewardCommandReceipt[] {
+  if (commandId === undefined) return receipts;
+  return freezeRewardCommandReceipts(
+    [...receipts, { commandId, type }].slice(-MAX_REWARD_COMMAND_RECEIPTS),
+  );
+}
+
+function freezeRewardRitual(ritual: RewardRitual): RewardRitual {
+  return Object.freeze({
+    ...ritual,
+    continuation: Object.freeze({ ...ritual.continuation }),
+  });
+}
+
+function freezeRewardCommandReceipts(
+  receipts: readonly RewardCommandReceipt[],
+): readonly RewardCommandReceipt[] {
+  return Object.freeze(
+    receipts.map((receipt) => Object.freeze({ ...receipt })),
+  );
 }
 
 export function stopSession(session: Session, now: number): StoppedSession {
@@ -440,6 +542,7 @@ export function stopSession(session: Session, now: number): StoppedSession {
     sourceWorkflowId: reconciled.sourceWorkflowId,
     snapshot: reconciled.snapshot,
     currentPhaseIndex: reconciled.currentPhaseIndex,
+    rewardCommandReceipts: reconciled.rewardCommandReceipts,
     status: 'stopped',
     stoppedAt: now,
   });

@@ -258,9 +258,7 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
   await expect(reward).toBeVisible({ timeout: 15_000 });
   const sidePanel = await context.newPage();
   await sidePanel.goto(extensionUrls.sidePanel);
-  await expect(
-    sidePanel.getByText('Reward pending — open focus view'),
-  ).toBeVisible();
+  await expect(sidePanel.getByText('Reward pending')).toBeVisible();
   await expect(sidePanel.getByRole('button', { name: 'Resume' })).toHaveCount(
     0,
   );

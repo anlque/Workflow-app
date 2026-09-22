@@ -1,7 +1,7 @@
 import {
   rerollSessionReward,
   rollSessionReward,
-  type PausedSession,
+  type Session,
 } from '../domain/Session';
 import { loadSession } from './loadSession';
 import type { SessionRepository } from './SessionRepository';
@@ -12,12 +12,13 @@ export async function rollSessionRewardUseCase(
   random: () => number,
   reroll = false,
   commandId?: string,
-): Promise<PausedSession> {
+): Promise<Session> {
   const current = await loadSession(repository, sessionId);
   if (
     commandId !== undefined &&
-    current.status === 'paused' &&
-    current.rewardRitual?.lastCommandId === commandId
+    current.rewardCommandReceipts.some(
+      (receipt) => receipt.commandId === commandId,
+    )
   ) {
     return current;
   }

@@ -71,7 +71,7 @@ describe('DexieSessionRepository', () => {
       createSession('reward-session', rewarded, 1_000),
       3_000,
     );
-    const rolled = rollSessionReward(paused, () => 0.99);
+    const rolled = rollSessionReward(paused, () => 0.99, 'roll-1');
     await repository.save(rolled);
 
     await expect(repository.get(rolled.id)).resolves.toEqual(rolled);
@@ -85,17 +85,34 @@ describe('DexieSessionRepository', () => {
           selectedSideIndex: 1,
           rerollsUsed: 0,
         },
+        rewardCommandReceipts: [{ commandId: 'roll-1', type: 'roll' }],
       },
     });
-    const corrupt = structuredClone(
-      await store.table<SessionRecord, string>('sessions').get(rolled.id),
-    ) as { session: { rewardRitual: { selectedSideIndex: number } } };
+    const validRecord = await store
+      .table<SessionRecord, string>('sessions')
+      .get(rolled.id);
+    const corrupt = structuredClone(validRecord) as {
+      session: { rewardRitual: { selectedSideIndex: number } };
+    };
     corrupt.session.rewardRitual.selectedSideIndex = 99;
     await store
       .table<SessionRecord, string>('sessions')
       .put(corrupt as unknown as SessionRecord);
     await expect(repository.get(rolled.id)).rejects.toThrow(
       'Session Reward ritual is invalid.',
+    );
+
+    const invalidReceipt = structuredClone(validRecord) as {
+      session: { rewardCommandReceipts: { type: string }[] };
+    };
+    const receipt = invalidReceipt.session.rewardCommandReceipts[0];
+    if (receipt === undefined) throw new Error('Expected Reward receipt.');
+    receipt.type = 'unknown';
+    await store
+      .table<SessionRecord, string>('sessions')
+      .put(invalidReceipt as unknown as SessionRecord);
+    await expect(repository.get(rolled.id)).rejects.toThrow(
+      'Stored Session record is invalid.',
     );
   });
   test.each([

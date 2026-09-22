@@ -230,7 +230,7 @@ function parseRewardRitual(value: unknown) {
         'acknowledged',
         'continuation',
       ],
-      ['selectedSideIndex', 'lastCommandId'],
+      ['selectedSideIndex'],
     ) ||
     typeof ritual['acknowledged'] !== 'boolean'
   )
@@ -253,11 +253,20 @@ function parseRewardRitual(value: unknown) {
       : { selectedSideIndex: number(ritual['selectedSideIndex']) }),
     rerollsUsed: number(ritual['rerollsUsed']),
     acknowledged: ritual['acknowledged'],
-    ...(ritual['lastCommandId'] === undefined
-      ? {}
-      : { lastCommandId: string(ritual['lastCommandId']) }),
     continuation: parsedContinuation,
   };
+}
+
+function parseRewardCommandReceipts(value: unknown) {
+  if (!Array.isArray(value)) return invalid();
+  return value.map((entry) => {
+    const receipt = record(entry);
+    if (!hasExactKeys(receipt, ['commandId', 'type'])) return invalid();
+    const type = receipt['type'];
+    if (type !== 'roll' && type !== 'reroll' && type !== 'continue')
+      return invalid();
+    return { commandId: string(receipt['commandId']), type } as const;
+  });
 }
 
 export function mapSessionRecord(value: unknown): Session {
@@ -279,10 +288,15 @@ export function mapSessionRecord(value: unknown): Session {
     outer['schemaVersion'] < 5
       ? undefined
       : parseRewardRitual(stored['rewardRitual']);
+  const rewardCommandReceipts =
+    outer['schemaVersion'] < 5
+      ? []
+      : parseRewardCommandReceipts(stored['rewardCommandReceipts']);
   const common = {
     id: string(stored['id']),
     workflow: parseWorkflow(stored['workflow'], outer['schemaVersion']),
     currentPhaseIndex: number(stored['currentPhaseIndex']),
+    rewardCommandReceipts,
     ...(rewardRitual === undefined ? {} : { rewardRitual }),
   };
 
@@ -360,6 +374,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
       id: session.id,
       workflow: session.snapshot.workflow,
       currentPhaseIndex: session.currentPhaseIndex,
+      rewardCommandReceipts: session.rewardCommandReceipts,
       status: session.status,
       ...(session.rewardRitual === undefined
         ? {}

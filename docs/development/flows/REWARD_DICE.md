@@ -45,7 +45,9 @@ Phase index; it is not a timer or random event.
    authoritative Reward pause with a `complete` continuation target.
 2. Any newly opened Session surface reconstructs the dialog from that state.
 3. Focus plays the distinct reward-unlocked cue. The ordinary completion cue is
-   delayed until Continue persists the Completed transition.
+   emitted only when Continue persists the Completed transition. Both cues are
+   derived from authoritative projection transitions, regardless of which
+   surface sends Continue; remount and roll/reroll updates do not replay Reward.
 
 ### Roll, Reroll and Continue
 
@@ -69,7 +71,9 @@ Phase index; it is not a timer or random event.
    the stored `complete` target and only then reveals Completed state.
 
 The selected Dice Side and reroll history are Session Domain state. They are
-stored and broadcast as part of the authoritative projection.
+stored and broadcast as part of the authoritative projection. Session-level
+bounded receipt history makes retained roll, reroll and continue command IDs
+no-ops after a background restart and later Phase transitions.
 
 ## Authoritative Changes
 
@@ -97,8 +101,10 @@ complete authoritative projection.
 
 Session record v5 persists `pauseReason: 'reward'`, the opportunity identity,
 completed Phase index, selected Side index, rerolls used, acknowledgment and
-the `phase | complete` continuation target. Versions 1–4 remain readable and
-restore their historical state without inventing a selected result.
+the `phase | complete` continuation target plus Session-level bounded command
+receipts.
+Versions 1–4 remain readable and restore their historical state without
+inventing a selected result.
 
 ## Failure and Recovery
 
@@ -117,7 +123,9 @@ restore their historical state without inventing a selected result.
 - weighted selection and random bounds: `src/features/workflow/domain/rollReward.test.ts`.
 - Reward pause/continue transitions: `src/features/session/domain/Session.test.ts`
   and `application/sessionUseCases.test.ts`.
-- opportunity detection/restoration: `src/features/session/presentation/rewardTransitions.test.ts`.
+- opportunity restoration and projection cue transitions:
+  `src/features/session/infrastructure/DexieSessionRepository.test.ts` and
+  `src/app/focus/completionCue.test.ts`.
 - click-to-roll, durations and rerolls: `RewardResultDialog.test.tsx`.
 - assembled dialog and final Continue behavior: `ActiveSessionView.test.tsx`.
 - audio sequencing: `src/app/focus/createUiSoundPlayer.test.ts`,

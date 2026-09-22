@@ -104,4 +104,51 @@ describe('RewardResultDialog', () => {
     );
     expect(screen.getByRole('button', { name: 'Roll dice' })).toBeEnabled();
   });
+
+  test('keeps Continue pending and prevents duplicate acknowledgment', async () => {
+    let resolveContinue: (() => void) | undefined;
+    const onContinue = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveContinue = resolve;
+        }),
+    );
+    render(
+      <RewardResultDialog
+        reward={side ?? null}
+        usedRerolls={0}
+        rerolls={0}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={onContinue}
+      />,
+    );
+    const button = screen.getByRole('button', { name: 'Continue' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(onContinue).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Continuing…' })).toBeDisabled();
+    await act(async () => {
+      resolveContinue?.();
+      await Promise.resolve();
+    });
+  });
+
+  test('moves focus to Continue when the final reroll is exhausted', () => {
+    render(
+      <RewardResultDialog
+        reward={side ?? null}
+        usedRerolls={1}
+        rerolls={1}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus();
+  });
 });

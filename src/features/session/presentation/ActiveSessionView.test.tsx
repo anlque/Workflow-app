@@ -98,6 +98,24 @@ describe('ActiveSessionView', () => {
     expect(callbacks.rollReward).toHaveBeenCalledWith(paused.id);
   });
 
+  test('requests authoritative Continue for a hydrated result', () => {
+    const paused = deriveSessionState(
+      createSession('session-1', workflow, 1_000),
+      3_000,
+    );
+    const rolled = rollSessionReward(paused, () => 0, 'roll-1');
+    const callbacks = interaction();
+    render(
+      <ActiveSessionView
+        session={rolled}
+        rewardInteraction={callbacks}
+        {...actions}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(callbacks.continueReward).toHaveBeenCalledWith(paused.id);
+  });
+
   test('keeps a final Reward visible before acknowledgment', () => {
     const finalWorkflow = createWorkflow({
       ...workflow,

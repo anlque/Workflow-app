@@ -150,10 +150,7 @@ export function FocusApp({
     [dependencies],
   );
 
-  const scheduleCompletionReveal = useCompletionCue(
-    projection.session,
-    dependencies.sounds,
-  );
+  useCompletionCue(projection.session, dependencies.sounds);
 
   if (projection.connection === 'connecting') {
     return <p role="status">Connecting to your session…</p>;
@@ -247,7 +244,6 @@ export function FocusApp({
           session={session}
           reducedMotion={reducedMotion}
           onPhaseBoundary={dependencies.sounds.playBell}
-          onFinalRewardContinued={scheduleCompletionReveal}
           rewardInteraction={{
             onRoll: dependencies.sounds.playDiceRoll,
             rollReward: dependencies.rollReward,

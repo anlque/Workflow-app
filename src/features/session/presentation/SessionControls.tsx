@@ -48,9 +48,7 @@ export function SessionControls({
   }
 
   if (session.status === 'paused' && session.pauseReason === 'reward') {
-    return (
-      <p className="session-reward-pending">Reward pending — open focus view</p>
-    );
+    return <p className="session-reward-pending">Reward pending</p>;
   }
 
   return (

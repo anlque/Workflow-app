@@ -8,6 +8,7 @@ import {
   getRemainingSeconds,
   pauseSession,
   rerollSessionReward,
+  restoreSession,
   resumeSession,
   rollSessionReward,
   stopSession,
@@ -66,12 +67,14 @@ describe('Session', () => {
       rewardRitual: { selectedSideIndex: 1, rerollsUsed: 1 },
     });
     expect(() => rerollSessionReward(rerolled, () => 0)).toThrow();
-    expect(continueRewardSession(rerolled, 20_000)).toMatchObject({
-      status: 'running',
-      currentPhaseIndex: 1,
-      phaseEndsAt: 25_000,
-      rewardRitual: { acknowledged: true, selectedSideIndex: 1 },
-    });
+    expect(continueRewardSession(rerolled, 20_000, 'continue-1')).toMatchObject(
+      {
+        status: 'running',
+        currentPhaseIndex: 1,
+        phaseEndsAt: 25_000,
+        rewardRitual: { acknowledged: true, selectedSideIndex: 1 },
+      },
+    );
   });
 
   test('keeps a final Reward actionable until it is rolled and acknowledged', () => {
@@ -97,11 +100,12 @@ describe('Session', () => {
       pauseReason: 'reward',
       rewardRitual: { continuation: { type: 'complete' } },
     });
-    expect(() => continueRewardSession(paused, 20_000)).toThrow();
+    expect(() => continueRewardSession(paused, 20_000, 'continue-1')).toThrow();
     expect(
       continueRewardSession(
         rollSessionReward(paused, () => 0),
         20_000,
+        'continue-2',
       ),
     ).toMatchObject({
       status: 'completed',
@@ -390,8 +394,9 @@ describe('Session', () => {
     );
 
     const continued = continueRewardSession(
-      rollSessionReward(paused, () => 0),
+      rollSessionReward(paused, () => 0, 'roll-1'),
       20_000,
+      'continue-1',
     );
 
     expect(continued).toMatchObject({
@@ -400,12 +405,120 @@ describe('Session', () => {
       phaseStartedAt: 20_000,
       phaseEndsAt: 25_000,
     });
+    expect(Object.isFrozen(continued.rewardRitual)).toBe(true);
+    expect(Object.isFrozen(continued.rewardRitual?.continuation)).toBe(true);
+    expect(Object.isFrozen(continued.rewardCommandReceipts)).toBe(true);
+    expect(Object.isFrozen(continued.rewardCommandReceipts[0])).toBe(true);
     expect(() =>
       continueRewardSession(
         pauseSession(createSession('session-2', workflow(), 1_000), 2_000),
         3_000,
+        'continue-2',
       ),
     ).toThrow('Session transition is not valid for its current state.');
+  });
+
+  test('rejects rituals that contradict canonical v5 Session state', () => {
+    const rewarded = createWorkflow({
+      id: 'strict-ritual',
+      name: 'Strict ritual',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'a', title: 'A' },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('strict-session', rewarded, 1_000),
+      3_000,
+    );
+    if (paused.status !== 'paused' || paused.rewardRitual === undefined) {
+      throw new Error('Expected Reward pause.');
+    }
+    const rewardRitual = paused.rewardRitual;
+    const common = {
+      id: paused.id,
+      workflow: paused.snapshot.workflow,
+      currentPhaseIndex: paused.currentPhaseIndex,
+      rewardRitual,
+    };
+
+    expect(() =>
+      restoreSession({
+        ...common,
+        status: 'paused',
+        pauseReason: 'user',
+        pausedAt: 3_000,
+        remainingMilliseconds: 1_000,
+      }),
+    ).toThrow('Session Reward ritual is invalid.');
+    expect(() =>
+      restoreSession({
+        ...common,
+        status: 'transitioning',
+        transitionEndsAt: 4_000,
+      }),
+    ).toThrow('Session Reward ritual is invalid.');
+    expect(() =>
+      restoreSession({ ...common, status: 'stopped', stoppedAt: 4_000 }),
+    ).toThrow('Session Reward ritual is invalid.');
+    expect(() =>
+      restoreSession({
+        ...common,
+        status: 'running',
+        phaseStartedAt: 4_000,
+        phaseEndsAt: 5_000,
+      }),
+    ).toThrow('Session Reward ritual is invalid.');
+  });
+
+  test('rejects a restored Side that is ineligible for its Reward opportunity', () => {
+    const rewarded = createWorkflow({
+      id: 'eligible-ritual',
+      name: 'Eligible ritual',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+        { type: 'focus', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        schedule: { type: 'custom', phaseIndexes: [0, 2] },
+        sides: [
+          { icon: 'a', title: 'Early', availability: 'early' },
+          { icon: 'b', title: 'Late', availability: 'late' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('eligible-session', rewarded, 1_000),
+      3_000,
+    );
+    if (paused.status !== 'paused' || paused.rewardRitual === undefined) {
+      throw new Error('Expected Reward pause.');
+    }
+    const rewardRitual = paused.rewardRitual;
+
+    expect(() =>
+      restoreSession({
+        id: paused.id,
+        workflow: paused.snapshot.workflow,
+        currentPhaseIndex: paused.currentPhaseIndex,
+        status: 'paused',
+        pauseReason: 'reward',
+        pausedAt: paused.pausedAt,
+        remainingMilliseconds: paused.remainingMilliseconds,
+        rewardRitual: {
+          ...rewardRitual,
+          selectedSideIndex: 1,
+        },
+      }),
+    ).toThrow('Session Reward ritual is invalid.');
   });
 
   test('rejects ordinary commands while transitioning and Resume for a Reward pause', () => {

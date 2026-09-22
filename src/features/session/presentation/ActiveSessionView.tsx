@@ -9,10 +9,8 @@ import { formatSessionCountdown } from './sessionCountdown';
 export type ActiveSessionViewProps = Readonly<{
   session: Session;
   now?: () => number;
-  random?: () => number;
   reducedMotion?: boolean;
   onPhaseBoundary?(): void;
-  onFinalRewardContinued?(): void;
   rewardInteraction?: Readonly<{
     onRoll(durationMs: 600 | 2500): void;
     rollReward?(id: SessionId): Promise<void>;
@@ -30,7 +28,6 @@ export function ActiveSessionView({
   now = systemNow,
   reducedMotion = false,
   onPhaseBoundary,
-  onFinalRewardContinued,
   rewardInteraction,
   onPause,
   onResume,
@@ -85,11 +82,7 @@ export function ActiveSessionView({
         requestReroll={() =>
           rewardInteraction.rerollReward?.(session.id) ?? Promise.resolve()
         }
-        onContinue={async () => {
-          const isFinalReward = ritual.continuation.type === 'complete';
-          await rewardInteraction.continueReward(session.id);
-          if (isFinalReward) onFinalRewardContinued?.();
-        }}
+        onContinue={() => rewardInteraction.continueReward(session.id)}
       />
     );
 

@@ -134,9 +134,8 @@ Transitioning:
 7. The loop continues, allowing one late wake-up to cross multiple elapsed
    boundaries, but stops at the first Reward pause.
 
-The final Phase completes before the non-final Reward-pause branch is considered.
-Therefore an eligible final Reward is a Presentation opportunity over an already
-Completed Session, not another authoritative Session state.
+An eligible final Reward is also an authoritative Reward pause. Its continuation
+target is `complete`, so the Session becomes Completed only after acknowledgment.
 
 ### Pause, Continue and Stop
 
@@ -223,7 +222,7 @@ interval only refreshes `now`; it does not decrement or persist Session state.
 
 - shows Pause for Running;
 - shows Resume only for user-paused state;
-- replaces controls with **Reward pending — open focus view** for a Reward pause;
+- replaces controls with **Reward pending** for a Reward pause;
 - hides all controls during Transitioning and terminal states;
 - confirms Stop in a Dialog and reports command errors.
 
@@ -249,8 +248,11 @@ Rerolls used and the selected Dice Side are authoritative Session ritual state;
 the dialog keeps only animation and transient error state. Reward opportunity
 identity and its `phase | complete` continuation target are persisted so reload
 or cross-surface hydration cannot select again or lose a final Reward.
-The ritual is persisted and broadcast. Reopening a Reward pause hydrates the
-same selected result and used-reroll count.
+The ritual is persisted and broadcast. Session also carries a bounded history
+of handled roll, reroll and continue command IDs across later state transitions,
+so retrying a retained ID after worker restart performs no randomness, write or
+reroll consumption. Reopening a Reward pause hydrates the same selected result
+and used-reroll count.
 
 ### Final Reward
 
@@ -307,7 +309,7 @@ A final Reward is reconstructed from persisted Session state after any reload.
 | Countdown derivation | `presentation/sessionCountdown.test.ts` |
 | Controls and Reward-pause restriction | `presentation/SessionControls.test.tsx` |
 | Boundary observation and active view | `presentation/didCrossPhaseBoundary.test.ts`, `ActiveSessionView.test.tsx` |
-| Reward transition detection, rolls/rerolls/reduced motion/failure | `presentation/rewardTransitions.test.ts`, `RewardResultDialog.test.tsx` |
+| Reward rolls/rerolls/reduced motion/failure and projection-driven cues | `presentation/RewardResultDialog.test.tsx`, `src/app/focus/completionCue.test.ts` |
 | Background authority, messages, alarms and command idempotency | `src/app/background/createSessionCoordinator.test.ts` |
 | Assembled execution/restoration | `tests/e2e/workflowExecution.spec.ts`, `sessionRestoration.spec.ts` |
 

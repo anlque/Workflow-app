@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
-import { createSession, deriveSessionState } from '@/features/session';
+import {
+  createSession,
+  deriveSessionState,
+  rollSessionReward,
+} from '@/features/session';
 import { createWorkflow } from '@/features/workflow';
 
 import { completionCue } from './completionCue';
@@ -33,11 +37,19 @@ describe('completionCue', () => {
     expect(completionCue(completed, completed)).toBeNull();
   });
 
-  test('uses the Reward cue for an eligible final completion', () => {
+  test('uses the Reward cue only when entering the final opportunity', () => {
     const initial = createSession('session-1', workflow(true), 1_000);
     const completed = deriveSessionState(initial, 3_000);
 
     expect(completionCue(initial, completed)).toBe('reward');
+    expect(completionCue(completed, completed)).toBeNull();
+    expect(
+      completionCue(
+        completed,
+        rollSessionReward(completed, () => 0, 'roll-1'),
+      ),
+    ).toBeNull();
+    expect(completionCue(null, completed)).toBeNull();
   });
 
   test('ignores unrelated Session changes', () => {

@@ -93,7 +93,7 @@ describe('SessionControls', () => {
 
     render(<SessionControls session={rewardPaused} {...callbacks()} />);
 
-    expect(screen.getByText('Reward pending — open focus view')).toBeVisible();
+    expect(screen.getByText('Reward pending')).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Resume' }),
     ).not.toBeInTheDocument();

@@ -3,7 +3,9 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
   createSession,
+  continueRewardSession,
   deriveSessionState,
+  rollSessionReward,
   type Session,
 } from '@/features/session';
 import { createWorkflow } from '@/features/workflow';
@@ -100,9 +102,10 @@ describe('useCompletionCue', () => {
       playSessionComplete: vi.fn(),
       playRewardUnlocked: vi.fn(),
     };
-    const { result, rerender } = renderHook(
-      ({ session }: Readonly<{ session: Session }>) =>
-        useCompletionCue(session, sounds),
+    const { rerender } = renderHook(
+      ({ session }: Readonly<{ session: Session }>) => {
+        useCompletionCue(session, sounds);
+      },
       { initialProps: { session: initial as Session } },
     );
 
@@ -113,8 +116,13 @@ describe('useCompletionCue', () => {
     expect(sounds.playRewardUnlocked).toHaveBeenCalledOnce();
     expect(sounds.playSessionComplete).not.toHaveBeenCalled();
 
+    const acknowledged = continueRewardSession(
+      rollSessionReward(completed, () => 0, 'roll-1'),
+      4_000,
+      'continue-1',
+    );
+    rerender({ session: acknowledged });
     act(() => {
-      result.current();
       vi.advanceTimersByTime(999);
     });
     expect(sounds.playSessionComplete).not.toHaveBeenCalled();
@@ -122,6 +130,60 @@ describe('useCompletionCue', () => {
     act(() => {
       vi.advanceTimersByTime(1);
     });
+    expect(sounds.playSessionComplete).toHaveBeenCalledOnce();
+  });
+
+  test('does not cancel the one-shot Reward cue when roll updates the ritual', () => {
+    vi.useFakeTimers();
+    const initial = createSession('session-1', rewardedWorkflow, 1_000);
+    const paused = deriveSessionState(initial, 3_000);
+    const sounds = {
+      playSessionComplete: vi.fn(),
+      playRewardUnlocked: vi.fn(),
+    };
+    const { rerender } = renderHook(
+      ({ session }: Readonly<{ session: Session }>) => {
+        useCompletionCue(session, sounds);
+      },
+      { initialProps: { session: initial as Session } },
+    );
+
+    rerender({ session: paused });
+    rerender({ session: rollSessionReward(paused, () => 0, 'roll-1') });
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(sounds.playRewardUnlocked).toHaveBeenCalledOnce();
+  });
+
+  test('queues completion without replacing the pending Reward cue', () => {
+    vi.useFakeTimers();
+    const initial = createSession('session-1', rewardedWorkflow, 1_000);
+    const paused = deriveSessionState(initial, 3_000);
+    const completed = continueRewardSession(
+      rollSessionReward(paused, () => 0, 'roll-1'),
+      4_000,
+      'continue-1',
+    );
+    const sounds = {
+      playSessionComplete: vi.fn(),
+      playRewardUnlocked: vi.fn(),
+    };
+    const { rerender } = renderHook(
+      ({ session }: Readonly<{ session: Session }>) => {
+        useCompletionCue(session, sounds);
+      },
+      { initialProps: { session: initial as Session } },
+    );
+
+    rerender({ session: paused });
+    rerender({ session: completed });
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(sounds.playRewardUnlocked).toHaveBeenCalledOnce();
     expect(sounds.playSessionComplete).toHaveBeenCalledOnce();
   });
 });

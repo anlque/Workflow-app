@@ -17,6 +17,7 @@ import {
 import { createWorkflowId, type WorkflowRepository } from '@/features/workflow';
 
 const SESSION_PHASE_ALARM = 'locusora.session-phase';
+const MAX_HANDLED_COMMANDS = 64;
 
 export type SessionCoordinatorDependencies = Readonly<{
   workflows: WorkflowRepository;
@@ -82,6 +83,7 @@ export function createSessionCoordinator({
         sessions,
         clock,
         command.sessionId,
+        command.commandId,
       );
     } else if (
       command.type === 'session/roll-reward' ||
@@ -110,6 +112,10 @@ export function createSessionCoordinator({
       () => undefined,
     );
     handledCommands.set(command.commandId, pending);
+    if (handledCommands.size > MAX_HANDLED_COMMANDS) {
+      const oldest = handledCommands.keys().next().value;
+      if (oldest !== undefined) handledCommands.delete(oldest);
+    }
     return pending;
   }
 

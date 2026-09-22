@@ -411,7 +411,7 @@ describe('FocusApp', () => {
       return Promise.resolve();
     });
     vi.mocked(deps.continueReward).mockImplementation(() => {
-      publish?.(continueRewardSession(rolled, 4_000));
+      publish?.(continueRewardSession(rolled, 4_000, 'continue-1'));
       return Promise.resolve();
     });
     render(<FocusApp dependencies={deps} />);

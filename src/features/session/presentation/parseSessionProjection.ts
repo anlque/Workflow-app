@@ -62,7 +62,7 @@ function rewardRitual(value: unknown) {
         'acknowledged',
         'continuation',
       ],
-      ['selectedSideIndex', 'lastCommandId'],
+      ['selectedSideIndex'],
     ) ||
     typeof input['acknowledged'] !== 'boolean'
   )
@@ -85,11 +85,21 @@ function rewardRitual(value: unknown) {
       : { selectedSideIndex: number(input['selectedSideIndex']) }),
     rerollsUsed: number(input['rerollsUsed']),
     acknowledged: input['acknowledged'],
-    ...(input['lastCommandId'] === undefined
-      ? {}
-      : { lastCommandId: string(input['lastCommandId']) }),
     continuation: target,
   };
+}
+
+function rewardCommandReceipts(value: unknown) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return invalid();
+  return value.map((entry) => {
+    const receipt = record(entry);
+    if (!hasExactKeys(receipt, ['commandId', 'type'])) return invalid();
+    const type = receipt['type'];
+    if (type !== 'roll' && type !== 'reroll' && type !== 'continue')
+      return invalid();
+    return { commandId: string(receipt['commandId']), type } as const;
+  });
 }
 
 function hasExactKeys(
@@ -233,6 +243,9 @@ export function parseSessionProjection(value: unknown): Session | null {
     id: string(input['id']),
     workflow: workflow(snapshot['workflow']),
     currentPhaseIndex: number(input['currentPhaseIndex']),
+    rewardCommandReceipts: rewardCommandReceipts(
+      input['rewardCommandReceipts'],
+    ),
     ...(ritual === undefined ? {} : { rewardRitual: ritual }),
   };
   const status = input['status'];
