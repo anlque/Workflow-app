@@ -54,11 +54,22 @@ export function parseSessionCommand(value: unknown): SessionCommand {
   }
 
   if (
+    (type === 'session/roll-reward' ||
+      type === 'session/reroll-reward' ||
+      type === 'session/continue-reward') &&
+    hasExactKeys(record, ['type', 'commandId', 'sessionId', 'rewardRitualId'])
+  ) {
+    return Object.freeze({
+      type,
+      commandId,
+      sessionId: nonEmptyString(record['sessionId']),
+      rewardRitualId: nonEmptyString(record['rewardRitualId']),
+    });
+  }
+
+  if (
     (type === 'session/pause' ||
       type === 'session/resume' ||
-      type === 'session/roll-reward' ||
-      type === 'session/reroll-reward' ||
-      type === 'session/continue-reward' ||
       type === 'session/stop') &&
     hasExactKeys(record, ['type', 'commandId', 'sessionId'])
   ) {

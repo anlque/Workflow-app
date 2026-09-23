@@ -30,9 +30,9 @@ export type FocusDependencies = Readonly<{
   sessions: SessionProjectionClient;
   pause(id: SessionId): Promise<void>;
   resume(id: SessionId): Promise<void>;
-  continueReward(id: SessionId): Promise<void>;
-  rollReward(id: SessionId): Promise<void>;
-  rerollReward(id: SessionId): Promise<void>;
+  continueReward(id: SessionId, rewardRitualId: string): Promise<void>;
+  rollReward(id: SessionId, rewardRitualId: string): Promise<void>;
+  rerollReward(id: SessionId, rewardRitualId: string): Promise<void>;
   stop(id: SessionId): Promise<void>;
   loadAssetUrl(id: AssetId): Promise<string | null>;
   releaseAssetUrl(url: string): void;

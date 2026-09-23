@@ -13,8 +13,8 @@ The catalog lists every current application runtime message exactly once.
 | `session/start` | Focus or side panel → background | Non-empty `commandId`; non-empty `workflowId` | `{ type, commandId, workflowId }` | `parseSessionCommand` → `ChromeMessageBus.onSessionCommand` → coordinator loads Workflow and calls `startSessionUseCase` | `{ ok: true, result: Session }` or `{ ok: false, error: string }`; client validates `result` as Session | Successful change also emits `session/changed` | Yes, within the current worker instance |
 | `session/pause` | Focus or side panel → background | Non-empty `commandId`; non-empty `sessionId` | `{ type, commandId, sessionId }` | `parseSessionCommand` → command bus → `pauseSessionUseCase` | Same normalized command response | Successful change also emits `session/changed` | Yes, within the current worker instance |
 | `session/resume` | Focus or side panel → background | Non-empty `commandId`; non-empty `sessionId` | `{ type, commandId, sessionId }` | `parseSessionCommand` → command bus → `resumeSessionUseCase` | Same normalized command response | Successful change also emits `session/changed` | Yes, within the current worker instance |
-| `session/continue-reward` | Focus or Side Panel → background | Non-empty `commandId`; non-empty `sessionId` | `{ type, commandId, sessionId }` | `parseSessionCommand` → command bus → `continueRewardSessionUseCase` | Same normalized command response | Successful change also emits `session/changed` | Yes; retained IDs are persisted in Session-level history |
-| `session/roll-reward` / `session/reroll-reward` | Focus or Side Panel → background | Non-empty `commandId`; non-empty `sessionId` | `{ type, commandId, sessionId }` | Exact parser → serialized coordinator → authoritative Reward use case with injected randomness | Updated Session projection | Successful change emits `session/changed` | Yes; retained IDs survive worker restart and distinct commands are serialized |
+| `session/continue-reward` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId`, `rewardRitualId` | `{ type, commandId, sessionId, rewardRitualId }` | `parseSessionCommand` → command bus → `continueRewardSessionUseCase` | Same normalized command response | Successful change also emits `session/changed` | Yes; exact fingerprints are persisted in Session-level history |
+| `session/roll-reward` / `session/reroll-reward` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId`, `rewardRitualId` | `{ type, commandId, sessionId, rewardRitualId }` | Exact parser → serialized coordinator → authoritative Reward use case with injected randomness | Updated Session projection | Successful change emits `session/changed` | Yes; exact fingerprints survive worker restart and distinct commands are serialized |
 | `session/stop` | Focus or side panel → background | Non-empty `commandId`; non-empty `sessionId` | `{ type, commandId, sessionId }` | `parseSessionCommand` → command bus → `stopSessionUseCase` | Same normalized command response | Successful change also emits `session/changed` | Yes, within the current worker instance |
 | `session/get-active` | Focus or side panel → background | Non-empty `requestId` | `{ type, requestId }` | `parseActiveSessionRequest` → `ChromeMessageBus.onActiveSessionRequest` → `getActiveSessionUseCase` | `{ ok: true, result: Session \| null }` or `{ ok: false, error: string }`; client validates result | No | No; `requestId` identifies the request but is not stored in the command map |
 | `session/changed` | Background → extension runtime listeners | None | `{ type, session: unknown }`, where Session may be `null` | `ChromeSessionClient.subscribe` first filters `type`, then `parseSessionProjection` validates the payload before replacing a store | No application response contract | Yes; all contexts may observe it, only Session clients consume it | No |
@@ -40,7 +40,8 @@ the background listener.
 - a supported command `type`;
 - a non-empty `commandId`;
 - exactly `type`, `commandId` and `workflowId` for `session/start`;
-- exactly `type`, `commandId` and `sessionId` for every other command;
+- exactly `type`, `commandId`, `sessionId` and `rewardRitualId` for Reward
+  commands; other Session commands omit `rewardRitualId`;
 - a non-empty target identifier.
 
 Extra properties are rejected. This prevents silently accepting a producer and
@@ -61,10 +62,13 @@ or has a non-string failure message. It then passes the successful `result` to
 
 ## Command Idempotency
 
-The background coordinator keeps a bounded Promise cache for in-flight/recent
-commands. In addition, Session persists a bounded receipt history for roll,
-reroll and continue across later states. A retained Reward command ID therefore
-does not execute randomness, persistence or reroll consumption after restart.
+The background coordinator keeps every pending Promise plus at most 64 settled
+recent commands. It fingerprints the full command, so reusing an ID with another
+type, Session or Reward opportunity is rejected. In addition, Session persists
+a bounded receipt history of `{ commandId, type, rewardRitualId }` for roll,
+reroll and continue across later states. A retained exact Reward fingerprint
+therefore does not execute randomness, persistence or reroll consumption after
+restart; a stale opportunity ID is rejected after its receipt is evicted.
 
 Current scope matters:
 

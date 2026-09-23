@@ -5,19 +5,23 @@ import {
 } from '../domain/Session';
 import { loadSession } from './loadSession';
 import type { SessionRepository } from './SessionRepository';
+import { isDuplicateRewardCommand } from './rewardCommandReceipt';
 
 export async function rollSessionRewardUseCase(
   repository: SessionRepository,
   sessionId: string,
   random: () => number,
   reroll = false,
-  commandId?: string,
+  commandId: string,
+  rewardRitualId: string,
 ): Promise<Session> {
   const current = await loadSession(repository, sessionId);
   if (
-    commandId !== undefined &&
-    current.rewardCommandReceipts.some(
-      (receipt) => receipt.commandId === commandId,
+    isDuplicateRewardCommand(
+      current,
+      commandId,
+      reroll ? 'reroll' : 'roll',
+      rewardRitualId,
     )
   ) {
     return current;

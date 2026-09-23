@@ -6,11 +6,13 @@ export type SessionCommand =
       type: 'session/continue-reward';
       commandId: string;
       sessionId: string;
+      rewardRitualId: string;
     }>
   | Readonly<{
       type: 'session/roll-reward' | 'session/reroll-reward';
       commandId: string;
       sessionId: string;
+      rewardRitualId: string;
     }>
   | Readonly<{ type: 'session/stop'; commandId: string; sessionId: string }>;
 

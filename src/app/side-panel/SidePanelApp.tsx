@@ -35,9 +35,9 @@ export type SidePanelDependencies = Readonly<{
   startSession(id: WorkflowId): Promise<void>;
   pauseSession(id: SessionId): Promise<void>;
   resumeSession(id: SessionId): Promise<void>;
-  rollReward(id: SessionId): Promise<void>;
-  rerollReward(id: SessionId): Promise<void>;
-  continueReward(id: SessionId): Promise<void>;
+  rollReward(id: SessionId, rewardRitualId: string): Promise<void>;
+  rerollReward(id: SessionId, rewardRitualId: string): Promise<void>;
+  continueReward(id: SessionId, rewardRitualId: string): Promise<void>;
   stopSession(id: SessionId): Promise<void>;
   openFocusView(): Promise<void>;
   closeSidePanel(): Promise<void>;

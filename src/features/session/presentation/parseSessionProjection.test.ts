@@ -35,7 +35,7 @@ describe('parseSessionProjection', () => {
     expect(parseSessionProjection(structuredClone(value))).toEqual(value);
   });
 
-  test('defaults missing Reward Dice rerolls in a runtime Session projection', () => {
+  test('rejects legacy Reward Dice defaults in a runtime Session projection', () => {
     const value = createSession(
       'legacy-reward-session',
       createWorkflow({
@@ -65,14 +65,9 @@ describe('parseSessionProjection', () => {
       delete side['availability'];
     }
 
-    const restored = parseSessionProjection(legacyProjection);
-
-    expect(restored?.snapshot.workflow.rewardDice?.rerolls).toBe(0);
-    expect(
-      restored?.snapshot.workflow.rewardDice?.sides.map(
-        ({ availability }) => availability,
-      ),
-    ).toEqual(['any', 'any']);
+    expect(() => parseSessionProjection(legacyProjection)).toThrow(
+      'Session projection is invalid.',
+    );
   });
 
   test('rejects malformed runtime Side availability', () => {
@@ -92,7 +87,7 @@ describe('parseSessionProjection', () => {
     );
   });
 
-  test('reads canonical custom and legacy frequency schedules', () => {
+  test('reads canonical custom and rejects legacy frequency schedules', () => {
     const canonical = createSession(
       'custom-session',
       createWorkflow({
@@ -124,13 +119,9 @@ describe('parseSessionProjection', () => {
     if (reward === undefined) throw new Error('Expected Reward Dice.');
     delete reward['schedule'];
     reward['frequency'] = 1;
-    expect(
-      parseSessionProjection(legacy)?.snapshot.workflow.rewardDice?.schedule,
-    ).toEqual({
-      type: 'frequency',
-      triggerPhaseType: 'focus',
-      frequency: 1,
-    });
+    expect(() => parseSessionProjection(legacy)).toThrow(
+      'Session projection is invalid.',
+    );
   });
 
   test.each([
@@ -197,5 +188,31 @@ describe('parseSessionProjection', () => {
     expect(() =>
       parseSessionProjection({ ...paused, pauseReason: 'automatic' }),
     ).toThrow();
+  });
+
+  test('requires canonical Reward receipts in every runtime projection', () => {
+    const value = structuredClone(
+      createSession('session-1', workflowWithReward(), 1_000),
+    ) as Record<string, unknown>;
+    delete value['rewardCommandReceipts'];
+
+    expect(() => parseSessionProjection(value)).toThrow(
+      'Session projection is invalid.',
+    );
+  });
+
+  test('rejects a final Reward projection without its ritual', () => {
+    const finalReward = structuredClone(
+      deriveSessionState(
+        createSession('session-final', workflowWithReward(), 1_000),
+        62_000,
+      ),
+    ) as Record<string, unknown>;
+    expect(finalReward['status']).toBe('paused');
+    delete finalReward['rewardRitual'];
+
+    expect(() => parseSessionProjection(finalReward)).toThrow(
+      'Session Reward ritual is invalid.',
+    );
   });
 });

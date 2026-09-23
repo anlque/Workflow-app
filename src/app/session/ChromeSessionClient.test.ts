@@ -30,11 +30,12 @@ describe('ChromeSessionClient', () => {
       removeMessageListener: vi.fn(),
     };
     const client = new ChromeSessionClient(runtime, () => 'command-1');
-    await client[method](createSessionId('session-1'));
+    await client[method](createSessionId('session-1'), 'session-1:0');
     expect(runtime.sendMessage).toHaveBeenCalledWith({
       type,
       commandId: 'command-1',
       sessionId: 'session-1',
+      rewardRitualId: 'session-1:0',
     });
   });
   test('sends a typed continue-Reward command', async () => {
@@ -56,12 +57,13 @@ describe('ChromeSessionClient', () => {
     };
     const client = new ChromeSessionClient(runtime, () => 'command-1');
 
-    await client.continueReward(createSessionId('session-1'));
+    await client.continueReward(createSessionId('session-1'), 'session-1:0');
 
     expect(runtime.sendMessage).toHaveBeenCalledWith({
       type: 'session/continue-reward',
       commandId: 'command-1',
       sessionId: 'session-1',
+      rewardRitualId: 'session-1:0',
     });
   });
 });

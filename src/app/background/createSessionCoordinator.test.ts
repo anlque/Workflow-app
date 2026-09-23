@@ -273,6 +273,35 @@ describe('createSessionCoordinator', () => {
     expect(messages.events).toHaveLength(2);
   });
 
+  test('does not evict pending commands when the recent cache exceeds its bound', async () => {
+    const { value, messages, coordinator } = setup();
+    await coordinator.initialize();
+    await messages.dispatch({
+      type: 'session/start',
+      commandId: 'start',
+      workflowId: value.id,
+    });
+    const firstCommand = {
+      type: 'session/pause',
+      commandId: 'pause-0',
+      sessionId: 'session-1',
+    } as const;
+    const first = messages.dispatch(firstCommand);
+    const pending = [
+      first,
+      ...Array.from({ length: 64 }, (_, index) =>
+        messages.dispatch({
+          type: 'session/pause',
+          commandId: `pause-${String(index + 1)}`,
+          sessionId: 'session-1',
+        }),
+      ),
+    ];
+
+    expect(messages.dispatch(firstCommand)).toBe(first);
+    await Promise.allSettled(pending);
+  });
+
   test('schedules and publishes both Phase and transition boundaries', async () => {
     const { value, clock, messages, alarms, coordinator } = setup();
     await coordinator.initialize();
@@ -386,17 +415,36 @@ describe('createSessionCoordinator', () => {
       type: 'session/roll-reward',
       commandId: 'command-roll',
       sessionId: 'session-1',
+      rewardRitualId: 'session-1:0',
     });
+    await expect(
+      messages.dispatch({
+        type: 'session/reroll-reward',
+        commandId: 'command-roll',
+        sessionId: 'session-1',
+        rewardRitualId: 'session-1:0',
+      }),
+    ).rejects.toThrow('Command identifier conflicts with an earlier command.');
+    await expect(
+      messages.dispatch({
+        type: 'session/reroll-reward',
+        commandId: 'command-roll',
+        sessionId: 'another-session',
+        rewardRitualId: 'another-session:0',
+      }),
+    ).rejects.toThrow('Command identifier conflicts with an earlier command.');
     const concurrentRerolls = await Promise.allSettled([
       messages.dispatch({
         type: 'session/reroll-reward',
         commandId: 'command-reroll-1',
         sessionId: 'session-1',
+        rewardRitualId: 'session-1:0',
       }),
       messages.dispatch({
         type: 'session/reroll-reward',
         commandId: 'command-reroll-2',
         sessionId: 'session-1',
+        rewardRitualId: 'session-1:0',
       }),
     ]);
     expect(concurrentRerolls.map(({ status }) => status).sort()).toEqual([
@@ -410,6 +458,7 @@ describe('createSessionCoordinator', () => {
       type: 'session/continue-reward',
       commandId: 'command-3',
       sessionId: 'session-1',
+      rewardRitualId: 'session-1:0',
     });
     expect(messages.events.at(-1)?.session).toMatchObject({
       status: 'running',

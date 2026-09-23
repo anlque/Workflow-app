@@ -13,9 +13,9 @@ export type ActiveSessionViewProps = Readonly<{
   onPhaseBoundary?(): void;
   rewardInteraction?: Readonly<{
     onRoll(durationMs: 600 | 2500): void;
-    rollReward?(id: SessionId): Promise<void>;
-    rerollReward?(id: SessionId): Promise<void>;
-    continueReward(id: SessionId): Promise<void>;
+    rollReward?(id: SessionId, rewardRitualId: string): Promise<void>;
+    rerollReward?(id: SessionId, rewardRitualId: string): Promise<void>;
+    continueReward(id: SessionId, rewardRitualId: string): Promise<void>;
   }>;
   onPause(id: SessionId): Promise<void>;
   onResume(id: SessionId): Promise<void>;
@@ -77,12 +77,16 @@ export function ActiveSessionView({
         reducedMotion={reducedMotion}
         onRoll={rewardInteraction.onRoll}
         requestRoll={() =>
-          rewardInteraction.rollReward?.(session.id) ?? Promise.resolve()
+          rewardInteraction.rollReward?.(session.id, ritual.id) ??
+          Promise.resolve()
         }
         requestReroll={() =>
-          rewardInteraction.rerollReward?.(session.id) ?? Promise.resolve()
+          rewardInteraction.rerollReward?.(session.id, ritual.id) ??
+          Promise.resolve()
         }
-        onContinue={() => rewardInteraction.continueReward(session.id)}
+        onContinue={() =>
+          rewardInteraction.continueReward(session.id, ritual.id)
+        }
       />
     );
 

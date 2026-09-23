@@ -446,6 +446,7 @@ describe('Session', () => {
       id: paused.id,
       workflow: paused.snapshot.workflow,
       currentPhaseIndex: paused.currentPhaseIndex,
+      rewardCommandReceipts: paused.rewardCommandReceipts,
       rewardRitual,
     };
 
@@ -509,6 +510,7 @@ describe('Session', () => {
         id: paused.id,
         workflow: paused.snapshot.workflow,
         currentPhaseIndex: paused.currentPhaseIndex,
+        rewardCommandReceipts: paused.rewardCommandReceipts,
         status: 'paused',
         pauseReason: 'reward',
         pausedAt: paused.pausedAt,

@@ -34,6 +34,7 @@ export type RewardContinuationTarget =
 export type RewardCommandReceipt = Readonly<{
   commandId: string;
   type: 'roll' | 'reroll' | 'continue';
+  rewardRitualId: string;
 }>;
 
 export const MAX_REWARD_COMMAND_RECEIPTS = 16;
@@ -92,7 +93,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
-      rewardCommandReceipts?: readonly RewardCommandReceipt[];
+      rewardCommandReceipts: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
       status: 'running';
       phaseStartedAt: number;
@@ -102,7 +103,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
-      rewardCommandReceipts?: readonly RewardCommandReceipt[];
+      rewardCommandReceipts: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
       status: 'transitioning';
       transitionEndsAt: number;
@@ -111,7 +112,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
-      rewardCommandReceipts?: readonly RewardCommandReceipt[];
+      rewardCommandReceipts: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
       status: 'paused';
       pauseReason?: 'user' | 'reward';
@@ -122,7 +123,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
-      rewardCommandReceipts?: readonly RewardCommandReceipt[];
+      rewardCommandReceipts: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
       status: 'completed';
       completedAt: number;
@@ -131,7 +132,7 @@ export type RestoreSessionInput =
       id: string;
       workflow: Workflow;
       currentPhaseIndex: number;
-      rewardCommandReceipts?: readonly RewardCommandReceipt[];
+      rewardCommandReceipts: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
       status: 'stopped';
       stoppedAt: number;
@@ -175,7 +176,7 @@ export function restoreSession(input: RestoreSessionInput): Session {
     throw new SessionValidationError('Session current Phase index is invalid.');
   }
 
-  const rewardCommandReceipts = input.rewardCommandReceipts ?? [];
+  const rewardCommandReceipts = input.rewardCommandReceipts;
   validateRewardCommandReceipts(rewardCommandReceipts);
   if (input.rewardRitual !== undefined) {
     validateRewardRitual(input, input.rewardRitual, rewardCommandReceipts);
@@ -218,19 +219,10 @@ export function restoreSession(input: RestoreSessionInput): Session {
         'Paused Session remaining time is invalid.',
       );
     }
-    const rewardRitual =
-      input.pauseReason === 'reward'
-        ? (input.rewardRitual ?? {
-            id: `${input.id}:${String(Math.max(0, input.currentPhaseIndex - 1))}`,
-            completedPhaseIndex: Math.max(0, input.currentPhaseIndex - 1),
-            rerollsUsed: 0,
-            acknowledged: false,
-            continuation: {
-              type: 'phase' as const,
-              phaseIndex: input.currentPhaseIndex,
-            },
-          })
-        : undefined;
+    const rewardRitual = input.rewardRitual;
+    if (input.pauseReason === 'reward' && rewardRitual === undefined) {
+      throw new SessionValidationError('Session Reward ritual is invalid.');
+    }
     return Object.freeze({
       ...base,
       status: input.status,
@@ -326,6 +318,7 @@ export function continueRewardSession(
         session.rewardCommandReceipts,
         commandId,
         'continue',
+        session.rewardRitual.id,
       ),
       status: 'completed',
       completedAt: now,
@@ -344,6 +337,7 @@ export function continueRewardSession(
       session.rewardCommandReceipts,
       commandId,
       'continue',
+      session.rewardRitual.id,
     ),
     status: 'running',
     phaseStartedAt: now,
@@ -393,6 +387,7 @@ function selectReward(
       session.rewardCommandReceipts,
       commandId,
       reroll ? 'reroll' : 'roll',
+      current.id,
     ),
     rewardRitual: freezeRewardRitual({
       ...current,
@@ -480,7 +475,10 @@ function validateRewardRitual(
     !validState ||
     (ritual.acknowledged && selected === undefined) ||
     (ritual.acknowledged &&
-      !rewardCommandReceipts.some(({ type }) => type === 'continue'))
+      !rewardCommandReceipts.some(
+        ({ type, rewardRitualId }) =>
+          type === 'continue' && rewardRitualId === ritual.id,
+      ))
   ) {
     throw new SessionValidationError('Session Reward ritual is invalid.');
   }
@@ -497,6 +495,7 @@ function validateRewardCommandReceipts(
       const type: unknown = receipt.type;
       return (
         receipt.commandId.trim() === '' ||
+        receipt.rewardRitualId.trim() === '' ||
         (type !== 'roll' && type !== 'reroll' && type !== 'continue')
       );
     })
@@ -509,10 +508,13 @@ function appendRewardCommandReceipt(
   receipts: readonly RewardCommandReceipt[],
   commandId: string | undefined,
   type: RewardCommandReceipt['type'],
+  rewardRitualId: string,
 ): readonly RewardCommandReceipt[] {
   if (commandId === undefined) return receipts;
   return freezeRewardCommandReceipts(
-    [...receipts, { commandId, type }].slice(-MAX_REWARD_COMMAND_RECEIPTS),
+    [...receipts, { commandId, type, rewardRitualId }].slice(
+      -MAX_REWARD_COMMAND_RECEIPTS,
+    ),
   );
 }
 

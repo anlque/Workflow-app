@@ -72,8 +72,10 @@ Phase index; it is not a timer or random event.
 
 The selected Dice Side and reroll history are Session Domain state. They are
 stored and broadcast as part of the authoritative projection. Session-level
-bounded receipt history makes retained roll, reroll and continue command IDs
-no-ops after a background restart and later Phase transitions.
+bounded receipt history makes an exact retained command ID, command type and
+Reward ritual ID fingerprint a no-op after a background restart. Reusing an ID
+for another command or opportunity is rejected, including after the in-memory
+coordinator cache evicts a settled entry.
 
 ## Authoritative Changes
 
@@ -102,7 +104,9 @@ complete authoritative projection.
 Session record v5 persists `pauseReason: 'reward'`, the opportunity identity,
 completed Phase index, selected Side index, rerolls used, acknowledgment and
 the `phase | complete` continuation target plus Session-level bounded command
-receipts.
+receipts. Legacy defaults for versions 1–4 are applied only by the
+version-aware persistence mapper; runtime projections require the canonical v5
+shape.
 Versions 1–4 remain readable and restore their historical state without
 inventing a selected result.
 

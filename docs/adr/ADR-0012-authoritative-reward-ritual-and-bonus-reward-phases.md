@@ -19,10 +19,12 @@ Future Bonus Reward Phases also require a durable continuation target.
 The Session aggregate owns Reward opportunity identity, selected Side, rerolls
 used, acknowledgment and a discriminated continuation target. Background
 Application commands perform roll, reroll and continue with injected randomness
-and serialized command handling. A bounded receipt history is stored in the
-Session aggregate, making retained roll, reroll and continue IDs idempotent
-across worker restarts. Presentation owns animation and projection-transition
-sound cues only.
+and serialized command handling. A bounded receipt history stores the full
+`commandId + command type + Reward ritual ID` fingerprint in the Session
+aggregate; Session scope is enforced by the Application/coordinator boundary.
+Only an exact retained fingerprint is an idempotent no-op across worker
+restarts, while identifier collisions and commands for a stale opportunity are
+rejected. Presentation owns animation and projection-transition sound cues only.
 The target supports the conceptual distinction between the next normal Phase,
 Session completion and a future Bonus Phase; RW-003 implements only the first
 two. Bonus configuration and execution remain RW-004 and RW-005.

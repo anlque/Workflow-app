@@ -261,11 +261,16 @@ function parseRewardCommandReceipts(value: unknown) {
   if (!Array.isArray(value)) return invalid();
   return value.map((entry) => {
     const receipt = record(entry);
-    if (!hasExactKeys(receipt, ['commandId', 'type'])) return invalid();
+    if (!hasExactKeys(receipt, ['commandId', 'type', 'rewardRitualId']))
+      return invalid();
     const type = receipt['type'];
     if (type !== 'roll' && type !== 'reroll' && type !== 'continue')
       return invalid();
-    return { commandId: string(receipt['commandId']), type } as const;
+    return {
+      commandId: string(receipt['commandId']),
+      type,
+      rewardRitualId: string(receipt['rewardRitualId']),
+    } as const;
   });
 }
 
@@ -315,19 +320,39 @@ export function mapSessionRecord(value: unknown): Session {
       transitionEndsAt: number(stored['transitionEndsAt']),
     };
   } else if (status === 'paused') {
-    if (
-      outer['schemaVersion'] === 5 &&
-      storedPauseReason(stored['pauseReason']) === 'reward' &&
-      rewardRitual === undefined
-    ) {
-      return invalid();
-    }
+    const pauseReason = storedPauseReason(stored['pauseReason']);
+    const remainingMilliseconds = number(stored['remainingMilliseconds']);
+    const currentPhaseIndex = common.currentPhaseIndex;
+    const restoredRitual =
+      pauseReason !== 'reward' || rewardRitual !== undefined
+        ? rewardRitual
+        : outer['schemaVersion'] === 5
+          ? invalid()
+          : remainingMilliseconds === 0
+            ? {
+                id: `${common.id}:${String(currentPhaseIndex)}`,
+                completedPhaseIndex: currentPhaseIndex,
+                rerollsUsed: 0,
+                acknowledged: false,
+                continuation: { type: 'complete' as const },
+              }
+            : {
+                id: `${common.id}:${String(Math.max(0, currentPhaseIndex - 1))}`,
+                completedPhaseIndex: Math.max(0, currentPhaseIndex - 1),
+                rerollsUsed: 0,
+                acknowledged: false,
+                continuation: {
+                  type: 'phase' as const,
+                  phaseIndex: currentPhaseIndex,
+                },
+              };
     input = {
       ...common,
       status,
-      pauseReason: storedPauseReason(stored['pauseReason']),
+      pauseReason,
       pausedAt: number(stored['pausedAt']),
-      remainingMilliseconds: number(stored['remainingMilliseconds']),
+      remainingMilliseconds,
+      ...(restoredRitual === undefined ? {} : { rewardRitual: restoredRitual }),
     };
   } else if (status === 'completed') {
     input = { ...common, status, completedAt: number(stored['completedAt']) };

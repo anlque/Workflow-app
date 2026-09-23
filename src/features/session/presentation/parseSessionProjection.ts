@@ -30,10 +30,7 @@ function optionalString(value: unknown): string | undefined {
   return value === undefined ? undefined : string(value);
 }
 
-function optionalRewardPhaseType(
-  value: unknown,
-): 'focus' | 'break' | undefined {
-  if (value === undefined) return undefined;
+function rewardPhaseType(value: unknown): 'focus' | 'break' {
   if (value === 'focus' || value === 'break') return value;
   return invalid();
 }
@@ -90,15 +87,19 @@ function rewardRitual(value: unknown) {
 }
 
 function rewardCommandReceipts(value: unknown) {
-  if (value === undefined) return [];
   if (!Array.isArray(value)) return invalid();
   return value.map((entry) => {
     const receipt = record(entry);
-    if (!hasExactKeys(receipt, ['commandId', 'type'])) return invalid();
+    if (!hasExactKeys(receipt, ['commandId', 'type', 'rewardRitualId']))
+      return invalid();
     const type = receipt['type'];
     if (type !== 'roll' && type !== 'reroll' && type !== 'continue')
       return invalid();
-    return { commandId: string(receipt['commandId']), type } as const;
+    return {
+      commandId: string(receipt['commandId']),
+      type,
+      rewardRitualId: string(receipt['rewardRitualId']),
+    } as const;
   });
 }
 
@@ -121,31 +122,23 @@ function workflow(value: unknown) {
   const diceValue = input['rewardDice'];
   const dice = diceValue === undefined ? undefined : record(diceValue);
   const sides = dice?.['sides'];
-  const rerolls =
-    dice?.['rerolls'] === undefined ? undefined : number(dice['rerolls']);
-  if (dice !== undefined && !Array.isArray(sides)) return invalid();
+  const rerolls = dice === undefined ? undefined : number(dice['rerolls']);
+  if (
+    dice !== undefined &&
+    (!hasExactKeys(dice, ['schedule', 'rerolls', 'sides']) ||
+      !Array.isArray(sides))
+  )
+    return invalid();
   const schedule = (() => {
     if (dice === undefined) return undefined;
-    if (dice['schedule'] === undefined) {
-      const triggerPhaseType = optionalRewardPhaseType(
-        dice['triggerPhaseType'],
-      );
-      return {
-        type: 'frequency' as const,
-        triggerPhaseType: triggerPhaseType ?? 'focus',
-        frequency: number(dice['frequency']),
-      };
-    }
     const raw = record(dice['schedule']);
     if (
       raw['type'] === 'frequency' &&
       hasExactKeys(raw, ['type', 'triggerPhaseType', 'frequency'])
     ) {
-      const triggerPhaseType = optionalRewardPhaseType(raw['triggerPhaseType']);
-      if (triggerPhaseType === undefined) return invalid();
       return {
         type: 'frequency' as const,
-        triggerPhaseType,
+        triggerPhaseType: rewardPhaseType(raw['triggerPhaseType']),
         frequency: number(raw['frequency']),
       };
     }
@@ -213,20 +206,24 @@ function workflow(value: unknown) {
       : {
           rewardDice: {
             schedule: schedule ?? invalid(),
-            ...(rerolls === undefined ? {} : { rerolls }),
+            rerolls: rerolls ?? invalid(),
             sides: (sides as unknown[]).map((value) => {
               const side = record(value);
+              if (
+                !hasExactKeys(
+                  side,
+                  ['icon', 'title', 'probability', 'availability'],
+                  ['description'],
+                )
+              )
+                return invalid();
               const description = optionalString(side['description']);
-              const availability =
-                side['availability'] === undefined
-                  ? 'any'
-                  : sideAvailability(side['availability']);
               return {
                 icon: string(side['icon']),
                 title: string(side['title']),
                 ...(description === undefined ? {} : { description }),
                 weight: number(side['probability']),
-                availability,
+                availability: sideAvailability(side['availability']),
               };
             }),
           },

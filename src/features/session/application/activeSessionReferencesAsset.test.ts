@@ -31,6 +31,13 @@ function workflow(reference: 'background' | 'audio' | 'other' = 'background') {
                 },
       },
     ],
+    rewardDice: {
+      frequency: 1,
+      sides: [
+        { icon: 'a', title: 'A' },
+        { icon: 'b', title: 'B' },
+      ],
+    },
   });
 }
 
@@ -42,7 +49,19 @@ function session(
   const base = {
     id: `session-${status}-${pauseReason}`,
     workflow: workflow(reference),
-    currentPhaseIndex: 0,
+    currentPhaseIndex: pauseReason === 'reward' ? 1 : 0,
+    rewardCommandReceipts: [],
+    ...(pauseReason === 'reward'
+      ? {
+          rewardRitual: {
+            id: `session-${status}-${pauseReason}:0`,
+            completedPhaseIndex: 0,
+            rerollsUsed: 0,
+            acknowledged: false,
+            continuation: { type: 'phase' as const, phaseIndex: 1 },
+          },
+        }
+      : {}),
   } as const;
   switch (status) {
     case 'running':

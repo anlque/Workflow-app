@@ -92,27 +92,30 @@ export class ChromeSessionClient implements SessionProjectionClient {
     });
   }
 
-  public continueReward(id: SessionId): Promise<void> {
+  public continueReward(id: SessionId, rewardRitualId: string): Promise<void> {
     return this.#command({
       type: 'session/continue-reward',
       commandId: this.#createId(),
       sessionId: id,
+      rewardRitualId,
     });
   }
 
-  public rollReward(id: SessionId): Promise<void> {
+  public rollReward(id: SessionId, rewardRitualId: string): Promise<void> {
     return this.#command({
       type: 'session/roll-reward',
       commandId: this.#createId(),
       sessionId: id,
+      rewardRitualId,
     });
   }
 
-  public rerollReward(id: SessionId): Promise<void> {
+  public rerollReward(id: SessionId, rewardRitualId: string): Promise<void> {
     return this.#command({
       type: 'session/reroll-reward',
       commandId: this.#createId(),
       sessionId: id,
+      rewardRitualId,
     });
   }
 

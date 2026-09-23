@@ -59,8 +59,14 @@ describe('parseSessionCommand', () => {
           type,
           commandId: 'command-1',
           sessionId: 'session-1',
+          rewardRitualId: 'session-1:0',
         }),
-      ).toEqual({ type, commandId: 'command-1', sessionId: 'session-1' });
+      ).toEqual({
+        type,
+        commandId: 'command-1',
+        sessionId: 'session-1',
+        rewardRitualId: 'session-1:0',
+      });
     },
   );
   test.each([
@@ -93,6 +99,7 @@ describe('parseSessionCommand', () => {
         type: 'session/continue-reward',
         commandId: 'command-5',
         sessionId: 'session-1',
+        rewardRitualId: 'session-1:0',
       },
       'session/continue-reward',
     ],

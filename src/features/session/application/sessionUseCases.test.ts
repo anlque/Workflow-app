@@ -279,7 +279,14 @@ describe('Session use cases', () => {
     );
     clock.set(12_000);
     await advanceSessionUseCase(repository, clock, started.id);
-    await rollSessionRewardUseCase(repository, started.id, () => 0);
+    await rollSessionRewardUseCase(
+      repository,
+      started.id,
+      () => 0,
+      false,
+      'roll-1',
+      'session-1:0',
+    );
 
     clock.set(20_000);
     const continued = await continueRewardSessionUseCase(
@@ -287,6 +294,7 @@ describe('Session use cases', () => {
       clock,
       started.id,
       'continue-1',
+      'session-1:0',
     );
 
     expect(continued).toMatchObject({
@@ -296,60 +304,6 @@ describe('Session use cases', () => {
       phaseEndsAt: 25_000,
     });
     await expect(repository.get(started.id)).resolves.toEqual(continued);
-  });
-
-  test('deduplicates an older persisted Reward command after a later command and restart', async () => {
-    const repository = new InMemorySessionRepository();
-    const clock = new FakeClock(1_000);
-    const rewarded = createWorkflow({
-      id: 'reward-retry',
-      name: 'Reward retry',
-      phases: [
-        { type: 'focus', durationSeconds: 1, environment: {} },
-        { type: 'break', durationSeconds: 1, environment: {} },
-      ],
-      rewardDice: {
-        frequency: 1,
-        rerolls: 1,
-        sides: [
-          { icon: 'a', title: 'A' },
-          { icon: 'b', title: 'B' },
-        ],
-      },
-    });
-    const started = await startSessionUseCase(
-      repository,
-      clock,
-      'retry-session',
-      rewarded,
-    );
-    clock.set(3_000);
-    await advanceSessionUseCase(repository, clock, started.id);
-    const random = vi.fn(() => 0);
-    await rollSessionRewardUseCase(
-      repository,
-      started.id,
-      random,
-      false,
-      'roll-1',
-    );
-    const first = await rollSessionRewardUseCase(
-      repository,
-      started.id,
-      () => 0.99,
-      true,
-      'reroll-1',
-    );
-    const retried = await rollSessionRewardUseCase(
-      repository,
-      started.id,
-      random,
-      false,
-      'roll-1',
-    );
-    expect(retried).toEqual(first);
-    expect(random).toHaveBeenCalledTimes(1);
-    expect(retried.rewardRitual?.rerollsUsed).toBe(1);
   });
 
   test('deduplicates Continue after restart without another write', async () => {
@@ -381,12 +335,14 @@ describe('Session use cases', () => {
       () => 0,
       false,
       'roll-1',
+      'continue-retry:0',
     );
     const completed = await continueRewardSessionUseCase(
       repository,
       clock,
       started.id,
       'continue-1',
+      'continue-retry:0',
     );
     const save = vi.spyOn(repository, 'save');
 
@@ -395,6 +351,7 @@ describe('Session use cases', () => {
       clock,
       started.id,
       'continue-1',
+      'continue-retry:0',
     );
 
     expect(retried).toEqual(completed);
@@ -407,8 +364,72 @@ describe('Session use cases', () => {
       random,
       false,
       'roll-1',
+      'continue-retry:0',
     );
     expect(oldRollRetry).toEqual(completed);
+    expect(random).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  test('rejects command-id collisions and stale Reward opportunities without writes', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const rewarded = createWorkflow({
+      id: 'fingerprint-workflow',
+      name: 'Fingerprint',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        rerolls: 3,
+        sides: [
+          { icon: 'a', title: 'A' },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'fingerprint-session',
+      rewarded,
+    );
+    clock.set(3_000);
+    await advanceSessionUseCase(repository, clock, started.id);
+    await rollSessionRewardUseCase(
+      repository,
+      started.id,
+      () => 0,
+      false,
+      'shared-id',
+      'fingerprint-session:0',
+    );
+    const save = vi.spyOn(repository, 'save');
+    const random = vi.fn(() => 0.5);
+
+    await expect(
+      rollSessionRewardUseCase(
+        repository,
+        started.id,
+        random,
+        true,
+        'shared-id',
+        'fingerprint-session:0',
+      ),
+    ).rejects.toThrow(
+      'Reward command identifier conflicts with an earlier command.',
+    );
+    await expect(
+      rollSessionRewardUseCase(
+        repository,
+        started.id,
+        random,
+        true,
+        'evicted-id',
+        'fingerprint-session:previous',
+      ),
+    ).rejects.toThrow(
+      'Reward command does not match the current Reward opportunity.',
+    );
     expect(random).not.toHaveBeenCalled();
     expect(save).not.toHaveBeenCalled();
   });

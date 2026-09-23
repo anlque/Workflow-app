@@ -6,7 +6,7 @@ Session start receives a Workflow resolver through its Application boundary.
 Roles resolve to same-kind direct IDs before construction, and
 `createSessionSnapshot` rejects any remaining Role. Moving a Role affects only
 future Sessions. New Session records use envelope version 5; the mapper reads
-versions 1–2 with legacy frequency fields. Timing never depends on Role lookup
+versions 1–5 and isolates legacy defaults to versions 1–4. Timing never depends on Role lookup
 after start.
 
 ## Purpose
@@ -50,16 +50,16 @@ exports:
 | Group | Exports |
 | --- | --- |
 | Application contracts/errors/events | `Clock`, `SessionRepository`, `SessionChangedEvent`, `SessionApplicationError` |
-| Application queries/use cases | `activeSessionReferencesAsset`, `advanceSessionUseCase`, `continueRewardSessionUseCase`, `getActiveSessionUseCase`, `pauseSessionUseCase`, `resumeSessionUseCase`, `startSessionUseCase`, `stopSessionUseCase` |
-| Domain types | `Session`, `SessionId`, `RunningSession`, `TransitioningSession`, `PausedSession`, `CompletedSession`, `StoppedSession`, `RestoreSessionInput`, `SessionSnapshot` |
-| Domain behavior/errors | `createSession`, `createSessionId`, `restoreSession`, `pauseSession`, `resumeSession`, `continueRewardSession`, `stopSession`, `getRemainingSeconds`, `deriveSessionState`, `SessionValidationError`, `SessionTransitionError` |
+| Application queries/use cases | `activeSessionReferencesAsset`, `advanceSessionUseCase`, `continueRewardSessionUseCase`, `getActiveSessionUseCase`, `pauseSessionUseCase`, `resumeSessionUseCase`, `rollSessionRewardUseCase`, `startSessionUseCase`, `stopSessionUseCase` |
+| Domain types | `Session`, `SessionId`, `RunningSession`, `TransitioningSession`, `PausedSession`, `CompletedSession`, `StoppedSession`, `RestoreSessionInput`, `SessionSnapshot`, `RewardContinuationTarget`, `RewardRitual` |
+| Domain behavior/errors | `createSession`, `createSessionId`, `restoreSession`, `pauseSession`, `resumeSession`, `rollSessionReward`, `rerollSessionReward`, `continueRewardSession`, `stopSession`, `getRemainingSeconds`, `deriveSessionState`, `SessionValidationError`, `SessionTransitionError` |
 | Infrastructure composition | `DexieSessionRepository`, `sessionDatabaseSchemas` |
 | Presentation store | `createActiveSessionStore`, `ActiveSessionState`, `ActiveSessionStore` |
 | Presentation view | `ActiveSessionView`, `ActiveSessionViewProps` |
 | Presentation synchronization | `connectSessionMessages`, `SessionMessageConnection`, `SessionProjectionClient`, `parseSessionProjection` |
 
 `SessionControls`, `RewardResultDialog`, `RewardCube`, countdown/boundary helpers
-and Reward transition detection are internal Presentation details. Consumers use
+helpers are internal Presentation details. Consumers use
 `ActiveSessionView` instead of assembling them directly.
 
 ## Internal Layers
@@ -110,7 +110,7 @@ side values. Source Workflow edits or deletion cannot affect execution.
 | --- | --- | --- |
 | Running | `phaseStartedAt`, `phaseEndsAt` | Current Phase is executing; end is strictly after start |
 | Transitioning | `transitionEndsAt` | Authoritative one-second boundary after a completed Phase |
-| Paused | `pauseReason: 'user' \| 'reward'`, `pausedAt`, positive `remainingMilliseconds` | Countdown is frozen; allowed continuation depends on reason |
+| Paused | `pauseReason: 'user' \| 'reward'`, `pausedAt`, non-negative `remainingMilliseconds` | Countdown is frozen; user pause is positive, while a final Reward pause uses zero; allowed continuation depends on reason |
 | Completed | `completedAt` | All Phases and the final one-second transition elapsed |
 | Stopped | `stoppedAt` | User ended an active Running or Paused Session |
 
@@ -175,13 +175,15 @@ internals. A later lifecycle ADR will supersede ADR-0006 with this boundary.
 
 ## Persistence
 
-`DexieSessionRepository` writes a version-4 envelope in the global version-2
+`DexieSessionRepository` writes a version-5 envelope in the global version-2
 `sessions: 'id, active, updatedAt'` table definition.
 
-The mapper reads versions 1–4 strictly: version 1 snapshots accept only legacy
-Asset ID fields; versions 2–4 accept only exact direct references. Versions 1–2
-map legacy frequency fields; versions 3–4 read canonical schedules. Version 4
-requires Side availability while versions 1–3 default it to `any`. Role,
+The mapper reads versions 1–5 strictly: version 1 snapshots accept only legacy
+Asset ID fields; versions 2–5 accept only exact direct references. Versions 1–2
+map legacy frequency fields; versions 3–5 read canonical schedules. Versions
+4–5 require Side availability while versions 1–3 default it to `any`. Version 5
+requires canonical Reward ritual and receipt state; only the version-aware
+v1–v4 mapper may supply legacy defaults. Role,
 mixed-version and unknown Environment fields are rejected because persisted
 Session snapshots must already be resolved and immutable.
 
@@ -335,8 +337,8 @@ When changing Session behavior:
 7. Update runtime projection parsing, message response expectations and
    per-context presentation handling.
 8. Check alarm scheduling/clearing and worker-start reconciliation.
-9. Distinguish non-final authoritative Reward pauses from final Presentation
-   completion behavior.
+9. Preserve authoritative non-final and zero-duration final Reward pauses and
+   their explicit continuation targets.
 10. Update this reference, state/messaging/persistence docs and affected flow
     documents.
 

@@ -44,7 +44,10 @@ export function createSessionCoordinator({
   workflowResolver,
   random = Math.random,
 }: SessionCoordinatorDependencies): SessionCoordinator {
-  const handledCommands = new Map<string, Promise<Session>>();
+  const handledCommands = new Map<
+    string,
+    { fingerprint: string; promise: Promise<Session>; settled: boolean }
+  >();
   let commandTail: Promise<void> = Promise.resolve();
 
   async function publishAndSchedule(session: Session | null): Promise<void> {
@@ -84,6 +87,7 @@ export function createSessionCoordinator({
         clock,
         command.sessionId,
         command.commandId,
+        command.rewardRitualId,
       );
     } else if (
       command.type === 'session/roll-reward' ||
@@ -95,6 +99,7 @@ export function createSessionCoordinator({
         random,
         command.type === 'session/reroll-reward',
         command.commandId,
+        command.rewardRitualId,
       );
     } else {
       session = await stopSessionUseCase(sessions, clock, command.sessionId);
@@ -104,18 +109,34 @@ export function createSessionCoordinator({
   }
 
   function handle(command: SessionCommand): Promise<Session> {
+    const fingerprint = JSON.stringify(command);
     const existing = handledCommands.get(command.commandId);
-    if (existing !== undefined) return existing;
+    if (existing !== undefined) {
+      if (existing.fingerprint !== fingerprint) {
+        return Promise.reject(
+          new Error('Command identifier conflicts with an earlier command.'),
+        );
+      }
+      return existing.promise;
+    }
     const pending = commandTail.then(() => execute(command));
     commandTail = pending.then(
       () => undefined,
       () => undefined,
     );
-    handledCommands.set(command.commandId, pending);
-    if (handledCommands.size > MAX_HANDLED_COMMANDS) {
-      const oldest = handledCommands.keys().next().value;
-      if (oldest !== undefined) handledCommands.delete(oldest);
-    }
+    const entry = { fingerprint, promise: pending, settled: false };
+    handledCommands.set(command.commandId, entry);
+    const settle = (): void => {
+      entry.settled = true;
+      while (handledCommands.size > MAX_HANDLED_COMMANDS) {
+        const oldestSettled = [...handledCommands].find(
+          ([, candidate]) => candidate.settled,
+        );
+        if (oldestSettled === undefined) break;
+        handledCommands.delete(oldestSettled[0]);
+      }
+    };
+    void pending.then(settle, settle);
     return pending;
   }
 

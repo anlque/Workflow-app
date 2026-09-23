@@ -2,18 +2,18 @@ import { continueRewardSession, type Session } from '../domain/Session';
 import type { Clock } from './Clock';
 import { loadSession } from './loadSession';
 import type { SessionRepository } from './SessionRepository';
+import { isDuplicateRewardCommand } from './rewardCommandReceipt';
 
 export async function continueRewardSessionUseCase(
   repository: SessionRepository,
   clock: Clock,
   sessionId: string,
   commandId: string,
+  rewardRitualId: string,
 ): Promise<Session> {
   const current = await loadSession(repository, sessionId);
   if (
-    current.rewardCommandReceipts.some(
-      (receipt) => receipt.commandId === commandId,
-    )
+    isDuplicateRewardCommand(current, commandId, 'continue', rewardRitualId)
   ) {
     return current;
   }

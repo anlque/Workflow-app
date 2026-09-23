@@ -151,4 +151,122 @@ describe('RewardResultDialog', () => {
     );
     expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus();
   });
+
+  test('uses the full 2500 ms animation and announces the result atomically', () => {
+    vi.useFakeTimers();
+    const onRoll = vi.fn();
+    const { rerender } = render(
+      <RewardResultDialog
+        reward={null}
+        usedRerolls={0}
+        rerolls={0}
+        reducedMotion={false}
+        onRoll={onRoll}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    rerender(
+      <RewardResultDialog
+        reward={side ?? null}
+        usedRerolls={0}
+        rerolls={0}
+        reducedMotion={false}
+        onRoll={onRoll}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    expect(onRoll).toHaveBeenCalledWith(2_500);
+    act(() => {
+      vi.advanceTimersByTime(2_499);
+    });
+    expect(screen.queryByText('Tea')).not.toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'true');
+  });
+
+  test('ignores Escape and keeps the authoritative ritual open', () => {
+    render(
+      <RewardResultDialog
+        reward={side ?? null}
+        usedRerolls={0}
+        rerolls={0}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    fireEvent(
+      screen.getByRole('dialog'),
+      new Event('cancel', { bubbles: false, cancelable: true }),
+    );
+    expect(screen.getByRole('dialog')).toBeVisible();
+  });
+
+  test('reports Continue failure and restores the actionable control', async () => {
+    render(
+      <RewardResultDialog
+        reward={side ?? null}
+        usedRerolls={0}
+        rerolls={0}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.reject(new Error('Continue failed.'))}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Continue failed.',
+    );
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+  });
+
+  test('moves focus to Continue after the last reroll animation', async () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <RewardResultDialog
+        reward={side ?? null}
+        usedRerolls={0}
+        rerolls={1}
+        reducedMotion
+        onRoll={vi.fn()}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll again · 1 left' }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    rerender(
+      <RewardResultDialog
+        reward={side ?? null}
+        usedRerolls={1}
+        rerolls={1}
+        reducedMotion
+        onRoll={vi.fn()}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus();
+  });
 });

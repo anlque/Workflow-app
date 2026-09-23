@@ -95,7 +95,10 @@ describe('ActiveSessionView', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
-    expect(callbacks.rollReward).toHaveBeenCalledWith(paused.id);
+    expect(callbacks.rollReward).toHaveBeenCalledWith(
+      paused.id,
+      paused.rewardRitual?.id,
+    );
   });
 
   test('requests authoritative Continue for a hydrated result', () => {
@@ -113,7 +116,10 @@ describe('ActiveSessionView', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(callbacks.continueReward).toHaveBeenCalledWith(paused.id);
+    expect(callbacks.continueReward).toHaveBeenCalledWith(
+      paused.id,
+      paused.rewardRitual?.id,
+    );
   });
 
   test('keeps a final Reward visible before acknowledgment', () => {
@@ -137,5 +143,45 @@ describe('ActiveSessionView', () => {
       screen.getByRole('dialog', { name: 'Reward unlocked' }),
     ).toBeVisible();
     expect(screen.queryByText('Session complete')).not.toBeInTheDocument();
+  });
+
+  test('renders transitions, reports boundaries and renders terminal state', () => {
+    const running = createSession('session-1', workflow, 1_000);
+    const transitioning = deriveSessionState(running, 2_000);
+    const onPhaseBoundary = vi.fn();
+    const { rerender } = render(
+      <ActiveSessionView
+        session={running}
+        onPhaseBoundary={onPhaseBoundary}
+        {...actions}
+      />,
+    );
+
+    rerender(
+      <ActiveSessionView
+        session={transitioning}
+        onPhaseBoundary={onPhaseBoundary}
+        {...actions}
+      />,
+    );
+    expect(screen.getByText('Transitioning to the next phase…')).toBeVisible();
+    expect(onPhaseBoundary).toHaveBeenCalledOnce();
+
+    const ordinary = createSession(
+      'ordinary-session',
+      createWorkflow({
+        id: 'ordinary',
+        name: 'Ordinary',
+        phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      }),
+      1_000,
+    );
+    rerender(
+      <ActiveSessionView
+        session={deriveSessionState(ordinary, 3_000)}
+        {...actions}
+      />,
+    );
+    expect(screen.getByText('Session complete')).toBeVisible();
   });
 });

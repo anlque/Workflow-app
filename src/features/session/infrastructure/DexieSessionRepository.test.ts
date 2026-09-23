@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 
 import Dexie from 'dexie';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { LocusoraDatabase } from '@/platform/storage';
 import { createWorkflow, workflowDatabaseSchemas } from '@/features/workflow';
@@ -15,6 +15,7 @@ import {
 } from '../domain/Session';
 import { SessionValidationError } from '../domain/SessionErrors';
 import { deriveSessionState } from '../domain/deriveSessionState';
+import { rollSessionRewardUseCase } from '../application/rollSessionRewardUseCase';
 import { DexieSessionRepository } from './DexieSessionRepository';
 import { sessionDatabaseSchemas, type SessionRecord } from './SessionRecord';
 
@@ -48,6 +49,70 @@ afterEach(async () => {
 });
 
 describe('DexieSessionRepository', () => {
+  test('deduplicates reroll A after reroll B and repository restart', async () => {
+    const store = database();
+    const repository = new DexieSessionRepository(store);
+    const rewarded = createWorkflow({
+      id: 'reward-retry',
+      name: 'Reward retry',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        rerolls: 3,
+        sides: [
+          { icon: 'a', title: 'A' },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('retry-session', rewarded, 1_000),
+      3_000,
+    );
+    await repository.save(paused);
+    await rollSessionRewardUseCase(
+      repository,
+      paused.id,
+      () => 0,
+      false,
+      'roll-1',
+      'retry-session:0',
+    );
+    await rollSessionRewardUseCase(
+      repository,
+      paused.id,
+      () => 0.25,
+      true,
+      'reroll-a',
+      'retry-session:0',
+    );
+    const afterB = await rollSessionRewardUseCase(
+      repository,
+      paused.id,
+      () => 0.75,
+      true,
+      'reroll-b',
+      'retry-session:0',
+    );
+
+    const restarted = new DexieSessionRepository(store);
+    const save = vi.spyOn(restarted, 'save');
+    const random = vi.fn(() => 0.5);
+    const retried = await rollSessionRewardUseCase(
+      restarted,
+      paused.id,
+      random,
+      true,
+      'reroll-a',
+      'retry-session:0',
+    );
+
+    expect(retried).toEqual(afterB);
+    expect(retried.rewardRitual?.rerollsUsed).toBe(2);
+    expect(random).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
   test('round-trips authoritative Reward ritual state in v5', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
@@ -85,7 +150,13 @@ describe('DexieSessionRepository', () => {
           selectedSideIndex: 1,
           rerollsUsed: 0,
         },
-        rewardCommandReceipts: [{ commandId: 'roll-1', type: 'roll' }],
+        rewardCommandReceipts: [
+          {
+            commandId: 'roll-1',
+            type: 'roll',
+            rewardRitualId: 'reward-session:0',
+          },
+        ],
       },
     });
     const validRecord = await store
