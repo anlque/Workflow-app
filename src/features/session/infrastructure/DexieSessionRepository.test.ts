@@ -49,6 +49,129 @@ afterEach(async () => {
 });
 
 describe('DexieSessionRepository', () => {
+  test.each([1, 2, 3, 4] as const)(
+    'restores a non-final Reward pause from legacy version %s without inventing a result',
+    async (schemaVersion) => {
+      const store = database();
+      const repository = new DexieSessionRepository(store);
+      const rewarded = createWorkflow({
+        id: `legacy-non-final-${String(schemaVersion)}`,
+        name: 'Legacy non-final',
+        phases: [
+          { type: 'focus', durationSeconds: 1, environment: {} },
+          { type: 'break', durationSeconds: 1, environment: {} },
+        ],
+        rewardDice: {
+          frequency: 1,
+          sides: [
+            { icon: 'a', title: 'A' },
+            { icon: 'b', title: 'B' },
+          ],
+        },
+      });
+      const paused = deriveSessionState(
+        createSession(
+          `legacy-non-final-${String(schemaVersion)}`,
+          rewarded,
+          1_000,
+        ),
+        3_000,
+      );
+      await repository.save(paused);
+      const table = store.table<SessionRecord, string>('sessions');
+      const stored = structuredClone(await table.get(paused.id)) as unknown as {
+        schemaVersion: 1 | 2 | 3 | 4 | 5;
+        session: Record<string, unknown> & {
+          workflow: { rewardDice: Record<string, unknown> };
+        };
+      };
+      stored.schemaVersion = schemaVersion;
+      delete stored.session['rewardRitual'];
+      delete stored.session['rewardCommandReceipts'];
+      const reward = stored.session.workflow.rewardDice;
+      delete reward['rerolls'];
+      if (schemaVersion < 3) {
+        const schedule = reward['schedule'] as Record<string, unknown>;
+        reward['triggerPhaseType'] = schedule['triggerPhaseType'];
+        reward['frequency'] = schedule['frequency'];
+        delete reward['schedule'];
+      }
+      if (schemaVersion < 4) {
+        for (const side of reward['sides'] as Record<string, unknown>[]) {
+          delete side['availability'];
+        }
+      }
+      await table.put(stored as unknown as SessionRecord);
+
+      const restored = await repository.get(paused.id);
+      expect(restored?.rewardRitual).toMatchObject({
+        completedPhaseIndex: 0,
+        rerollsUsed: 0,
+        acknowledged: false,
+        continuation: { type: 'phase', phaseIndex: 1 },
+      });
+      expect(restored?.rewardRitual?.selectedSideIndex).toBeUndefined();
+    },
+  );
+
+  test.each([1, 2, 3, 4] as const)(
+    'restores a final Reward pause from legacy version %s without inventing a result',
+    async (schemaVersion) => {
+      const store = database();
+      const repository = new DexieSessionRepository(store);
+      const rewarded = createWorkflow({
+        id: `legacy-final-${String(schemaVersion)}`,
+        name: 'Legacy final',
+        phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+        rewardDice: {
+          frequency: 1,
+          sides: [
+            { icon: 'a', title: 'A' },
+            { icon: 'b', title: 'B' },
+          ],
+        },
+      });
+      const paused = deriveSessionState(
+        createSession(`legacy-final-${String(schemaVersion)}`, rewarded, 1_000),
+        3_000,
+      );
+      await repository.save(paused);
+      const table = store.table<SessionRecord, string>('sessions');
+      const stored = structuredClone(await table.get(paused.id)) as unknown as {
+        schemaVersion: 1 | 2 | 3 | 4 | 5;
+        session: Record<string, unknown> & {
+          workflow: { rewardDice: Record<string, unknown> };
+        };
+      };
+      stored.schemaVersion = schemaVersion;
+      delete stored.session['rewardRitual'];
+      delete stored.session['rewardCommandReceipts'];
+      const reward = stored.session.workflow.rewardDice;
+      delete reward['rerolls'];
+      if (schemaVersion < 3) {
+        const schedule = reward['schedule'] as Record<string, unknown>;
+        reward['triggerPhaseType'] = schedule['triggerPhaseType'];
+        reward['frequency'] = schedule['frequency'];
+        delete reward['schedule'];
+      }
+      if (schemaVersion < 4) {
+        for (const side of reward['sides'] as Record<string, unknown>[]) {
+          delete side['availability'];
+        }
+      }
+      await table.put(stored as unknown as SessionRecord);
+
+      const restored = await repository.get(paused.id);
+      expect(restored?.rewardRitual).toMatchObject({
+        completedPhaseIndex: 0,
+        rerollsUsed: 0,
+        acknowledged: false,
+        continuation: { type: 'complete' },
+      });
+      expect(restored?.rewardRitual?.selectedSideIndex).toBeUndefined();
+    },
+  );
+
   test('deduplicates reroll A after reroll B and repository restart', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
@@ -340,6 +463,38 @@ describe('DexieSessionRepository', () => {
         },
       },
     });
+  });
+
+  test('rejects a version-5 Reward Dice without rerolls', async () => {
+    const store = database();
+    const repository = new DexieSessionRepository(store);
+    const value = createSession(
+      'missing-rerolls',
+      createWorkflow({
+        id: 'missing-rerolls-workflow',
+        name: 'Missing rerolls',
+        phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+        rewardDice: {
+          frequency: 1,
+          sides: [
+            { icon: 'tea', title: 'Tea' },
+            { icon: 'walk', title: 'Walk' },
+          ],
+        },
+      }),
+      1_000,
+    );
+    await repository.save(value);
+    const table = store.table<SessionRecord, string>('sessions');
+    const stored = structuredClone(await table.get(value.id)) as unknown as {
+      session: { workflow: { rewardDice: Record<string, unknown> } };
+    };
+    delete stored.session.workflow.rewardDice['rerolls'];
+    await table.put(stored as unknown as SessionRecord);
+
+    await expect(repository.get(value.id)).rejects.toBeInstanceOf(
+      SessionValidationError,
+    );
   });
 
   test('rejects malformed version-4 Side availability', async () => {

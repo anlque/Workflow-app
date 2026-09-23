@@ -58,7 +58,7 @@ exports:
 | Presentation view | `ActiveSessionView`, `ActiveSessionViewProps` |
 | Presentation synchronization | `connectSessionMessages`, `SessionMessageConnection`, `SessionProjectionClient`, `parseSessionProjection` |
 
-`SessionControls`, `RewardResultDialog`, `RewardCube`, countdown/boundary helpers
+`SessionControls`, `RewardResultDialog`, `RewardCube` and countdown/boundary
 helpers are internal Presentation details. Consumers use
 `ActiveSessionView` instead of assembling them directly.
 

@@ -117,6 +117,8 @@ function hasExactKeys(
 
 function workflow(value: unknown) {
   const input = record(value);
+  if (!hasExactKeys(input, ['id', 'name', 'phases'], ['rewardDice']))
+    return invalid();
   const phases = input['phases'];
   if (!Array.isArray(phases)) return invalid();
   const diceValue = input['rewardDice'];
@@ -159,11 +161,17 @@ function workflow(value: unknown) {
     name: string(input['name']),
     phases: phases.map((value) => {
       const phase = record(value);
+      if (!hasExactKeys(phase, ['type', 'durationSeconds', 'environment']))
+        return invalid();
       const environment = record(phase['environment']);
-      const backgroundAssetId = optionalString(
-        environment['backgroundAssetId'],
-      );
-      const audioAssetId = optionalString(environment['audioAssetId']);
+      if (
+        !hasExactKeys(
+          environment,
+          [],
+          ['backgroundAsset', 'audioAsset', 'backgroundColor'],
+        )
+      )
+        return invalid();
       const parseReference = (raw: unknown) => {
         const reference = record(raw);
         const keys = Object.keys(reference);
@@ -193,8 +201,6 @@ function workflow(value: unknown) {
         type: string(phase['type']),
         durationSeconds: number(phase['durationSeconds']),
         environment: {
-          ...(backgroundAssetId === undefined ? {} : { backgroundAssetId }),
-          ...(audioAssetId === undefined ? {} : { audioAssetId }),
           ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
           ...(audioAsset === undefined ? {} : { audioAsset }),
           ...(backgroundColor === undefined ? {} : { backgroundColor }),
@@ -234,18 +240,50 @@ function workflow(value: unknown) {
 export function parseSessionProjection(value: unknown): Session | null {
   if (value === null) return null;
   const input = record(value);
+  const status = input['status'];
+  const statusKeys =
+    status === 'running'
+      ? ['phaseStartedAt', 'phaseEndsAt']
+      : status === 'transitioning'
+        ? ['transitionEndsAt']
+        : status === 'paused'
+          ? ['pauseReason', 'pausedAt', 'remainingMilliseconds']
+          : status === 'completed'
+            ? ['completedAt']
+            : status === 'stopped'
+              ? ['stoppedAt']
+              : invalid();
+  if (
+    !hasExactKeys(
+      input,
+      [
+        'id',
+        'sourceWorkflowId',
+        'snapshot',
+        'currentPhaseIndex',
+        'rewardCommandReceipts',
+        'status',
+        ...statusKeys,
+      ],
+      ['rewardRitual'],
+    )
+  )
+    return invalid();
   const snapshot = record(input['snapshot']);
+  if (!hasExactKeys(snapshot, ['workflow'])) return invalid();
+  const restoredWorkflow = workflow(snapshot['workflow']);
+  if (string(input['sourceWorkflowId']) !== restoredWorkflow.id)
+    return invalid();
   const ritual = rewardRitual(input['rewardRitual']);
   const common = {
     id: string(input['id']),
-    workflow: workflow(snapshot['workflow']),
+    workflow: restoredWorkflow,
     currentPhaseIndex: number(input['currentPhaseIndex']),
     rewardCommandReceipts: rewardCommandReceipts(
       input['rewardCommandReceipts'],
     ),
     ...(ritual === undefined ? {} : { rewardRitual: ritual }),
   };
-  const status = input['status'];
   let restored: RestoreSessionInput;
   if (status === 'running') {
     restored = {

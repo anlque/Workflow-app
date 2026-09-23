@@ -99,7 +99,15 @@ function parseWorkflow(value: unknown, schemaVersion: SessionSchemaVersion) {
         frequency: number(reward['frequency']),
       };
     }
-    if (!hasExactKeys(reward, ['schedule', 'sides'], ['rerolls']))
+    if (
+      !hasExactKeys(
+        reward,
+        schemaVersion === 5
+          ? ['schedule', 'sides', 'rerolls']
+          : ['schedule', 'sides'],
+        schemaVersion === 5 ? [] : ['rerolls'],
+      )
+    )
       return invalid();
     const raw = record(reward['schedule']);
     if (

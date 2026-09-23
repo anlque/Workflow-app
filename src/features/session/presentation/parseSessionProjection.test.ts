@@ -215,4 +215,94 @@ describe('parseSessionProjection', () => {
       'Session Reward ritual is invalid.',
     );
   });
+
+  test.each([
+    ['Session', (value: Record<string, unknown>) => value],
+    [
+      'snapshot',
+      (value: Record<string, unknown>) =>
+        value['snapshot'] as Record<string, unknown>,
+    ],
+    [
+      'Workflow',
+      (value: Record<string, unknown>) =>
+        (value['snapshot'] as { workflow: Record<string, unknown> }).workflow,
+    ],
+    [
+      'Phase',
+      (value: Record<string, unknown>) => {
+        const phase = (
+          value['snapshot'] as {
+            workflow: { phases: Record<string, unknown>[] };
+          }
+        ).workflow.phases[0];
+        if (phase === undefined) throw new Error('Expected Phase.');
+        return phase;
+      },
+    ],
+    [
+      'Environment',
+      (value: Record<string, unknown>) =>
+        (
+          (
+            value['snapshot'] as {
+              workflow: { phases: { environment: Record<string, unknown> }[] };
+            }
+          ).workflow.phases[0] as { environment: Record<string, unknown> }
+        ).environment,
+    ],
+  ] as const)('rejects extra %s projection keys', (_label, target) => {
+    const value = structuredClone(
+      createSession('strict-shape', workflowWithReward(), 1_000),
+    ) as unknown as Record<string, unknown>;
+    target(value)['extra'] = true;
+
+    expect(() => parseSessionProjection(value)).toThrow(
+      'Session projection is invalid.',
+    );
+  });
+
+  test.each(['backgroundAssetId', 'audioAssetId'] as const)(
+    'rejects legacy Environment field %s',
+    (field) => {
+      const value = structuredClone(
+        createSession('legacy-environment', workflowWithReward(), 1_000),
+      ) as unknown as {
+        snapshot: {
+          workflow: { phases: { environment: Record<string, unknown> }[] };
+        };
+      };
+      const environment = value.snapshot.workflow.phases[0]?.environment;
+      if (environment === undefined) throw new Error('Expected Environment.');
+      environment[field] = 'asset-1';
+
+      expect(() => parseSessionProjection(value)).toThrow(
+        'Session projection is invalid.',
+      );
+    },
+  );
+
+  test('rejects Role references and a mismatched source Workflow ID', () => {
+    const withRole = structuredClone(
+      createSession('role-reference', workflowWithReward(), 1_000),
+    ) as unknown as {
+      snapshot: {
+        workflow: { phases: { environment: Record<string, unknown> }[] };
+      };
+    };
+    const environment = withRole.snapshot.workflow.phases[0]?.environment;
+    if (environment === undefined) throw new Error('Expected Environment.');
+    environment['backgroundAsset'] = { type: 'role', role: 'Backdrop' };
+    expect(() => parseSessionProjection(withRole)).toThrow(
+      'Session projection is invalid.',
+    );
+
+    const mismatched = structuredClone(
+      createSession('source-mismatch', workflowWithReward(), 1_000),
+    ) as unknown as Record<string, unknown>;
+    mismatched['sourceWorkflowId'] = 'another-workflow';
+    expect(() => parseSessionProjection(mismatched)).toThrow(
+      'Session projection is invalid.',
+    );
+  });
 });
