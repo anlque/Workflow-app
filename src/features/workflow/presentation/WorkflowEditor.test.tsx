@@ -24,6 +24,39 @@ const image = createAsset({
   createdAt: 1_000,
 });
 
+const roleAudio = createAsset({
+  id: 'audio-1',
+  name: 'Rain',
+  kind: 'audio',
+  mimeType: 'audio/mpeg',
+  byteSize: 10,
+  createdAt: 1_000,
+  role: 'Ambient',
+});
+
+function workflowWithBonus() {
+  return createWorkflow({
+    id: 'workflow-1',
+    name: 'Bonus rewards',
+    phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    rewardDice: {
+      frequency: 1,
+      sides: [
+        {
+          icon: 'tea',
+          title: 'Tea',
+          bonusPhase: {
+            name: 'Tea break',
+            durationSeconds: 300,
+            environment: {},
+          },
+        },
+        { icon: 'walk', title: 'Walk' },
+      ],
+    },
+  });
+}
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -396,6 +429,108 @@ describe('WorkflowEditor', () => {
         'Duration must be at least 0.5 minutes in 0.5-minute increments.',
       );
     }
+  });
+
+  test('preserves the Bonus draft across toggle off/on and omits it while disabled', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    render(
+      <WorkflowEditor
+        workflowId="workflow-1"
+        workflow={workflowWithBonus()}
+        assets={[]}
+        onSave={onSave}
+      />,
+    );
+    const toggle = screen.getByLabelText('Enable Bonus Phase for side 1');
+    const name = screen.getByLabelText('Side 1 Bonus Phase name');
+    await user.clear(name);
+    await user.type(name, 'Long tea break');
+
+    await user.click(toggle);
+    expect(screen.queryByLabelText('Side 1 Bonus Phase name')).toBeNull();
+    await user.click(toggle);
+    expect(screen.getByLabelText('Side 1 Bonus Phase name')).toHaveValue(
+      'Long tea break',
+    );
+
+    await user.click(toggle);
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+    expect(onSave).toHaveBeenCalledOnce();
+    expect(onSave.mock.calls[0]?.[0].rewardDice?.sides[0]).not.toHaveProperty(
+      'bonusPhase',
+    );
+  });
+
+  test('saves direct and Role references selected for a Bonus Environment', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    render(
+      <WorkflowEditor
+        workflowId="workflow-1"
+        workflow={workflowWithBonus()}
+        assets={[image, roleAudio]}
+        onSave={onSave}
+      />,
+    );
+
+    await user.selectOptions(
+      screen.getByLabelText('Side 1 Bonus Phase background image'),
+      'direct:image-1',
+    );
+    await user.selectOptions(
+      screen.getByLabelText('Side 1 Bonus Phase ambient audio'),
+      'role:ambient',
+    );
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+
+    expect(
+      onSave.mock.calls[0]?.[0].rewardDice?.sides[0]?.bonusPhase?.environment,
+    ).toEqual({
+      backgroundAsset: { type: 'direct', assetId: image.id },
+      audioAsset: { type: 'role', role: 'Ambient' },
+    });
+  });
+
+  test('commits and steps Bonus duration like ordinary Phase duration', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflowId="workflow-1"
+        workflow={workflowWithBonus()}
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+    const duration = screen.getByLabelText(
+      'Side 1 Bonus Phase duration in minutes',
+    );
+
+    await user.clear(duration);
+    await user.type(duration, '1.0');
+    await user.tab();
+    expect(duration).toHaveValue('1');
+
+    await user.clear(duration);
+    await user.type(duration, '0.5');
+    await user.keyboard('{ArrowDown}');
+    expect(duration).toHaveValue('0.5');
+    await user.keyboard('{ArrowUp}');
+    expect(duration).toHaveValue('1');
+
+    await user.clear(duration);
+    await user.type(duration, '1.2');
+    await user.tab();
+    expect(duration).toHaveValue('1.2');
+    expect(
+      screen.getByText(
+        'Duration must be at least 0.5 minutes in 0.5-minute increments.',
+      ),
+    ).toBeVisible();
   });
 
   test('identifies the first Reward opportunity without an available Side', () => {

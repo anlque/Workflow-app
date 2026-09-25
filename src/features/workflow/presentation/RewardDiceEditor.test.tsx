@@ -28,6 +28,9 @@ describe('RewardDiceEditor', () => {
         onFrequencyChange={() => undefined}
         onRerollsChange={() => undefined}
         onSideChange={() => undefined}
+        onBonusDurationChange={() => undefined}
+        onBonusDurationCommit={() => undefined}
+        onBonusDurationStep={() => undefined}
         onAddSide={() => undefined}
         onRemoveSide={() => undefined}
       />,
@@ -75,6 +78,9 @@ describe('RewardDiceEditor', () => {
         onFrequencyChange={() => undefined}
         onRerollsChange={() => undefined}
         onSideChange={() => undefined}
+        onBonusDurationChange={() => undefined}
+        onBonusDurationCommit={() => undefined}
+        onBonusDurationStep={() => undefined}
         onAddSide={() => undefined}
         onRemoveSide={() => undefined}
       />,
@@ -130,6 +136,9 @@ describe('RewardDiceEditor', () => {
         onFrequencyChange={() => undefined}
         onRerollsChange={() => undefined}
         onSideChange={onSideChange}
+        onBonusDurationChange={() => undefined}
+        onBonusDurationCommit={() => undefined}
+        onBonusDurationStep={() => undefined}
         onAddSide={() => undefined}
         onRemoveSide={() => undefined}
       />,
@@ -167,6 +176,9 @@ describe('RewardDiceEditor', () => {
         onFrequencyChange={() => undefined}
         onRerollsChange={() => undefined}
         onSideChange={() => undefined}
+        onBonusDurationChange={() => undefined}
+        onBonusDurationCommit={() => undefined}
+        onBonusDurationStep={() => undefined}
         onAddSide={() => undefined}
         onRemoveSide={() => undefined}
       />,
@@ -204,6 +216,9 @@ describe('RewardDiceEditor', () => {
         onFrequencyChange={() => undefined}
         onRerollsChange={onRerollsChange}
         onSideChange={() => undefined}
+        onBonusDurationChange={() => undefined}
+        onBonusDurationCommit={() => undefined}
+        onBonusDurationStep={() => undefined}
         onAddSide={() => undefined}
         onRemoveSide={() => undefined}
       />,
@@ -276,6 +291,9 @@ describe('RewardDiceEditor', () => {
         onFrequencyChange={() => undefined}
         onRerollsChange={() => undefined}
         onSideChange={onSideChange}
+        onBonusDurationChange={() => undefined}
+        onBonusDurationCommit={() => undefined}
+        onBonusDurationStep={() => undefined}
         onAddSide={() => undefined}
         onRemoveSide={() => undefined}
       />,

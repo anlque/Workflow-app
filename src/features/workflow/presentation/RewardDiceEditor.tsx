@@ -20,6 +20,9 @@ export type RewardDiceEditorProps = Readonly<{
   onFrequencyChange(value: string): void;
   onRerollsChange(value: string): void;
   onSideChange(key: string, patch: Partial<RewardSideDraft>): void;
+  onBonusDurationChange(key: string, value: string): void;
+  onBonusDurationCommit(key: string): void;
+  onBonusDurationStep(key: string, direction: -1 | 1): void;
   onAddSide(): void;
   onRemoveSide(key: string): void;
 }>;
@@ -34,6 +37,9 @@ export function RewardDiceEditor({
   onFrequencyChange,
   onRerollsChange,
   onSideChange,
+  onBonusDurationChange,
+  onBonusDurationCommit,
+  onBonusDurationStep,
   onAddSide,
   onRemoveSide,
 }: RewardDiceEditorProps) {
@@ -262,9 +268,26 @@ export function RewardDiceEditor({
                               type="text"
                               value={bonusPhase.durationMinutes}
                               onChange={(event) => {
-                                updateBonus({
-                                  durationMinutes: event.target.value,
-                                });
+                                onBonusDurationChange(
+                                  side.key,
+                                  event.target.value,
+                                );
+                              }}
+                              onBlur={() => {
+                                onBonusDurationCommit(side.key);
+                              }}
+                              onKeyDown={(event) => {
+                                if (
+                                  event.key !== 'ArrowUp' &&
+                                  event.key !== 'ArrowDown'
+                                ) {
+                                  return;
+                                }
+                                event.preventDefault();
+                                onBonusDurationStep(
+                                  side.key,
+                                  event.key === 'ArrowUp' ? 1 : -1,
+                                );
                               }}
                             />
                           </Field>

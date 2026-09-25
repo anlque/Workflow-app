@@ -31,8 +31,7 @@ export function WorkflowEditor({
   const [saved, setSaved] = useState(false);
   const saveStatusTimer = useRef<number | undefined>(undefined);
 
-  function setDurationError(phaseKey: string, invalid: boolean): void {
-    const errorKey = `phase:${phaseKey}:duration`;
+  function setDurationError(errorKey: string, invalid: boolean): void {
     setErrors((current) => {
       if (invalid) {
         return {
@@ -234,14 +233,14 @@ export function WorkflowEditor({
                     type="text"
                     value={phase.durationMinutes}
                     onChange={(event) => {
-                      setDurationError(phase.key, false);
+                      setDurationError(`phase:${phase.key}:duration`, false);
                       editor.updatePhase(phase.key, {
                         durationMinutes: event.target.value,
                       });
                     }}
                     onBlur={() => {
                       setDurationError(
-                        phase.key,
+                        `phase:${phase.key}:duration`,
                         !editor.commitPhaseDuration(phase.key),
                       );
                     }}
@@ -254,7 +253,7 @@ export function WorkflowEditor({
                       }
                       event.preventDefault();
                       setDurationError(
-                        phase.key,
+                        `phase:${phase.key}:duration`,
                         !editor.stepPhaseDuration(
                           phase.key,
                           event.key === 'ArrowUp' ? 1 : -1,
@@ -319,6 +318,29 @@ export function WorkflowEditor({
         }}
         onSideChange={(key, side) => {
           editor.updateRewardSide(key, side);
+        }}
+        onBonusDurationChange={(sideKey, durationMinutes) => {
+          setDurationError(`reward:${sideKey}:bonus:duration`, false);
+          const bonusPhase = editor.draft.rewardDice.sides.find(
+            ({ key }) => key === sideKey,
+          )?.bonusPhase;
+          if (bonusPhase !== undefined) {
+            editor.updateRewardSide(sideKey, {
+              bonusPhase: { ...bonusPhase, durationMinutes },
+            });
+          }
+        }}
+        onBonusDurationCommit={(sideKey) => {
+          setDurationError(
+            `reward:${sideKey}:bonus:duration`,
+            !editor.commitBonusDuration(sideKey),
+          );
+        }}
+        onBonusDurationStep={(sideKey, direction) => {
+          setDurationError(
+            `reward:${sideKey}:bonus:duration`,
+            !editor.stepBonusDuration(sideKey, direction),
+          );
         }}
         onAddSide={() => {
           editor.addRewardSide();

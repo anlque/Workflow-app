@@ -114,6 +114,38 @@ describe('DexieSessionRepository', () => {
     },
   );
 
+  test('rejects a version-6 Reward pause without its authoritative ritual', async () => {
+    const store = database();
+    const repository = new DexieSessionRepository(store);
+    const rewarded = createWorkflow({
+      id: 'missing-v6-ritual-workflow',
+      name: 'Missing v6 ritual',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'a', title: 'A' },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('missing-v6-ritual', rewarded, 1_000),
+      3_000,
+    );
+    await repository.save(paused);
+    const table = store.table<SessionRecord, string>('sessions');
+    const stored = structuredClone(await table.get(paused.id)) as unknown as {
+      session: Record<string, unknown>;
+    };
+    delete stored.session['rewardRitual'];
+    await table.put(stored as unknown as SessionRecord);
+
+    await expect(repository.get(paused.id)).rejects.toBeInstanceOf(
+      SessionValidationError,
+    );
+  });
+
   test.each([1, 2, 3, 4] as const)(
     'restores a final Reward pause from legacy version %s without inventing a result',
     async (schemaVersion) => {

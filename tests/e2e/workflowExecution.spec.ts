@@ -144,6 +144,24 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
+  await options.getByRole('tab', { name: 'Assets' }).click();
+  await options.getByLabel('Add local image or audio').setInputFiles({
+    name: 'bonus-background.png',
+    mimeType: 'image/png',
+    buffer: onePixelPng,
+  });
+  await options.getByLabel('Add local image or audio').setInputFiles({
+    name: 'bonus-ambient.mp3',
+    mimeType: 'audio/mpeg',
+    buffer: Buffer.from('ID3 bonus audio fixture'),
+  });
+  await options
+    .getByRole('button', { name: 'Manage role for bonus-ambient.mp3' })
+    .click();
+  await options.getByRole('textbox', { name: 'Role' }).fill('Bonus ambience');
+  await options.getByRole('button', { name: 'Review role' }).click();
+  await options.getByRole('button', { name: 'Assign role' }).click();
+  await options.getByRole('tab', { name: 'Workflows' }).click();
   await options.getByRole('button', { name: 'Create workflow' }).click();
   await options.getByLabel('Workflow name').fill('Custom rewards');
   for (let index = 0; index < 5; index += 1) {
@@ -164,6 +182,12 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
   await options
     .getByLabel('Side 1 Bonus Phase background color')
     .fill('#123456');
+  await options
+    .getByLabel('Side 1 Bonus Phase background image')
+    .selectOption({ label: 'bonus-background.png' });
+  await options
+    .getByLabel('Side 1 Bonus Phase ambient audio')
+    .selectOption('role:bonus ambience');
 
   await options.getByLabel('Reward after Phase 1').uncheck();
   await options.getByLabel('Reward after Phase 5').uncheck();
@@ -191,6 +215,12 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
   await expect(
     options.getByLabel('Side 1 Bonus Phase background color'),
   ).toHaveValue('#123456');
+  await expect(
+    options.getByLabel('Side 1 Bonus Phase background image'),
+  ).toHaveValue(/^direct:/u);
+  await expect(
+    options.getByLabel('Side 1 Bonus Phase ambient audio'),
+  ).toHaveValue('role:bonus ambience');
   for (const index of [1, 2, 3, 5]) {
     await expect(
       options.getByLabel(`Reward after Phase ${String(index + 1)}`),

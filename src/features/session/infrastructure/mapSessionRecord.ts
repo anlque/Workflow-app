@@ -358,7 +358,7 @@ export function mapSessionRecord(value: unknown): Session {
     const restoredRitual =
       pauseReason !== 'reward' || rewardRitual !== undefined
         ? rewardRitual
-        : outer['schemaVersion'] === 5
+        : outer['schemaVersion'] >= 5
           ? invalid()
           : remainingMilliseconds === 0
             ? {

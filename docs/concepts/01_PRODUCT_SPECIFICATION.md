@@ -321,12 +321,11 @@ omitted. Each side has an `any`, `early` or `late` availability. The Domain
 orders the Reward opportunities produced by the canonical schedule: the first
 half admits `early` and `any` sides, the second half admits `late` and `any`
 sides, and the middle opportunity of an odd count belongs to both halves. Every
-configured opportunity must have at least one eligible side. After the
-Each Side may optionally configure one Bonus Reward Phase with a non-empty name,
+configured opportunity must have at least one eligible side. Each Side may
+optionally configure one Bonus Reward Phase with a non-empty name,
 positive duration and the same Environment fields as a normal Phase. RW-004
 stores this configuration; it does not execute it. Bonus timing and lifecycle
-belong to RW-005. After the
-one-second Phase transition, an eligible non-final Reward
+belong to RW-005. After the one-second Phase transition, an eligible non-final Reward
 pauses the full next Phase until the user clicks `Roll dice`, sees the result
 and clicks `Continue`.
 The cube, result and current action use a centered composition with deliberate

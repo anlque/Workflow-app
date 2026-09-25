@@ -386,6 +386,26 @@ export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
     }));
   };
 
+  const updateBonusDuration = (
+    sideKey: string,
+    durationMinutes: string,
+  ): void => {
+    setDraft((current) => ({
+      ...current,
+      rewardDice: {
+        ...current.rewardDice,
+        sides: current.rewardDice.sides.map((side) =>
+          side.key === sideKey && side.bonusPhase !== undefined
+            ? {
+                ...side,
+                bonusPhase: { ...side.bonusPhase, durationMinutes },
+              }
+            : side,
+        ),
+      },
+    }));
+  };
+
   return {
     draft,
     rewardAfterPhaseKeys,
@@ -410,6 +430,31 @@ export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
       );
       if (durationMinutes === null) return false;
       updatePhase(phaseKey, { durationMinutes });
+      return true;
+    },
+    commitBonusDuration(sideKey: string): boolean {
+      const bonusPhase = draft.rewardDice.sides.find(
+        ({ key: value }) => value === sideKey,
+      )?.bonusPhase;
+      if (bonusPhase === undefined) return false;
+      const durationMinutes = normalizedDurationMinutes(
+        bonusPhase.durationMinutes,
+      );
+      if (durationMinutes === null) return false;
+      updateBonusDuration(sideKey, durationMinutes);
+      return true;
+    },
+    stepBonusDuration(sideKey: string, direction: -1 | 1): boolean {
+      const bonusPhase = draft.rewardDice.sides.find(
+        ({ key: value }) => value === sideKey,
+      )?.bonusPhase;
+      if (bonusPhase === undefined) return false;
+      const durationMinutes = steppedDurationMinutes(
+        bonusPhase.durationMinutes,
+        direction,
+      );
+      if (durationMinutes === null) return false;
+      updateBonusDuration(sideKey, durationMinutes);
       return true;
     },
     addPhase(): void {
