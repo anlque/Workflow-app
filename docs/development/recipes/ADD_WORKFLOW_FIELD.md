@@ -79,8 +79,8 @@ Cross a feature boundary only through its root `index.ts`; see
 - **Old records:** does an absent field have one safe meaning? If not, use a
   record version/migration rather than an arbitrary default.
 - **Current writes:** do they always store the canonical field?
-- **Workflow packages:** current export writes version 4 and import supports
-  versions 1–4. Does the field fit the v4 contract and preserve explicit v1–v3
+- **Workflow packages:** current export writes version 5 and import supports
+  versions 1–5. Does the field fit the v5 contract and preserve explicit v1–v4
   compatibility, or must the public envelope advance under
   [ADR-0007](../../adr/ADR-0007-versioned-import-export.md)?
 - **Session history:** can stored snapshots without the field still restore?

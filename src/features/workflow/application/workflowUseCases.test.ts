@@ -76,7 +76,16 @@ describe('Workflow use cases', () => {
         schedule: { type: 'custom', phaseIndexes: [0] },
         rerolls: 3,
         sides: [
-          { icon: 'tea', title: 'Tea', availability: 'early' },
+          {
+            icon: 'tea',
+            title: 'Tea',
+            availability: 'early',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 300,
+              environment: { backgroundColor: '#123456' },
+            },
+          },
           { icon: 'walk', title: 'Walk', availability: 'late' },
         ],
       },

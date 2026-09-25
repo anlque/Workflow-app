@@ -6,6 +6,7 @@ export type DiceSide = Readonly<{
   description?: string;
   probability: number;
   availability: DiceSideAvailability;
+  bonusPhase?: BonusRewardPhase;
 }>;
 
 export type DiceSideInput = Readonly<{
@@ -14,4 +15,9 @@ export type DiceSideInput = Readonly<{
   description?: string;
   weight?: number;
   availability?: DiceSideAvailability;
+  bonusPhase?: BonusRewardPhaseInput;
 }>;
+import type {
+  BonusRewardPhase,
+  BonusRewardPhaseInput,
+} from './BonusRewardPhase';

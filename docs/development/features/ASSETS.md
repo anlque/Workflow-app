@@ -158,7 +158,8 @@ See [Persistence and Compatibility](../PERSISTENCE.md) and
 
 Options uses the library for local import, preview, Role management and a
 two-step retirement dialog. The first step lists affected Workflows and direct/
-Role occurrences with phase, location and optionality; the second chooses an
+Role occurrences with normal Phase or Reward Side Bonus ownership, location
+and optionality; the second chooses an
 existing same-kind Asset, a new upload or
 optional-reference removal. The injected Application operation remains the
 authoritative kind/size/MIME and transaction boundary. Rejections remain inline
@@ -216,8 +217,9 @@ channel policy remains deferred to AU-001.
   feature imports Assets internals.
 - Assets never imports Session. Options composes the public Session query into
   the narrow active-reference port alongside Workflow counting and UI operations.
-- Role management and Asset retirement reuse this port/query boundary. RW-005
-  extends Session's one snapshot traversal for Bonus environments. ADR-0011
+- Role management and Asset retirement reuse this port/query boundary. The
+  traversal already includes Bonus environments; RW-005 adds their execution.
+  ADR-0011
   supersedes ADR-0006.
 
 ## Failure Model

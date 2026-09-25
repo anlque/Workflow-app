@@ -236,7 +236,7 @@ describe('DexieSessionRepository', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  test('round-trips authoritative Reward ritual state in v5', async () => {
+  test('round-trips authoritative Reward ritual and Bonus configuration in v6', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
     const rewarded = createWorkflow({
@@ -250,7 +250,17 @@ describe('DexieSessionRepository', () => {
         frequency: 1,
         rerolls: 1,
         sides: [
-          { icon: 'a', title: 'A' },
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 300,
+              environment: {
+                audioAsset: { type: 'direct', assetId: 'audio-1' },
+              },
+            },
+          },
           { icon: 'b', title: 'B' },
         ],
       },
@@ -266,7 +276,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(rolled.id),
     ).resolves.toMatchObject({
-      schemaVersion: 5,
+      schemaVersion: 6,
       session: {
         rewardRitual: {
           id: 'reward-session:0',
@@ -451,7 +461,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(expected.id),
     ).resolves.toMatchObject({
-      schemaVersion: 5,
+      schemaVersion: 6,
       session: {
         workflow: {
           rewardDice: {

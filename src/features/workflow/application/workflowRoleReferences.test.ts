@@ -82,7 +82,18 @@ describe('Workflow Role references', () => {
       rewardDice: {
         schedule: { type: 'custom', phaseIndexes: [1] },
         sides: [
-          { icon: 'tea', title: 'Tea', availability: 'early' },
+          {
+            icon: 'tea',
+            title: 'Tea',
+            availability: 'early',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 300,
+              environment: {
+                backgroundAsset: { type: 'role', role: 'AMBIENT' },
+              },
+            },
+          },
           { icon: 'walk', title: 'Walk', availability: 'late' },
         ],
       },
@@ -118,5 +129,8 @@ describe('Workflow Role references', () => {
     expect(
       renamed?.rewardDice?.sides.map(({ availability }) => availability),
     ).toEqual(['early', 'late']);
+    expect(
+      renamed?.rewardDice?.sides[0]?.bonusPhase?.environment.backgroundAsset,
+    ).toEqual({ type: 'role', role: 'Deep Work' });
   });
 });

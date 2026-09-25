@@ -9,11 +9,11 @@ before Session creation. The editor draft stores one discriminated reference
 per Environment slot, and its picker explicitly offers direct Asset and Role
 modes. Unrelated Phase edits preserve the selected reference variant.
 
-Workflow record version 4 writes the reference union, canonical Reward schedule
-and Side availability. Its mapper reads version-1
+Workflow record version 5 writes the reference union, canonical Reward schedule,
+Side availability and optional Side Bonus Reward Phase. Its mapper reads version-1
 `backgroundAssetId`/`audioAssetId` fields as direct references. Table indexes
-remain `id, order`. Package export writes version 4; import supports versions
-1–4.
+remain `id, order`. Package export writes version 5; import supports versions
+1–5.
 
 ## Purpose
 
@@ -56,9 +56,9 @@ exports:
 
 | Group | Exports |
 | --- | --- |
-| Domain value types | `DiceSide`, `DiceSideInput`, `DiceSideAvailability`, `AssetId`, `AssetReference`, `AssetReferenceInput`, `Environment`, `EnvironmentInput`, `DurationSeconds`, `Phase`, `PhaseInput`, `PhaseType`, `RewardDice`, `RewardDiceInput`, `RewardPhaseType`, `CreateWorkflowInput`, `Workflow`, `WorkflowId` |
+| Domain value types | `BonusRewardPhase`, `BonusRewardPhaseInput`, `DiceSide`, `DiceSideInput`, `DiceSideAvailability`, `AssetId`, `AssetReference`, `AssetReferenceInput`, `Environment`, `EnvironmentInput`, `DurationSeconds`, `Phase`, `PhaseInput`, `PhaseType`, `RewardDice`, `RewardDiceInput`, `RewardPhaseType`, `CreateWorkflowInput`, `Workflow`, `WorkflowId` |
 | Domain behavior and errors | `createWorkflowId`, `createWorkflow`, `rollReward`, `eligibleDiceSides`, `rewardOpportunityPhaseIndexes`, `isRewardDueAfterPhase`, `WorkflowValidationError` |
-| Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`, `WorkflowPackageV2`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
+| Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`–`WorkflowPackageV5`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
 | Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `resolveWorkflowAssetReferences`, Role-summary/rename and Asset-retirement summary/patch operations, `exportWorkflowUseCase`, `importWorkflowUseCase` |
 | Infrastructure composition | `DexieWorkflowRepository`, `workflowDatabaseSchemas`, `DexieWorkflowPackageUnitOfWork` |
 | Presentation components | `WorkflowLibrary`, `WorkflowLibraryProps`, `WorkflowEditor`, `WorkflowEditorProps`, `RewardDiceEditor`, `RewardDiceEditorProps` |
@@ -76,7 +76,7 @@ presence in the root does not permit Presentation to instantiate them.
 constructor, eligibility calculation and random selection:
 
 - `Workflow.ts` owns identity and aggregate/input shapes;
-- `Phase.ts`, `Environment.ts`, `RewardDice.ts` and `DiceSide.ts` own value
+- `Phase.ts`, `Environment.ts`, `BonusRewardPhase.ts`, `RewardDice.ts` and `DiceSide.ts` own value
   shapes;
 - `createWorkflow.ts` validates, normalizes, copies and freezes the full
   aggregate;
@@ -145,6 +145,10 @@ seconds. This is not the more general Domain duration rule.
 - Every supplied weight and their total are finite and positive.
 - Domain stores normalized `probability`, not the original arbitrary weight.
 - If weights are omitted, every side receives equal probability.
+- Each Side may own at most one Bonus Reward Phase. Its trimmed name is
+  non-empty, duration is a positive integer in seconds and Environment follows
+  the same Asset/reference/color rules as a normal Phase. The nested value is
+  deeply immutable. Configuration is inert until RW-005.
 
 `isRewardDueAfterPhase()` returns false for an invalid index or absent Reward
 Dice. Custom schedules use exact Phase membership; frequency schedules preserve
@@ -158,9 +162,8 @@ presentation animation are not part of the aggregate.
 ### Copy Boundaries
 
 Creating, duplicating, importing and capturing a Session snapshot all rebuild
-the aggregate through `createWorkflow()`. Reward Dice sides are copied by value;
-reroll allowance is configuration, while the number used for a particular
-Reward is Presentation state and resets with each new dialog.
+the aggregate through `createWorkflow()`. Reward Dice sides and optional Bonus
+Phases are copied by value. Session Domain owns per-opportunity reroll usage.
 
 ## Use Cases
 
@@ -172,7 +175,7 @@ Reward is Presentation state and resets with each new dialog.
 | `deleteWorkflowUseCase` | Repository, ID | Requires existence, deletes; repository compacts collection order | `void` or not-found error |
 | `listWorkflowsUseCase` | Repository | Returns repository order | Readonly Workflow list |
 | `reorderWorkflowsUseCase` | Repository, complete ordered IDs | Requires an exact permutation of current IDs, delegates atomic replacement | `void` or Application error |
-| `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced Assets/Blobs and creates deterministic version-4 JSON | JSON or package validation error |
+| `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced Assets/Blobs, including Bonus Environments, and creates deterministic version-5 JSON | JSON or package validation error |
 | `importWorkflowUseCase` | Repositories, unit of work, JSON, limits/policy/identity | Validates complete package before writes, generates collision-free IDs, rewrites Environment references, atomically writes Assets and Workflow | Imported Workflow or package validation/storage failure |
 
 Composition wraps successful catalog mutations with
@@ -182,15 +185,16 @@ use cases.
 
 ## Persistence
 
-`DexieWorkflowRepository` writes version-4 `WorkflowRecord` rows in the global
-version-1 `workflows: 'id, order'` table definition and reads versions 1–4.
+`DexieWorkflowRepository` writes version-5 `WorkflowRecord` rows in the global
+version-1 `workflows: 'id, order'` table definition and reads versions 1–5.
 
 - Reads treat rows as `unknown`, validate record metadata and reconstruct the
   Domain aggregate.
-- Version 1 accepts only legacy ID Environment fields; versions 2–4 accept only
+- Version 1 accepts only legacy ID Environment fields; versions 2–5 accept only
   exact direct-or-Role reference fields. Versions 1–2 read legacy frequency
-  fields; versions 3–4 read the canonical schedule union. Versions 1–3 default
-  missing Side availability to `any`; version 4 requires it.
+  fields; versions 3–5 read the canonical schedule union. Versions 1–3 default
+  missing Side availability to `any`; versions 4–5 require it. Only version 5
+  accepts the optional exact Bonus Reward Phase shape.
 - New rows append after the highest order.
 - Updates preserve the current order.
 - Delete compacts remaining order values.
@@ -221,7 +225,8 @@ does not choose create versus update. It prevents removing the last Phase.
 
 ### `RewardDiceEditor`
 
-Edits enablement, frequency or custom marker schedule, 0–3 rerolls and sides.
+Edits enablement, frequency or custom marker schedule, 0–3 rerolls, sides and
+each Side's optional Bonus Reward Phase configuration.
 Custom markers bind to stable Phase draft keys: reorder moves them, delete
 removes them and duplicate copies them. Save converts keys to current indexes.
 It disables side removal at two sides. UI weights remain strings until draft

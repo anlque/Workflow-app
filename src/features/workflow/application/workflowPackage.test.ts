@@ -299,7 +299,7 @@ describe('Workflow package', () => {
       packageWith({ type: 'direct', assetId: 'a' }, { ...asset, extra: true }),
     );
   });
-  test('exports version 4 and remaps a colliding imported Role to its imported Asset', async () => {
+  test('exports version 5 and remaps a colliding imported Role to its imported Asset', async () => {
     const sourceAssets = new MemoryAssetRepository();
     await addAsset(sourceAssets, 'source-image', 'Backdrop');
     const source = createWorkflow({
@@ -335,7 +335,7 @@ describe('Workflow package', () => {
       },
     );
 
-    expect(parsed.version).toBe(4);
+    expect(parsed.version).toBe(5);
     expect(parsed.assets).toEqual([
       expect.objectContaining({ role: 'Backdrop' }),
     ]);
@@ -346,6 +346,103 @@ describe('Workflow package', () => {
     expect(
       targetAssets.values.get(createAssetId('asset-new'))?.asset.role,
     ).toBe('Backdrop (imported)');
+  });
+
+  test('round-trips and remaps references in a Bonus Reward Phase', async () => {
+    const sourceAssets = new MemoryAssetRepository();
+    await addAsset(sourceAssets, 'bonus-image', 'Bonus backdrop');
+    const source = createWorkflow({
+      id: 'workflow-bonus',
+      name: 'Bonus workflow',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        schedule: {
+          type: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: 1,
+        },
+        sides: [
+          {
+            icon: 'tea',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 300,
+              environment: {
+                backgroundAsset: {
+                  type: 'role',
+                  role: 'Bonus backdrop',
+                },
+              },
+            },
+          },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const data = await exportWorkflowUseCase(source, sourceAssets);
+
+    const imported = await importWorkflowUseCase(
+      new MemoryWorkflowRepository(),
+      new MemoryAssetRepository(),
+      new MemoryUnitOfWork(),
+      data,
+      { maxFileBytes: 10_000, assetPolicy: policy },
+      {
+        createWorkflowId: () => 'workflow-new',
+        createAssetId: () => 'asset-new',
+        now: () => 2_000,
+      },
+    );
+
+    expect(imported.rewardDice?.sides[0]?.bonusPhase).toMatchObject({
+      name: 'Tea break',
+      durationSeconds: 300,
+      environment: {
+        backgroundAsset: { type: 'role', role: 'Bonus backdrop' },
+      },
+    });
+  });
+
+  test('rejects malformed version-5 Bonus Reward Phase input before writes', async () => {
+    await expectRejectedPackage({
+      kind: 'locusora/workflow',
+      version: 5,
+      workflow: {
+        id: 'invalid-bonus',
+        name: 'Invalid bonus',
+        phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+        rewardDice: {
+          schedule: {
+            type: 'frequency',
+            triggerPhaseType: 'focus',
+            frequency: 1,
+          },
+          rerolls: 0,
+          sides: [
+            {
+              icon: 'tea',
+              title: 'Tea',
+              weight: 1,
+              availability: 'any',
+              bonusPhase: {
+                name: 'Bonus',
+                durationSeconds: 300,
+                environment: {},
+                extra: true,
+              },
+            },
+            {
+              icon: 'walk',
+              title: 'Walk',
+              weight: 1,
+              availability: 'any',
+            },
+          ],
+        },
+      },
+      assets: [],
+    });
   });
 
   test('continues deterministic Role collision suffixes beyond 9999', async () => {
@@ -468,7 +565,7 @@ describe('Workflow package', () => {
 
     expect(JSON.parse(data)).toMatchObject({
       kind: 'locusora/workflow',
-      version: 4,
+      version: 5,
       workflow: {
         rewardDice: {
           schedule: { type: 'frequency', triggerPhaseType: 'break' },
@@ -528,7 +625,7 @@ describe('Workflow package', () => {
     expect(imported.rewardDice?.rerolls).toBe(0);
   });
 
-  test('round-trips a canonical custom Reward schedule in version 4', async () => {
+  test('round-trips a canonical custom Reward schedule in version 5', async () => {
     const source = createWorkflow({
       id: 'custom-reward-workflow',
       name: 'Custom reward',
@@ -563,7 +660,7 @@ describe('Workflow package', () => {
     );
 
     expect(JSON.parse(data)).toMatchObject({
-      version: 4,
+      version: 5,
       workflow: {
         rewardDice: {
           schedule: { type: 'custom', phaseIndexes: [1] },

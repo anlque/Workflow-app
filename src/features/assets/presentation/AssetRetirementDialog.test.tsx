@@ -31,15 +31,24 @@ const preview = {
       workflowName: 'Deep work',
       occurrences: [
         {
+          owner: 'phase',
           phaseIndex: 0,
           location: 'background',
           referenceMode: 'direct',
           optional: true,
         },
         {
+          owner: 'phase',
           phaseIndex: 1,
           location: 'background',
           referenceMode: 'role',
+          optional: true,
+        },
+        {
+          owner: 'bonus',
+          sideIndex: 0,
+          location: 'background',
+          referenceMode: 'direct',
           optional: true,
         },
       ],
@@ -86,6 +95,14 @@ describe('AssetRetirementDialog', () => {
     await user.tab();
     expect(screen.getByRole('button', { name: 'Review usage' })).toHaveFocus();
     await user.keyboard('{Enter}');
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.textContent ===
+          'Reward Side 1 Bonus Phase · background · direct · optional',
+        { selector: 'li' },
+      ),
+    ).toBeVisible();
     expect(
       await screen.findByRole('button', { name: 'Continue' }),
     ).toHaveFocus();
@@ -289,6 +306,7 @@ describe('AssetRetirementDialog', () => {
               occurrences: [
                 ...preview.usages[0].occurrences,
                 {
+                  owner: 'phase',
                   phaseIndex: 2,
                   location: 'audio',
                   referenceMode: 'direct',

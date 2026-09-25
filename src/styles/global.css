@@ -776,6 +776,18 @@ textarea {
   margin-top: 1rem;
 }
 
+.reward-side__bonus {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.reward-side__bonus legend {
+  padding: 0 0.375rem;
+  font-weight: 700;
+}
+
 .check-control {
   display: flex;
   align-items: center;

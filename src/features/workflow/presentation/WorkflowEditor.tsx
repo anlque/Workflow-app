@@ -299,6 +299,7 @@ export function WorkflowEditor({
       </section>
 
       <RewardDiceEditor
+        assets={assets}
         draft={editor.draft.rewardDice}
         errors={errors}
         onEnabledChange={(enabled) => {

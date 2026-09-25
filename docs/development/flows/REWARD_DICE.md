@@ -85,6 +85,8 @@ coordinator cache evicts a settled entry.
 - Animation stage, sound and dialog focus are local
   Presentation state.
 - Reward Dice configuration remains part of the immutable Session snapshot.
+- A selected Side may carry inert Bonus Reward Phase configuration. RW-004
+  persists it; RW-005 will define the continuation and execution transition.
 
 ## Messages
 
@@ -101,14 +103,14 @@ complete authoritative projection.
 
 ## Persistence
 
-Session record v5 persists `pauseReason: 'reward'`, the opportunity identity,
+Session record v6 persists `pauseReason: 'reward'`, the opportunity identity,
 completed Phase index, selected Side index, rerolls used, acknowledgment and
 the `phase | complete` continuation target plus Session-level bounded command
-receipts. Legacy defaults for versions 1–4 are applied only by the
-version-aware persistence mapper; runtime projections require the canonical v5
-shape.
-Versions 1–4 remain readable and restore their historical state without
-inventing a selected result.
+receipts plus optional Bonus configuration on Dice Sides. Legacy defaults for
+versions 1–4 are applied only by the version-aware persistence mapper; runtime
+projections require the canonical shape. Versions 1–5 remain readable and
+restore their historical state without Bonus configuration or inventing a
+selected result.
 
 ## Failure and Recovery
 

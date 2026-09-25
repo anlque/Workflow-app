@@ -16,12 +16,24 @@ function snapshotReferencesAsset(
   snapshot: SessionSnapshot,
   assetId: AssetId,
 ): boolean {
-  return snapshot.workflow.phases.some(
-    ({ environment }) =>
-      (environment.backgroundAsset?.type === 'direct' &&
-        environment.backgroundAsset.assetId === assetId) ||
-      (environment.audioAsset?.type === 'direct' &&
-        environment.audioAsset.assetId === assetId),
+  return (
+    snapshot.workflow.phases.some(
+      ({ environment }) =>
+        (environment.backgroundAsset?.type === 'direct' &&
+          environment.backgroundAsset.assetId === assetId) ||
+        (environment.audioAsset?.type === 'direct' &&
+          environment.audioAsset.assetId === assetId),
+    ) ||
+    (snapshot.workflow.rewardDice?.sides.some(({ bonusPhase }) => {
+      const environment = bonusPhase?.environment;
+      return (
+        (environment?.backgroundAsset?.type === 'direct' &&
+          environment.backgroundAsset.assetId === assetId) ||
+        (environment?.audioAsset?.type === 'direct' &&
+          environment.audioAsset.assetId === assetId)
+      );
+    }) ??
+      false)
   );
 }
 

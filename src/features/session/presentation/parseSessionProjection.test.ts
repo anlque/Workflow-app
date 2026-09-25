@@ -87,6 +87,69 @@ describe('parseSessionProjection', () => {
     );
   });
 
+  test('restores a canonical Bonus Reward Phase with direct references', () => {
+    const value = createSession(
+      'bonus-session',
+      createWorkflow({
+        id: 'bonus-workflow',
+        name: 'Bonus',
+        phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+        rewardDice: {
+          frequency: 1,
+          sides: [
+            {
+              icon: 'tea',
+              title: 'Tea',
+              bonusPhase: {
+                name: 'Tea break',
+                durationSeconds: 300,
+                environment: {
+                  backgroundAsset: { type: 'direct', assetId: 'image-1' },
+                },
+              },
+            },
+            { icon: 'walk', title: 'Walk' },
+          ],
+        },
+      }),
+      1_000,
+    );
+
+    expect(
+      parseSessionProjection(structuredClone(value))?.snapshot.workflow
+        .rewardDice?.sides[0]?.bonusPhase,
+    ).toEqual(value.snapshot.workflow.rewardDice?.sides[0]?.bonusPhase);
+  });
+
+  test.each([
+    {
+      name: 'Bonus',
+      durationSeconds: 300,
+      environment: {},
+      extra: true,
+    },
+    {
+      name: 'Bonus',
+      durationSeconds: 300,
+      environment: { audioAsset: { type: 'role', role: 'Ambient' } },
+    },
+  ])('rejects malformed canonical Bonus projection', (bonusPhase) => {
+    const value = structuredClone(
+      createSession('invalid-bonus', workflowWithReward(), 1_000),
+    ) as unknown as {
+      snapshot: {
+        workflow: { rewardDice: { sides: Record<string, unknown>[] } };
+      };
+    };
+    const firstSide = value.snapshot.workflow.rewardDice.sides[0];
+    if (firstSide === undefined) throw new Error('Expected first Dice Side.');
+    firstSide['bonusPhase'] = bonusPhase;
+
+    expect(() => parseSessionProjection(value)).toThrow(
+      'Session projection is invalid.',
+    );
+  });
+
   test('reads canonical custom and rejects legacy frequency schedules', () => {
     const canonical = createSession(
       'custom-session',

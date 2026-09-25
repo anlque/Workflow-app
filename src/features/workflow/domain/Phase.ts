@@ -1,4 +1,5 @@
 import type { Environment, EnvironmentInput } from './Environment';
+import { WorkflowValidationError } from './WorkflowErrors';
 
 declare const durationSecondsBrand: unique symbol;
 
@@ -19,3 +20,12 @@ export type PhaseInput = Readonly<{
   durationSeconds: number;
   environment: EnvironmentInput;
 }>;
+
+export function createDurationSeconds(value: number): DurationSeconds {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new WorkflowValidationError(
+      'Phase duration must be a positive integer number of seconds.',
+    );
+  }
+  return value as DurationSeconds;
+}

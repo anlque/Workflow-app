@@ -40,7 +40,38 @@ function occurrences(workflow: Workflow, source: Asset) {
     references.forEach(({ location, reference }) => {
       const referenceMode = referenceKind(reference, source);
       if (referenceMode !== null) {
-        values.push({ phaseIndex, location, referenceMode, optional: true });
+        values.push({
+          owner: 'phase',
+          phaseIndex,
+          location,
+          referenceMode,
+          optional: true,
+        });
+      }
+    });
+  });
+  workflow.rewardDice?.sides.forEach(({ bonusPhase }, sideIndex) => {
+    if (bonusPhase === undefined) return;
+    const references = [
+      {
+        location: 'background' as const,
+        reference: bonusPhase.environment.backgroundAsset,
+      },
+      {
+        location: 'audio' as const,
+        reference: bonusPhase.environment.audioAsset,
+      },
+    ];
+    references.forEach(({ location, reference }) => {
+      const referenceMode = referenceKind(reference, source);
+      if (referenceMode !== null) {
+        values.push({
+          owner: 'bonus',
+          sideIndex,
+          location,
+          referenceMode,
+          optional: true,
+        });
       }
     });
   });
@@ -104,10 +135,39 @@ function copyWorkflow(
                 : { description: side.description }),
               availability: side.availability,
               weight: side.probability,
+              ...(side.bonusPhase === undefined
+                ? {}
+                : {
+                    bonusPhase: {
+                      name: side.bonusPhase.name,
+                      durationSeconds: side.bonusPhase.durationSeconds,
+                      environment: copyEnvironment(
+                        side.bonusPhase.environment,
+                        transform,
+                      ),
+                    },
+                  }),
             })),
           },
         }),
   });
+}
+
+function copyEnvironment(
+  source: Workflow['phases'][number]['environment'],
+  transform: (
+    reference: AssetReference | undefined,
+  ) => AssetReference | undefined,
+): EnvironmentInput {
+  const backgroundAsset = transform(source.backgroundAsset);
+  const audioAsset = transform(source.audioAsset);
+  return {
+    ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
+    ...(audioAsset === undefined ? {} : { audioAsset }),
+    ...(source.backgroundColor === undefined
+      ? {}
+      : { backgroundColor: source.backgroundColor }),
+  };
 }
 
 async function patch(

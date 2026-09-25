@@ -48,7 +48,18 @@ function workflow() {
     rewardDice: {
       schedule: { type: 'custom', phaseIndexes: [1] },
       sides: [
-        { icon: 'tea', title: 'Tea', availability: 'early' },
+        {
+          icon: 'tea',
+          title: 'Tea',
+          availability: 'early',
+          bonusPhase: {
+            name: 'Bonus',
+            durationSeconds: 300,
+            environment: {
+              backgroundAsset: { type: 'direct', assetId: source.id },
+            },
+          },
+        },
         { icon: 'walk', title: 'Walk', availability: 'late' },
       ],
     },
@@ -65,21 +76,31 @@ test('reports every direct and Role occurrence with its Phase location and optio
       workflowName: 'Deep work',
       occurrences: [
         {
+          owner: 'phase',
           phaseIndex: 0,
           location: 'background',
           referenceMode: 'direct',
           optional: true,
         },
         {
+          owner: 'phase',
           phaseIndex: 0,
           location: 'audio',
           referenceMode: 'role',
           optional: true,
         },
         {
+          owner: 'phase',
           phaseIndex: 1,
           location: 'background',
           referenceMode: 'role',
+          optional: true,
+        },
+        {
+          owner: 'bonus',
+          sideIndex: 0,
+          location: 'background',
+          referenceMode: 'direct',
           optional: true,
         },
       ],
@@ -113,6 +134,9 @@ describe('Workflow Asset retirement patches', () => {
     expect(
       saved.rewardDice?.sides.map(({ availability }) => availability),
     ).toEqual(['early', 'late']);
+    expect(
+      saved.rewardDice?.sides[0]?.bonusPhase?.environment.backgroundAsset,
+    ).toEqual({ type: 'direct', assetId: replacement.id });
   });
 
   test('removes every optional direct and Role reference', async () => {
@@ -124,5 +148,8 @@ describe('Workflow Asset retirement patches', () => {
     expect(saved.phases[0].environment.backgroundAsset).toBeUndefined();
     expect(saved.phases[1]?.environment.backgroundAsset).toBeUndefined();
     expect(saved.phases[0].environment.audioAsset).toBeUndefined();
+    expect(
+      saved.rewardDice?.sides[0]?.bonusPhase?.environment.backgroundAsset,
+    ).toBeUndefined();
   });
 });

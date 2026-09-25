@@ -156,6 +156,14 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
   await options.getByLabel('Reward side 2 icon').fill('🌿');
   await options.getByLabel('Reward side 2 title').fill('Fresh air');
   await options.getByLabel('Reward side 2 availability').selectOption('late');
+  await options.getByLabel('Enable Bonus Phase for side 1').check();
+  await options.getByLabel('Side 1 Bonus Phase name').fill('Tea break');
+  await options
+    .getByLabel('Side 1 Bonus Phase duration in minutes')
+    .fill('7.5');
+  await options
+    .getByLabel('Side 1 Bonus Phase background color')
+    .fill('#123456');
 
   await options.getByLabel('Reward after Phase 1').uncheck();
   await options.getByLabel('Reward after Phase 5').uncheck();
@@ -171,6 +179,18 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
   await expect(options.getByLabel('Reward side 2 availability')).toHaveValue(
     'late',
   );
+  await expect(
+    options.getByLabel('Enable Bonus Phase for side 1'),
+  ).toBeChecked();
+  await expect(options.getByLabel('Side 1 Bonus Phase name')).toHaveValue(
+    'Tea break',
+  );
+  await expect(
+    options.getByLabel('Side 1 Bonus Phase duration in minutes'),
+  ).toHaveValue('7.5');
+  await expect(
+    options.getByLabel('Side 1 Bonus Phase background color'),
+  ).toHaveValue('#123456');
   for (const index of [1, 2, 3, 5]) {
     await expect(
       options.getByLabel(`Reward after Phase ${String(index + 1)}`),

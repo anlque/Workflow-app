@@ -1,4 +1,5 @@
 import { Button, Field } from '@/shared';
+import { AssetPicker, type Asset } from '@/features/assets';
 
 import type { RewardPhaseType } from '../domain/RewardDice';
 import type { DiceSideAvailability } from '../domain/DiceSide';
@@ -10,6 +11,7 @@ import type {
 } from './useWorkflowEditor';
 
 export type RewardDiceEditorProps = Readonly<{
+  assets: readonly Asset[];
   draft: RewardDiceDraft;
   errors: WorkflowDraftErrors;
   onEnabledChange(enabled: boolean): void;
@@ -24,6 +26,7 @@ export type RewardDiceEditorProps = Readonly<{
 
 export function RewardDiceEditor({
   draft,
+  assets,
   errors,
   onEnabledChange,
   onScheduleModeChange,
@@ -133,93 +136,189 @@ export function RewardDiceEditor({
               </p>
             )}
             <ol className="reward-sides">
-              {draft.sides.map((side, index) => (
-                <li key={side.key} className="reward-side">
-                  <h4>Side {String(index + 1)}</h4>
-                  <div className="form-grid">
-                    <Field
-                      label={`Reward side ${String(index + 1)} icon`}
-                      error={errors[`reward:${side.key}:icon`]}
-                    >
-                      <input
-                        value={side.icon}
-                        onChange={(event) => {
-                          onSideChange(side.key, { icon: event.target.value });
-                        }}
-                      />
-                    </Field>
-                    <Field
-                      label={`Reward side ${String(index + 1)} title`}
-                      error={errors[`reward:${side.key}:title`]}
-                    >
-                      <input
-                        value={side.title}
-                        onChange={(event) => {
-                          onSideChange(side.key, { title: event.target.value });
-                        }}
-                      />
-                    </Field>
-                    <Field
-                      label={`Reward side ${String(index + 1)} description`}
-                    >
-                      <input
-                        value={side.description}
-                        onChange={(event) => {
-                          onSideChange(side.key, {
-                            description: event.target.value,
-                          });
-                        }}
-                      />
-                    </Field>
-                    <Field
-                      label={`Reward side ${String(index + 1)} availability`}
-                    >
-                      <select
-                        className="select"
-                        value={side.availability}
-                        onChange={(event) => {
-                          onSideChange(side.key, {
-                            availability: event.target
-                              .value as DiceSideAvailability,
-                          });
-                        }}
+              {draft.sides.map((side, index) => {
+                const bonusPhase = side.bonusPhase ?? {
+                  enabled: false,
+                  name: '',
+                  durationMinutes: '5',
+                  backgroundAsset: undefined,
+                  audioAsset: undefined,
+                  backgroundColor: '',
+                };
+                const updateBonus = (
+                  patch: Partial<typeof bonusPhase>,
+                ): void => {
+                  onSideChange(side.key, {
+                    bonusPhase: { ...bonusPhase, ...patch },
+                  });
+                };
+                return (
+                  <li key={side.key} className="reward-side">
+                    <h4>Side {String(index + 1)}</h4>
+                    <div className="form-grid">
+                      <Field
+                        label={`Reward side ${String(index + 1)} icon`}
+                        error={errors[`reward:${side.key}:icon`]}
                       >
-                        <option value="any">Any</option>
-                        <option value="early">Early</option>
-                        <option value="late">Late</option>
-                      </select>
-                    </Field>
-                    <Field
-                      label={`Reward side ${String(index + 1)} weight`}
-                      hint="Leave every weight empty for equal odds."
-                      error={errors[`reward:${side.key}:weight`]}
-                    >
+                        <input
+                          value={side.icon}
+                          onChange={(event) => {
+                            onSideChange(side.key, {
+                              icon: event.target.value,
+                            });
+                          }}
+                        />
+                      </Field>
+                      <Field
+                        label={`Reward side ${String(index + 1)} title`}
+                        error={errors[`reward:${side.key}:title`]}
+                      >
+                        <input
+                          value={side.title}
+                          onChange={(event) => {
+                            onSideChange(side.key, {
+                              title: event.target.value,
+                            });
+                          }}
+                        />
+                      </Field>
+                      <Field
+                        label={`Reward side ${String(index + 1)} description`}
+                      >
+                        <input
+                          value={side.description}
+                          onChange={(event) => {
+                            onSideChange(side.key, {
+                              description: event.target.value,
+                            });
+                          }}
+                        />
+                      </Field>
+                      <Field
+                        label={`Reward side ${String(index + 1)} availability`}
+                      >
+                        <select
+                          className="select"
+                          value={side.availability}
+                          onChange={(event) => {
+                            onSideChange(side.key, {
+                              availability: event.target
+                                .value as DiceSideAvailability,
+                            });
+                          }}
+                        >
+                          <option value="any">Any</option>
+                          <option value="early">Early</option>
+                          <option value="late">Late</option>
+                        </select>
+                      </Field>
+                      <Field
+                        label={`Reward side ${String(index + 1)} weight`}
+                        hint="Leave every weight empty for equal odds."
+                        error={errors[`reward:${side.key}:weight`]}
+                      >
+                        <input
+                          inputMode="decimal"
+                          value={side.weight}
+                          onChange={(event) => {
+                            onSideChange(side.key, {
+                              weight: event.target.value,
+                            });
+                          }}
+                        />
+                      </Field>
+                    </div>
+                    <label className="check-control reward-side__bonus-toggle">
                       <input
-                        inputMode="decimal"
-                        value={side.weight}
+                        type="checkbox"
+                        checked={bonusPhase.enabled}
                         onChange={(event) => {
-                          onSideChange(side.key, {
-                            weight: event.target.value,
-                          });
+                          updateBonus({ enabled: event.target.checked });
                         }}
                       />
-                    </Field>
-                  </div>
-                  <Button
-                    variant="quiet"
-                    aria-label={`Remove reward side ${String(index + 1)}`}
-                    aria-describedby={
-                      removalDisabled ? removalHintId : undefined
-                    }
-                    disabled={removalDisabled}
-                    onClick={() => {
-                      onRemoveSide(side.key);
-                    }}
-                  >
-                    Remove side
-                  </Button>
-                </li>
-              ))}
+                      Enable Bonus Phase for side {String(index + 1)}
+                    </label>
+                    {bonusPhase.enabled ? (
+                      <fieldset className="reward-side__bonus">
+                        <legend>Side {String(index + 1)} Bonus Phase</legend>
+                        <div className="form-grid">
+                          <Field
+                            label={`Side ${String(index + 1)} Bonus Phase name`}
+                            error={errors[`reward:${side.key}:bonus:name`]}
+                          >
+                            <input
+                              value={bonusPhase.name}
+                              onChange={(event) => {
+                                updateBonus({ name: event.target.value });
+                              }}
+                            />
+                          </Field>
+                          <Field
+                            label={`Side ${String(index + 1)} Bonus Phase duration in minutes`}
+                            error={errors[`reward:${side.key}:bonus:duration`]}
+                          >
+                            <input
+                              inputMode="decimal"
+                              type="text"
+                              value={bonusPhase.durationMinutes}
+                              onChange={(event) => {
+                                updateBonus({
+                                  durationMinutes: event.target.value,
+                                });
+                              }}
+                            />
+                          </Field>
+                          <AssetPicker
+                            label={`Side ${String(index + 1)} Bonus Phase background image`}
+                            kind="image"
+                            assets={assets}
+                            value={bonusPhase.backgroundAsset}
+                            onChange={(backgroundAsset) => {
+                              updateBonus({ backgroundAsset });
+                            }}
+                          />
+                          <AssetPicker
+                            label={`Side ${String(index + 1)} Bonus Phase ambient audio`}
+                            kind="audio"
+                            assets={assets}
+                            value={bonusPhase.audioAsset}
+                            onChange={(audioAsset) => {
+                              updateBonus({ audioAsset });
+                            }}
+                          />
+                          <Field
+                            label={`Side ${String(index + 1)} Bonus Phase background color`}
+                            hint="Optional CSS color."
+                          >
+                            <input
+                              value={bonusPhase.backgroundColor}
+                              placeholder="#18342b"
+                              onChange={(event) => {
+                                updateBonus({
+                                  backgroundColor: event.target.value,
+                                });
+                              }}
+                            />
+                          </Field>
+                        </div>
+                      </fieldset>
+                    ) : null}
+                    <Button
+                      variant="quiet"
+                      aria-label={`Remove reward side ${String(index + 1)}`}
+                      aria-describedby={
+                        removalDisabled ? removalHintId : undefined
+                      }
+                      disabled={removalDisabled}
+                      onClick={() => {
+                        onRemoveSide(side.key);
+                      }}
+                    >
+                      Remove side
+                    </Button>
+                  </li>
+                );
+              })}
             </ol>
             {removalDisabled ? (
               <p className="field__hint" id={removalHintId}>

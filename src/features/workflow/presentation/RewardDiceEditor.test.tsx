@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
 import { RewardDiceEditor } from './RewardDiceEditor';
+import type { RewardSideDraft } from './useWorkflowEditor';
 
 describe('RewardDiceEditor', () => {
   test('keeps optional reward controls hidden until enabled', async () => {
@@ -10,6 +11,7 @@ describe('RewardDiceEditor', () => {
     const onEnabledChange = vi.fn();
     render(
       <RewardDiceEditor
+        assets={[]}
         draft={{
           enabled: false,
           scheduleMode: 'frequency',
@@ -39,6 +41,7 @@ describe('RewardDiceEditor', () => {
   test('disables side removal when two sides remain', () => {
     render(
       <RewardDiceEditor
+        assets={[]}
         draft={{
           enabled: true,
           scheduleMode: 'frequency',
@@ -89,9 +92,11 @@ describe('RewardDiceEditor', () => {
 
   test('changes a Side availability through an accessible select', async () => {
     const user = userEvent.setup();
-    const onSideChange = vi.fn();
+    const onSideChange =
+      vi.fn<(key: string, patch: Partial<RewardSideDraft>) => void>();
     render(
       <RewardDiceEditor
+        assets={[]}
         draft={{
           enabled: true,
           scheduleMode: 'frequency',
@@ -145,6 +150,7 @@ describe('RewardDiceEditor', () => {
     const onTriggerPhaseTypeChange = vi.fn();
     render(
       <RewardDiceEditor
+        assets={[]}
         draft={{
           enabled: true,
           scheduleMode: 'frequency',
@@ -181,6 +187,7 @@ describe('RewardDiceEditor', () => {
     const onRerollsChange = vi.fn();
     render(
       <RewardDiceEditor
+        assets={[]}
         draft={{
           enabled: true,
           scheduleMode: 'frequency',
@@ -211,5 +218,79 @@ describe('RewardDiceEditor', () => {
     await user.selectOptions(screen.getByLabelText('Available rerolls'), '3');
 
     expect(onRerollsChange).toHaveBeenCalledWith('3');
+  });
+
+  test('reveals accessible Side Bonus Phase environment controls when enabled', async () => {
+    const user = userEvent.setup();
+    const onSideChange =
+      vi.fn<(key: string, patch: Partial<RewardSideDraft>) => void>();
+    render(
+      <RewardDiceEditor
+        assets={[]}
+        draft={{
+          enabled: true,
+          scheduleMode: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: '1',
+          customPhaseKeys: [],
+          rerolls: '0',
+          sides: [
+            {
+              key: 'tea',
+              icon: '☕',
+              title: 'Tea',
+              description: '',
+              weight: '',
+              availability: 'any',
+              bonusPhase: {
+                enabled: true,
+                name: '',
+                durationMinutes: '5',
+                backgroundAsset: undefined,
+                audioAsset: undefined,
+                backgroundColor: '',
+              },
+            },
+            {
+              key: 'walk',
+              icon: '🚶',
+              title: 'Walk',
+              description: '',
+              weight: '',
+              availability: 'any',
+              bonusPhase: {
+                enabled: false,
+                name: '',
+                durationMinutes: '5',
+                backgroundAsset: undefined,
+                audioAsset: undefined,
+                backgroundColor: '',
+              },
+            },
+          ],
+        }}
+        errors={{}}
+        onEnabledChange={() => undefined}
+        onScheduleModeChange={() => undefined}
+        onTriggerPhaseTypeChange={() => undefined}
+        onFrequencyChange={() => undefined}
+        onRerollsChange={() => undefined}
+        onSideChange={onSideChange}
+        onAddSide={() => undefined}
+        onRemoveSide={() => undefined}
+      />,
+    );
+
+    expect(screen.getByLabelText('Side 1 Bonus Phase name')).toBeVisible();
+    expect(
+      screen.getByLabelText('Side 1 Bonus Phase background image'),
+    ).toBeVisible();
+    expect(
+      screen.getByLabelText('Side 1 Bonus Phase ambient audio'),
+    ).toBeVisible();
+    await user.click(screen.getByLabelText('Enable Bonus Phase for side 1'));
+    expect(onSideChange).toHaveBeenCalledOnce();
+    expect(onSideChange.mock.calls[0]?.[0]).toBe('tea');
+    expect(onSideChange.mock.calls[0]?.[1].bonusPhase?.enabled).toBe(false);
   });
 });

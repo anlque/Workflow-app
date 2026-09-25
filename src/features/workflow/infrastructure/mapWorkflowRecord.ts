@@ -6,6 +6,8 @@ import type { Workflow } from '../domain/Workflow';
 import { WorkflowValidationError } from '../domain/WorkflowErrors';
 import type { WorkflowRecord } from './WorkflowRecord';
 
+type WorkflowSchemaVersion = 1 | 2 | 3 | 4 | 5;
+
 function invalidRecord(): never {
   throw new WorkflowValidationError('Stored Workflow record is invalid.');
 }
@@ -81,7 +83,7 @@ function mapAssetReference(value: unknown) {
 
 function mapEnvironmentRecord(
   value: unknown,
-  schemaVersion: 1 | 2 | 3 | 4,
+  schemaVersion: WorkflowSchemaVersion,
 ): EnvironmentInput {
   const record = objectRecord(value);
   const allowedKeys =
@@ -119,7 +121,7 @@ function mapEnvironmentRecord(
 
 function mapPhaseRecord(
   value: unknown,
-  schemaVersion: 1 | 2 | 3 | 4,
+  schemaVersion: WorkflowSchemaVersion,
 ): PhaseInput {
   const record = objectRecord(value);
   return {
@@ -131,7 +133,7 @@ function mapPhaseRecord(
 
 function mapRewardDiceRecord(
   value: unknown,
-  schemaVersion: 1 | 2 | 3 | 4,
+  schemaVersion: WorkflowSchemaVersion,
 ): RewardDiceInput {
   const record = objectRecord(value);
   const sides = record['sides'];
@@ -201,19 +203,40 @@ function mapRewardDiceRecord(
         !hasExactKeys(
           side,
           schemaVersion < 4 ? required : [...required, 'availability'],
-          ['description'],
+          schemaVersion === 5 ? ['description', 'bonusPhase'] : ['description'],
         )
       ) {
         return invalidRecord();
       }
+      const bonusPhase =
+        side['bonusPhase'] === undefined
+          ? undefined
+          : mapBonusRewardPhaseRecord(side['bonusPhase'], schemaVersion);
       return {
         icon: stringValue(side['icon']),
         title: stringValue(side['title']),
         ...(description === undefined ? {} : { description }),
         weight: numberValue(side['probability']),
         availability: availability as 'any' | 'early' | 'late',
+        ...(bonusPhase === undefined ? {} : { bonusPhase }),
       };
     }),
+  };
+}
+
+function mapBonusRewardPhaseRecord(
+  value: unknown,
+  schemaVersion: WorkflowSchemaVersion,
+) {
+  if (schemaVersion !== 5) return invalidRecord();
+  const record = objectRecord(value);
+  if (!hasExactKeys(record, ['name', 'durationSeconds', 'environment'])) {
+    return invalidRecord();
+  }
+  return {
+    name: stringValue(record['name']),
+    durationSeconds: numberValue(record['durationSeconds']),
+    environment: mapEnvironmentRecord(record['environment'], schemaVersion),
   };
 }
 
@@ -223,7 +246,8 @@ export function mapWorkflowRecord(value: unknown): Workflow {
     record['schemaVersion'] !== 1 &&
     record['schemaVersion'] !== 2 &&
     record['schemaVersion'] !== 3 &&
-    record['schemaVersion'] !== 4
+    record['schemaVersion'] !== 4 &&
+    record['schemaVersion'] !== 5
   ) {
     return invalidRecord();
   }
@@ -258,7 +282,7 @@ export function mapWorkflowToRecord(
 ): WorkflowRecord {
   return {
     id: workflow.id,
-    schemaVersion: 4,
+    schemaVersion: 5,
     order,
     name: workflow.name,
     phases: workflow.phases.map((phase) => ({
@@ -290,6 +314,36 @@ export function mapWorkflowToRecord(
                 : { description: side.description }),
               probability: side.probability,
               availability: side.availability,
+              ...(side.bonusPhase === undefined
+                ? {}
+                : {
+                    bonusPhase: {
+                      name: side.bonusPhase.name,
+                      durationSeconds: side.bonusPhase.durationSeconds,
+                      environment: {
+                        ...(side.bonusPhase.environment.backgroundAsset ===
+                        undefined
+                          ? {}
+                          : {
+                              backgroundAsset:
+                                side.bonusPhase.environment.backgroundAsset,
+                            }),
+                        ...(side.bonusPhase.environment.audioAsset === undefined
+                          ? {}
+                          : {
+                              audioAsset:
+                                side.bonusPhase.environment.audioAsset,
+                            }),
+                        ...(side.bonusPhase.environment.backgroundColor ===
+                        undefined
+                          ? {}
+                          : {
+                              backgroundColor:
+                                side.bonusPhase.environment.backgroundColor,
+                            }),
+                      },
+                    },
+                  }),
             })),
           },
         }),

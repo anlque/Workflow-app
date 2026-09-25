@@ -205,11 +205,19 @@ export function AssetRetirementDialog({
                       <ul>
                         {usage.occurrences.map((occurrence) => (
                           <li
-                            key={`${String(occurrence.phaseIndex)}:${occurrence.location}:${occurrence.referenceMode}`}
+                            key={`${occurrence.owner}:${String(
+                              occurrence.owner === 'phase'
+                                ? occurrence.phaseIndex
+                                : occurrence.sideIndex,
+                            )}:${occurrence.location}:${occurrence.referenceMode}`}
                           >
-                            Phase {String(occurrence.phaseIndex + 1)} ·{' '}
-                            {occurrence.location} · {occurrence.referenceMode} ·{' '}
-                            {occurrence.optional ? 'optional' : 'required'}
+                            {occurrence.owner === 'phase'
+                              ? `Phase ${String(occurrence.phaseIndex + 1)}`
+                              : `Reward Side ${String(
+                                  occurrence.sideIndex + 1,
+                                )} Bonus Phase`}{' '}
+                            · {occurrence.location} · {occurrence.referenceMode}{' '}
+                            · {occurrence.optional ? 'optional' : 'required'}
                           </li>
                         ))}
                       </ul>

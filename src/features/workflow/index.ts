@@ -1,4 +1,9 @@
 export type { DiceSide, DiceSideInput } from './domain/DiceSide';
+export {
+  createBonusRewardPhase,
+  type BonusRewardPhase,
+  type BonusRewardPhaseInput,
+} from './domain/BonusRewardPhase';
 export type {
   AssetId,
   AssetReference,
@@ -62,6 +67,9 @@ export {
   type WorkflowPackageUnitOfWork,
   type WorkflowPackageV1,
   type WorkflowPackageV2,
+  type WorkflowPackageV3,
+  type WorkflowPackageV4,
+  type WorkflowPackageV5,
 } from './application/WorkflowPackage';
 export { exportWorkflowUseCase } from './application/exportWorkflowUseCase';
 export {

@@ -87,7 +87,13 @@ function packageReferences(workflow: Workflow): PackageReferences {
     }
     target.set(key, kind);
   };
-  for (const { environment } of workflow.phases) {
+  const environments = [
+    ...workflow.phases.map(({ environment }) => environment),
+    ...(workflow.rewardDice?.sides.flatMap(({ bonusPhase }) =>
+      bonusPhase === undefined ? [] : [bonusPhase.environment],
+    ) ?? []),
+  ];
+  for (const environment of environments) {
     if (environment.backgroundAsset?.type === 'direct') {
       add(direct, environment.backgroundAsset.assetId, 'image');
     } else if (environment.backgroundAsset?.type === 'role') {
@@ -104,7 +110,7 @@ function packageReferences(workflow: Workflow): PackageReferences {
 
 function parseAsset(
   value: unknown,
-  version: 1 | 2 | 3 | 4,
+  version: 1 | 2 | 3 | 4 | 5,
   policy: AssetImportPolicy,
   identity: WorkflowImportIdentity,
 ): DecodedAsset {
@@ -223,7 +229,8 @@ export async function importWorkflowUseCase(
     (envelope['version'] !== 1 &&
       envelope['version'] !== 2 &&
       envelope['version'] !== 3 &&
-      envelope['version'] !== 4) ||
+      envelope['version'] !== 4 &&
+      envelope['version'] !== 5) ||
     !Array.isArray(envelope['assets'])
   ) {
     throw new WorkflowPackageValidationError();
@@ -323,29 +330,30 @@ export async function importWorkflowUseCase(
         ? undefined
         : { type: 'role' as const, role: mapped.asset.role };
     };
+    const rewriteEnvironment = (
+      environment: Workflow['phases'][number]['environment'],
+    ) => {
+      const backgroundAsset = rewriteReference(environment.backgroundAsset);
+      const audioAsset = rewriteReference(environment.audioAsset);
+      return {
+        ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
+        ...(audioAsset === undefined ? {} : { audioAsset }),
+        ...(environment.backgroundColor === undefined
+          ? {}
+          : { backgroundColor: environment.backgroundColor }),
+      };
+    };
     const reservedWorkflowIds = new Set(
       (await workflows.list()).map((workflow) => String(workflow.id)),
     );
     const imported = createWorkflow({
       id: nextUniqueId(identity.createWorkflowId, reservedWorkflowIds),
       name: sourceWorkflow.name,
-      phases: sourceWorkflow.phases.map((phase) => {
-        const backgroundAsset = rewriteReference(
-          phase.environment.backgroundAsset,
-        );
-        const audioAsset = rewriteReference(phase.environment.audioAsset);
-        return {
-          type: phase.type,
-          durationSeconds: phase.durationSeconds,
-          environment: {
-            ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
-            ...(audioAsset === undefined ? {} : { audioAsset }),
-            ...(phase.environment.backgroundColor === undefined
-              ? {}
-              : { backgroundColor: phase.environment.backgroundColor }),
-          },
-        };
-      }),
+      phases: sourceWorkflow.phases.map((phase) => ({
+        type: phase.type,
+        durationSeconds: phase.durationSeconds,
+        environment: rewriteEnvironment(phase.environment),
+      })),
       ...(sourceWorkflow.rewardDice === undefined
         ? {}
         : {
@@ -360,6 +368,17 @@ export async function importWorkflowUseCase(
                   : { description: side.description }),
                 availability: side.availability,
                 weight: side.probability,
+                ...(side.bonusPhase === undefined
+                  ? {}
+                  : {
+                      bonusPhase: {
+                        name: side.bonusPhase.name,
+                        durationSeconds: side.bonusPhase.durationSeconds,
+                        environment: rewriteEnvironment(
+                          side.bonusPhase.environment,
+                        ),
+                      },
+                    }),
               })),
             },
           }),

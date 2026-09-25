@@ -115,6 +115,47 @@ function hasExactKeys(
   );
 }
 
+function directReference(value: unknown) {
+  const reference = record(value);
+  if (
+    reference['type'] !== 'direct' ||
+    !hasExactKeys(reference, ['type', 'assetId'])
+  ) {
+    return invalid();
+  }
+  return {
+    type: 'direct' as const,
+    assetId: string(reference['assetId']),
+  };
+}
+
+function environment(value: unknown) {
+  const input = record(value);
+  if (
+    !hasExactKeys(
+      input,
+      [],
+      ['backgroundAsset', 'audioAsset', 'backgroundColor'],
+    )
+  ) {
+    return invalid();
+  }
+  const backgroundAsset =
+    input['backgroundAsset'] === undefined
+      ? undefined
+      : directReference(input['backgroundAsset']);
+  const audioAsset =
+    input['audioAsset'] === undefined
+      ? undefined
+      : directReference(input['audioAsset']);
+  const backgroundColor = optionalString(input['backgroundColor']);
+  return {
+    ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
+    ...(audioAsset === undefined ? {} : { audioAsset }),
+    ...(backgroundColor === undefined ? {} : { backgroundColor }),
+  };
+}
+
 function workflow(value: unknown) {
   const input = record(value);
   if (!hasExactKeys(input, ['id', 'name', 'phases'], ['rewardDice']))
@@ -163,48 +204,10 @@ function workflow(value: unknown) {
       const phase = record(value);
       if (!hasExactKeys(phase, ['type', 'durationSeconds', 'environment']))
         return invalid();
-      const environment = record(phase['environment']);
-      if (
-        !hasExactKeys(
-          environment,
-          [],
-          ['backgroundAsset', 'audioAsset', 'backgroundColor'],
-        )
-      )
-        return invalid();
-      const parseReference = (raw: unknown) => {
-        const reference = record(raw);
-        const keys = Object.keys(reference);
-        if (
-          reference['type'] !== 'direct' ||
-          keys.length !== 2 ||
-          !keys.includes('type') ||
-          !keys.includes('assetId')
-        ) {
-          return invalid();
-        }
-        return {
-          type: 'direct' as const,
-          assetId: string(reference['assetId']),
-        };
-      };
-      const backgroundAsset =
-        environment['backgroundAsset'] === undefined
-          ? undefined
-          : parseReference(environment['backgroundAsset']);
-      const audioAsset =
-        environment['audioAsset'] === undefined
-          ? undefined
-          : parseReference(environment['audioAsset']);
-      const backgroundColor = optionalString(environment['backgroundColor']);
       return {
         type: string(phase['type']),
         durationSeconds: number(phase['durationSeconds']),
-        environment: {
-          ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
-          ...(audioAsset === undefined ? {} : { audioAsset }),
-          ...(backgroundColor === undefined ? {} : { backgroundColor }),
-        },
+        environment: environment(phase['environment']),
       };
     }),
     ...(dice === undefined
@@ -219,17 +222,36 @@ function workflow(value: unknown) {
                 !hasExactKeys(
                   side,
                   ['icon', 'title', 'probability', 'availability'],
-                  ['description'],
+                  ['description', 'bonusPhase'],
                 )
               )
                 return invalid();
               const description = optionalString(side['description']);
+              const bonusPhase = (() => {
+                if (side['bonusPhase'] === undefined) return undefined;
+                const bonus = record(side['bonusPhase']);
+                if (
+                  !hasExactKeys(bonus, [
+                    'name',
+                    'durationSeconds',
+                    'environment',
+                  ])
+                ) {
+                  return invalid();
+                }
+                return {
+                  name: string(bonus['name']),
+                  durationSeconds: number(bonus['durationSeconds']),
+                  environment: environment(bonus['environment']),
+                };
+              })();
               return {
                 icon: string(side['icon']),
                 title: string(side['title']),
                 ...(description === undefined ? {} : { description }),
                 weight: number(side['probability']),
                 availability: sideAvailability(side['availability']),
+                ...(bonusPhase === undefined ? {} : { bonusPhase }),
               };
             }),
           },

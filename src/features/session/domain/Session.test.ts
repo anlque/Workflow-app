@@ -40,7 +40,17 @@ describe('Session', () => {
         frequency: 1,
         rerolls: 1,
         sides: [
-          { icon: 'tea', title: 'Tea' },
+          {
+            icon: 'tea',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 300,
+              environment: {
+                backgroundAsset: { type: 'direct', assetId: 'image-1' },
+              },
+            },
+          },
           { icon: 'walk', title: 'Walk' },
         ],
       },
@@ -122,7 +132,17 @@ describe('Session', () => {
         frequency: 1,
         rerolls: 3,
         sides: [
-          { icon: 'tea', title: 'Tea' },
+          {
+            icon: 'tea',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 300,
+              environment: {
+                backgroundAsset: { type: 'direct', assetId: 'image-1' },
+              },
+            },
+          },
           { icon: 'walk', title: 'Walk' },
         ],
       },
@@ -142,6 +162,10 @@ describe('Session', () => {
     expect(Object.isFrozen(session.snapshot)).toBe(true);
     expect(Object.isFrozen(session.snapshot.workflow)).toBe(true);
     expect(Object.isFrozen(session.snapshot.workflow.phases)).toBe(true);
+    const bonus = session.snapshot.workflow.rewardDice?.sides[0]?.bonusPhase;
+    expect(Object.isFrozen(bonus)).toBe(true);
+    expect(Object.isFrozen(bonus?.environment)).toBe(true);
+    expect(Object.isFrozen(bonus?.environment.backgroundAsset)).toBe(true);
   });
 
   test('rejects an unresolved Role before creating a Session snapshot', () => {
@@ -155,6 +179,35 @@ describe('Session', () => {
           environment: { audioAsset: { type: 'role', role: 'Ambient' } },
         },
       ],
+    });
+
+    expect(() => createSession('session-1', source, 1_000)).toThrow(
+      'Session snapshot requires direct Asset references.',
+    );
+  });
+
+  test('rejects an unresolved Role in a Bonus Reward Phase before snapshot creation', () => {
+    const source = createWorkflow({
+      id: 'workflow-bonus-role',
+      name: 'Bonus Role workflow',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'tea',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 300,
+              environment: {
+                audioAsset: { type: 'role', role: 'Ambient' },
+              },
+            },
+          },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
     });
 
     expect(() => createSession('session-1', source, 1_000)).toThrow(

@@ -9,7 +9,9 @@ import { activeSessionReferencesAsset } from './activeSessionReferencesAsset';
 
 const targetId = 'asset-target' as AssetId;
 
-function workflow(reference: 'background' | 'audio' | 'other' = 'background') {
+function workflow(
+  reference: 'background' | 'audio' | 'bonus' | 'other' = 'background',
+) {
   return createWorkflow({
     id: 'workflow-1',
     name: 'Deep work',
@@ -34,7 +36,24 @@ function workflow(reference: 'background' | 'audio' | 'other' = 'background') {
     rewardDice: {
       frequency: 1,
       sides: [
-        { icon: 'a', title: 'A' },
+        {
+          icon: 'a',
+          title: 'A',
+          ...(reference === 'bonus'
+            ? {
+                bonusPhase: {
+                  name: 'Bonus',
+                  durationSeconds: 300,
+                  environment: {
+                    backgroundAsset: {
+                      type: 'direct' as const,
+                      assetId: targetId,
+                    },
+                  },
+                },
+              }
+            : {}),
+        },
         { icon: 'b', title: 'B' },
       ],
     },
@@ -43,7 +62,7 @@ function workflow(reference: 'background' | 'audio' | 'other' = 'background') {
 
 function session(
   status: Session['status'],
-  reference: 'background' | 'audio' | 'other' = 'background',
+  reference: 'background' | 'audio' | 'bonus' | 'other' = 'background',
   pauseReason: 'user' | 'reward' = 'user',
 ): Session {
   const base = {
@@ -100,6 +119,7 @@ describe('activeSessionReferencesAsset', () => {
   test.each([
     ['background', 'running'],
     ['audio', 'running'],
+    ['bonus', 'running'],
     ['background', 'transitioning'],
     ['background', 'paused'],
   ] as const)(

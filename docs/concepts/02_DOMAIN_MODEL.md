@@ -296,6 +296,11 @@ Each side defines:
 - title;
 - probability;
 - availability: `any`, `early` or `late`.
+- at most one optional Bonus Reward Phase.
+
+A Bonus Reward Phase is a deeply immutable value with a non-empty name,
+positive integer duration in seconds and one Environment. It is configuration
+owned by the Side; RW-004 does not give it an independent execution lifecycle.
 
 Dice Sides belong exclusively to a Reward Dice.
 
@@ -468,6 +473,10 @@ half of those opportunities admits `early` and `any` sides, while the second
 half admits `late` and `any` sides. For an odd number of opportunities, the
 middle opportunity belongs to both halves. Every configured opportunity must
 have at least one eligible Dice Side.
+
+Each Dice Side may own one optional Bonus Reward Phase. Its Environment follows
+the same Asset-reference and color rules as a normal Phase. Bonus execution,
+pause/resume and completion remain deferred to RW-005.
 
 Reward Dice owns its Dice Sides.
 

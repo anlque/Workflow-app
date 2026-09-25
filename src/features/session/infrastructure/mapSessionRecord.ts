@@ -8,7 +8,7 @@ import {
 import { SessionValidationError } from '../domain/SessionErrors';
 import type { SessionRecord } from './SessionRecord';
 
-type SessionSchemaVersion = 1 | 2 | 3 | 4 | 5;
+type SessionSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6;
 
 function invalid(): never {
   throw new SessionValidationError('Stored Session record is invalid.');
@@ -69,6 +69,47 @@ function hasExactKeys(
   );
 }
 
+function parseDirectReference(value: unknown) {
+  const reference = record(value);
+  if (!hasExactKeys(reference, ['type', 'assetId'])) return invalid();
+  if (reference['type'] !== 'direct') return invalid();
+  return {
+    type: 'direct' as const,
+    assetId: string(reference['assetId']),
+  };
+}
+
+function parseEnvironment(value: unknown, schemaVersion: SessionSchemaVersion) {
+  const environment = record(value);
+  const allowedEnvironmentKeys =
+    schemaVersion === 1
+      ? ['backgroundAssetId', 'audioAssetId', 'backgroundColor']
+      : ['backgroundAsset', 'audioAsset', 'backgroundColor'];
+  if (!hasOnlyKeys(environment, allowedEnvironmentKeys)) return invalid();
+  const backgroundAssetId = optionalString(
+    schemaVersion === 1 ? environment['backgroundAssetId'] : undefined,
+  );
+  const audioAssetId = optionalString(
+    schemaVersion === 1 ? environment['audioAssetId'] : undefined,
+  );
+  const backgroundAsset =
+    schemaVersion === 1 || environment['backgroundAsset'] === undefined
+      ? undefined
+      : parseDirectReference(environment['backgroundAsset']);
+  const audioAsset =
+    schemaVersion === 1 || environment['audioAsset'] === undefined
+      ? undefined
+      : parseDirectReference(environment['audioAsset']);
+  const backgroundColor = optionalString(environment['backgroundColor']);
+  return {
+    ...(backgroundAssetId === undefined ? {} : { backgroundAssetId }),
+    ...(audioAssetId === undefined ? {} : { audioAssetId }),
+    ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
+    ...(audioAsset === undefined ? {} : { audioAsset }),
+    ...(backgroundColor === undefined ? {} : { backgroundColor }),
+  };
+}
+
 function parseWorkflow(value: unknown, schemaVersion: SessionSchemaVersion) {
   const input = record(value);
   const phases = input['phases'];
@@ -102,10 +143,10 @@ function parseWorkflow(value: unknown, schemaVersion: SessionSchemaVersion) {
     if (
       !hasExactKeys(
         reward,
-        schemaVersion === 5
+        schemaVersion >= 5
           ? ['schedule', 'sides', 'rerolls']
           : ['schedule', 'sides'],
-        schemaVersion === 5 ? [] : ['rerolls'],
+        schemaVersion >= 5 ? [] : ['rerolls'],
       )
     )
       return invalid();
@@ -140,53 +181,10 @@ function parseWorkflow(value: unknown, schemaVersion: SessionSchemaVersion) {
     name: string(input['name']),
     phases: phases.map((phaseValue) => {
       const phase = record(phaseValue);
-      const environment = record(phase['environment']);
-      const allowedEnvironmentKeys =
-        schemaVersion === 1
-          ? ['backgroundAssetId', 'audioAssetId', 'backgroundColor']
-          : ['backgroundAsset', 'audioAsset', 'backgroundColor'];
-      if (!hasOnlyKeys(environment, allowedEnvironmentKeys)) return invalid();
-      const backgroundAssetId = optionalString(
-        schemaVersion === 1 ? environment['backgroundAssetId'] : undefined,
-      );
-      const audioAssetId = optionalString(
-        schemaVersion === 1 ? environment['audioAssetId'] : undefined,
-      );
-      const parseReference = (value: unknown) => {
-        const reference = record(value);
-        const keys = Object.keys(reference);
-        if (
-          reference['type'] !== 'direct' ||
-          keys.length !== 2 ||
-          !keys.includes('type') ||
-          !keys.includes('assetId')
-        ) {
-          return invalid();
-        }
-        return {
-          type: 'direct' as const,
-          assetId: string(reference['assetId']),
-        };
-      };
-      const backgroundAsset =
-        schemaVersion === 1 || environment['backgroundAsset'] === undefined
-          ? undefined
-          : parseReference(environment['backgroundAsset']);
-      const audioAsset =
-        schemaVersion === 1 || environment['audioAsset'] === undefined
-          ? undefined
-          : parseReference(environment['audioAsset']);
-      const backgroundColor = optionalString(environment['backgroundColor']);
       return {
         type: string(phase['type']),
         durationSeconds: number(phase['durationSeconds']),
-        environment: {
-          ...(backgroundAssetId === undefined ? {} : { backgroundAssetId }),
-          ...(audioAssetId === undefined ? {} : { audioAssetId }),
-          ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
-          ...(audioAsset === undefined ? {} : { audioAsset }),
-          ...(backgroundColor === undefined ? {} : { backgroundColor }),
-        },
+        environment: parseEnvironment(phase['environment'], schemaVersion),
       };
     }),
     ...(reward === undefined
@@ -203,11 +201,35 @@ function parseWorkflow(value: unknown, schemaVersion: SessionSchemaVersion) {
                 !hasExactKeys(
                   side,
                   schemaVersion < 4 ? required : [...required, 'availability'],
-                  ['description'],
+                  schemaVersion === 6
+                    ? ['description', 'bonusPhase']
+                    : ['description'],
                 )
               ) {
                 return invalid();
               }
+              const bonusPhase = (() => {
+                if (side['bonusPhase'] === undefined) return undefined;
+                if (schemaVersion !== 6) return invalid();
+                const bonus = record(side['bonusPhase']);
+                if (
+                  !hasExactKeys(bonus, [
+                    'name',
+                    'durationSeconds',
+                    'environment',
+                  ])
+                ) {
+                  return invalid();
+                }
+                return {
+                  name: string(bonus['name']),
+                  durationSeconds: number(bonus['durationSeconds']),
+                  environment: parseEnvironment(
+                    bonus['environment'],
+                    schemaVersion,
+                  ),
+                };
+              })();
               return {
                 icon: string(side['icon']),
                 title: string(side['title']),
@@ -217,6 +239,7 @@ function parseWorkflow(value: unknown, schemaVersion: SessionSchemaVersion) {
                   schemaVersion < 4
                     ? 'any'
                     : sideAvailability(side['availability']),
+                ...(bonusPhase === undefined ? {} : { bonusPhase }),
               };
             }),
           },
@@ -289,7 +312,8 @@ export function mapSessionRecord(value: unknown): Session {
       outer['schemaVersion'] !== 2 &&
       outer['schemaVersion'] !== 3 &&
       outer['schemaVersion'] !== 4 &&
-      outer['schemaVersion'] !== 5) ||
+      outer['schemaVersion'] !== 5 &&
+      outer['schemaVersion'] !== 6) ||
     (outer['active'] !== 0 && outer['active'] !== 1)
   ) {
     return invalid();
@@ -400,7 +424,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
             : session.stoppedAt;
   return {
     id: session.id,
-    schemaVersion: 5,
+    schemaVersion: 6,
     active,
     updatedAt,
     session: {

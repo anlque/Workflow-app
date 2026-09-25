@@ -45,8 +45,18 @@ export type WorkflowRecordV4 = WorkflowRecordBase &
     phases: WorkflowRecordV2['phases'];
   }>;
 
+export type WorkflowRecordV5 = WorkflowRecordBase &
+  Readonly<{
+    schemaVersion: 5;
+    phases: WorkflowRecordV2['phases'];
+  }>;
+
 export type WorkflowRecord =
-  WorkflowRecordV1 | WorkflowRecordV2 | WorkflowRecordV3 | WorkflowRecordV4;
+  | WorkflowRecordV1
+  | WorkflowRecordV2
+  | WorkflowRecordV3
+  | WorkflowRecordV4
+  | WorkflowRecordV5;
 
 export const workflowDatabaseSchemas: readonly DatabaseSchema[] = [
   {

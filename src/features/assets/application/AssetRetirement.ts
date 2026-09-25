@@ -12,12 +12,17 @@ export type AssetRetirementUsage = Readonly<{
   occurrences: readonly AssetRetirementOccurrence[];
 }>;
 
-export type AssetRetirementOccurrence = Readonly<{
-  phaseIndex: number;
+type AssetRetirementOccurrenceBase = Readonly<{
   location: 'background' | 'audio';
   referenceMode: 'direct' | 'role';
   optional: boolean;
 }>;
+
+export type AssetRetirementOccurrence = AssetRetirementOccurrenceBase &
+  (
+    | Readonly<{ owner: 'phase'; phaseIndex: number }>
+    | Readonly<{ owner: 'bonus'; sideIndex: number }>
+  );
 
 export type AssetRetirementPreview = Readonly<{
   asset: Asset;

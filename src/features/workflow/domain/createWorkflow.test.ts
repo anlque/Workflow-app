@@ -144,6 +144,94 @@ describe('createWorkflow', () => {
     expect(Object.isFrozen(workflow.rewardDice?.sides[0])).toBe(true);
   });
 
+  test('creates a normalized deeply immutable Bonus Reward Phase', () => {
+    const workflow = createWorkflow({
+      id: 'workflow-1',
+      name: 'Deep work',
+      phases: [validPhase],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'tea',
+            title: 'Tea',
+            bonusPhase: {
+              name: '  Tea break  ',
+              durationSeconds: 300,
+              environment: {
+                backgroundAsset: { type: 'role', role: 'Backdrop' },
+                audioAsset: { type: 'direct', assetId: 'audio-1' },
+                backgroundColor: '#123456',
+              },
+            },
+          },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+
+    const [withBonus, withoutBonus] = workflow.rewardDice?.sides ?? [];
+    expect(withBonus?.bonusPhase).toEqual({
+      name: 'Tea break',
+      durationSeconds: 300,
+      environment: {
+        backgroundAsset: { type: 'role', role: 'Backdrop' },
+        audioAsset: { type: 'direct', assetId: 'audio-1' },
+        backgroundColor: '#123456',
+      },
+    });
+    expect(Object.isFrozen(withBonus?.bonusPhase)).toBe(true);
+    expect(Object.isFrozen(withBonus?.bonusPhase?.environment)).toBe(true);
+    expect(
+      Object.isFrozen(withBonus?.bonusPhase?.environment.backgroundAsset),
+    ).toBe(true);
+    expect(withoutBonus).not.toHaveProperty('bonusPhase');
+  });
+
+  test.each([
+    [
+      'blank name',
+      { name: '  ', durationSeconds: 300, environment: {} },
+      'Bonus Reward Phase name must not be empty.',
+    ],
+    [
+      'zero duration',
+      { name: 'Tea', durationSeconds: 0, environment: {} },
+      'Phase duration must be a positive integer number of seconds.',
+    ],
+    [
+      'fractional duration',
+      { name: 'Tea', durationSeconds: 1.5, environment: {} },
+      'Phase duration must be a positive integer number of seconds.',
+    ],
+    [
+      'malformed Environment',
+      {
+        name: 'Tea',
+        durationSeconds: 300,
+        environment: {
+          audioAsset: { type: 'direct', assetId: 'audio-1', role: 'Ambient' },
+        },
+      },
+      'Asset reference must be direct or role-based.',
+    ],
+  ])('rejects Bonus Reward Phase with %s', (_case, bonusPhase, message) => {
+    expect(() =>
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [validPhase],
+        rewardDice: {
+          frequency: 1,
+          sides: [
+            { icon: 'tea', title: 'Tea', bonusPhase } as never,
+            { icon: 'walk', title: 'Walk' },
+          ],
+        },
+      }),
+    ).toThrow(message);
+  });
+
   test.each(['sometimes', '', null])(
     'rejects invalid Dice Side availability %j',
     (availability) => {

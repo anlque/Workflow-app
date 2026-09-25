@@ -12,7 +12,13 @@ export function createSessionSnapshot(source: Workflow): SessionSnapshot {
       ({ environment }) =>
         environment.backgroundAsset?.type === 'role' ||
         environment.audioAsset?.type === 'role',
-    )
+    ) ||
+    (source.rewardDice?.sides.some(
+      ({ bonusPhase }) =>
+        bonusPhase?.environment.backgroundAsset?.type === 'role' ||
+        bonusPhase?.environment.audioAsset?.type === 'role',
+    ) ??
+      false)
   ) {
     throw new SessionValidationError(
       'Session snapshot requires direct Asset references.',
@@ -36,6 +42,15 @@ export function createSessionSnapshot(source: Workflow): SessionSnapshot {
                 : { description: side.description }),
               availability: side.availability,
               weight: side.probability,
+              ...(side.bonusPhase === undefined
+                ? {}
+                : {
+                    bonusPhase: {
+                      name: side.bonusPhase.name,
+                      durationSeconds: side.bonusPhase.durationSeconds,
+                      environment: side.bonusPhase.environment,
+                    },
+                  }),
             })),
           },
         }),

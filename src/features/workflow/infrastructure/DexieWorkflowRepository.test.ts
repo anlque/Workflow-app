@@ -105,7 +105,7 @@ describe('DexieWorkflowRepository', () => {
     await expect(
       database.table<unknown, string>('workflows').get(expected.id),
     ).resolves.toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: 5,
       rewardDice: {
         sides: [
           expect.objectContaining({ availability: 'any' }),
@@ -136,6 +136,137 @@ describe('DexieWorkflowRepository', () => {
     await repository.save(expected);
 
     await expect(repository.get(expected.id)).resolves.toEqual(expected);
+  });
+
+  test('round-trips a version-5 Bonus Reward Phase with direct and Role references', async () => {
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
+    const expected = createWorkflow({
+      id: 'bonus-reward',
+      name: 'Bonus reward',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        schedule: {
+          type: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: 1,
+        },
+        sides: [
+          {
+            icon: 'tea',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 300,
+              environment: {
+                backgroundAsset: { type: 'role', role: 'Calm scene' },
+                audioAsset: { type: 'direct', assetId: 'audio-1' },
+                backgroundColor: '#123456',
+              },
+            },
+          },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+
+    await repository.save(expected);
+
+    await expect(repository.get(expected.id)).resolves.toEqual(expected);
+    await expect(
+      database.table<unknown, string>('workflows').get(expected.id),
+    ).resolves.toMatchObject({ schemaVersion: 5 });
+  });
+
+  test('restores version-4 Sides without a Bonus Reward Phase', async () => {
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
+    const stored = {
+      id: 'version-4-no-bonus',
+      schemaVersion: 4,
+      order: 0,
+      name: 'Version 4',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        schedule: {
+          type: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: 1,
+        },
+        rerolls: 0,
+        sides: [
+          {
+            icon: 'tea',
+            title: 'Tea',
+            probability: 0.5,
+            availability: 'any',
+          },
+          {
+            icon: 'walk',
+            title: 'Walk',
+            probability: 0.5,
+            availability: 'any',
+          },
+        ],
+      },
+    };
+    await putWorkflowRecord(database, stored);
+
+    const restored = await repository.get(
+      workflow('version-4-no-bonus', 'Fixture').id,
+    );
+
+    expect(restored?.rewardDice?.sides[0]).not.toHaveProperty('bonusPhase');
+  });
+
+  test.each([
+    [{ durationSeconds: 300, environment: {} }],
+    [{ name: 'Bonus', durationSeconds: 300, environment: {}, extra: true }],
+    [{ name: 'Bonus', durationSeconds: 0, environment: {} }],
+    [
+      {
+        name: 'Bonus',
+        durationSeconds: 300,
+        environment: { backgroundAssetId: 'legacy-id' },
+      },
+    ],
+  ])('rejects a malformed version-5 Bonus Reward Phase', async (bonusPhase) => {
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
+    await putWorkflowRecord(database, {
+      id: 'invalid-bonus',
+      schemaVersion: 5,
+      order: 0,
+      name: 'Invalid bonus',
+      phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      rewardDice: {
+        schedule: {
+          type: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: 1,
+        },
+        rerolls: 0,
+        sides: [
+          {
+            icon: 'tea',
+            title: 'Tea',
+            probability: 0.5,
+            availability: 'any',
+            bonusPhase,
+          },
+          {
+            icon: 'walk',
+            title: 'Walk',
+            probability: 0.5,
+            availability: 'any',
+          },
+        ],
+      },
+    });
+
+    await expect(
+      repository.get(workflow('invalid-bonus', 'Fixture').id),
+    ).rejects.toBeInstanceOf(WorkflowValidationError);
   });
 
   test('round-trips a version-2 Workflow with a Role reference', async () => {

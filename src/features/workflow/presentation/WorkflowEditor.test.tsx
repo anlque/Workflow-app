@@ -312,6 +312,92 @@ describe('WorkflowEditor', () => {
     }
   });
 
+  test('hydrates, edits and saves a Side Bonus Phase in minutes', () => {
+    const workflow = createWorkflow({
+      id: 'workflow-1',
+      name: 'Bonus rewards',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'tea',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 300,
+              environment: {
+                backgroundAsset: { type: 'direct', assetId: 'image-1' },
+                backgroundColor: '#123456',
+              },
+            },
+          },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const { result } = renderHook(() =>
+      useWorkflowEditor('workflow-1', workflow),
+    );
+    const firstSide = result.current.draft.rewardDice.sides[0];
+    if (firstSide === undefined) throw new Error('Expected first Dice Side.');
+
+    expect(firstSide.bonusPhase).toMatchObject({
+      enabled: true,
+      name: 'Tea break',
+      durationMinutes: '5',
+      backgroundAsset: { type: 'direct', assetId: 'image-1' },
+      backgroundColor: '#123456',
+    });
+    const validation = validateWorkflowDraft(result.current.draft);
+    expect(validation.valid).toBe(true);
+    if (validation.valid) {
+      expect(validation.input.rewardDice?.sides[0]?.bonusPhase).toMatchObject({
+        name: 'Tea break',
+        durationSeconds: 300,
+      });
+    }
+  });
+
+  test('keeps an invalid Bonus draft out of save and reports Side-scoped errors', () => {
+    const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
+    const side = result.current.draft.rewardDice.sides[0];
+    if (side === undefined) throw new Error('Expected first Dice Side.');
+    const bonusPhase = side.bonusPhase;
+    if (bonusPhase === undefined) throw new Error('Expected Bonus draft.');
+    const second = result.current.draft.rewardDice.sides[1];
+    if (second === undefined) throw new Error('Expected second Dice Side.');
+    act(() => {
+      result.current.setName('Workflow');
+      result.current.setRewardEnabled(true);
+      result.current.updateRewardSide(side.key, {
+        icon: 'tea',
+        title: 'Tea',
+        bonusPhase: {
+          ...bonusPhase,
+          enabled: true,
+          name: ' ',
+          durationMinutes: '1.2',
+        },
+      });
+      result.current.updateRewardSide(second.key, {
+        icon: 'walk',
+        title: 'Walk',
+      });
+    });
+
+    const validation = validateWorkflowDraft(result.current.draft);
+    expect(validation.valid).toBe(false);
+    if (!validation.valid) {
+      expect(validation.errors[`reward:${side.key}:bonus:name`]).toBe(
+        'Bonus Phase name is required.',
+      );
+      expect(validation.errors[`reward:${side.key}:bonus:duration`]).toBe(
+        'Duration must be at least 0.5 minutes in 0.5-minute increments.',
+      );
+    }
+  });
+
   test('identifies the first Reward opportunity without an available Side', () => {
     const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
     act(() => {

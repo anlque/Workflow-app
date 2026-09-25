@@ -34,7 +34,19 @@ describe('resolveWorkflowAssetReferences', () => {
       rewardDice: {
         schedule: { type: 'custom', phaseIndexes: [1] },
         sides: [
-          { icon: 'tea', title: 'Tea', availability: 'early' },
+          {
+            icon: 'tea',
+            title: 'Tea',
+            availability: 'early',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 300,
+              environment: {
+                backgroundAsset: { type: 'role', role: 'Bonus backdrop' },
+                audioAsset: { type: 'role', role: 'Bonus ambient' },
+              },
+            },
+          },
           { icon: 'walk', title: 'Walk', availability: 'late' },
         ],
       },
@@ -56,6 +68,8 @@ describe('resolveWorkflowAssetReferences', () => {
 
     expect(resolve).toHaveBeenNthCalledWith(1, 'Backdrop', 'image');
     expect(resolve).toHaveBeenNthCalledWith(2, 'Ambient', 'audio');
+    expect(resolve).toHaveBeenNthCalledWith(3, 'Bonus backdrop', 'image');
+    expect(resolve).toHaveBeenNthCalledWith(4, 'Bonus ambient', 'audio');
     expect(firstPhase.environment).toEqual({
       backgroundAsset: { type: 'direct', assetId: 'image-Backdrop' },
       audioAsset: { type: 'direct', assetId: 'audio-Ambient' },
@@ -70,6 +84,10 @@ describe('resolveWorkflowAssetReferences', () => {
     expect(
       resolved.rewardDice?.sides.map(({ availability }) => availability),
     ).toEqual(['early', 'late']);
+    expect(resolved.rewardDice?.sides[0]?.bonusPhase?.environment).toEqual({
+      backgroundAsset: { type: 'direct', assetId: 'image-Bonus backdrop' },
+      audioAsset: { type: 'direct', assetId: 'audio-Bonus ambient' },
+    });
   });
 
   test('propagates resolution failure without returning a partial Workflow', async () => {

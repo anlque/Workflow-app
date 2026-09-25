@@ -1,14 +1,13 @@
 import type { DiceSide, DiceSideInput } from './DiceSide';
-import { createAssetRole } from '@/features/assets';
+import { createBonusRewardPhase } from './BonusRewardPhase';
 
-import type {
-  AssetId,
-  AssetReference,
-  AssetReferenceInput,
-  Environment,
-  EnvironmentInput,
-} from './Environment';
-import type { DurationSeconds, Phase, PhaseInput, PhaseType } from './Phase';
+import { createEnvironment } from './Environment';
+import {
+  createDurationSeconds,
+  type Phase,
+  type PhaseInput,
+  type PhaseType,
+} from './Phase';
 import type {
   RewardDice,
   RewardDiceInput,
@@ -24,107 +23,12 @@ import { WorkflowValidationError } from './WorkflowErrors';
 import { eligibleDiceSides } from './eligibleDiceSides';
 import { rewardOpportunityPhaseIndexes } from './rewardOpportunityPhaseIndexes';
 
-function createAssetId(value: string): AssetId {
-  if (value.trim().length === 0) {
-    throw new WorkflowValidationError('Asset identifier must not be empty.');
-  }
-
-  return value as AssetId;
-}
-
-function createDurationSeconds(value: number): DurationSeconds {
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new WorkflowValidationError(
-      'Phase duration must be a positive integer number of seconds.',
-    );
-  }
-
-  return value as DurationSeconds;
-}
-
 function createPhaseType(value: string): PhaseType {
   if (value !== 'focus' && value !== 'break') {
     throw new WorkflowValidationError('Phase type must be focus or break.');
   }
 
   return value;
-}
-
-function createEnvironment(input: EnvironmentInput): Environment {
-  const createAssetReference = (value: AssetReferenceInput): AssetReference => {
-    const candidate: Readonly<{
-      type?: unknown;
-      assetId?: unknown;
-      role?: unknown;
-    }> = value;
-    const keys = Object.keys(value);
-    if (
-      candidate.type === 'direct' &&
-      typeof candidate.assetId === 'string' &&
-      keys.length === 2 &&
-      keys.includes('type') &&
-      keys.includes('assetId')
-    ) {
-      return Object.freeze({
-        type: 'direct',
-        assetId: createAssetId(candidate.assetId),
-      });
-    }
-    if (
-      candidate.type === 'role' &&
-      typeof candidate.role === 'string' &&
-      keys.length === 2 &&
-      keys.includes('type') &&
-      keys.includes('role')
-    ) {
-      return Object.freeze({
-        type: 'role',
-        role: createAssetRole(candidate.role),
-      });
-    }
-    throw new WorkflowValidationError(
-      'Asset reference must be direct or role-based.',
-    );
-  };
-  if (
-    (input.backgroundAsset !== undefined &&
-      input.backgroundAssetId !== undefined) ||
-    (input.audioAsset !== undefined && input.audioAssetId !== undefined)
-  ) {
-    throw new WorkflowValidationError(
-      'Environment Asset reference is ambiguous.',
-    );
-  }
-  const backgroundInput =
-    input.backgroundAsset ??
-    (input.backgroundAssetId === undefined
-      ? undefined
-      : { type: 'direct' as const, assetId: input.backgroundAssetId });
-  const audioInput =
-    input.audioAsset ??
-    (input.audioAssetId === undefined
-      ? undefined
-      : { type: 'direct' as const, assetId: input.audioAssetId });
-  const backgroundAsset =
-    backgroundInput === undefined
-      ? undefined
-      : createAssetReference(backgroundInput);
-  const audioAsset =
-    audioInput === undefined ? undefined : createAssetReference(audioInput);
-
-  if (input.backgroundColor?.trim().length === 0) {
-    throw new WorkflowValidationError(
-      'Environment background color must not be empty.',
-    );
-  }
-
-  return Object.freeze({
-    ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
-    ...(audioAsset === undefined ? {} : { audioAsset }),
-    ...(input.backgroundColor === undefined
-      ? {}
-      : { backgroundColor: input.backgroundColor }),
-  });
 }
 
 function createPhase(input: PhaseInput): Phase {
@@ -331,6 +235,9 @@ function createRewardDice(
         : { description: sideInput.description.trim() }),
       probability: (sideInput.weight ?? 1) / totalWeight,
       availability: sideInput.availability ?? 'any',
+      ...(sideInput.bonusPhase === undefined
+        ? {}
+        : { bonusPhase: createBonusRewardPhase(sideInput.bonusPhase) }),
     });
 
   const firstSide = createSide(firstInput);

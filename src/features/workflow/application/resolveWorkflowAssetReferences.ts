@@ -1,5 +1,6 @@
 import { createWorkflow } from '../domain/createWorkflow';
 import type { AssetReference } from '../domain/Environment';
+import type { Environment } from '../domain/Environment';
 import type { Workflow } from '../domain/Workflow';
 import type { AssetReferenceResolver } from './AssetReferenceResolver';
 
@@ -15,32 +16,39 @@ async function resolveReference(
   };
 }
 
+async function resolveEnvironment(
+  environment: Environment,
+  resolver: AssetReferenceResolver,
+) {
+  const backgroundAsset = await resolveReference(
+    environment.backgroundAsset,
+    'image',
+    resolver,
+  );
+  const audioAsset = await resolveReference(
+    environment.audioAsset,
+    'audio',
+    resolver,
+  );
+  return {
+    ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
+    ...(audioAsset === undefined ? {} : { audioAsset }),
+    ...(environment.backgroundColor === undefined
+      ? {}
+      : { backgroundColor: environment.backgroundColor }),
+  };
+}
+
 export async function resolveWorkflowAssetReferences(
   workflow: Workflow,
   resolver: AssetReferenceResolver,
 ): Promise<Workflow> {
   const phases = await Promise.all(
     workflow.phases.map(async (phase) => {
-      const backgroundAsset = await resolveReference(
-        phase.environment.backgroundAsset,
-        'image',
-        resolver,
-      );
-      const audioAsset = await resolveReference(
-        phase.environment.audioAsset,
-        'audio',
-        resolver,
-      );
       return {
         type: phase.type,
         durationSeconds: phase.durationSeconds,
-        environment: {
-          ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
-          ...(audioAsset === undefined ? {} : { audioAsset }),
-          ...(phase.environment.backgroundColor === undefined
-            ? {}
-            : { backgroundColor: phase.environment.backgroundColor }),
-        },
+        environment: await resolveEnvironment(phase.environment, resolver),
       };
     }),
   );
@@ -54,15 +62,29 @@ export async function resolveWorkflowAssetReferences(
           rewardDice: {
             schedule: workflow.rewardDice.schedule,
             rerolls: workflow.rewardDice.rerolls,
-            sides: workflow.rewardDice.sides.map((side) => ({
-              icon: side.icon,
-              title: side.title,
-              ...(side.description === undefined
-                ? {}
-                : { description: side.description }),
-              availability: side.availability,
-              weight: side.probability,
-            })),
+            sides: await Promise.all(
+              workflow.rewardDice.sides.map(async (side) => ({
+                icon: side.icon,
+                title: side.title,
+                ...(side.description === undefined
+                  ? {}
+                  : { description: side.description }),
+                availability: side.availability,
+                weight: side.probability,
+                ...(side.bonusPhase === undefined
+                  ? {}
+                  : {
+                      bonusPhase: {
+                        name: side.bonusPhase.name,
+                        durationSeconds: side.bonusPhase.durationSeconds,
+                        environment: await resolveEnvironment(
+                          side.bonusPhase.environment,
+                          resolver,
+                        ),
+                      },
+                    }),
+              })),
+            ),
           },
         }),
   });

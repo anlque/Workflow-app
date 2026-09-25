@@ -279,6 +279,7 @@ describe('AssetLibrary', () => {
               workflowName: 'Deep work',
               occurrences: [
                 {
+                  owner: 'phase',
                   phaseIndex: 0,
                   location: 'background',
                   referenceMode: 'direct',

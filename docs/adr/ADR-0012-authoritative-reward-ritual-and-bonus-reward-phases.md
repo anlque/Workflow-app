@@ -26,8 +26,11 @@ Only an exact retained fingerprint is an idempotent no-op across worker
 restarts, while identifier collisions and commands for a stale opportunity are
 rejected. Presentation owns animation and projection-transition sound cues only.
 The target supports the conceptual distinction between the next normal Phase,
-Session completion and a future Bonus Phase; RW-003 implements only the first
-two. Bonus configuration and execution remain RW-004 and RW-005.
+Session completion and a future Bonus Phase. RW-004 adds one optional immutable
+Bonus Reward Phase configuration (`name`, `durationSeconds`, `environment`) to
+each Dice Side and preserves it through Workflow/package/Session boundaries.
+Execution remains deferred to RW-005; RW-004 does not alter continuation or
+Session transitions.
 
 ## Alternatives Considered
 

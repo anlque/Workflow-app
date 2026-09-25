@@ -33,6 +33,12 @@ function usageKinds(
     if (matches(environment.backgroundAsset, role)) kinds.add('image');
     if (matches(environment.audioAsset, role)) kinds.add('audio');
   });
+  workflow.rewardDice?.sides.forEach(({ bonusPhase }) => {
+    if (bonusPhase === undefined) return;
+    if (matches(bonusPhase.environment.backgroundAsset, role))
+      kinds.add('image');
+    if (matches(bonusPhase.environment.audioAsset, role)) kinds.add('audio');
+  });
   return kinds;
 }
 
@@ -117,10 +123,43 @@ export async function renameWorkflowRoleReferences(
                     : { description: side.description }),
                   availability: side.availability,
                   weight: side.probability,
+                  ...(side.bonusPhase === undefined
+                    ? {}
+                    : {
+                        bonusPhase: {
+                          name: side.bonusPhase.name,
+                          durationSeconds: side.bonusPhase.durationSeconds,
+                          environment: renameEnvironmentValue(
+                            side.bonusPhase.environment,
+                            from,
+                            to,
+                          ),
+                        },
+                      }),
                 })),
               },
             }),
       }),
     );
   }
+}
+
+function renameEnvironmentValue(
+  environment: Workflow['phases'][number]['environment'],
+  from: AssetRole,
+  to: AssetRole,
+): EnvironmentInput {
+  const backgroundAsset = renameReference(
+    environment.backgroundAsset,
+    from,
+    to,
+  );
+  const audioAsset = renameReference(environment.audioAsset, from, to);
+  return {
+    ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
+    ...(audioAsset === undefined ? {} : { audioAsset }),
+    ...(environment.backgroundColor === undefined
+      ? {}
+      : { backgroundColor: environment.backgroundColor }),
+  };
 }

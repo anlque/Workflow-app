@@ -3,11 +3,11 @@
 ## Resolved Asset snapshots
 
 Session start receives a Workflow resolver through its Application boundary.
-Roles resolve to same-kind direct IDs before construction, and
-`createSessionSnapshot` rejects any remaining Role. Moving a Role affects only
-future Sessions. New Session records use envelope version 5; the mapper reads
-versions 1–5 and isolates legacy defaults to versions 1–4. Timing never depends on Role lookup
-after start.
+Roles resolve to same-kind direct IDs before construction, including references
+inside Bonus Environments, and `createSessionSnapshot` rejects any remaining
+Role. Moving a Role affects only future Sessions. New Session records use
+envelope version 6; the mapper reads versions 1–6 and isolates legacy defaults
+to versions 1–4. Timing never depends on Role lookup after start.
 
 ## Purpose
 
@@ -101,8 +101,9 @@ Every Session contains:
 - exactly one discriminated state variant.
 
 `createSessionSnapshot()` rebuilds the Workflow with `createWorkflow()`, copying
-Phases, Environments, Reward Dice schedule, rerolls and
-side values. Source Workflow edits or deletion cannot affect execution.
+Phases, Environments, Reward Dice schedule, rerolls, side values and optional
+Side Bonus Reward Phase configuration. Source Workflow edits or deletion cannot
+affect execution.
 
 ### State Variants
 
@@ -158,7 +159,7 @@ target is `complete`, so the Session becomes Completed only after acknowledgment
 | `startSessionUseCase` | Requires no active Session, creates snapshot and first Running state using injected clock/ID | Saves new active Session |
 | `advanceSessionUseCase` | Loads by ID and derives at current clock | Saves only if the immutable state object changed |
 | `getActiveSessionUseCase` | Loads the one active row and reconciles elapsed anchors | Saves changed state; returns only non-terminal result, otherwise `null` |
-| `activeSessionReferencesAsset` | Reads the persisted active row and checks background/audio across every immutable snapshot Phase | Boolean only; never reconciles or writes |
+| `activeSessionReferencesAsset` | Reads the persisted active row and checks background/audio across normal and Bonus Environments in the immutable snapshot | Boolean only; never reconciles or writes |
 | `pauseSessionUseCase` | Loads, reconciles and applies user pause | Saves Paused Session |
 | `resumeSessionUseCase` | Loads and resumes only user pause | Saves Running Session with new anchors |
 | `continueRewardSessionUseCase` | Loads and continues only Reward pause | Saves Running next Phase with new anchors |
@@ -169,20 +170,21 @@ Chrome, alarms, messages or Dexie.
 
 The Asset-reference query treats Running, Transitioning and either Paused reason
 as active. Completed and Stopped are non-blocking. Its single snapshot traversal
-is the extension point for RW-005 Bonus environments; AS-001 and AS-003 consume
+already includes Bonus environments; AS-001 and AS-003 consume
 the public query through an Assets-owned port rather than importing Session
 internals. A later lifecycle ADR will supersede ADR-0006 with this boundary.
 
 ## Persistence
 
-`DexieSessionRepository` writes a version-5 envelope in the global version-2
+`DexieSessionRepository` writes a version-6 envelope in the global version-2
 `sessions: 'id, active, updatedAt'` table definition.
 
-The mapper reads versions 1–5 strictly: version 1 snapshots accept only legacy
-Asset ID fields; versions 2–5 accept only exact direct references. Versions 1–2
-map legacy frequency fields; versions 3–5 read canonical schedules. Versions
-4–5 require Side availability while versions 1–3 default it to `any`. Version 5
-requires canonical Reward ritual and receipt state; only the version-aware
+The mapper reads versions 1–6 strictly: version 1 snapshots accept only legacy
+Asset ID fields; versions 2–6 accept only exact direct references. Versions 1–2
+map legacy frequency fields; versions 3–6 read canonical schedules. Versions
+4–6 require Side availability while versions 1–3 default it to `any`. Versions
+5–6 require canonical Reward ritual and receipt state; version 6 additionally
+accepts the optional exact Bonus Reward Phase shape. Only the version-aware
 v1–v4 mapper may supply legacy defaults. Role,
 mixed-version and unknown Environment fields are rejected because persisted
 Session snapshots must already be resolved and immutable.

@@ -37,6 +37,9 @@ export async function duplicateWorkflowUseCase(
                 : { description: side.description }),
               availability: side.availability,
               weight: side.probability,
+              ...(side.bonusPhase === undefined
+                ? {}
+                : { bonusPhase: side.bonusPhase }),
             })),
           },
         }),

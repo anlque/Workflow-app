@@ -37,12 +37,14 @@ const usage: readonly AssetRetirementUsage[] = [
     workflowName: 'Deep work',
     occurrences: [
       {
+        owner: 'phase',
         phaseIndex: 0,
         location: 'background',
         referenceMode: 'direct',
         optional: true,
       },
       {
+        owner: 'phase',
         phaseIndex: 1,
         location: 'background',
         referenceMode: 'role',
@@ -183,6 +185,7 @@ describe('retireAssetUseCase', () => {
         occurrences: [
           ...firstUsage.occurrences,
           {
+            owner: 'phase',
             phaseIndex: 2,
             location: 'background',
             referenceMode: 'direct',
@@ -299,6 +302,7 @@ describe('retireAssetUseCase', () => {
         occurrences: [
           ...firstUsage.occurrences,
           {
+            owner: 'phase',
             phaseIndex: 2,
             location: 'audio',
             referenceMode: 'direct',

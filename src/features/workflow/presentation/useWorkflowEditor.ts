@@ -21,6 +21,16 @@ export type RewardSideDraft = Readonly<{
   description: string;
   weight: string;
   availability: DiceSideAvailability;
+  bonusPhase?: BonusRewardPhaseDraft;
+}>;
+
+export type BonusRewardPhaseDraft = Readonly<{
+  enabled: boolean;
+  name: string;
+  durationMinutes: string;
+  backgroundAsset: AssetReference | undefined;
+  audioAsset: AssetReference | undefined;
+  backgroundColor: string;
 }>;
 
 export type RewardDiceDraft = Readonly<{
@@ -69,6 +79,18 @@ function newSide(): RewardSideDraft {
     description: '',
     weight: '',
     availability: 'any',
+    bonusPhase: newBonusRewardPhase(),
+  };
+}
+
+function newBonusRewardPhase(): BonusRewardPhaseDraft {
+  return {
+    enabled: false,
+    name: '',
+    durationMinutes: '5',
+    backgroundAsset: undefined,
+    audioAsset: undefined,
+    backgroundColor: '',
   };
 }
 
@@ -108,6 +130,18 @@ function initialDraft(workflowId: string, workflow?: Workflow): WorkflowDraft {
         description: side.description ?? '',
         weight: String(side.probability),
         availability: side.availability,
+        bonusPhase:
+          side.bonusPhase === undefined
+            ? newBonusRewardPhase()
+            : {
+                enabled: true,
+                name: side.bonusPhase.name,
+                durationMinutes: String(side.bonusPhase.durationSeconds / 60),
+                backgroundAsset: side.bonusPhase.environment.backgroundAsset,
+                audioAsset: side.bonusPhase.environment.audioAsset,
+                backgroundColor:
+                  side.bonusPhase.environment.backgroundColor ?? '',
+              },
       })) ?? [newSide(), newSide()],
     },
   };
@@ -218,6 +252,7 @@ export function validateWorkflowDraft(
       ({ weight }) => weight.trim().length > 0,
     );
     const sides = draft.rewardDice.sides.map((side) => {
+      const bonusPhase = side.bonusPhase ?? newBonusRewardPhase();
       if (side.icon.trim().length === 0) {
         errors[`reward:${side.key}:icon`] = 'Icon is required.';
       }
@@ -234,6 +269,17 @@ export function validateWorkflowDraft(
         errors[`reward:${side.key}:weight`] =
           'Weight must be a positive number for every side.';
       }
+      const bonusDurationSeconds = bonusPhase.enabled
+        ? minutesToDurationSeconds(bonusPhase.durationMinutes)
+        : null;
+      if (bonusPhase.enabled && bonusPhase.name.trim().length === 0) {
+        errors[`reward:${side.key}:bonus:name`] =
+          'Bonus Phase name is required.';
+      }
+      if (bonusPhase.enabled && bonusDurationSeconds === null) {
+        errors[`reward:${side.key}:bonus:duration`] =
+          'Duration must be at least 0.5 minutes in 0.5-minute increments.';
+      }
       return {
         icon: side.icon.trim(),
         title: side.title.trim(),
@@ -242,6 +288,29 @@ export function validateWorkflowDraft(
           : { description: side.description.trim() }),
         ...(weight === undefined ? {} : { weight }),
         availability: side.availability,
+        ...(bonusPhase.enabled
+          ? {
+              bonusPhase: {
+                name: bonusPhase.name.trim(),
+                durationSeconds: bonusDurationSeconds ?? 1,
+                environment: {
+                  ...(bonusPhase.backgroundAsset === undefined
+                    ? {}
+                    : {
+                        backgroundAsset: bonusPhase.backgroundAsset,
+                      }),
+                  ...(bonusPhase.audioAsset === undefined
+                    ? {}
+                    : { audioAsset: bonusPhase.audioAsset }),
+                  ...(bonusPhase.backgroundColor.trim().length === 0
+                    ? {}
+                    : {
+                        backgroundColor: bonusPhase.backgroundColor.trim(),
+                      }),
+                },
+              },
+            }
+          : {}),
       };
     });
     const opportunityPhaseIndexes =
