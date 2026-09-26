@@ -7,6 +7,7 @@ import {
   createActiveSessionStore,
   type SessionId,
   type SessionProjectionClient,
+  getActiveSessionSegment,
 } from '@/features/session';
 import type { AssetId } from '@/features/assets';
 import {
@@ -30,6 +31,7 @@ export type FocusDependencies = Readonly<{
   sessions: SessionProjectionClient;
   pause(id: SessionId): Promise<void>;
   resume(id: SessionId): Promise<void>;
+  restartPhase(id: SessionId, rewardRitualId: string): Promise<void>;
   continueReward(id: SessionId, rewardRitualId: string): Promise<void>;
   rollReward(id: SessionId, rewardRitualId: string): Promise<void>;
   rerollReward(id: SessionId, rewardRitualId: string): Promise<void>;
@@ -181,9 +183,7 @@ export function FocusApp({
   }
 
   const session = projection.session;
-  const phase =
-    session.snapshot.workflow.phases[session.currentPhaseIndex] ??
-    session.snapshot.workflow.phases[0];
+  const segment = getActiveSessionSegment(session);
   return (
     <main className="focus-app">
       <div className="focus-app__utility-actions">
@@ -232,7 +232,7 @@ export function FocusApp({
         </Button>
       </div>
       <FocusEnvironment
-        environment={phase.environment}
+        environment={segment.environment}
         reducedMotion={reducedMotion}
         playing={session.status === 'running'}
         volume={volumePercent / 100}
@@ -258,6 +258,7 @@ export function FocusApp({
             void activateSounds();
             await dependencies.resume(id);
           }}
+          onRestart={dependencies.restartPhase}
           onStop={async (id) => {
             void activateSounds();
             await dependencies.stop(id);

@@ -361,3 +361,76 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
   await expect(focus.getByText('Break · Phase 2 of 2')).toBeVisible();
   await expect(focus.getByLabel('Time remaining')).toHaveText(/00:(29|30)/u);
 });
+
+test('executes and restores a non-final Bonus Reward Phase authoritatively', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Bonus Reward journey');
+  await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
+  await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByLabel('Phase 2 type').selectOption('break');
+  await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
+  await options.getByLabel('Enable Reward Dice').check();
+  for (const side of [1, 2]) {
+    await options.getByLabel(`Reward side ${String(side)} icon`).fill('✨');
+    await options
+      .getByLabel(`Reward side ${String(side)} title`)
+      .fill(`Bonus ${String(side)}`);
+    await options
+      .getByLabel(`Enable Bonus Phase for side ${String(side)}`)
+      .check();
+    await options
+      .getByLabel(`Side ${String(side)} Bonus Phase name`)
+      .fill('Bonus reset');
+    await options
+      .getByLabel(`Side ${String(side)} Bonus Phase duration in minutes`)
+      .fill('0.5');
+    await options
+      .getByLabel(`Side ${String(side)} Bonus Phase background color`)
+      .fill('#123456');
+  }
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+
+  const focus = await context.newPage();
+  await focus.goto(extensionUrls.focus);
+  await focus
+    .getByRole('button', { name: 'Start Bonus Reward journey' })
+    .click();
+  await expireActiveSessionDeadline(focus);
+  await expect(
+    focus.getByText('Transitioning to the next phase…'),
+  ).toBeVisible();
+  await expireActiveSessionDeadline(focus);
+  await expect(
+    focus.getByRole('dialog', { name: 'Reward unlocked' }),
+  ).toBeVisible();
+  await focus.getByRole('button', { name: 'Roll dice' }).click();
+  await focus.getByRole('button', { name: 'Continue' }).click();
+
+  await expect(focus.getByText('Bonus · Bonus reset')).toBeVisible();
+  await expect(focus.locator('.focus-environment')).toHaveCSS(
+    'background-color',
+    'rgb(18, 52, 86)',
+  );
+  await focus.reload();
+  await expect(focus.getByText('Bonus · Bonus reset')).toBeVisible();
+  await focus.getByRole('button', { name: 'Pause' }).click();
+  await expect(focus.getByRole('button', { name: 'Resume' })).toBeVisible();
+  await focus.getByRole('button', { name: 'Resume' }).click();
+  await focus.getByRole('button', { name: 'Restart phase' }).click();
+  await focus
+    .getByRole('dialog', { name: 'Restart this Bonus Phase?' })
+    .getByRole('button', { name: 'Restart phase' })
+    .click();
+  await expect(focus.getByLabel('Time remaining')).toHaveText(/00:(29|30)/u);
+
+  await expireActiveSessionDeadline(focus);
+  await expect(focus.getByText('Break · Phase 2 of 2')).toBeVisible();
+  await expect(
+    focus.getByRole('dialog', { name: 'Reward unlocked' }),
+  ).toHaveCount(0);
+});

@@ -10,6 +10,9 @@ export function didCrossPhaseBoundary(
   }
   if (previous.status === 'transitioning') return false;
   return (
+    (previous.activeBonusPhase !== undefined &&
+      current.activeBonusPhase === undefined &&
+      current.status === 'running') ||
     current.status === 'transitioning' ||
     current.currentPhaseIndex > previous.currentPhaseIndex ||
     current.status === 'completed'

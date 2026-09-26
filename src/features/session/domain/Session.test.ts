@@ -8,6 +8,7 @@ import {
   getRemainingSeconds,
   pauseSession,
   rerollSessionReward,
+  restartSessionPhase,
   restoreSession,
   resumeSession,
   rollSessionReward,
@@ -27,7 +28,190 @@ function workflow() {
   });
 }
 
+function bonusWorkflow(final = false) {
+  return createWorkflow({
+    id: final ? 'bonus-final' : 'bonus-non-final',
+    name: 'Bonus work',
+    phases: final
+      ? [{ type: 'focus', durationSeconds: 10, environment: {} }]
+      : [
+          { type: 'focus', durationSeconds: 10, environment: {} },
+          { type: 'break', durationSeconds: 5, environment: {} },
+        ],
+    rewardDice: {
+      frequency: 1,
+      sides: [
+        {
+          icon: 'tea',
+          title: 'Tea',
+          bonusPhase: {
+            name: 'Tea break',
+            durationSeconds: 30,
+            environment: { backgroundColor: '#123456' },
+          },
+        },
+        { icon: 'walk', title: 'Walk' },
+      ],
+    },
+  });
+}
+
+function runningBonus(final = false) {
+  const paused = deriveSessionState(
+    createSession(
+      final ? 'bonus-final-session' : 'bonus-session',
+      bonusWorkflow(final),
+      1_000,
+    ),
+    12_000,
+  );
+  const continued = continueRewardSession(
+    rollSessionReward(paused, () => 0, 'roll-bonus'),
+    20_000,
+    'continue-bonus',
+  );
+  if (continued.status !== 'running') {
+    throw new Error('Expected running Bonus.');
+  }
+  return continued;
+}
+
 describe('Session', () => {
+  test('starts a non-final Bonus without changing Workflow phase identity', () => {
+    const bonus = runningBonus();
+
+    expect(bonus).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+      phaseStartedAt: 20_000,
+      phaseEndsAt: 50_000,
+      activeBonusPhase: {
+        rewardRitualId: 'bonus-session:0',
+        selectedSideIndex: 0,
+      },
+      rewardRitual: { acknowledged: true },
+    });
+    expect(bonus.snapshot.workflow.phases).toHaveLength(2);
+    expect(Object.isFrozen(bonus.activeBonusPhase)).toBe(true);
+  });
+
+  test('starts a final Bonus instead of completing immediately', () => {
+    expect(runningBonus(true)).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 0,
+      phaseEndsAt: 50_000,
+      activeBonusPhase: {
+        rewardRitualId: 'bonus-final-session:0',
+        selectedSideIndex: 0,
+      },
+      rewardRitual: { continuation: { type: 'complete' } },
+    });
+  });
+
+  test('pauses, resumes and restarts the active Bonus with authoritative time', () => {
+    const running = runningBonus();
+    const paused = pauseSession(running, 25_500);
+    if (
+      paused.rewardRitual === undefined ||
+      paused.activeBonusPhase === undefined
+    ) {
+      throw new Error('Expected paused Bonus state.');
+    }
+    const { rewardRitual, activeBonusPhase } = paused;
+    expect(paused).toMatchObject({
+      status: 'paused',
+      pauseReason: 'user',
+      remainingMilliseconds: 24_500,
+      activeBonusPhase: { rewardRitualId: 'bonus-session:0' },
+    });
+    expect(resumeSession(paused, 30_000)).toMatchObject({
+      status: 'running',
+      phaseEndsAt: 54_500,
+      activeBonusPhase: { rewardRitualId: 'bonus-session:0' },
+    });
+    expect(() =>
+      restoreSession({
+        id: paused.id,
+        workflow: paused.snapshot.workflow,
+        currentPhaseIndex: paused.currentPhaseIndex,
+        rewardCommandReceipts: paused.rewardCommandReceipts,
+        rewardRitual,
+        activeBonusPhase,
+        status: 'paused',
+        pauseReason: 'user',
+        pausedAt: paused.pausedAt,
+        remainingMilliseconds: paused.remainingMilliseconds,
+      }),
+    ).not.toThrow();
+    const restarted = restartSessionPhase(paused, 40_000, 'restart-1');
+    expect(restarted).toMatchObject({
+      status: 'running',
+      phaseStartedAt: 40_000,
+      phaseEndsAt: 70_000,
+    });
+    expect(restarted.rewardCommandReceipts.at(-1)).toEqual({
+      commandId: 'restart-1',
+      type: 'restart',
+      rewardRitualId: 'bonus-session:0',
+    });
+  });
+
+  test('rejects an active Bonus marker outside its linked timed state', () => {
+    const running = runningBonus();
+    if (
+      running.rewardRitual === undefined ||
+      running.activeBonusPhase === undefined
+    ) {
+      throw new Error('Expected running Bonus.');
+    }
+    const common = {
+      id: running.id,
+      workflow: running.snapshot.workflow,
+      currentPhaseIndex: running.currentPhaseIndex,
+      rewardCommandReceipts: running.rewardCommandReceipts,
+      rewardRitual: running.rewardRitual,
+      activeBonusPhase: running.activeBonusPhase,
+    };
+
+    expect(() =>
+      restoreSession({
+        ...common,
+        activeBonusPhase: {
+          rewardRitualId: 'wrong:0',
+          selectedSideIndex: 0,
+        },
+        status: 'running',
+        phaseStartedAt: 20_000,
+        phaseEndsAt: 50_000,
+      }),
+    ).toThrow('Session Bonus Reward Phase is invalid.');
+    expect(() =>
+      restoreSession({
+        ...common,
+        status: 'completed',
+        completedAt: 50_000,
+      }),
+    ).toThrow('Session Bonus Reward Phase is invalid.');
+  });
+
+  test('reconciles non-final and final Bonus completion without another Reward', () => {
+    expect(deriveSessionState(runningBonus(), 50_000)).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+      phaseStartedAt: 50_000,
+      phaseEndsAt: 55_000,
+    });
+    const late = deriveSessionState(runningBonus(), 60_000);
+    expect(late.status).toBe('completed');
+    expect(late).not.toHaveProperty('activeBonusPhase');
+
+    expect(deriveSessionState(runningBonus(true), 60_000)).toMatchObject({
+      status: 'completed',
+      completedAt: 50_000,
+      currentPhaseIndex: 0,
+    });
+  });
+
   test('owns Reward selection, rerolls and continuation in the Session aggregate', () => {
     const rewarded = createWorkflow({
       id: 'workflow-authoritative-reward',

@@ -36,6 +36,7 @@ function dependencies(session: Session | null): FocusDependencies {
     },
     pause: vi.fn(() => Promise.resolve()),
     resume: vi.fn(() => Promise.resolve()),
+    restartPhase: vi.fn(() => Promise.resolve()),
     continueReward: vi.fn(() => Promise.resolve()),
     rollReward: vi.fn(() => Promise.resolve()),
     rerollReward: vi.fn(() => Promise.resolve()),

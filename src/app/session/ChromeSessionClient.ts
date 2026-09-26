@@ -119,6 +119,15 @@ export class ChromeSessionClient implements SessionProjectionClient {
     });
   }
 
+  public restartPhase(id: SessionId, rewardRitualId: string): Promise<void> {
+    return this.#command({
+      type: 'session/restart-phase',
+      commandId: this.#createId(),
+      sessionId: id,
+      rewardRitualId,
+    });
+  }
+
   public stop(id: SessionId): Promise<void> {
     return this.#command({
       type: 'session/stop',

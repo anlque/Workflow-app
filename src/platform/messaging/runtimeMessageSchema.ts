@@ -56,7 +56,8 @@ export function parseSessionCommand(value: unknown): SessionCommand {
   if (
     (type === 'session/roll-reward' ||
       type === 'session/reroll-reward' ||
-      type === 'session/continue-reward') &&
+      type === 'session/continue-reward' ||
+      type === 'session/restart-phase') &&
     hasExactKeys(record, ['type', 'commandId', 'sessionId', 'rewardRitualId'])
   ) {
     return Object.freeze({

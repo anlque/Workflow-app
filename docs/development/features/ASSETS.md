@@ -218,7 +218,7 @@ channel policy remains deferred to AU-001.
 - Assets never imports Session. Options composes the public Session query into
   the narrow active-reference port alongside Workflow counting and UI operations.
 - Role management and Asset retirement reuse this port/query boundary. The
-  traversal already includes Bonus environments; RW-005 adds their execution.
+  traversal includes Bonus environments used by authoritative Session execution.
   ADR-0011
   supersedes ADR-0006.
 

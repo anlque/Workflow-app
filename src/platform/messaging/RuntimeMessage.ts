@@ -14,6 +14,12 @@ export type SessionCommand =
       sessionId: string;
       rewardRitualId: string;
     }>
+  | Readonly<{
+      type: 'session/restart-phase';
+      commandId: string;
+      sessionId: string;
+      rewardRitualId: string;
+    }>
   | Readonly<{ type: 'session/stop'; commandId: string; sessionId: string }>;
 
 export type SessionChangedMessage = Readonly<{

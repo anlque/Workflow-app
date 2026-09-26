@@ -61,6 +61,7 @@ export function createSidePanelDependencies(
     startSession: (id) => sessions.start(id),
     pauseSession: (id) => sessions.pause(id),
     resumeSession: (id) => sessions.resume(id),
+    restartPhase: (id, ritualId) => sessions.restartPhase(id, ritualId),
     rollReward: (id, ritualId) => sessions.rollReward(id, ritualId),
     rerollReward: (id, ritualId) => sessions.rerollReward(id, ritualId),
     continueReward: (id, ritualId) => sessions.continueReward(id, ritualId),

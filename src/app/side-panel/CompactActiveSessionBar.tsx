@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import { getRemainingSeconds, type Session } from '@/features/session';
+import {
+  getActiveSessionSegment,
+  getRemainingSeconds,
+  type Session,
+} from '@/features/session';
 import { Button } from '@/shared';
 
 export type CompactActiveSessionBarProps = Readonly<{
@@ -36,8 +40,7 @@ export function CompactActiveSessionBar({
   }, [now, session.status]);
 
   const workflow = session.snapshot.workflow;
-  const phase =
-    workflow.phases[session.currentPhaseIndex] ?? workflow.phases[0];
+  const segment = getActiveSessionSegment(session);
 
   return (
     <section
@@ -46,7 +49,11 @@ export function CompactActiveSessionBar({
     >
       <div className="compact-session-bar__summary">
         <strong>{workflow.name}</strong>
-        <span>{phase.type === 'focus' ? 'Focus' : 'Break'}</span>
+        <span>
+          {segment.isBonus
+            ? `Bonus · ${segment.label}`
+            : segment.label.split(' · ')[0]}
+        </span>
       </div>
       <output aria-label="Compact time remaining">
         {formatSeconds(getRemainingSeconds(session, displayNow))}

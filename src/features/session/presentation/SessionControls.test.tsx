@@ -4,7 +4,12 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { createWorkflow } from '@/features/workflow';
 
-import { createSession, pauseSession } from '../domain/Session';
+import {
+  continueRewardSession,
+  createSession,
+  pauseSession,
+  rollSessionReward,
+} from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
 import { SessionControls } from './SessionControls';
 
@@ -96,6 +101,127 @@ describe('SessionControls', () => {
     expect(screen.getByText('Reward pending')).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Resume' }),
+    ).not.toBeInTheDocument();
+  });
+
+  test('confirms Restart phase only for an active Bonus', async () => {
+    const user = userEvent.setup();
+    const rewarded = createWorkflow({
+      id: 'bonus-controls',
+      name: 'Bonus controls',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const rewardPaused = deriveSessionState(
+      createSession('bonus-controls-session', rewarded, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(rewardPaused, () => 0),
+      4_000,
+      'continue-controls',
+    );
+    const actions = {
+      ...callbacks(),
+      onRestart: vi.fn(() => Promise.resolve()),
+    };
+    render(<SessionControls session={bonus} {...actions} />);
+
+    await user.click(screen.getByRole('button', { name: 'Restart phase' }));
+    expect(
+      screen.getByRole('dialog', { name: 'Restart this Bonus Phase?' }),
+    ).toBeVisible();
+    const restartButtons = screen.getAllByRole('button', {
+      name: 'Restart phase',
+    });
+    const confirm = restartButtons.at(-1);
+    if (confirm === undefined)
+      throw new Error('Expected restart confirmation.');
+    await user.click(confirm);
+    expect(actions.onRestart).toHaveBeenCalledWith(
+      bonus.id,
+      'bonus-controls-session:0',
+    );
+  });
+
+  test('keeps a failed Bonus restart recoverable in the confirmation dialog', async () => {
+    const user = userEvent.setup();
+    const rewarded = createWorkflow({
+      id: 'bonus-retry',
+      name: 'Bonus retry',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const rewardPaused = deriveSessionState(
+      createSession('bonus-retry-session', rewarded, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(rewardPaused, () => 0),
+      4_000,
+      'continue-retry',
+    );
+    const actions = {
+      ...callbacks(),
+      onRestart: vi
+        .fn(() => Promise.resolve())
+        .mockRejectedValueOnce(new Error('Restart unavailable.')),
+    };
+    render(<SessionControls session={bonus} {...actions} />);
+
+    await user.click(screen.getByRole('button', { name: 'Restart phase' }));
+    const confirm = screen.getAllByRole('button', {
+      name: 'Restart phase',
+    })[1];
+    if (confirm === undefined)
+      throw new Error('Expected restart confirmation.');
+    await user.click(confirm);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Restart unavailable.',
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Restart this Bonus Phase?' }),
+    ).toBeVisible();
+
+    await user.click(confirm);
+    expect(actions.onRestart).toHaveBeenCalledTimes(2);
+    expect(
+      screen.queryByRole('dialog', { name: 'Restart this Bonus Phase?' }),
     ).not.toBeInTheDocument();
   });
 });

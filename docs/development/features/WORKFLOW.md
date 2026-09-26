@@ -148,7 +148,8 @@ seconds. This is not the more general Domain duration rule.
 - Each Side may own at most one Bonus Reward Phase. Its trimmed name is
   non-empty, duration is a positive integer in seconds and Environment follows
   the same Asset/reference/color rules as a normal Phase. The nested value is
-  deeply immutable. Configuration is inert until RW-005.
+  deeply immutable. Session execution uses it only after an authoritative
+  Reward result is acknowledged; it remains configuration in the Workflow.
 
 `isRewardDueAfterPhase()` returns false for an invalid index or absent Reward
 Dice. Custom schedules use exact Phase membership; frequency schedules preserve

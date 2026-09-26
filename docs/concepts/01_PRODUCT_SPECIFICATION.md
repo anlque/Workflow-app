@@ -322,10 +322,12 @@ orders the Reward opportunities produced by the canonical schedule: the first
 half admits `early` and `any` sides, the second half admits `late` and `any`
 sides, and the middle opportunity of an odd count belongs to both halves. Every
 configured opportunity must have at least one eligible side. Each Side may
-optionally configure one Bonus Reward Phase with a non-empty name,
-positive duration and the same Environment fields as a normal Phase. RW-004
-stores this configuration; it does not execute it. Bonus timing and lifecycle
-belong to RW-005. After the one-second Phase transition, an eligible non-final Reward
+optionally configure one Bonus Reward Phase with a non-empty name, positive
+duration and the same Environment fields as a normal Phase. After `Continue`,
+the selected Bonus runs on the authoritative Session clock without becoming a
+Workflow Phase index. It supports pause, resume and restart; expiry returns to
+the saved next Phase or completes the Session, and never creates a nested
+Reward. After the one-second Phase transition, an eligible non-final Reward
 pauses the full next Phase until the user clicks `Roll dice`, sees the result
 and clicks `Continue`.
 The cube, result and current action use a centered composition with deliberate
@@ -357,8 +359,10 @@ is open and loaded, a short local bell communicates an observed Phase boundary
 and a layered local rolling sound accompanies Reward Dice mixing. One second
 after ordinary Session completion, a short completion chord plays. An eligible
 final Reward first plays a distinct Reward celebration one second after unlock.
-After the user rolls the dice and selects `Continue`, the Reward dialog closes,
-`Session complete` is revealed and the completion chord plays one second later.
+After the user rolls the dice and selects `Continue`, the Reward dialog closes.
+If the selected Side has a final Bonus, completion remains hidden until that
+Bonus expires; otherwise `Session complete` is revealed immediately. The
+completion chord follows the first visible completed projection.
 These sounds are non-blocking, require no network request and are not guaranteed
 after the focus tab is closed, discarded or unloaded. The MVP requests only
 permissions required for the side panel, durable local storage, Session alarms

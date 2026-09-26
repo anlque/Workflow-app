@@ -2,7 +2,13 @@ import { describe, expect, test } from 'vitest';
 
 import { createWorkflow } from '@/features/workflow';
 
-import { createSession, pauseSession, stopSession } from '../domain/Session';
+import {
+  continueRewardSession,
+  createSession,
+  pauseSession,
+  rollSessionReward,
+  stopSession,
+} from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
 import { didCrossPhaseBoundary } from './didCrossPhaseBoundary';
 
@@ -69,5 +75,44 @@ describe('didCrossPhaseBoundary', () => {
     );
 
     expect(didCrossPhaseBoundary(initial, another)).toBe(false);
+  });
+
+  test('rings once when a non-final Bonus reveals its normal continuation', () => {
+    const rewarded = createWorkflow({
+      id: 'bonus-boundary',
+      name: 'Bonus boundary',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 5, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('bonus-boundary-session', rewarded, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(paused, () => 0),
+      4_000,
+      'continue-boundary',
+    );
+    const normal = deriveSessionState(bonus, 34_000);
+
+    expect(didCrossPhaseBoundary(bonus, normal)).toBe(true);
+    expect(didCrossPhaseBoundary(normal, normal)).toBe(false);
   });
 });

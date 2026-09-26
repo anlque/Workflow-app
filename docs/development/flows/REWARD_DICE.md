@@ -63,12 +63,15 @@ Phase index; it is not a timer or random event.
    animation and sound sequence and replaces the previous result. `rerolls` is
    the number of additional rolls, from 0 through 3; the initial roll does not
    consume it.
-6. **Continue** accepts the last visible result. For a non-final Reward it sends
-   `session/continue-reward`; Domain resumes the waiting Phase from the current
-   wall clock with its stored full duration, then background saves, broadcasts
-   and schedules its deadline.
-7. For a final Reward, Continue sends the same authoritative command, follows
-   the stored `complete` target and only then reveals Completed state.
+6. **Continue** accepts the last visible result and sends
+   `session/continue-reward`. Without Bonus, Domain follows the saved normal
+   continuation immediately. With Bonus, it starts the selected Side's full
+   Bonus duration under the authoritative Session clock while preserving that
+   continuation target.
+7. Bonus pause/resume uses the existing Session controls and anchors. A
+   confirmed `session/restart-phase` resets only the active Bonus to its full
+   configured duration. Its deadline returns directly to the saved next Phase
+   or Completed state and never creates another Reward opportunity.
 
 The selected Dice Side and reroll history are Session Domain state. They are
 stored and broadcast as part of the authoritative projection. Session-level
@@ -85,8 +88,9 @@ coordinator cache evicts a settled entry.
 - Animation stage, sound and dialog focus are local
   Presentation state.
 - Reward Dice configuration remains part of the immutable Session snapshot.
-- A selected Side may carry inert Bonus Reward Phase configuration. RW-004
-  persists it; RW-005 will define the continuation and execution transition.
+- A selected Side may start its configured Bonus Reward Phase. The persisted
+  active marker identifies the ritual and selected Side; name, duration and
+  Environment derive from the immutable Session snapshot.
 
 ## Messages
 
@@ -94,6 +98,7 @@ coordinator cache evicts a settled entry.
 | ------------------------------------ | ------------------------------------ | ------------------------------------------------------ |
 | `session/changed`                    | Reward pause/completion is persisted | Focus detects and presents the opportunity             |
 | `session/continue-reward`            | Continue after a non-final result    | Requests the only valid transition out of Reward pause |
+| `session/restart-phase`              | Confirm restart during active Bonus  | Resets that Bonus to its full configured duration      |
 | command response + `session/changed` | Continue succeeds                    | Validates and replaces projections with Running state  |
 
 Messages do not carry caller-selected outcomes. `session/roll-reward` and
@@ -103,13 +108,13 @@ complete authoritative projection.
 
 ## Persistence
 
-Session record v6 persists `pauseReason: 'reward'`, the opportunity identity,
+Session record v7 persists `pauseReason: 'reward'`, the opportunity identity,
 completed Phase index, selected Side index, rerolls used, acknowledgment and
 the `phase | complete` continuation target plus Session-level bounded command
-receipts plus optional Bonus configuration on Dice Sides. Legacy defaults for
-versions 1–4 are applied only by the version-aware persistence mapper; runtime
-projections require the canonical shape. Versions 1–5 remain readable and
-restore their historical state without Bonus configuration or inventing a
+receipts plus optional Bonus configuration on Dice Sides and an optional exact
+active Bonus marker. Legacy defaults for versions 1–4 are applied only by the
+version-aware persistence mapper; runtime projections require the canonical
+shape. Versions 1–6 remain readable without inventing an active Bonus marker or
 selected result.
 
 ## Failure and Recovery

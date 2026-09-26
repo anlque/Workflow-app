@@ -84,7 +84,7 @@ These version numbers solve different compatibility problems:
 | --- | --- | --- | --- |
 | Dexie database version | Whole `locusora` database structure and upgrade order | 1–4 history; current 4 | A table/index changes or existing stored data needs a database migration |
 | `WorkflowRecord.schemaVersion` | One Workflow record serialization shape | Current writes 5; reads 1–5 | The Workflow record reader/writer needs a new incompatible serialization |
-| `SessionRecord.schemaVersion` | One Session record envelope | Current writes 6; reads 1–6 | The Session record reader/writer needs a new incompatible serialization |
+| `SessionRecord.schemaVersion` | One Session record envelope | Current writes 7; reads 1–7 | The Session record reader/writer needs a new incompatible serialization |
 | `AssetRecord.schemaVersion` | One Asset record shape | Current writes 2; reads role-less 1 and 2 | The Asset record reader/writer needs a new incompatible serialization |
 | Workflow package `version` | Public `locusora/workflow` import/export envelope | Current export 5; import 1–5 | The external Workflow package contract changes |
 | Settings package `version` | Public `locusora/settings` import/export envelope | 1 | The external Settings package contract changes |
@@ -150,7 +150,7 @@ The outer record contains:
 ```ts
 {
   id: string;
-  schemaVersion: 6;
+  schemaVersion: 7;
   active: 0 | 1;
   updatedAt: number;
   session: unknown;
@@ -158,13 +158,15 @@ The outer record contains:
 ```
 
 Version 1 snapshots accept only legacy direct ID Environment fields. Versions
-2–6 accept only exact direct-reference objects; Role references, mixed
+2–7 accept only exact direct-reference objects; Role references, mixed
 versions and unknown Environment fields are rejected. Versions 1–2 read legacy
 top-level Reward `triggerPhaseType + frequency` fields and default a missing
-trigger type to `focus`; versions 3–6 require the canonical `frequency | custom`
-schedule union, including `triggerPhaseType` for frequency. Versions 4–6 require
-canonical Side availability; versions 1–3 default it to `any`. Version 6 accepts
-optional exact Bonus configuration; versions 1–5 do not. The nested `session`
+trigger type to `focus`; versions 3–7 require the canonical `frequency | custom`
+schedule union, including `triggerPhaseType` for frequency. Versions 4–7 require
+canonical Side availability; versions 1–3 default it to `any`. Versions 6–7
+accept optional exact Bonus configuration; versions 1–5 do not. Version 7 adds
+the optional exact active Bonus marker and permits `restart` Reward-command
+receipts; versions 1–6 restore without an active Bonus marker. The nested `session`
 stores the immutable Workflow snapshot, current Phase index,
 state discriminator and the timing fields required by that state. It does not
 store a live reference to the Workflow table.

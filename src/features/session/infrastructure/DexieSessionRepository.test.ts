@@ -7,6 +7,7 @@ import { LocusoraDatabase } from '@/platform/storage';
 import { createWorkflow, workflowDatabaseSchemas } from '@/features/workflow';
 
 import {
+  continueRewardSession,
   createSession,
   pauseSession,
   rollSessionReward,
@@ -49,6 +50,57 @@ afterEach(async () => {
 });
 
 describe('DexieSessionRepository', () => {
+  test('round-trips canonical version-7 active Bonus state', async () => {
+    const store = database();
+    const repository = new DexieSessionRepository(store);
+    const rewarded = createWorkflow({
+      id: 'v7-bonus-workflow',
+      name: 'V7 Bonus',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const rewardPaused = deriveSessionState(
+      createSession('v7-bonus-session', rewarded, 1_000),
+      3_000,
+    );
+    const running = continueRewardSession(
+      rollSessionReward(rewardPaused, () => 0, 'roll-v7'),
+      4_000,
+      'continue-v7',
+    );
+    await repository.save(running);
+
+    await expect(repository.get(running.id)).resolves.toEqual(running);
+    await expect(
+      store.table<SessionRecord, string>('sessions').get(running.id),
+    ).resolves.toMatchObject({
+      schemaVersion: 7,
+      session: {
+        activeBonusPhase: {
+          rewardRitualId: 'v7-bonus-session:0',
+          selectedSideIndex: 0,
+        },
+      },
+    });
+  });
+
   test.each([1, 2, 3, 4] as const)(
     'restores a non-final Reward pause from legacy version %s without inventing a result',
     async (schemaVersion) => {
@@ -136,9 +188,12 @@ describe('DexieSessionRepository', () => {
     await repository.save(paused);
     const table = store.table<SessionRecord, string>('sessions');
     const stored = structuredClone(await table.get(paused.id)) as unknown as {
+      schemaVersion: number;
       session: Record<string, unknown>;
     };
+    stored.schemaVersion = 6;
     delete stored.session['rewardRitual'];
+    delete stored.session['activeBonusPhase'];
     await table.put(stored as unknown as SessionRecord);
 
     await expect(repository.get(paused.id)).rejects.toBeInstanceOf(
@@ -268,7 +323,7 @@ describe('DexieSessionRepository', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  test('round-trips authoritative Reward ritual and Bonus configuration in v6', async () => {
+  test('round-trips authoritative Reward ritual and Bonus configuration in v7', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
     const rewarded = createWorkflow({
@@ -308,7 +363,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(rolled.id),
     ).resolves.toMatchObject({
-      schemaVersion: 6,
+      schemaVersion: 7,
       session: {
         rewardRitual: {
           id: 'reward-session:0',
@@ -493,7 +548,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(expected.id),
     ).resolves.toMatchObject({
-      schemaVersion: 6,
+      schemaVersion: 7,
       session: {
         workflow: {
           rewardDice: {

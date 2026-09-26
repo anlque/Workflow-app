@@ -2,7 +2,12 @@ import { describe, expect, test } from 'vitest';
 
 import { createWorkflow } from '@/features/workflow';
 
-import { createSession, pauseSession } from '../domain/Session';
+import {
+  continueRewardSession,
+  createSession,
+  pauseSession,
+  rollSessionReward,
+} from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
 import { parseSessionProjection } from './parseSessionProjection';
 
@@ -22,6 +27,50 @@ function workflowWithReward() {
 }
 
 describe('parseSessionProjection', () => {
+  test('accepts only canonical active Bonus projection state', () => {
+    const rewarded = createWorkflow({
+      id: 'projection-bonus-workflow',
+      name: 'Projection Bonus',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('projection-bonus', rewarded, 1_000),
+      3_000,
+    );
+    const running = continueRewardSession(
+      rollSessionReward(paused, () => 0, 'roll-projection'),
+      4_000,
+      'continue-projection',
+    );
+
+    expect(parseSessionProjection(structuredClone(running))).toEqual(running);
+    const corrupt = structuredClone(running) as unknown as {
+      activeBonusPhase: Record<string, unknown>;
+    };
+    corrupt.activeBonusPhase['extra'] = true;
+    expect(() => parseSessionProjection(corrupt)).toThrow(
+      'Session projection is invalid.',
+    );
+  });
+
   test('restores a transport-safe Session projection', () => {
     const value = createSession(
       'session-1',

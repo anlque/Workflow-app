@@ -9,6 +9,7 @@ export { continueRewardSessionUseCase } from './application/continueRewardSessio
 export { getActiveSessionUseCase } from './application/getActiveSessionUseCase';
 export { pauseSessionUseCase } from './application/pauseSessionUseCase';
 export { resumeSessionUseCase } from './application/resumeSessionUseCase';
+export { restartSessionPhaseUseCase } from './application/restartSessionPhaseUseCase';
 export { rollSessionRewardUseCase } from './application/rollSessionRewardUseCase';
 export { startSessionUseCase } from './application/startSessionUseCase';
 export { stopSessionUseCase } from './application/stopSessionUseCase';
@@ -19,6 +20,7 @@ export {
   getRemainingSeconds,
   pauseSession,
   rerollSessionReward,
+  restartSessionPhase,
   resumeSession,
   rollSessionReward,
   restoreSession,
@@ -57,3 +59,7 @@ export {
   type SessionProjectionClient,
 } from './presentation/connectSessionMessages';
 export { parseSessionProjection } from './presentation/parseSessionProjection';
+export {
+  getActiveSessionSegment,
+  type ActiveSessionSegment,
+} from './presentation/getActiveSessionSegment';

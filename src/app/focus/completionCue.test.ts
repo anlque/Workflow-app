@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  continueRewardSession,
   createSession,
   deriveSessionState,
   rollSessionReward,
@@ -61,5 +62,43 @@ describe('completionCue', () => {
 
     expect(completionCue(null, initial)).toBeNull();
     expect(completionCue(initial, another)).toBeNull();
+  });
+
+  test('waits for a final Bonus deadline before classifying completion', () => {
+    const rewarded = createWorkflow({
+      id: 'final-bonus-cue',
+      name: 'Final Bonus cue',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const rewardPaused = deriveSessionState(
+      createSession('final-bonus-cue-session', rewarded, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(rewardPaused, () => 0),
+      4_000,
+      'continue-cue',
+    );
+    const completed = deriveSessionState(bonus, 34_000);
+
+    expect(completionCue(rewardPaused, bonus)).toBeNull();
+    expect(completionCue(bonus, completed)).toBe('complete');
+    expect(completionCue(completed, completed)).toBeNull();
+    expect(completionCue(null, completed)).toBeNull();
   });
 });

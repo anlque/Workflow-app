@@ -5,6 +5,7 @@ import { SessionControls } from './SessionControls';
 import { RewardResultDialog } from './RewardResultDialog';
 import { didCrossPhaseBoundary } from './didCrossPhaseBoundary';
 import { formatSessionCountdown } from './sessionCountdown';
+import { getActiveSessionSegment } from './getActiveSessionSegment';
 
 export type ActiveSessionViewProps = Readonly<{
   session: Session;
@@ -19,6 +20,7 @@ export type ActiveSessionViewProps = Readonly<{
   }>;
   onPause(id: SessionId): Promise<void>;
   onResume(id: SessionId): Promise<void>;
+  onRestart?(id: SessionId, rewardRitualId: string): Promise<void>;
   onStop(id: SessionId): Promise<void>;
 }>;
 
@@ -31,6 +33,7 @@ export function ActiveSessionView({
   rewardInteraction,
   onPause,
   onResume,
+  onRestart,
   onStop,
 }: ActiveSessionViewProps) {
   const [displayNow, setDisplayNow] = useState(now);
@@ -104,8 +107,7 @@ export function ActiveSessionView({
     );
   }
 
-  const phase =
-    workflow.phases[session.currentPhaseIndex] ?? workflow.phases[0];
+  const segment = getActiveSessionSegment(session);
   return (
     <section
       className="active-session"
@@ -118,10 +120,7 @@ export function ActiveSessionView({
         {session.status === 'transitioning' ? (
           'Transitioning to the next phase…'
         ) : (
-          <>
-            {phase.type === 'focus' ? 'Focus' : 'Break'} · Phase{' '}
-            {session.currentPhaseIndex + 1} of {workflow.phases.length}
-          </>
+          <>{segment.isBonus ? `Bonus · ${segment.label}` : segment.label}</>
         )}
       </p>
       <output className="session-countdown" aria-label="Time remaining">
@@ -131,6 +130,7 @@ export function ActiveSessionView({
         session={session}
         onPause={onPause}
         onResume={onResume}
+        {...(onRestart === undefined ? {} : { onRestart })}
         onStop={onStop}
       />
       {rewardResult}

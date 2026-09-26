@@ -93,7 +93,12 @@ function rewardCommandReceipts(value: unknown) {
     if (!hasExactKeys(receipt, ['commandId', 'type', 'rewardRitualId']))
       return invalid();
     const type = receipt['type'];
-    if (type !== 'roll' && type !== 'reroll' && type !== 'continue')
+    if (
+      type !== 'roll' &&
+      type !== 'reroll' &&
+      type !== 'continue' &&
+      type !== 'restart'
+    )
       return invalid();
     return {
       commandId: string(receipt['commandId']),
@@ -101,6 +106,18 @@ function rewardCommandReceipts(value: unknown) {
       rewardRitualId: string(receipt['rewardRitualId']),
     } as const;
   });
+}
+
+function activeBonusPhase(value: unknown) {
+  if (value === undefined) return undefined;
+  const active = record(value);
+  if (!hasExactKeys(active, ['rewardRitualId', 'selectedSideIndex'])) {
+    return invalid();
+  }
+  return {
+    rewardRitualId: string(active['rewardRitualId']),
+    selectedSideIndex: number(active['selectedSideIndex']),
+  };
 }
 
 function hasExactKeys(
@@ -287,7 +304,7 @@ export function parseSessionProjection(value: unknown): Session | null {
         'status',
         ...statusKeys,
       ],
-      ['rewardRitual'],
+      ['rewardRitual', 'activeBonusPhase'],
     )
   )
     return invalid();
@@ -297,6 +314,7 @@ export function parseSessionProjection(value: unknown): Session | null {
   if (string(input['sourceWorkflowId']) !== restoredWorkflow.id)
     return invalid();
   const ritual = rewardRitual(input['rewardRitual']);
+  const activeBonus = activeBonusPhase(input['activeBonusPhase']);
   const common = {
     id: string(input['id']),
     workflow: restoredWorkflow,
@@ -305,6 +323,7 @@ export function parseSessionProjection(value: unknown): Session | null {
       input['rewardCommandReceipts'],
     ),
     ...(ritual === undefined ? {} : { rewardRitual: ritual }),
+    ...(activeBonus === undefined ? {} : { activeBonusPhase: activeBonus }),
   };
   let restored: RestoreSessionInput;
   if (status === 'running') {

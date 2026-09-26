@@ -64,6 +64,7 @@ export function createFocusDependencies(
     sessions,
     pause: (id) => sessions.pause(id),
     resume: (id) => sessions.resume(id),
+    restartPhase: (id, ritualId) => sessions.restartPhase(id, ritualId),
     continueReward: (id, ritualId) => sessions.continueReward(id, ritualId),
     rollReward: (id, ritualId) => sessions.rollReward(id, ritualId),
     rerollReward: (id, ritualId) => sessions.rerollReward(id, ritualId),

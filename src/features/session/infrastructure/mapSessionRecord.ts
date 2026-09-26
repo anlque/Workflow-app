@@ -8,7 +8,7 @@ import {
 import { SessionValidationError } from '../domain/SessionErrors';
 import type { SessionRecord } from './SessionRecord';
 
-type SessionSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6;
+type SessionSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 function invalid(): never {
   throw new SessionValidationError('Stored Session record is invalid.');
@@ -201,7 +201,7 @@ function parseWorkflow(value: unknown, schemaVersion: SessionSchemaVersion) {
                 !hasExactKeys(
                   side,
                   schemaVersion < 4 ? required : [...required, 'availability'],
-                  schemaVersion === 6
+                  schemaVersion >= 6
                     ? ['description', 'bonusPhase']
                     : ['description'],
                 )
@@ -210,7 +210,7 @@ function parseWorkflow(value: unknown, schemaVersion: SessionSchemaVersion) {
               }
               const bonusPhase = (() => {
                 if (side['bonusPhase'] === undefined) return undefined;
-                if (schemaVersion !== 6) return invalid();
+                if (schemaVersion < 6) return invalid();
                 const bonus = record(side['bonusPhase']);
                 if (
                   !hasExactKeys(bonus, [
@@ -288,14 +288,22 @@ function parseRewardRitual(value: unknown) {
   };
 }
 
-function parseRewardCommandReceipts(value: unknown) {
+function parseRewardCommandReceipts(
+  value: unknown,
+  schemaVersion: SessionSchemaVersion,
+) {
   if (!Array.isArray(value)) return invalid();
   return value.map((entry) => {
     const receipt = record(entry);
     if (!hasExactKeys(receipt, ['commandId', 'type', 'rewardRitualId']))
       return invalid();
     const type = receipt['type'];
-    if (type !== 'roll' && type !== 'reroll' && type !== 'continue')
+    if (
+      type !== 'roll' &&
+      type !== 'reroll' &&
+      type !== 'continue' &&
+      !(schemaVersion >= 7 && type === 'restart')
+    )
       return invalid();
     return {
       commandId: string(receipt['commandId']),
@@ -303,6 +311,18 @@ function parseRewardCommandReceipts(value: unknown) {
       rewardRitualId: string(receipt['rewardRitualId']),
     } as const;
   });
+}
+
+function parseActiveBonusPhase(value: unknown) {
+  if (value === undefined) return undefined;
+  const active = record(value);
+  if (!hasExactKeys(active, ['rewardRitualId', 'selectedSideIndex'])) {
+    return invalid();
+  }
+  return {
+    rewardRitualId: string(active['rewardRitualId']),
+    selectedSideIndex: number(active['selectedSideIndex']),
+  };
 }
 
 export function mapSessionRecord(value: unknown): Session {
@@ -313,7 +333,8 @@ export function mapSessionRecord(value: unknown): Session {
       outer['schemaVersion'] !== 3 &&
       outer['schemaVersion'] !== 4 &&
       outer['schemaVersion'] !== 5 &&
-      outer['schemaVersion'] !== 6) ||
+      outer['schemaVersion'] !== 6 &&
+      outer['schemaVersion'] !== 7) ||
     (outer['active'] !== 0 && outer['active'] !== 1)
   ) {
     return invalid();
@@ -328,13 +349,21 @@ export function mapSessionRecord(value: unknown): Session {
   const rewardCommandReceipts =
     outer['schemaVersion'] < 5
       ? []
-      : parseRewardCommandReceipts(stored['rewardCommandReceipts']);
+      : parseRewardCommandReceipts(
+          stored['rewardCommandReceipts'],
+          outer['schemaVersion'],
+        );
+  const activeBonusPhase =
+    outer['schemaVersion'] < 7
+      ? undefined
+      : parseActiveBonusPhase(stored['activeBonusPhase']);
   const common = {
     id: string(stored['id']),
     workflow: parseWorkflow(stored['workflow'], outer['schemaVersion']),
     currentPhaseIndex: number(stored['currentPhaseIndex']),
     rewardCommandReceipts,
     ...(rewardRitual === undefined ? {} : { rewardRitual }),
+    ...(activeBonusPhase === undefined ? {} : { activeBonusPhase }),
   };
 
   let input: RestoreSessionInput;
@@ -424,7 +453,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
             : session.stoppedAt;
   return {
     id: session.id,
-    schemaVersion: 6,
+    schemaVersion: 7,
     active,
     updatedAt,
     session: {
@@ -436,6 +465,9 @@ export function mapSessionToRecord(session: Session): SessionRecord {
       ...(session.rewardRitual === undefined
         ? {}
         : { rewardRitual: session.rewardRitual }),
+      ...(session.activeBonusPhase === undefined
+        ? {}
+        : { activeBonusPhase: session.activeBonusPhase }),
       ...(session.status === 'running'
         ? {
             phaseStartedAt: session.phaseStartedAt,

@@ -25,6 +25,12 @@ type SessionBase = Readonly<{
   currentPhaseIndex: number;
   rewardCommandReceipts: readonly RewardCommandReceipt[];
   rewardRitual?: RewardRitual;
+  activeBonusPhase?: ActiveBonusRewardPhase;
+}>;
+
+export type ActiveBonusRewardPhase = Readonly<{
+  rewardRitualId: string;
+  selectedSideIndex: number;
 }>;
 
 export type RewardContinuationTarget =
@@ -33,7 +39,7 @@ export type RewardContinuationTarget =
 
 export type RewardCommandReceipt = Readonly<{
   commandId: string;
-  type: 'roll' | 'reroll' | 'continue';
+  type: 'roll' | 'reroll' | 'continue' | 'restart';
   rewardRitualId: string;
 }>;
 
@@ -95,6 +101,7 @@ export type RestoreSessionInput =
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
+      activeBonusPhase?: ActiveBonusRewardPhase;
       status: 'running';
       phaseStartedAt: number;
       phaseEndsAt: number;
@@ -105,6 +112,7 @@ export type RestoreSessionInput =
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
+      activeBonusPhase?: ActiveBonusRewardPhase;
       status: 'transitioning';
       transitionEndsAt: number;
     }>
@@ -114,6 +122,7 @@ export type RestoreSessionInput =
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
+      activeBonusPhase?: ActiveBonusRewardPhase;
       status: 'paused';
       pauseReason?: 'user' | 'reward';
       pausedAt: number;
@@ -125,6 +134,7 @@ export type RestoreSessionInput =
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
+      activeBonusPhase?: ActiveBonusRewardPhase;
       status: 'completed';
       completedAt: number;
     }>
@@ -134,6 +144,7 @@ export type RestoreSessionInput =
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       rewardRitual?: RewardRitual;
+      activeBonusPhase?: ActiveBonusRewardPhase;
       status: 'stopped';
       stoppedAt: number;
     }>;
@@ -178,6 +189,7 @@ export function restoreSession(input: RestoreSessionInput): Session {
 
   const rewardCommandReceipts = input.rewardCommandReceipts;
   validateRewardCommandReceipts(rewardCommandReceipts);
+  validateActiveBonusPhase(input);
   if (input.rewardRitual !== undefined) {
     validateRewardRitual(input, input.rewardRitual, rewardCommandReceipts);
   }
@@ -191,6 +203,9 @@ export function restoreSession(input: RestoreSessionInput): Session {
     ...(input.rewardRitual === undefined
       ? {}
       : { rewardRitual: freezeRewardRitual(input.rewardRitual) }),
+    ...(input.activeBonusPhase === undefined
+      ? {}
+      : { activeBonusPhase: freezeActiveBonusPhase(input.activeBonusPhase) }),
   };
 
   if (input.status === 'running') {
@@ -270,6 +285,12 @@ export function pauseSession(session: Session, now: number): PausedSession {
     snapshot: reconciled.snapshot,
     currentPhaseIndex: reconciled.currentPhaseIndex,
     rewardCommandReceipts: reconciled.rewardCommandReceipts,
+    ...(reconciled.rewardRitual === undefined
+      ? {}
+      : { rewardRitual: reconciled.rewardRitual }),
+    ...(reconciled.activeBonusPhase === undefined
+      ? {}
+      : { activeBonusPhase: reconciled.activeBonusPhase }),
     status: 'paused',
     pauseReason: 'user',
     pausedAt: now,
@@ -289,6 +310,12 @@ export function resumeSession(session: Session, now: number): RunningSession {
     snapshot: session.snapshot,
     currentPhaseIndex: session.currentPhaseIndex,
     rewardCommandReceipts: session.rewardCommandReceipts,
+    ...(session.rewardRitual === undefined
+      ? {}
+      : { rewardRitual: session.rewardRitual }),
+    ...(session.activeBonusPhase === undefined
+      ? {}
+      : { activeBonusPhase: session.activeBonusPhase }),
     status: 'running',
     phaseStartedAt: now,
     phaseEndsAt: now + session.remainingMilliseconds,
@@ -307,6 +334,36 @@ export function continueRewardSession(
     session.rewardRitual?.selectedSideIndex === undefined
   ) {
     throw new SessionTransitionError();
+  }
+  const selectedSide =
+    session.snapshot.workflow.rewardDice?.sides[
+      session.rewardRitual.selectedSideIndex
+    ];
+  const bonusPhase = selectedSide?.bonusPhase;
+  if (bonusPhase !== undefined) {
+    return Object.freeze({
+      id: session.id,
+      sourceWorkflowId: session.sourceWorkflowId,
+      snapshot: session.snapshot,
+      currentPhaseIndex: session.currentPhaseIndex,
+      rewardCommandReceipts: appendRewardCommandReceipt(
+        session.rewardCommandReceipts,
+        commandId,
+        'continue',
+        session.rewardRitual.id,
+      ),
+      status: 'running',
+      phaseStartedAt: now,
+      phaseEndsAt: now + bonusPhase.durationSeconds * 1_000,
+      rewardRitual: freezeRewardRitual({
+        ...session.rewardRitual,
+        acknowledged: true,
+      }),
+      activeBonusPhase: freezeActiveBonusPhase({
+        rewardRitualId: session.rewardRitual.id,
+        selectedSideIndex: session.rewardRitual.selectedSideIndex,
+      }),
+    });
   }
   if (session.rewardRitual.continuation.type === 'complete') {
     return Object.freeze({
@@ -346,6 +403,44 @@ export function continueRewardSession(
       ...session.rewardRitual,
       acknowledged: true,
     }),
+  });
+}
+
+export function restartSessionPhase(
+  session: Session,
+  now: number,
+  commandId: string,
+): RunningSession {
+  validateEpochMilliseconds(now);
+  if (
+    (session.status !== 'running' &&
+      !(session.status === 'paused' && session.pauseReason === 'user')) ||
+    session.activeBonusPhase === undefined ||
+    session.rewardRitual === undefined
+  ) {
+    throw new SessionTransitionError();
+  }
+  const bonus =
+    session.snapshot.workflow.rewardDice?.sides[
+      session.activeBonusPhase.selectedSideIndex
+    ]?.bonusPhase;
+  if (bonus === undefined) throw new SessionTransitionError();
+  return Object.freeze({
+    id: session.id,
+    sourceWorkflowId: session.sourceWorkflowId,
+    snapshot: session.snapshot,
+    currentPhaseIndex: session.currentPhaseIndex,
+    rewardCommandReceipts: appendRewardCommandReceipt(
+      session.rewardCommandReceipts,
+      commandId,
+      'restart',
+      session.activeBonusPhase.rewardRitualId,
+    ),
+    rewardRitual: session.rewardRitual,
+    activeBonusPhase: session.activeBonusPhase,
+    status: 'running',
+    phaseStartedAt: now,
+    phaseEndsAt: now + bonus.durationSeconds * 1_000,
   });
 }
 
@@ -457,11 +552,15 @@ function validateRewardRitual(
         ritual.continuation.phaseIndex === input.currentPhaseIndex &&
         ritual.continuation.phaseIndex === ritual.completedPhaseIndex + 1 &&
         input.workflow.phases[ritual.continuation.phaseIndex] !== undefined;
+  const activeBonus = input.activeBonusPhase;
   const validState =
     input.status === 'paused'
-      ? input.pauseReason === 'reward' && !ritual.acknowledged
+      ? input.pauseReason === 'reward'
+        ? !ritual.acknowledged && activeBonus === undefined
+        : ritual.acknowledged && activeBonus !== undefined
       : input.status === 'running'
-        ? ritual.acknowledged && ritual.continuation.type === 'phase'
+        ? ritual.acknowledged &&
+          (activeBonus !== undefined || ritual.continuation.type === 'phase')
         : input.status === 'completed'
           ? ritual.acknowledged && ritual.continuation.type === 'complete'
           : false;
@@ -484,6 +583,24 @@ function validateRewardRitual(
   }
 }
 
+function validateActiveBonusPhase(input: RestoreSessionInput): void {
+  const active = input.activeBonusPhase;
+  if (active === undefined) return;
+  const ritual = input.rewardRitual;
+  const side = input.workflow.rewardDice?.sides[active.selectedSideIndex];
+  if (
+    (input.status !== 'running' &&
+      !(input.status === 'paused' && input.pauseReason === 'user')) ||
+    ritual === undefined ||
+    !ritual.acknowledged ||
+    ritual.id !== active.rewardRitualId ||
+    ritual.selectedSideIndex !== active.selectedSideIndex ||
+    side?.bonusPhase === undefined
+  ) {
+    throw new SessionValidationError('Session Bonus Reward Phase is invalid.');
+  }
+}
+
 function validateRewardCommandReceipts(
   receipts: readonly RewardCommandReceipt[],
 ): void {
@@ -496,7 +613,10 @@ function validateRewardCommandReceipts(
       return (
         receipt.commandId.trim() === '' ||
         receipt.rewardRitualId.trim() === '' ||
-        (type !== 'roll' && type !== 'reroll' && type !== 'continue')
+        (type !== 'roll' &&
+          type !== 'reroll' &&
+          type !== 'continue' &&
+          type !== 'restart')
       );
     })
   ) {
@@ -523,6 +643,12 @@ function freezeRewardRitual(ritual: RewardRitual): RewardRitual {
     ...ritual,
     continuation: Object.freeze({ ...ritual.continuation }),
   });
+}
+
+function freezeActiveBonusPhase(
+  active: ActiveBonusRewardPhase,
+): ActiveBonusRewardPhase {
+  return Object.freeze({ ...active });
 }
 
 function freezeRewardCommandReceipts(

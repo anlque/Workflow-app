@@ -369,8 +369,24 @@ describe('createSessionCoordinator', () => {
         frequency: 1,
         rerolls: 1,
         sides: [
-          { icon: 'tea', title: 'Tea' },
-          { icon: 'walk', title: 'Walk' },
+          {
+            icon: 'tea',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          {
+            icon: 'walk',
+            title: 'Walk',
+            bonusPhase: {
+              name: 'Walk break',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
         ],
       },
     });
@@ -463,11 +479,28 @@ describe('createSessionCoordinator', () => {
     expect(messages.events.at(-1)?.session).toMatchObject({
       status: 'running',
       currentPhaseIndex: 1,
-      phaseEndsAt: 25_000,
+      phaseEndsAt: 50_000,
+      activeBonusPhase: { rewardRitualId: 'session-1:0' },
     });
     expect(alarms.scheduled).toEqual({
       name: 'locusora.session-phase',
-      when: 25_000,
+      when: 50_000,
+    });
+    clock.set(25_000);
+    await messages.dispatch({
+      type: 'session/restart-phase',
+      commandId: 'command-restart',
+      sessionId: 'session-1',
+      rewardRitualId: 'session-1:0',
+    });
+    expect(messages.events.at(-1)?.session).toMatchObject({
+      status: 'running',
+      phaseEndsAt: 55_000,
+      activeBonusPhase: { rewardRitualId: 'session-1:0' },
+    });
+    expect(alarms.scheduled).toEqual({
+      name: 'locusora.session-phase',
+      when: 55_000,
     });
   });
 

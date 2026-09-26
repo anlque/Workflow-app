@@ -6,6 +6,7 @@ import {
   getActiveSessionUseCase,
   pauseSessionUseCase,
   resumeSessionUseCase,
+  restartSessionPhaseUseCase,
   rollSessionRewardUseCase,
   startSessionUseCase,
   stopSessionUseCase,
@@ -83,6 +84,14 @@ export function createSessionCoordinator({
       session = await resumeSessionUseCase(sessions, clock, command.sessionId);
     } else if (command.type === 'session/continue-reward') {
       session = await continueRewardSessionUseCase(
+        sessions,
+        clock,
+        command.sessionId,
+        command.commandId,
+        command.rewardRitualId,
+      );
+    } else if (command.type === 'session/restart-phase') {
+      session = await restartSessionPhaseUseCase(
         sessions,
         clock,
         command.sessionId,

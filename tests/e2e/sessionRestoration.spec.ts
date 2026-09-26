@@ -108,7 +108,7 @@ test('shows terminal completion from the authoritative alarm transition', async 
   await expect(focus.getByRole('button', { name: 'Stop' })).toHaveCount(0);
 });
 
-test('restores an unacknowledged final Reward after reload', async ({
+test('restores a final Bonus Reward Phase and completes only after its deadline', async ({
   context,
   extensionUrls,
 }) => {
@@ -122,6 +122,17 @@ test('restores an unacknowledged final Reward after reload', async ({
   await options.getByLabel('Reward side 1 title').fill('Tea');
   await options.getByLabel('Reward side 2 icon').fill('🧘');
   await options.getByLabel('Reward side 2 title').fill('Stretch');
+  for (const side of [1, 2]) {
+    await options
+      .getByLabel(`Enable Bonus Phase for side ${String(side)}`)
+      .check();
+    await options
+      .getByLabel(`Side ${String(side)} Bonus Phase name`)
+      .fill('Final Bonus');
+    await options
+      .getByLabel(`Side ${String(side)} Bonus Phase duration in minutes`)
+      .fill('0.5');
+  }
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(
     options.getByRole('button', { name: 'Open Final reward restore' }),
@@ -148,5 +159,10 @@ test('restores an unacknowledged final Reward after reload', async ({
     focus.getByRole('dialog', { name: 'Reward unlocked' }),
   ).toContainText(title ?? '');
   await focus.getByRole('button', { name: 'Continue' }).click();
+  await expect(focus.getByText('Bonus · Final Bonus')).toBeVisible();
+  await expect(focus.getByText('Session complete')).toHaveCount(0);
+  await focus.reload();
+  await expect(focus.getByText('Bonus · Final Bonus')).toBeVisible();
+  await expireActiveSessionDeadline(focus);
   await expect(focus.getByText('Session complete')).toBeVisible();
 });

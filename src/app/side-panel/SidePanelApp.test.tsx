@@ -30,6 +30,7 @@ function dependencies(
     startSession: vi.fn(() => Promise.resolve()),
     pauseSession: vi.fn(() => Promise.resolve()),
     resumeSession: vi.fn(() => Promise.resolve()),
+    restartPhase: vi.fn(() => Promise.resolve()),
     rollReward: vi.fn(() => Promise.resolve()),
     rerollReward: vi.fn(() => Promise.resolve()),
     continueReward: vi.fn(() => Promise.resolve()),

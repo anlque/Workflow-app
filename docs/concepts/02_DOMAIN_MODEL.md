@@ -475,8 +475,11 @@ middle opportunity belongs to both halves. Every configured opportunity must
 have at least one eligible Dice Side.
 
 Each Dice Side may own one optional Bonus Reward Phase. Its Environment follows
-the same Asset-reference and color rules as a normal Phase. Bonus execution,
-pause/resume and completion remain deferred to RW-005.
+the same Asset-reference and color rules as a normal Phase. Session execution
+identifies an active Bonus by the authoritative Reward ritual and selected Side,
+while retaining the normal `phase | complete` continuation target. A Bonus uses
+Session timing anchors but is not inserted into the Workflow Phase sequence;
+its completion cannot create another Reward opportunity.
 
 Reward Dice owns its Dice Sides.
 

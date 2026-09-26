@@ -6,7 +6,7 @@ Session start receives a Workflow resolver through its Application boundary.
 Roles resolve to same-kind direct IDs before construction, including references
 inside Bonus Environments, and `createSessionSnapshot` rejects any remaining
 Role. Moving a Role affects only future Sessions. New Session records use
-envelope version 6; the mapper reads versions 1–6 and isolates legacy defaults
+envelope version 7; the mapper reads versions 1–7 and isolates legacy defaults
 to versions 1–4. Timing never depends on Role lookup after start.
 
 ## Purpose
@@ -50,9 +50,9 @@ exports:
 | Group | Exports |
 | --- | --- |
 | Application contracts/errors/events | `Clock`, `SessionRepository`, `SessionChangedEvent`, `SessionApplicationError` |
-| Application queries/use cases | `activeSessionReferencesAsset`, `advanceSessionUseCase`, `continueRewardSessionUseCase`, `getActiveSessionUseCase`, `pauseSessionUseCase`, `resumeSessionUseCase`, `rollSessionRewardUseCase`, `startSessionUseCase`, `stopSessionUseCase` |
-| Domain types | `Session`, `SessionId`, `RunningSession`, `TransitioningSession`, `PausedSession`, `CompletedSession`, `StoppedSession`, `RestoreSessionInput`, `SessionSnapshot`, `RewardContinuationTarget`, `RewardRitual` |
-| Domain behavior/errors | `createSession`, `createSessionId`, `restoreSession`, `pauseSession`, `resumeSession`, `rollSessionReward`, `rerollSessionReward`, `continueRewardSession`, `stopSession`, `getRemainingSeconds`, `deriveSessionState`, `SessionValidationError`, `SessionTransitionError` |
+| Application queries/use cases | `activeSessionReferencesAsset`, `advanceSessionUseCase`, `continueRewardSessionUseCase`, `getActiveSessionUseCase`, `pauseSessionUseCase`, `restartSessionPhaseUseCase`, `resumeSessionUseCase`, `rollSessionRewardUseCase`, `startSessionUseCase`, `stopSessionUseCase` |
+| Domain types | `Session`, `SessionId`, `RunningSession`, `TransitioningSession`, `PausedSession`, `CompletedSession`, `StoppedSession`, `RestoreSessionInput`, `SessionSnapshot`, `ActiveBonusRewardPhase`, `RewardContinuationTarget`, `RewardRitual` |
+| Domain behavior/errors | `createSession`, `createSessionId`, `restoreSession`, `pauseSession`, `restartSessionPhase`, `resumeSession`, `rollSessionReward`, `rerollSessionReward`, `continueRewardSession`, `stopSession`, `getRemainingSeconds`, `deriveSessionState`, `SessionValidationError`, `SessionTransitionError` |
 | Infrastructure composition | `DexieSessionRepository`, `sessionDatabaseSchemas` |
 | Presentation store | `createActiveSessionStore`, `ActiveSessionState`, `ActiveSessionStore` |
 | Presentation view | `ActiveSessionView`, `ActiveSessionViewProps` |
@@ -117,6 +117,10 @@ affect execution.
 
 All epoch values must be finite and non-negative. At most one Running,
 Transitioning or Paused Session may be active in the repository.
+Running or user-paused state may also carry `activeBonusPhase`, which identifies
+the acknowledged Reward ritual and selected Side. Its Environment and full
+duration are derived from the immutable snapshot; it never changes
+`currentPhaseIndex` or becomes an ordinary Workflow Phase.
 
 ### Timing and Derivation
 
@@ -124,7 +128,7 @@ Transitioning or Paused Session may be active in the repository.
 Transitioning:
 
 1. A Running state remains unchanged before `phaseEndsAt`.
-2. At or after that anchor, it becomes Transitioning with
+2. At or after an ordinary Phase anchor, it becomes Transitioning with
    `transitionEndsAt = phaseEndsAt + 1000`.
 3. A Transitioning state remains unchanged before `transitionEndsAt`.
 4. At or after it, absence of a next Phase produces Completed at the scheduled
@@ -135,6 +139,11 @@ Transitioning:
 7. The loop continues, allowing one late wake-up to cross multiple elapsed
    boundaries, but stops at the first Reward pause.
 
+An active Bonus follows a separate authoritative deadline branch. At expiry it
+clears the active marker and returns directly to the ritual's saved next Phase,
+or becomes Completed at that deadline for a `complete` target. It does not enter
+the ordinary transition state and cannot schedule another Reward.
+
 An eligible final Reward is also an authoritative Reward pause. Its continuation
 target is `complete`, so the Session becomes Completed only after acknowledgment.
 
@@ -144,8 +153,12 @@ target is `complete`, so the Session becomes Completed only after acknowledgment
   Running. It stores exact remaining milliseconds.
 - Ordinary Resume accepts only a Paused Session with `pauseReason: 'user'` and
   creates fresh anchors from the frozen remainder.
-- Reward Continue accepts only `pauseReason: 'reward'` and starts the full next
-  Phase from the continuation epoch.
+- Reward Continue accepts only `pauseReason: 'reward'`. A selected Side without
+  Bonus follows the saved continuation immediately; a Side with Bonus starts
+  its full configured duration from the continuation epoch.
+- Pause/resume preserve an active Bonus and its remaining time. Restart is
+  available only for an active Bonus and resets its full configured duration;
+  ordinary Phase restart belongs to FX-002.
 - Ordinary Resume cannot bypass a Reward.
 - Stop reconciles first and accepts only Running or Paused; Transitioning and
   terminal states reject it.
@@ -163,6 +176,7 @@ target is `complete`, so the Session becomes Completed only after acknowledgment
 | `pauseSessionUseCase` | Loads, reconciles and applies user pause | Saves Paused Session |
 | `resumeSessionUseCase` | Loads and resumes only user pause | Saves Running Session with new anchors |
 | `continueRewardSessionUseCase` | Loads and continues only Reward pause | Saves Running next Phase with new anchors |
+| `restartSessionPhaseUseCase` | Validates an active Bonus ritual fingerprint and resets its full duration | Saves the restarted active Bonus exactly once |
 | `stopSessionUseCase` | Loads, reconciles and stops a valid active state | Saves Stopped history row |
 
 All clock and repository dependencies are explicit. The use cases do not know
@@ -176,15 +190,16 @@ internals. A later lifecycle ADR will supersede ADR-0006 with this boundary.
 
 ## Persistence
 
-`DexieSessionRepository` writes a version-6 envelope in the global version-2
+`DexieSessionRepository` writes a version-7 envelope in the global version-2
 `sessions: 'id, active, updatedAt'` table definition.
 
-The mapper reads versions 1–6 strictly: version 1 snapshots accept only legacy
-Asset ID fields; versions 2–6 accept only exact direct references. Versions 1–2
-map legacy frequency fields; versions 3–6 read canonical schedules. Versions
-4–6 require Side availability while versions 1–3 default it to `any`. Versions
-5–6 require canonical Reward ritual and receipt state; version 6 additionally
-accepts the optional exact Bonus Reward Phase shape. Only the version-aware
+The mapper reads versions 1–7 strictly: version 1 snapshots accept only legacy
+Asset ID fields; versions 2–7 accept only exact direct references. Versions 1–2
+map legacy frequency fields; versions 3–7 read canonical schedules. Versions
+4–7 require Side availability while versions 1–3 default it to `any`. Versions
+5–7 require canonical Reward ritual and receipt state; versions 6–7 additionally
+accept the optional exact Bonus Reward Phase shape. Version 7 alone accepts the
+exact active Bonus marker and `restart` receipt type. Only the version-aware
 v1–v4 mapper may supply legacy defaults. Role,
 mixed-version and unknown Environment fields are rejected because persisted
 Session snapshots must already be resolved and immutable.
@@ -229,6 +244,7 @@ interval only refreshes `now`; it does not decrement or persist Session state.
 - replaces controls with **Reward pending** for a Reward pause;
 - hides all controls during Transitioning and terminal states;
 - confirms Stop in a Dialog and reports command errors.
+- offers a confirmed **Restart phase** action only while a Bonus is active.
 
 Focus and Side Panel provide the same authoritative Reward commands. Focus also
 provides the production Dice sound; either surface can resolve a Reward pause.
@@ -262,7 +278,9 @@ and used-reroll count.
 
 After the final transition, Domain creates a Reward pause whose continuation is
 `complete`. Presentation hydrates it like any other ritual; **Continue** sends
-the authoritative command and only then produces Completed state.
+the authoritative command. A selected Side without Bonus then produces
+Completed state; a Side with Bonus remains Running until its authoritative
+deadline and only then produces Completed state.
 
 This distinction is deliberate:
 

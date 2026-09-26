@@ -7,6 +7,7 @@ import { continueRewardSessionUseCase } from './continueRewardSessionUseCase';
 import { getActiveSessionUseCase } from './getActiveSessionUseCase';
 import { pauseSessionUseCase } from './pauseSessionUseCase';
 import { resumeSessionUseCase } from './resumeSessionUseCase';
+import { restartSessionPhaseUseCase } from './restartSessionPhaseUseCase';
 import { rollSessionRewardUseCase } from './rollSessionRewardUseCase';
 import { startSessionUseCase } from './startSessionUseCase';
 import type { SessionWorkflowResolver } from './SessionWorkflowResolver';
@@ -431,6 +432,100 @@ describe('Session use cases', () => {
       'Reward command does not match the current Reward opportunity.',
     );
     expect(random).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  test('restarts a Bonus once and deduplicates the persisted command fingerprint', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const rewarded = createWorkflow({
+      id: 'restart-bonus-workflow',
+      name: 'Restart Bonus',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'restart-bonus-session',
+      rewarded,
+    );
+    clock.set(3_000);
+    await advanceSessionUseCase(repository, clock, started.id);
+    await rollSessionRewardUseCase(
+      repository,
+      started.id,
+      () => 0,
+      false,
+      'roll-restart',
+      'restart-bonus-session:0',
+    );
+    await continueRewardSessionUseCase(
+      repository,
+      clock,
+      started.id,
+      'continue-restart',
+      'restart-bonus-session:0',
+    );
+    clock.set(10_000);
+    const restarted = await restartSessionPhaseUseCase(
+      repository,
+      clock,
+      started.id,
+      'restart-1',
+      'restart-bonus-session:0',
+    );
+    expect(restarted).toMatchObject({ phaseEndsAt: 40_000 });
+
+    const save = vi.spyOn(repository, 'save');
+    await expect(
+      restartSessionPhaseUseCase(
+        repository,
+        clock,
+        started.id,
+        'restart-1',
+        'restart-bonus-session:0',
+      ),
+    ).resolves.toEqual(restarted);
+    await expect(
+      restartSessionPhaseUseCase(
+        repository,
+        clock,
+        started.id,
+        'continue-restart',
+        'restart-bonus-session:0',
+      ),
+    ).rejects.toThrow(
+      'Reward command identifier conflicts with an earlier command.',
+    );
+    await expect(
+      restartSessionPhaseUseCase(
+        repository,
+        clock,
+        started.id,
+        'restart-stale',
+        'restart-bonus-session:previous',
+      ),
+    ).rejects.toThrow(
+      'Reward command does not match the current Reward opportunity.',
+    );
     expect(save).not.toHaveBeenCalled();
   });
 });

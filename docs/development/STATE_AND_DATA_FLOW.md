@@ -31,8 +31,10 @@ describes the current realization.
 
 Workflow constructors copy and freeze aggregate values. Session transitions
 return new frozen variants rather than mutating the previous Session. Starting a
-Session copies the Workflow into `SessionSnapshot`, including Reward Dice and
-its sides.
+Session copies the Workflow into `SessionSnapshot`, including Reward Dice,
+optional Bonus configurations and their Environments. An active Bonus is a
+persisted Session marker plus ordinary timing anchors; its visible configuration
+is derived from this immutable snapshot rather than copied into Presentation.
 
 Consequences:
 
@@ -141,7 +143,7 @@ Local React state owns values that do not need cross-context durability:
 - Options `workflows | assets | settings` tab;
 - side-panel `session | workflows` view;
 - selected Workflow and unsaved editor draft;
-- open dialogs, roll animation progress and displayed Reward;
+- open dialogs and roll animation progress;
 - pending, success and error feedback;
 - focus volume, audio lock and side-panel button state.
 
@@ -165,6 +167,8 @@ document.
 - Workflow and Asset CRUD go through their Application/repository boundaries.
 - Settings use `chrome.storage.local`; they are not copied into IndexedDB.
 - Countdown values derive from epoch anchors.
+- Bonus countdown, pause/resume/restart and completion use the same authoritative
+  Session command path; no document owns a separate Bonus timer.
 - Catalog invalidation contains no Workflow data and does not poll.
 - Active Sessions remain bound to the Workflow snapshot captured at start.
 - Runtime input, persistence records and imported files remain `unknown` until
