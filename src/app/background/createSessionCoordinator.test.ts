@@ -231,14 +231,16 @@ function workflow(): Workflow {
   });
 }
 
-function runningBonusSession(): Session {
+function runningBonusSession(final = false): Session {
   const rewarded = createWorkflow({
-    id: 'serialized-bonus',
+    id: final ? 'serialized-final-bonus' : 'serialized-bonus',
     name: 'Serialized Bonus',
-    phases: [
-      { type: 'focus', durationSeconds: 10, environment: {} },
-      { type: 'break', durationSeconds: 5, environment: {} },
-    ],
+    phases: final
+      ? [{ type: 'focus', durationSeconds: 10, environment: {} }]
+      : [
+          { type: 'focus', durationSeconds: 10, environment: {} },
+          { type: 'break', durationSeconds: 5, environment: {} },
+        ],
     rewardDice: {
       frequency: 1,
       sides: [
@@ -295,8 +297,8 @@ function setup() {
   return { value, sessions, clock, messages, alarms, coordinator };
 }
 
-async function controlledSetup() {
-  const session = runningBonusSession();
+async function controlledSetup(final = false) {
+  const session = runningBonusSession(final);
   const sessions = new ControlledSessionRepository();
   await sessions.save(session);
   sessions.operations.length = 0;
@@ -667,6 +669,66 @@ describe('createSessionCoordinator', () => {
 
     await expect(messages.requestActiveSession()).resolves.toEqual(session);
   });
+
+  test.each([
+    ['non-final', 50_000, false],
+    ['non-final', 51_000, false],
+    ['final', 50_000, true],
+    ['final', 51_000, true],
+  ] as const)(
+    'rejects %s Bonus Restart at %i without hidden writes, then reconciles by alarm',
+    async (_kind, now, final) => {
+      const { session, sessions, clock, messages, alarms, coordinator } =
+        await controlledSetup(final);
+      await coordinator.initialize();
+      const persistedBefore = await sessions.get(session.id);
+      sessions.operations.length = 0;
+      const eventCount = messages.events.length;
+      clock.set(now);
+
+      await expect(
+        messages.dispatch({
+          type: 'session/restart-phase',
+          commandId: `expired-restart-${String(final)}-${String(now)}`,
+          sessionId: session.id,
+          rewardRitualId: 'session-1:0',
+        }),
+      ).rejects.toThrow();
+
+      expect(sessions.operations).toEqual(['get']);
+      await expect(sessions.get(session.id)).resolves.toEqual(persistedBefore);
+      expect(messages.events).toHaveLength(eventCount);
+      expect(alarms.scheduled).toEqual({
+        name: 'locusora.session-phase',
+        when: 50_000,
+      });
+
+      await alarms.fire('locusora.session-phase');
+      if (final) {
+        await expect(sessions.get(session.id)).resolves.toMatchObject({
+          status: 'completed',
+          completedAt: 50_000,
+        });
+        expect(alarms.scheduled).toBeNull();
+      } else {
+        const reconciled = await sessions.get(session.id);
+        expect(reconciled).toMatchObject({
+          status: 'running',
+          currentPhaseIndex: 1,
+          phaseEndsAt: 55_000,
+        });
+        expect(reconciled?.activeBonusPhase).toBeUndefined();
+        expect(alarms.scheduled).toEqual({
+          name: 'locusora.session-phase',
+          when: 55_000,
+        });
+      }
+      expect(messages.events).toHaveLength(eventCount + 1);
+      expect(messages.events.at(-1)?.session).toEqual(
+        await sessions.get(session.id),
+      );
+    },
+  );
 
   test('serializes alarm reconciliation after a pending Bonus Restart', async () => {
     const { sessions, clock, messages, alarms, coordinator } =

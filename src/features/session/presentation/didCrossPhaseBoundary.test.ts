@@ -151,4 +151,153 @@ describe('didCrossPhaseBoundary', () => {
     expect(didCrossPhaseBoundary(bonus, completed)).toBe(false);
     expect(didCrossPhaseBoundary(completed, completed)).toBe(false);
   });
+
+  test.each([
+    ['running non-final', 'running-non-final', false, false],
+    ['paused non-final', 'paused-non-final', false, true],
+    ['running final', 'running-final', true, false],
+    ['paused final', 'paused-final', true, true],
+  ] as const)(
+    'does not ring when stopping a %s Bonus',
+    (_label, fixtureId, isFinal, isPaused) => {
+      const rewarded = createWorkflow({
+        id: `stopped-bonus-${fixtureId}`,
+        name: 'Stopped Bonus boundary',
+        phases: [
+          { type: 'focus', durationSeconds: 1, environment: {} },
+          ...(!isFinal
+            ? [
+                {
+                  type: 'break' as const,
+                  durationSeconds: 5,
+                  environment: {},
+                },
+              ]
+            : []),
+        ],
+        rewardDice: {
+          frequency: 1,
+          sides: [
+            {
+              icon: 'a',
+              title: 'A',
+              bonusPhase: {
+                name: 'Bonus',
+                durationSeconds: 30,
+                environment: {},
+              },
+            },
+            { icon: 'b', title: 'B' },
+          ],
+        },
+      });
+      const reward = deriveSessionState(
+        createSession(`stopped-bonus-${fixtureId}`, rewarded, 1_000),
+        3_000,
+      );
+      const runningBonus = continueRewardSession(
+        rollSessionReward(reward, () => 0),
+        4_000,
+        `continue-stopped-${fixtureId}`,
+      );
+      const activeBonus = isPaused
+        ? pauseSession(runningBonus, 5_000)
+        : runningBonus;
+      const stopped = stopSession(activeBonus, 6_000);
+
+      expect(didCrossPhaseBoundary(activeBonus, stopped)).toBe(false);
+      expect(didCrossPhaseBoundary(stopped, stopped)).toBe(false);
+    },
+  );
+
+  test.each([
+    ['transitioning', 39_000, 'transitioning'],
+    ['completed', 40_000, 'completed'],
+  ] as const)(
+    'rings once when a late non-final Bonus reaches %s',
+    (_label, now, expectedStatus) => {
+      const rewarded = createWorkflow({
+        id: `late-bonus-${expectedStatus}`,
+        name: 'Late Bonus boundary',
+        phases: [
+          { type: 'focus', durationSeconds: 1, environment: {} },
+          { type: 'break', durationSeconds: 5, environment: {} },
+        ],
+        rewardDice: {
+          frequency: 1,
+          sides: [
+            {
+              icon: 'a',
+              title: 'A',
+              bonusPhase: {
+                name: 'Bonus',
+                durationSeconds: 30,
+                environment: {},
+              },
+            },
+            { icon: 'b', title: 'B' },
+          ],
+        },
+      });
+      const paused = deriveSessionState(
+        createSession(`late-${expectedStatus}`, rewarded, 1_000),
+        3_000,
+      );
+      const bonus = continueRewardSession(
+        rollSessionReward(paused, () => 0),
+        4_000,
+        `continue-${expectedStatus}`,
+      );
+      const late = deriveSessionState(bonus, now);
+
+      expect(late.status).toBe(expectedStatus);
+      expect(didCrossPhaseBoundary(bonus, late)).toBe(true);
+      expect(didCrossPhaseBoundary(late, late)).toBe(false);
+    },
+  );
+
+  test('rings once when a late non-final Bonus reaches another Reward pause', () => {
+    const rewarded = createWorkflow({
+      id: 'late-bonus-reward',
+      name: 'Late Bonus Reward boundary',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 5, environment: {} },
+        { type: 'focus', durationSeconds: 5, environment: {} },
+      ],
+      rewardDice: {
+        schedule: { type: 'custom', phaseIndexes: [0, 1] },
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('late-bonus-reward', rewarded, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(paused, () => 0),
+      4_000,
+      'continue-late-reward',
+    );
+    const nextReward = deriveSessionState(bonus, 40_000);
+
+    expect(nextReward).toMatchObject({
+      status: 'paused',
+      pauseReason: 'reward',
+      currentPhaseIndex: 2,
+    });
+    expect(didCrossPhaseBoundary(bonus, nextReward)).toBe(true);
+    expect(didCrossPhaseBoundary(nextReward, nextReward)).toBe(false);
+  });
 });

@@ -5,6 +5,7 @@ export function didCrossPhaseBoundary(
   current: Session,
 ): boolean {
   if (previous.id !== current.id) return false;
+  if (current.status === 'stopped') return false;
   if (previous.status === 'completed' || previous.status === 'stopped') {
     return false;
   }
@@ -13,7 +14,10 @@ export function didCrossPhaseBoundary(
     previous.activeBonusPhase !== undefined &&
     current.activeBonusPhase === undefined
   ) {
-    return current.status === 'running';
+    return !(
+      previous.rewardRitual?.continuation.type === 'complete' &&
+      current.status === 'completed'
+    );
   }
   return (
     current.status === 'transitioning' ||

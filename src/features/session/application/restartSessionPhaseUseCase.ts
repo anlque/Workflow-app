@@ -14,13 +14,17 @@ export async function restartSessionPhaseUseCase(
 ): Promise<Session> {
   const current = await loadSession(repository, sessionId);
   const now = clock.now();
+  const duplicate = isDuplicateRewardCommand(
+    current,
+    commandId,
+    'restart',
+    rewardRitualId,
+  );
   const reconciled = deriveSessionState(current, now);
-  if (reconciled !== current) {
-    await repository.save(reconciled);
-  }
-  if (
-    isDuplicateRewardCommand(reconciled, commandId, 'restart', rewardRitualId)
-  ) {
+  if (duplicate) {
+    if (reconciled !== current) {
+      await repository.save(reconciled);
+    }
     return reconciled;
   }
   const restarted = restartSessionPhase(reconciled, now, commandId);

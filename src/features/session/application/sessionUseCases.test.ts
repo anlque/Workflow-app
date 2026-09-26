@@ -25,14 +25,16 @@ const workflow = () =>
     ],
   });
 
-const restartBonusWorkflow = () =>
+const restartBonusWorkflow = (final = false) =>
   createWorkflow({
-    id: 'restart-bonus-workflow',
+    id: final ? 'restart-final-bonus-workflow' : 'restart-bonus-workflow',
     name: 'Restart Bonus',
-    phases: [
-      { type: 'focus', durationSeconds: 1, environment: {} },
-      { type: 'break', durationSeconds: 1, environment: {} },
-    ],
+    phases: final
+      ? [{ type: 'focus', durationSeconds: 1, environment: {} }]
+      : [
+          { type: 'focus', durationSeconds: 1, environment: {} },
+          { type: 'break', durationSeconds: 1, environment: {} },
+        ],
     rewardDice: {
       frequency: 1,
       sides: [
@@ -532,16 +534,21 @@ describe('Session use cases', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  test.each([33_000, 34_000])(
-    'does not restart a Bonus at or after its %i deadline',
-    async (now) => {
+  test.each([
+    ['non-final', 33_000, false],
+    ['non-final', 34_000, false],
+    ['final', 33_000, true],
+    ['final', 34_000, true],
+  ] as const)(
+    'rejects %s Bonus Restart at %i with zero writes',
+    async (_kind, now, final) => {
       const repository = new InMemorySessionRepository();
       const clock = new FakeClock(1_000);
       const started = await startSessionUseCase(
         repository,
         clock,
         `expired-bonus-${String(now)}`,
-        restartBonusWorkflow(),
+        restartBonusWorkflow(final),
       );
       clock.set(3_000);
       await advanceSessionUseCase(repository, clock, started.id);
@@ -561,6 +568,8 @@ describe('Session use cases', () => {
         `${started.id}:0`,
       );
       clock.set(now);
+      const before = await repository.get(started.id);
+      const save = vi.spyOn(repository, 'save');
 
       await expect(
         restartSessionPhaseUseCase(
@@ -571,9 +580,65 @@ describe('Session use cases', () => {
           `${started.id}:0`,
         ),
       ).rejects.toThrow();
-      const persisted = await repository.get(started.id);
-      expect(persisted).toMatchObject({ currentPhaseIndex: 1 });
-      expect(persisted?.activeBonusPhase).toBeUndefined();
+      expect(save).not.toHaveBeenCalled();
+      await expect(repository.get(started.id)).resolves.toEqual(before);
     },
   );
+
+  test('reconciles an exact persisted Restart retry without adding another receipt', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'durable-restart-session',
+      restartBonusWorkflow(),
+    );
+    clock.set(3_000);
+    await advanceSessionUseCase(repository, clock, started.id);
+    await rollSessionRewardUseCase(
+      repository,
+      started.id,
+      () => 0,
+      false,
+      'durable-roll',
+      'durable-restart-session:0',
+    );
+    await continueRewardSessionUseCase(
+      repository,
+      clock,
+      started.id,
+      'durable-continue',
+      'durable-restart-session:0',
+    );
+    clock.set(10_000);
+    await restartSessionPhaseUseCase(
+      repository,
+      clock,
+      started.id,
+      'durable-restart',
+      'durable-restart-session:0',
+    );
+    clock.set(40_000);
+
+    const reconciled = await restartSessionPhaseUseCase(
+      repository,
+      clock,
+      started.id,
+      'durable-restart',
+      'durable-restart-session:0',
+    );
+
+    expect(reconciled).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+      phaseEndsAt: 41_000,
+    });
+    expect(
+      reconciled.rewardCommandReceipts.filter(
+        ({ commandId }) => commandId === 'durable-restart',
+      ),
+    ).toHaveLength(1);
+    await expect(repository.get(started.id)).resolves.toEqual(reconciled);
+  });
 });
