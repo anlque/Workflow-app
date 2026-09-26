@@ -192,6 +192,47 @@ describe('Session', () => {
         completedAt: 50_000,
       }),
     ).toThrow('Session Bonus Reward Phase is invalid.');
+    expect(() =>
+      restoreSession({
+        ...common,
+        status: 'transitioning',
+        transitionEndsAt: 50_000,
+      }),
+    ).toThrow('Session Bonus Reward Phase is invalid.');
+    expect(() =>
+      restoreSession({
+        ...common,
+        status: 'paused',
+        pauseReason: 'reward',
+        pausedAt: 20_000,
+        remainingMilliseconds: 5_000,
+      }),
+    ).toThrow('Session Bonus Reward Phase is invalid.');
+    expect(() =>
+      restoreSession({
+        ...common,
+        status: 'stopped',
+        stoppedAt: 20_000,
+      }),
+    ).toThrow('Session Bonus Reward Phase is invalid.');
+
+    const finalBonus = runningBonus(true);
+    if (finalBonus.rewardRitual === undefined) {
+      throw new Error('Expected final Bonus ritual.');
+    }
+    const finalRitual = finalBonus.rewardRitual;
+    expect(() =>
+      restoreSession({
+        id: finalBonus.id,
+        workflow: finalBonus.snapshot.workflow,
+        currentPhaseIndex: finalBonus.currentPhaseIndex,
+        rewardCommandReceipts: finalBonus.rewardCommandReceipts,
+        rewardRitual: finalRitual,
+        status: 'running',
+        phaseStartedAt: finalBonus.phaseStartedAt,
+        phaseEndsAt: finalBonus.phaseEndsAt,
+      }),
+    ).toThrow('Session Reward ritual is invalid.');
   });
 
   test('reconciles non-final and final Bonus completion without another Reward', () => {

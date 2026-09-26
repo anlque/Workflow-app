@@ -115,4 +115,40 @@ describe('didCrossPhaseBoundary', () => {
     expect(didCrossPhaseBoundary(bonus, normal)).toBe(true);
     expect(didCrossPhaseBoundary(normal, normal)).toBe(false);
   });
+
+  test('does not ring when a final Bonus reveals Session completion', () => {
+    const rewarded = createWorkflow({
+      id: 'final-bonus-boundary',
+      name: 'Final Bonus boundary',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const paused = deriveSessionState(
+      createSession('final-bonus-boundary-session', rewarded, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(paused, () => 0),
+      4_000,
+      'continue-final-boundary',
+    );
+    const completed = deriveSessionState(bonus, 34_000);
+
+    expect(didCrossPhaseBoundary(bonus, completed)).toBe(false);
+    expect(didCrossPhaseBoundary(completed, completed)).toBe(false);
+  });
 });

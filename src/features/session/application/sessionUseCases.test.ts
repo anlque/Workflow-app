@@ -25,6 +25,31 @@ const workflow = () =>
     ],
   });
 
+const restartBonusWorkflow = () =>
+  createWorkflow({
+    id: 'restart-bonus-workflow',
+    name: 'Restart Bonus',
+    phases: [
+      { type: 'focus', durationSeconds: 1, environment: {} },
+      { type: 'break', durationSeconds: 1, environment: {} },
+    ],
+    rewardDice: {
+      frequency: 1,
+      sides: [
+        {
+          icon: 'a',
+          title: 'A',
+          bonusPhase: {
+            name: 'Bonus',
+            durationSeconds: 30,
+            environment: {},
+          },
+        },
+        { icon: 'b', title: 'B' },
+      ],
+    },
+  });
+
 describe('Session use cases', () => {
   test('resolves Workflow Asset references before creating the snapshot', async () => {
     const repository = new InMemorySessionRepository();
@@ -438,29 +463,7 @@ describe('Session use cases', () => {
   test('restarts a Bonus once and deduplicates the persisted command fingerprint', async () => {
     const repository = new InMemorySessionRepository();
     const clock = new FakeClock(1_000);
-    const rewarded = createWorkflow({
-      id: 'restart-bonus-workflow',
-      name: 'Restart Bonus',
-      phases: [
-        { type: 'focus', durationSeconds: 1, environment: {} },
-        { type: 'break', durationSeconds: 1, environment: {} },
-      ],
-      rewardDice: {
-        frequency: 1,
-        sides: [
-          {
-            icon: 'a',
-            title: 'A',
-            bonusPhase: {
-              name: 'Bonus',
-              durationSeconds: 30,
-              environment: {},
-            },
-          },
-          { icon: 'b', title: 'B' },
-        ],
-      },
-    });
+    const rewarded = restartBonusWorkflow();
     const started = await startSessionUseCase(
       repository,
       clock,
@@ -528,4 +531,49 @@ describe('Session use cases', () => {
     );
     expect(save).not.toHaveBeenCalled();
   });
+
+  test.each([33_000, 34_000])(
+    'does not restart a Bonus at or after its %i deadline',
+    async (now) => {
+      const repository = new InMemorySessionRepository();
+      const clock = new FakeClock(1_000);
+      const started = await startSessionUseCase(
+        repository,
+        clock,
+        `expired-bonus-${String(now)}`,
+        restartBonusWorkflow(),
+      );
+      clock.set(3_000);
+      await advanceSessionUseCase(repository, clock, started.id);
+      await rollSessionRewardUseCase(
+        repository,
+        started.id,
+        () => 0,
+        false,
+        `roll-${String(now)}`,
+        `${started.id}:0`,
+      );
+      await continueRewardSessionUseCase(
+        repository,
+        clock,
+        started.id,
+        `continue-${String(now)}`,
+        `${started.id}:0`,
+      );
+      clock.set(now);
+
+      await expect(
+        restartSessionPhaseUseCase(
+          repository,
+          clock,
+          started.id,
+          `restart-${String(now)}`,
+          `${started.id}:0`,
+        ),
+      ).rejects.toThrow();
+      const persisted = await repository.get(started.id);
+      expect(persisted).toMatchObject({ currentPhaseIndex: 1 });
+      expect(persisted?.activeBonusPhase).toBeUndefined();
+    },
+  );
 });

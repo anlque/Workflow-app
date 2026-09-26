@@ -20,7 +20,10 @@ import {
   type WorkflowRepository,
 } from '@/features/workflow';
 import {
+  continueRewardSession,
   createSession,
+  deriveSessionState,
+  rollSessionReward,
   type Clock,
   type Session,
   type SessionId,
@@ -66,6 +69,83 @@ class InMemorySessionRepository implements SessionRepository {
   public save(session: Session): Promise<void> {
     this.#sessions.set(session.id, session);
     return Promise.resolve();
+  }
+}
+
+function deferred(): Readonly<{
+  promise: Promise<void>;
+  resolve(): void;
+}> {
+  let resolve = (): void => undefined;
+  const promise = new Promise<void>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+}
+
+class ControlledSessionRepository implements SessionRepository {
+  readonly operations: string[] = [];
+  readonly #sessions = new Map<SessionId, Session>();
+  #saveGate:
+    | Readonly<{ started: ReturnType<typeof deferred>; release: Promise<void> }>
+    | undefined;
+  #activeGate:
+    | Readonly<{ started: ReturnType<typeof deferred>; release: Promise<void> }>
+    | undefined;
+
+  public blockNextSave(): Readonly<{
+    started: Promise<void>;
+    release(): void;
+  }> {
+    const started = deferred();
+    const release = deferred();
+    this.#saveGate = { started, release: release.promise };
+    return { started: started.promise, release: release.resolve };
+  }
+
+  public blockNextActiveRead(): Readonly<{
+    started: Promise<void>;
+    release(): void;
+  }> {
+    const started = deferred();
+    const release = deferred();
+    this.#activeGate = { started, release: release.promise };
+    return { started: started.promise, release: release.resolve };
+  }
+
+  public async getActive(): Promise<Session | null> {
+    this.operations.push('getActive');
+    const captured =
+      [...this.#sessions.values()].find(
+        ({ status }) =>
+          status === 'running' ||
+          status === 'transitioning' ||
+          status === 'paused',
+      ) ?? null;
+    const gate = this.#activeGate;
+    if (gate !== undefined) {
+      this.#activeGate = undefined;
+      gate.started.resolve();
+      await gate.release;
+    }
+    return captured;
+  }
+
+  public get(id: SessionId): Promise<Session | null> {
+    this.operations.push('get');
+    return Promise.resolve(this.#sessions.get(id) ?? null);
+  }
+
+  public async save(session: Session): Promise<void> {
+    this.operations.push(`save:start:${session.status}`);
+    const gate = this.#saveGate;
+    if (gate !== undefined) {
+      this.#saveGate = undefined;
+      gate.started.resolve();
+      await gate.release;
+    }
+    this.#sessions.set(session.id, session);
+    this.operations.push(`save:done:${session.status}`);
   }
 }
 
@@ -151,6 +231,41 @@ function workflow(): Workflow {
   });
 }
 
+function runningBonusSession(): Session {
+  const rewarded = createWorkflow({
+    id: 'serialized-bonus',
+    name: 'Serialized Bonus',
+    phases: [
+      { type: 'focus', durationSeconds: 10, environment: {} },
+      { type: 'break', durationSeconds: 5, environment: {} },
+    ],
+    rewardDice: {
+      frequency: 1,
+      sides: [
+        {
+          icon: 'a',
+          title: 'A',
+          bonusPhase: {
+            name: 'Bonus',
+            durationSeconds: 30,
+            environment: {},
+          },
+        },
+        { icon: 'b', title: 'B' },
+      ],
+    },
+  });
+  const rewardPaused = deriveSessionState(
+    createSession('session-1', rewarded, 1_000),
+    12_000,
+  );
+  return continueRewardSession(
+    rollSessionReward(rewardPaused, () => 0, 'roll-serialized'),
+    20_000,
+    'continue-serialized',
+  );
+}
+
 function workflowRepository(value: Workflow): WorkflowRepository {
   return {
     list: () => Promise.resolve([value]),
@@ -178,6 +293,26 @@ function setup() {
     workflowResolver: { resolve: (workflow) => Promise.resolve(workflow) },
   });
   return { value, sessions, clock, messages, alarms, coordinator };
+}
+
+async function controlledSetup() {
+  const session = runningBonusSession();
+  const sessions = new ControlledSessionRepository();
+  await sessions.save(session);
+  sessions.operations.length = 0;
+  const clock = new FakeClock(25_000);
+  const messages = new FakeMessageBus();
+  const alarms = new FakeAlarmScheduler();
+  const coordinator = createSessionCoordinator({
+    workflows: workflowRepository(session.snapshot.workflow),
+    sessions,
+    clock,
+    messages,
+    alarms,
+    createSessionId: () => 'unused-session',
+    workflowResolver: { resolve: (workflow) => Promise.resolve(workflow) },
+  });
+  return { session, sessions, clock, messages, alarms, coordinator };
 }
 
 describe('createSessionCoordinator', () => {
@@ -531,5 +666,115 @@ describe('createSessionCoordinator', () => {
     });
 
     await expect(messages.requestActiveSession()).resolves.toEqual(session);
+  });
+
+  test('serializes alarm reconciliation after a pending Bonus Restart', async () => {
+    const { sessions, clock, messages, alarms, coordinator } =
+      await controlledSetup();
+    await coordinator.initialize();
+    const baselineReads = sessions.operations.filter(
+      (operation) => operation === 'getActive',
+    ).length;
+    const gate = sessions.blockNextSave();
+    const restart = messages.dispatch({
+      type: 'session/restart-phase',
+      commandId: 'restart-race',
+      sessionId: 'session-1',
+      rewardRitualId: 'session-1:0',
+    });
+    await gate.started;
+    clock.set(51_000);
+
+    const alarm = alarms.fire('locusora.session-phase');
+    expect(
+      sessions.operations.filter((operation) => operation === 'getActive'),
+    ).toHaveLength(baselineReads);
+    gate.release();
+    await Promise.all([restart, alarm]);
+
+    await expect(sessions.getActive()).resolves.toMatchObject({
+      status: 'running',
+      activeBonusPhase: { rewardRitualId: 'session-1:0' },
+      phaseEndsAt: 55_000,
+    });
+  });
+
+  test('serializes alarm reconciliation after a pending Stop', async () => {
+    const { session, sessions, clock, messages, alarms, coordinator } =
+      await controlledSetup();
+    await coordinator.initialize();
+    const baselineReads = sessions.operations.filter(
+      (operation) => operation === 'getActive',
+    ).length;
+    const gate = sessions.blockNextSave();
+    const stop = messages.dispatch({
+      type: 'session/stop',
+      commandId: 'stop-race',
+      sessionId: 'session-1',
+    });
+    await gate.started;
+    clock.set(51_000);
+
+    const alarm = alarms.fire('locusora.session-phase');
+    expect(
+      sessions.operations.filter((operation) => operation === 'getActive'),
+    ).toHaveLength(baselineReads);
+    gate.release();
+    await Promise.all([stop, alarm]);
+
+    await expect(sessions.get(session.id)).resolves.toMatchObject({
+      status: 'stopped',
+    });
+  });
+
+  test('serializes active hydration after a pending command', async () => {
+    const { sessions, clock, messages, coordinator } = await controlledSetup();
+    await coordinator.initialize();
+    const baselineReads = sessions.operations.filter(
+      (operation) => operation === 'getActive',
+    ).length;
+    const gate = sessions.blockNextSave();
+    const restart = messages.dispatch({
+      type: 'session/restart-phase',
+      commandId: 'restart-before-hydration',
+      sessionId: 'session-1',
+      rewardRitualId: 'session-1:0',
+    });
+    await gate.started;
+    clock.set(51_000);
+
+    const hydration = messages.requestActiveSession();
+    expect(
+      sessions.operations.filter((operation) => operation === 'getActive'),
+    ).toHaveLength(baselineReads);
+    gate.release();
+    await restart;
+    await expect(hydration).resolves.toMatchObject({
+      status: 'running',
+      activeBonusPhase: { rewardRitualId: 'session-1:0' },
+      phaseEndsAt: 55_000,
+    });
+  });
+
+  test('serializes commands after initial reconciliation', async () => {
+    const { sessions, messages, coordinator } = await controlledSetup();
+    const gate = sessions.blockNextActiveRead();
+    const initialization = coordinator.initialize();
+    await gate.started;
+
+    const stop = messages.dispatch({
+      type: 'session/stop',
+      commandId: 'stop-during-initialize',
+      sessionId: 'session-1',
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(sessions.operations).not.toContain('save:start:stopped');
+    gate.release();
+    await Promise.all([initialization, stop]);
+
+    expect(messages.events.at(-1)?.session).toMatchObject({
+      status: 'stopped',
+    });
   });
 });

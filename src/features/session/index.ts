@@ -25,6 +25,7 @@ export {
   rollSessionReward,
   restoreSession,
   stopSession,
+  type ActiveBonusRewardPhase,
   type CompletedSession,
   type PausedSession,
   type RewardContinuationTarget,

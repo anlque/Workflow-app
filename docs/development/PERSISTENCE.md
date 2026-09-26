@@ -5,7 +5,7 @@
 Global Dexie version 4 defines `assets: 'id, createdAt, &roleKey'`. The optional
 normalized key is globally unique; role-less rows are not indexed. Asset writers
 remain at record version 2; Workflow writers emit record version 5 and Session
-writers emit version 6. Their readers retain the compatible older versions. Workflow
+writers emit version 7. Their readers retain the compatible older versions. Workflow
 and Session indexes are unchanged.
 
 Workflow package export emits version 5 with canonical Reward schedules,

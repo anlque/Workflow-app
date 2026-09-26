@@ -49,7 +49,16 @@ export function createSessionCoordinator({
     string,
     { fingerprint: string; promise: Promise<Session>; settled: boolean }
   >();
-  let commandTail: Promise<void> = Promise.resolve();
+  let operationTail: Promise<void> = Promise.resolve();
+
+  function enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const pending = operationTail.then(operation);
+    operationTail = pending.then(
+      () => undefined,
+      () => undefined,
+    );
+    return pending;
+  }
 
   async function publishAndSchedule(session: Session | null): Promise<void> {
     await messages.publishSessionChanged({ type: 'session/changed', session });
@@ -128,11 +137,7 @@ export function createSessionCoordinator({
       }
       return existing.promise;
     }
-    const pending = commandTail.then(() => execute(command));
-    commandTail = pending.then(
-      () => undefined,
-      () => undefined,
-    );
+    const pending = enqueue(() => execute(command));
     const entry = { fingerprint, promise: pending, settled: false };
     handledCommands.set(command.commandId, entry);
     const settle = (): void => {
@@ -151,22 +156,28 @@ export function createSessionCoordinator({
 
   async function handleAlarm(name: string): Promise<void> {
     if (name !== SESSION_PHASE_ALARM) return;
-    const active = await sessions.getActive();
-    const reconciled =
-      active?.status === 'running' || active?.status === 'transitioning'
-        ? await advanceSessionUseCase(sessions, clock, active.id)
-        : active;
-    await publishAndSchedule(reconciled);
+    await enqueue(async () => {
+      const active = await sessions.getActive();
+      const reconciled =
+        active?.status === 'running' || active?.status === 'transitioning'
+          ? await advanceSessionUseCase(sessions, clock, active.id)
+          : active;
+      await publishAndSchedule(reconciled);
+    });
   }
 
   return {
     async initialize(): Promise<void> {
       messages.onSessionCommand(handle);
       messages.onActiveSessionRequest(() =>
-        getActiveSessionUseCase(sessions, clock),
+        enqueue(() => getActiveSessionUseCase(sessions, clock)),
       );
       alarms.onFired(handleAlarm);
-      await publishAndSchedule(await getActiveSessionUseCase(sessions, clock));
+      await enqueue(async () => {
+        await publishAndSchedule(
+          await getActiveSessionUseCase(sessions, clock),
+        );
+      });
     },
   };
 }

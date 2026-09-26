@@ -1,4 +1,5 @@
 import { restartSessionPhase, type Session } from '../domain/Session';
+import { deriveSessionState } from '../domain/deriveSessionState';
 import type { Clock } from './Clock';
 import { loadSession } from './loadSession';
 import { isDuplicateRewardCommand } from './rewardCommandReceipt';
@@ -12,10 +13,17 @@ export async function restartSessionPhaseUseCase(
   rewardRitualId: string,
 ): Promise<Session> {
   const current = await loadSession(repository, sessionId);
-  if (isDuplicateRewardCommand(current, commandId, 'restart', rewardRitualId)) {
-    return current;
+  const now = clock.now();
+  const reconciled = deriveSessionState(current, now);
+  if (reconciled !== current) {
+    await repository.save(reconciled);
   }
-  const restarted = restartSessionPhase(current, clock.now(), commandId);
+  if (
+    isDuplicateRewardCommand(reconciled, commandId, 'restart', rewardRitualId)
+  ) {
+    return reconciled;
+  }
+  const restarted = restartSessionPhase(reconciled, now, commandId);
   await repository.save(restarted);
   return restarted;
 }

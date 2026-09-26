@@ -50,7 +50,7 @@ afterEach(async () => {
 });
 
 describe('DexieSessionRepository', () => {
-  test('round-trips canonical version-7 active Bonus state', async () => {
+  test('round-trips canonical version-7 active Bonus state and rejects corrupt markers', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
     const rewarded = createWorkflow({
@@ -88,9 +88,8 @@ describe('DexieSessionRepository', () => {
     await repository.save(running);
 
     await expect(repository.get(running.id)).resolves.toEqual(running);
-    await expect(
-      store.table<SessionRecord, string>('sessions').get(running.id),
-    ).resolves.toMatchObject({
+    const table = store.table<SessionRecord, string>('sessions');
+    await expect(table.get(running.id)).resolves.toMatchObject({
       schemaVersion: 7,
       session: {
         activeBonusPhase: {
@@ -99,6 +98,40 @@ describe('DexieSessionRepository', () => {
         },
       },
     });
+    const stored = await table.get(running.id);
+    if (stored === undefined) throw new Error('Expected stored Session.');
+    const corruptions: ((record: Record<string, unknown>) => void)[] = [
+      (record) => {
+        delete record['selectedSideIndex'];
+      },
+      (record) => {
+        record['extra'] = true;
+      },
+      (record) => {
+        record['selectedSideIndex'] = 1;
+      },
+      (record) => {
+        record['rewardRitualId'] = 'another-ritual';
+      },
+    ];
+    for (const corruptMarker of corruptions) {
+      const corrupt = structuredClone(stored) as unknown as {
+        session: { activeBonusPhase: Record<string, unknown> };
+      };
+      corruptMarker(corrupt.session.activeBonusPhase);
+      await table.put(corrupt as unknown as SessionRecord);
+      await expect(repository.get(running.id)).rejects.toBeInstanceOf(
+        SessionValidationError,
+      );
+    }
+    const missingTiming = structuredClone(stored) as unknown as {
+      session: Record<string, unknown>;
+    };
+    delete missingTiming.session['phaseEndsAt'];
+    await table.put(missingTiming as unknown as SessionRecord);
+    await expect(repository.get(running.id)).rejects.toBeInstanceOf(
+      SessionValidationError,
+    );
   });
 
   test.each([1, 2, 3, 4] as const)(
