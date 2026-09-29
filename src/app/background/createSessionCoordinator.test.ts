@@ -23,6 +23,8 @@ import {
   continueRewardSession,
   createSession,
   deriveSessionState,
+  pauseSession,
+  restoreSession,
   rollSessionReward,
   type Clock,
   type Session,
@@ -268,6 +270,11 @@ function runningBonusSession(final = false): Session {
   );
 }
 
+function pausedNormalSessionAfterBonus(): Session {
+  const normal = deriveSessionState(runningBonusSession(), 50_000);
+  return pauseSession(normal, 51_000);
+}
+
 function workflowRepository(value: Workflow): WorkflowRepository {
   return {
     list: () => Promise.resolve([value]),
@@ -318,6 +325,44 @@ async function controlledSetup(final = false) {
 }
 
 describe('createSessionCoordinator', () => {
+  test('initializes and serves get-active from a persisted normal pause after Bonus', async () => {
+    const persisted = pausedNormalSessionAfterBonus();
+    if (persisted.status !== 'paused' || persisted.rewardRitual === undefined) {
+      throw new Error('Expected persisted user pause with Reward history.');
+    }
+    const rewardRitual = persisted.rewardRitual;
+    const restorePersisted = () =>
+      restoreSession({
+        id: persisted.id,
+        workflow: persisted.snapshot.workflow,
+        currentPhaseIndex: persisted.currentPhaseIndex,
+        rewardCommandReceipts: persisted.rewardCommandReceipts,
+        rewardRitual,
+        status: 'paused',
+        pauseReason: 'user',
+        pausedAt: persisted.pausedAt,
+        remainingMilliseconds: persisted.remainingMilliseconds,
+      });
+    const sessions: SessionRepository = {
+      getActive: () => Promise.resolve(restorePersisted()),
+      get: () => Promise.resolve(restorePersisted()),
+      save: () => Promise.resolve(),
+    };
+    const messages = new FakeMessageBus();
+    const coordinator = createSessionCoordinator({
+      workflows: workflowRepository(persisted.snapshot.workflow),
+      sessions,
+      clock: new FakeClock(51_000),
+      messages,
+      alarms: new FakeAlarmScheduler(),
+      createSessionId: () => 'unused-session',
+      workflowResolver: { resolve: (workflow) => Promise.resolve(workflow) },
+    });
+
+    await expect(coordinator.initialize()).resolves.toBeUndefined();
+    await expect(messages.requestActiveSession()).resolves.toEqual(persisted);
+  });
+
   test('composes the real Role resolvers into a direct Session snapshot', async () => {
     const source = createWorkflow({
       id: 'workflow-role',

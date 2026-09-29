@@ -121,6 +121,9 @@ Running or user-paused state may also carry `activeBonusPhase`, which identifies
 the acknowledged Reward ritual and selected Side. Its Environment and full
 duration are derived from the immutable snapshot; it never changes
 `currentPhaseIndex` or becomes an ordinary Workflow Phase.
+After an acknowledged non-final Reward continues into its normal target Phase,
+Running and user-paused states retain the acknowledged ritual as durable command
+history without an `activeBonusPhase` marker.
 
 ### Timing and Derivation
 

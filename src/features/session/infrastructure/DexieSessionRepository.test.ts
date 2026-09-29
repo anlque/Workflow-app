@@ -50,6 +50,63 @@ afterEach(async () => {
 });
 
 describe('DexieSessionRepository', () => {
+  test('round-trips a v7 user pause in the normal Phase after a non-final Bonus', async () => {
+    const store = database();
+    const repository = new DexieSessionRepository(store);
+    const rewarded = createWorkflow({
+      id: 'v7-normal-after-bonus-workflow',
+      name: 'Normal after Bonus',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'focus', durationSeconds: 10, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const rewardPaused = deriveSessionState(
+      createSession('v7-normal-after-bonus', rewarded, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(rewardPaused, () => 0, 'roll-normal-after-bonus'),
+      4_000,
+      'continue-normal-after-bonus',
+    );
+    const normal = deriveSessionState(bonus, 34_000);
+    const paused = pauseSession(normal, 35_000);
+
+    await repository.save(paused);
+
+    await expect(repository.get(paused.id)).resolves.toEqual(paused);
+    await expect(repository.getActive()).resolves.toEqual(paused);
+    await expect(
+      store.table<SessionRecord, string>('sessions').get(paused.id),
+    ).resolves.toMatchObject({
+      schemaVersion: 7,
+      session: {
+        status: 'paused',
+        pauseReason: 'user',
+        rewardRitual: {
+          acknowledged: true,
+          continuation: { type: 'phase', phaseIndex: 1 },
+        },
+      },
+    });
+  });
+
   test('round-trips canonical version-7 active Bonus state and rejects corrupt markers', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);

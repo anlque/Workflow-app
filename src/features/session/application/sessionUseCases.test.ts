@@ -219,6 +219,55 @@ describe('Session use cases', () => {
     await expect(repository.getActive()).resolves.toBeNull();
   });
 
+  test('pauses and resumes the normal continuation after a non-final Bonus', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'normal-after-bonus-session',
+      restartBonusWorkflow(),
+    );
+    clock.set(3_000);
+    await advanceSessionUseCase(repository, clock, started.id);
+    await rollSessionRewardUseCase(
+      repository,
+      started.id,
+      () => 0,
+      false,
+      'roll-normal-after-bonus',
+      'normal-after-bonus-session:0',
+    );
+    await continueRewardSessionUseCase(
+      repository,
+      clock,
+      started.id,
+      'continue-normal-after-bonus',
+      'normal-after-bonus-session:0',
+    );
+    clock.set(33_000);
+    await advanceSessionUseCase(repository, clock, started.id);
+    clock.set(33_500);
+
+    const paused = await pauseSessionUseCase(repository, clock, started.id);
+    expect(paused).toMatchObject({
+      status: 'paused',
+      pauseReason: 'user',
+      currentPhaseIndex: 1,
+      rewardRitual: { acknowledged: true },
+    });
+    expect(paused).not.toHaveProperty('activeBonusPhase');
+
+    clock.set(34_000);
+    await expect(
+      resumeSessionUseCase(repository, clock, started.id),
+    ).resolves.toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+      rewardRitual: { acknowledged: true },
+    });
+  });
+
   test('advances and persists a Session after a late wake-up', async () => {
     const repository = new InMemorySessionRepository();
     const clock = new FakeClock(1_000);

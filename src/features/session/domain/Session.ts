@@ -557,7 +557,8 @@ function validateRewardRitual(
     input.status === 'paused'
       ? input.pauseReason === 'reward'
         ? !ritual.acknowledged && activeBonus === undefined
-        : ritual.acknowledged && activeBonus !== undefined
+        : ritual.acknowledged &&
+          (activeBonus !== undefined || ritual.continuation.type === 'phase')
       : input.status === 'running'
         ? ritual.acknowledged &&
           (activeBonus !== undefined || ritual.continuation.type === 'phase')
