@@ -89,7 +89,7 @@ cross-document memory.
   `ChromeWorkflowCatalogEvents.test.ts`.
 - subscription/load race, coalescing and error retention:
   `src/features/workflow/presentation/useWorkflowCatalog.test.tsx`.
-- app composition: `src/app/options/OptionsApp.test.tsx`,
+- app composition: `src/app/workflow-studio/WorkflowStudio.test.tsx`,
   `src/app/side-panel/SidePanelApp.test.tsx` and
   `src/app/focus/FocusApp.test.tsx`.
 

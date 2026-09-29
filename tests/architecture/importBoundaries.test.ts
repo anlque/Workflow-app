@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { relative, resolve, sep } from 'node:path';
+import { dirname, join, normalize, relative, resolve, sep } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
@@ -29,6 +29,81 @@ function listTypeScriptFiles(directory: string): readonly string[] {
     .sort();
 }
 
+function findImportViolations(
+  projectPath: string,
+  importedModule: string,
+): readonly Violation[] {
+  const importedProjectPath = importedModule.startsWith('@/')
+    ? importedModule.replace(/^@\//, 'src/')
+    : importedModule.startsWith('.')
+      ? normalize(join(dirname(projectPath), importedModule))
+          .split(sep)
+          .join('/')
+      : null;
+
+  if (
+    projectPath.startsWith('src/app/workflow-studio/') &&
+    importedProjectPath?.startsWith('src/app/focus/') === true
+  ) {
+    return [
+      {
+        file: projectPath,
+        importedModule,
+        reason: 'shared Studio imports Focus surface',
+      },
+    ];
+  }
+
+  if (/^@\/features\/[^/]+\//.test(importedModule)) {
+    return [
+      { file: projectPath, importedModule, reason: 'feature deep import' },
+    ];
+  }
+
+  if (
+    !projectPath.startsWith('src/app/') &&
+    importedModule.startsWith('@/app/')
+  ) {
+    return [
+      {
+        file: projectPath,
+        importedModule,
+        reason: 'lower module imports app',
+      },
+    ];
+  }
+
+  if (
+    projectPath.startsWith('src/platform/') &&
+    importedModule.startsWith('@/features/')
+  ) {
+    return [
+      {
+        file: projectPath,
+        importedModule,
+        reason: 'platform imports feature',
+      },
+    ];
+  }
+
+  const isStableLayer = /\/((domain)|(application))\//.test(projectPath);
+  const isForbiddenDependency =
+    /^(react|wxt|zustand|dexie)(\/|$)/.test(importedModule) ||
+    importedModule.startsWith('@/platform/') ||
+    importedModule.includes('/infrastructure/') ||
+    importedModule.includes('/presentation/');
+
+  return isStableLayer && isForbiddenDependency
+    ? [
+        {
+          file: projectPath,
+          importedModule,
+          reason: 'stable layer imports unstable dependency',
+        },
+      ]
+    : [];
+}
+
 function findViolations(): readonly Violation[] {
   return listTypeScriptFiles(sourceRoot).flatMap((file) => {
     const projectPath = relative(projectRoot, file).split(sep).join('/');
@@ -37,60 +112,11 @@ function findViolations(): readonly Violation[] {
       (match) => match[1],
     );
 
-    return imports.flatMap((importedModule) => {
-      if (importedModule === undefined) {
-        return [];
-      }
-
-      if (/^@\/features\/[^/]+\//.test(importedModule)) {
-        return [
-          { file: projectPath, importedModule, reason: 'feature deep import' },
-        ];
-      }
-
-      if (
-        !projectPath.startsWith('src/app/') &&
-        importedModule.startsWith('@/app/')
-      ) {
-        return [
-          {
-            file: projectPath,
-            importedModule,
-            reason: 'lower module imports app',
-          },
-        ];
-      }
-
-      if (
-        projectPath.startsWith('src/platform/') &&
-        importedModule.startsWith('@/features/')
-      ) {
-        return [
-          {
-            file: projectPath,
-            importedModule,
-            reason: 'platform imports feature',
-          },
-        ];
-      }
-
-      const isStableLayer = /\/((domain)|(application))\//.test(projectPath);
-      const isForbiddenDependency =
-        /^(react|wxt|zustand|dexie)(\/|$)/.test(importedModule) ||
-        importedModule.startsWith('@/platform/') ||
-        importedModule.includes('/infrastructure/') ||
-        importedModule.includes('/presentation/');
-
-      return isStableLayer && isForbiddenDependency
-        ? [
-            {
-              file: projectPath,
-              importedModule,
-              reason: 'stable layer imports unstable dependency',
-            },
-          ]
-        : [];
-    });
+    return imports.flatMap((importedModule) =>
+      importedModule === undefined
+        ? []
+        : findImportViolations(projectPath, importedModule),
+    );
   });
 }
 
@@ -101,5 +127,31 @@ describe('architectural import boundaries', () => {
 
   test('source imports respect dependency direction and feature public APIs', () => {
     expect(findViolations()).toEqual([]);
+  });
+
+  test('shared Workflow Studio cannot import the Focus surface', () => {
+    const studioModule = 'src/app/workflow-studio/Probe.tsx';
+
+    expect(
+      [
+        '@/app/focus/FocusApp',
+        '../focus/FocusApp',
+        '../document-preferences/useDocumentPreferences',
+        '@/features/workflow',
+      ].flatMap((importedModule) =>
+        findImportViolations(studioModule, importedModule),
+      ),
+    ).toEqual([
+      {
+        file: studioModule,
+        importedModule: '@/app/focus/FocusApp',
+        reason: 'shared Studio imports Focus surface',
+      },
+      {
+        file: studioModule,
+        importedModule: '../focus/FocusApp',
+        reason: 'shared Studio imports Focus surface',
+      },
+    ]);
   });
 });

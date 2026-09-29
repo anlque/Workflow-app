@@ -142,13 +142,13 @@ present a combined cross-storage atomic backup.
   `src/features/settings/application/settingsUseCases.test.ts`.
 - Options operation feedback/composition:
   `src/features/settings/presentation/SettingsPage.test.tsx` and
-  `src/app/options/OptionsApp.test.tsx`.
+  `src/app/workflow-studio/WorkflowStudio.test.tsx`.
 - assembled file journeys: `tests/e2e/dataPortability.spec.ts`.
 
 Run focused proof with:
 
 ```bash
-pnpm vitest run src/features/workflow src/features/settings src/app/options
+pnpm vitest run src/features/workflow src/features/settings src/app/workflow-studio src/app/options
 ```
 
 ## Related Concepts and ADRs

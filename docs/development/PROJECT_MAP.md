@@ -26,13 +26,17 @@ reusable image and audio Asset records and behavior.
 | --- | --- | --- | --- | --- |
 | [`src/app/background/`](../../src/app/background/) | Background worker | `bootstrapBackground`, focus-action registration and the authoritative Session coordinator | Feature root APIs, platform adapters and WXT/browser APIs | Composes the non-React MV3 worker that owns active Session execution |
 | [`src/app/focus/`](../../src/app/focus/) | Focus view | `FocusApp`, launcher/environment views, audio behavior, focus-tab controller, bootstrap and dependency factory | Feature root APIs, platform APIs, shared UI and browser APIs | Composes the full-page focus experience and its local presentation effects |
-| [`src/app/options/`](../../src/app/options/) | Options page | `OptionsApp`, bootstrap and CRUD/import/export dependency factory | Feature root APIs, platform APIs and browser/document APIs | Composes Workflow editing, Asset management and Settings |
+| [`src/app/options/`](../../src/app/options/) | Options page fallback | Thin `OptionsApp`, bootstrap and CRUD/import/export dependency factory | Shared Workflow Studio, feature root APIs, platform APIs and browser/document APIs | Hosts the reusable Studio in Chrome's manifest options page and supplies its concrete adapters |
+| [`src/app/workflow-studio/`](../../src/app/workflow-studio/) | Workflow Studio | `WorkflowStudio`, its dependency contract and shared component tests | Feature root APIs, generic document preferences, shared UI and React | Owns the reusable Workflows, Assets and Settings composition plus initial loading/error state |
 | [`src/app/side-panel/`](../../src/app/side-panel/) | Side panel | `SidePanelApp`, compact Session bar, bootstrap and dependency factory | Feature root APIs, platform APIs, shared UI and browser APIs | Composes compact Workflow and Session access in Chrome's side panel |
 | [`src/app/session/`](../../src/app/session/) | Cross-surface Session client | `ChromeSessionClient` | Session and messaging public APIs plus an injected runtime transport | Gives React surfaces a validated client for background Session commands and projections |
 | [`src/app/closeSidePanel.ts`](../../src/app/closeSidePanel.ts) | Focus surface browser integration | Side-panel open, close and state subscription helpers | WXT/browser APIs | Keeps a surface-specific Chrome integration near its composition owner |
 | [`src/app/runWorkflowCatalogMutation.ts`](../../src/app/runWorkflowCatalogMutation.ts) | Catalog mutation composition | Success-only Workflow catalog invalidation wrapper | Workflow catalog event port | Ensures Options and side-panel mutations publish the same invalidation behavior |
 
 Files in `src/app/` are composition code. Lower modules must not import them.
+The shared Workflow Studio may use generic app-owned contracts but must not
+import the Focus surface that can host it; the architecture suite enforces this
+direction.
 
 ## Feature Shape
 

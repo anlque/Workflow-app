@@ -133,6 +133,13 @@ It must not decide whether a Session transition is valid, normalize Reward Dice
 weights, define record compatibility or implement another feature's invariant.
 Those decisions remain with Domain, Application or Infrastructure owners.
 
+The reusable `src/app/workflow-studio/` composition owns configuration UI state
+behind `WorkflowStudioDependencies`. Extension surfaces own their own lifecycle
+and navigation and inject concrete operations. In particular, the Studio must
+not import `src/app/focus/`; alias and relative variants are rejected by the
+architecture test. This direction is recorded by
+[ADR-0013](../adr/ADR-0013-embedded-workflow-studio-and-extension-surface-navigation.md).
+
 ## Persistence Composition Boundary
 
 Feature Infrastructure owns its record, mapper, repository and database schema
@@ -169,6 +176,7 @@ Both reject:
 - Platform importing a feature;
 - Domain or Application importing React, WXT, Zustand, Dexie, Platform,
   Infrastructure or Presentation.
+- the shared Workflow Studio importing Focus-owned modules.
 
 Examples of rejected dependencies:
 

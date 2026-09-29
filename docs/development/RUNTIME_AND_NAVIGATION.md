@@ -81,7 +81,7 @@ that complete baseline through `minimum_chrome_version`.
 
 Locusora has no React Router and no client-side URL router.
 
-The Options page uses local React state for these tabs:
+The shared Workflow Studio uses local React state for these sections:
 
 ```text
 workflows | assets | settings
@@ -96,8 +96,9 @@ session | workflows
 Changing either value does not change the URL, create browser history or load a
 different JavaScript bundle. The state belongs to the already loaded document:
 
-- Options renders one active `tabpanel` and keeps Workflow selection in local
-  component state.
+- `WorkflowStudio` renders one active `tabpanel` and keeps Workflow selection in
+  local component state. The current `OptionsApp` only hosts that composition in
+  the manifest options document.
 - The side panel moves to the Session view when a new active Session appears,
   permits returning to the Workflow list, and displays a compact active-Session
   bar there.
@@ -114,8 +115,8 @@ page has its own DOM, bootstrap and React root.
 WXT/Vite builds one entry chunk per page and may extract common dependencies
 such as React, global styles or shared feature code into reusable chunks. That
 code splitting is a build consequence of multiple entry documents, not the
-architectural reason for creating them. Local Options tabs and side-panel views
-remain inside their page bundle.
+architectural reason for creating them. The Studio sections hosted by Options
+and the side-panel views remain inside their page bundle.
 
 Do not import generated chunk names. Their hashes and grouping may change on
 every build.
@@ -152,6 +153,9 @@ navigation APIs.
   proves create, activation, window focus and request coalescing.
 - [`closeSidePanel.ts`](../../src/app/closeSidePanel.ts) owns focus-view and
   Side Panel lifecycle integration.
-- [`OptionsApp.tsx`](../../src/app/options/OptionsApp.tsx) and
-  [`SidePanelApp.tsx`](../../src/app/side-panel/SidePanelApp.tsx) own local view
-  state.
+- [`WorkflowStudio.tsx`](../../src/app/workflow-studio/WorkflowStudio.tsx) owns
+  configuration-section and Workflow-selection state;
+  [`OptionsApp.tsx`](../../src/app/options/OptionsApp.tsx) is its current
+  fallback host.
+- [`SidePanelApp.tsx`](../../src/app/side-panel/SidePanelApp.tsx) owns the side
+  panel's local view state.

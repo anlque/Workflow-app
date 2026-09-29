@@ -44,7 +44,7 @@ import {
 import { LocusoraDatabase } from '@/platform/storage';
 import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 
-import type { OptionsDependencies } from './OptionsApp';
+import type { WorkflowStudioDependencies } from '../workflow-studio/WorkflowStudio';
 import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
 import { DexieAssetRoleManagementUnitOfWork } from './DexieAssetRoleManagementUnitOfWork';
 import { DexieAssetRetirementUnitOfWork } from './DexieAssetRetirementUnitOfWork';
@@ -78,7 +78,7 @@ function downloadJson(data: string, filename: string): void {
 }
 
 export function createOptionsDependencies(
-  preferences: OptionsDependencies['preferences'],
+  preferences: WorkflowStudioDependencies['preferences'],
   database: LocusoraDatabase = new LocusoraDatabase({
     schemas: [
       ...workflowDatabaseSchemas,
@@ -86,7 +86,7 @@ export function createOptionsDependencies(
       ...assetDatabaseSchemas,
     ],
   }),
-): OptionsDependencies {
+): WorkflowStudioDependencies {
   const workflows = new DexieWorkflowRepository(database);
   const assets = new DexieAssetRepository(database);
   const sessions = new DexieSessionRepository(database);

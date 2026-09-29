@@ -163,7 +163,7 @@ package contracts.
 | Single Chrome Storage key mapping                                 | `infrastructure/ChromeSettingsRepository.test.ts` |
 | Appearance updates, pending state and portability feedback        | `presentation/SettingsPage.test.tsx`              |
 | Cross-document loading and application                            | `src/app/document-preferences/*.test.*`            |
-| Options live preference controls                                  | `src/app/options/OptionsApp.test.tsx`              |
+| Workflow Studio live preference controls                          | `src/app/workflow-studio/WorkflowStudio.test.tsx`  |
 | Settings import/export journey                                    | `tests/e2e/dataPortability.spec.ts`               |
 
 Run focused tests with:

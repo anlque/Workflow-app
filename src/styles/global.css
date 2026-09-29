@@ -959,7 +959,7 @@ textarea {
   gap: 0.625rem;
 }
 
-.options-app {
+.workflow-studio {
   width: min(100% - 2rem, 76rem);
   margin: 0 auto;
   padding: 2rem 0 4rem;
@@ -1183,7 +1183,7 @@ textarea {
 }
 
 @media (max-width: 34rem) {
-  .options-app {
+  .workflow-studio {
     width: min(100% - 1rem, 76rem);
     padding-top: 1rem;
   }

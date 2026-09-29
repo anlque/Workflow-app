@@ -17,6 +17,7 @@ records remain available if they are later Superseded or Archived.
 | [ADR-0010](ADR-0010-indexeddb-schema-composition.md) | Accepted | Compose one IndexedDB schema from feature-owned fragments |
 | [ADR-0011](ADR-0011-global-asset-roles-and-transactional-retirement.md) | Accepted | Add global Asset Roles and define transactional retirement |
 | [ADR-0012](ADR-0012-authoritative-reward-ritual-and-bonus-reward-phases.md) | Accepted | Persist Reward ritual state in the authoritative Session aggregate |
+| [ADR-0013](ADR-0013-embedded-workflow-studio-and-extension-surface-navigation.md) | Accepted | Share one Workflow Studio composition while extension surfaces retain lifecycle and navigation ownership |
 
 Create and evolve records according to
 [`docs/concepts/09_ADR_GUIDELINES.md`](../concepts/09_ADR_GUIDELINES.md).
