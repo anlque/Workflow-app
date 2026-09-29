@@ -176,7 +176,10 @@ Both reject:
 - Platform importing a feature;
 - Domain or Application importing React, WXT, Zustand, Dexie, Platform,
   Infrastructure or Presentation.
-- the shared Workflow Studio importing Focus-owned modules.
+
+The architecture test additionally rejects Focus-owned imports from the shared
+Workflow Studio after resolving and normalizing alias or relative paths. This
+Studio-specific rule is not duplicated in ESLint.
 
 Examples of rejected dependencies:
 

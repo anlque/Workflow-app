@@ -34,7 +34,7 @@ function findImportViolations(
   importedModule: string,
 ): readonly Violation[] {
   const importedProjectPath = importedModule.startsWith('@/')
-    ? importedModule.replace(/^@\//, 'src/')
+    ? normalize(importedModule.replace(/^@\//, 'src/')).split(sep).join('/')
     : importedModule.startsWith('.')
       ? normalize(join(dirname(projectPath), importedModule))
           .split(sep)
@@ -43,7 +43,8 @@ function findImportViolations(
 
   if (
     projectPath.startsWith('src/app/workflow-studio/') &&
-    importedProjectPath?.startsWith('src/app/focus/') === true
+    (importedProjectPath === 'src/app/focus' ||
+      importedProjectPath?.startsWith('src/app/focus/') === true)
   ) {
     return [
       {
@@ -134,7 +135,10 @@ describe('architectural import boundaries', () => {
 
     expect(
       [
+        '@/app/focus',
         '@/app/focus/FocusApp',
+        '@/app/workflow-studio/../focus/FocusApp',
+        '../focus',
         '../focus/FocusApp',
         '../document-preferences/useDocumentPreferences',
         '@/features/workflow',
@@ -144,7 +148,22 @@ describe('architectural import boundaries', () => {
     ).toEqual([
       {
         file: studioModule,
+        importedModule: '@/app/focus',
+        reason: 'shared Studio imports Focus surface',
+      },
+      {
+        file: studioModule,
         importedModule: '@/app/focus/FocusApp',
+        reason: 'shared Studio imports Focus surface',
+      },
+      {
+        file: studioModule,
+        importedModule: '@/app/workflow-studio/../focus/FocusApp',
+        reason: 'shared Studio imports Focus surface',
+      },
+      {
+        file: studioModule,
+        importedModule: '../focus',
         reason: 'shared Studio imports Focus surface',
       },
       {
