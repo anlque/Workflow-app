@@ -17,6 +17,7 @@ export type WorkflowCatalogRuntime = Readonly<{
 
 export class ChromeWorkflowCatalogEvents implements WorkflowCatalogEvents {
   readonly #runtime: WorkflowCatalogRuntime;
+  readonly #localListeners = new Set<() => void>();
 
   public constructor(runtime: WorkflowCatalogRuntime) {
     this.#runtime = runtime;
@@ -24,9 +25,11 @@ export class ChromeWorkflowCatalogEvents implements WorkflowCatalogEvents {
 
   public async publishChanged(): Promise<void> {
     await this.#runtime.sendMessage({ type: 'workflow/catalog-changed' });
+    for (const listener of this.#localListeners) listener();
   }
 
   public subscribeChanged(listener: () => void): () => void {
+    this.#localListeners.add(listener);
     const runtimeListener: MessageListener = (message) => {
       try {
         parseWorkflowCatalogChangedMessage(message);
@@ -38,6 +41,7 @@ export class ChromeWorkflowCatalogEvents implements WorkflowCatalogEvents {
     };
     this.#runtime.onMessage.addListener(runtimeListener);
     return () => {
+      this.#localListeners.delete(listener);
       this.#runtime.onMessage.removeListener(runtimeListener);
     };
   }

@@ -50,6 +50,7 @@ export function createFocusDependencies(
   };
   const sessions = new ChromeSessionClient(runtime, () => crypto.randomUUID());
   const catalogEvents = createChromeWorkflowCatalogEvents();
+  let studioPromise: ReturnType<FocusDependencies['loadStudio']> | undefined;
   return {
     preferences,
     sounds: createUiSoundPlayer(),
@@ -60,7 +61,18 @@ export function createFocusDependencies(
     subscribeWorkflowChanges: (listener) =>
       catalogEvents.subscribeChanged(listener),
     start: (id) => sessions.start(id),
-    openOptions: () => browser.runtime.openOptionsPage(),
+    loadStudio() {
+      studioPromise ??=
+        import('../workflow-studio/createWorkflowStudioDependencies').then(
+          ({ createWorkflowStudioDependencies }) =>
+            createWorkflowStudioDependencies(
+              preferences,
+              database,
+              catalogEvents,
+            ),
+        );
+      return studioPromise;
+    },
     sessions,
     pause: (id) => sessions.pause(id),
     resume: (id) => sessions.resume(id),

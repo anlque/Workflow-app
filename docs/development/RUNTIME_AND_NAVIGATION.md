@@ -37,14 +37,30 @@ This mechanism intentionally maintains at most one found focus tab in normal
 operation. It does not navigate the active web tab and requires no host
 permission.
 
-## Opening the Options Page
+## Opening Workflow Studio
 
-Focus and side-panel composition call `browser.runtime.openOptionsPage()`.
-Chrome opens or focuses the manifest-declared `options.html` document in a tab.
+Focus opens Workflow Studio inside the existing `focus.html` document. The
+Focus composition owns a full-viewport overlay shell and lazy-loads both the
+shared Studio presentation and its concrete dependency composition after the
+first open. Neither Studio module is in the initial Focus preload graph.
+Opening or closing it does not navigate, reload or unmount the underlying Focus
+Session projection, Active Session view or ambient-audio player.
+
+The overlay stays mounted after its first load, so an unsaved Studio draft
+survives close/reopen until the Focus document itself is destroyed. Focus makes
+the underlying surface inert while the overlay is open, suppresses Focus-owned
+native dialogs, moves focus to the close control and returns focus to the
+trigger—or the stable Focus Studio action if that trigger was removed—on close.
+Nested Studio dialogs own Escape before the overlay. Reduced motion removes the
+slide transition without changing those lifecycle or accessibility rules.
+
+Chrome's manifest-declared `options.html` remains the system fallback. The side
+panel currently calls `browser.runtime.openOptionsPage()` when it needs the
+standalone Studio; Focus product navigation does not.
 
 The side panel first saves the selected `WorkflowId` as
 `lastSelectedWorkflowId` in Settings when **Open** is used, then opens Options.
-The Options page reads that preference while selecting the initial Workflow.
+The Options fallback reads that preference while selecting the initial Workflow.
 This is durable selection handoff, not a query-string route.
 
 The Options HTML metadata requests `open_in_tab`; the generated manifest records
@@ -97,8 +113,8 @@ Changing either value does not change the URL, create browser history or load a
 different JavaScript bundle. The state belongs to the already loaded document:
 
 - `WorkflowStudio` renders one active `tabpanel` and keeps Workflow selection in
-  local component state. The current `OptionsApp` only hosts that composition in
-  the manifest options document.
+  local component state. Focus lazy-loads it inside a Focus-owned overlay;
+  `OptionsApp` hosts the same composition in the manifest options document.
 - The side panel moves to the Session view when a new active Session appears,
   permits returning to the Workflow list, and displays a compact active-Session
   bar there.
@@ -115,8 +131,9 @@ page has its own DOM, bootstrap and React root.
 WXT/Vite builds one entry chunk per page and may extract common dependencies
 such as React, global styles or shared feature code into reusable chunks. That
 code splitting is a build consequence of multiple entry documents, not the
-architectural reason for creating them. The Studio sections hosted by Options
-and the side-panel views remain inside their page bundle.
+architectural reason for creating them. Focus additionally uses an explicit
+dynamic boundary for the Studio component, so its UI loads on first open. The
+side-panel views remain inside their page bundle.
 
 Do not import generated chunk names. Their hashes and grouping may change on
 every build.
@@ -126,6 +143,7 @@ every build.
 | Event | What survives | What is reconstructed |
 | --- | --- | --- |
 | Focus tab reload or reopen | IndexedDB records, Settings and authoritative background Session | React state, Zustand projection, object URLs and audio state |
+| Focus Studio overlay close/reopen | Loaded Studio instance and its unsaved draft | Nothing until the Focus document is destroyed |
 | Options page close/reopen | Saved Workflows, Assets and Settings | Active tab, unsaved editor draft, dialog and feedback state |
 | Side panel close/reopen | Saved data and background Session | Local `session | workflows` view and Zustand projection |
 | Background worker restart | Persisted Session anchors and records | Message/alarm handlers, repository connections, in-memory command cache and next alarm |
@@ -143,6 +161,9 @@ functions such as `openOptions()` and `openFocusView()` through dependencies.
 Feature Domain, Application and Presentation modules do not import WXT/browser
 navigation APIs.
 
+The Focus-owned Studio overlay is local document state and does not use a
+browser navigation API.
+
 ## Verification Sources
 
 - [`wxt.config.ts`](../../wxt.config.ts) owns requested permissions and action
@@ -155,7 +176,8 @@ navigation APIs.
   Side Panel lifecycle integration.
 - [`WorkflowStudio.tsx`](../../src/app/workflow-studio/WorkflowStudio.tsx) owns
   configuration-section and Workflow-selection state;
-  [`OptionsApp.tsx`](../../src/app/options/OptionsApp.tsx) is its current
-  fallback host.
+  [`WorkflowStudioOverlay.tsx`](../../src/app/focus/WorkflowStudioOverlay.tsx)
+  owns the Focus overlay lifecycle; [`OptionsApp.tsx`](../../src/app/options/OptionsApp.tsx)
+  is the fallback host.
 - [`SidePanelApp.tsx`](../../src/app/side-panel/SidePanelApp.tsx) owns the side
   panel's local view state.

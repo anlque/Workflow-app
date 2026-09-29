@@ -32,7 +32,7 @@ import {
 import { LocusoraDatabase } from '@/platform/storage';
 import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
 
-import { createOptionsDependencies } from './createOptionsDependencies';
+import { createWorkflowStudioDependencies } from './createWorkflowStudioDependencies';
 
 const databaseNames: string[] = [];
 
@@ -63,7 +63,7 @@ async function seedAsset(
   return asset;
 }
 
-describe('createOptionsDependencies Asset Role integration', () => {
+describe('createWorkflowStudioDependencies Asset Role integration', () => {
   test('renames the Asset Role and every Workflow Role reference', async () => {
     const database = createDatabase();
     const assets = new DexieAssetRepository(database);
@@ -92,7 +92,7 @@ describe('createOptionsDependencies Asset Role integration', () => {
         ],
       }),
     );
-    const dependencies = createOptionsDependencies(
+    const dependencies = createWorkflowStudioDependencies(
       createTestDocumentPreferences(),
       database,
     );
@@ -146,7 +146,7 @@ describe('createOptionsDependencies Asset Role integration', () => {
         ],
       }),
     );
-    const dependencies = createOptionsDependencies(
+    const dependencies = createWorkflowStudioDependencies(
       createTestDocumentPreferences(),
       database,
     );
@@ -182,7 +182,7 @@ describe('createOptionsDependencies Asset Role integration', () => {
       byteSize: 1,
       createdAt: 1,
     });
-    const dependencies = createOptionsDependencies(
+    const dependencies = createWorkflowStudioDependencies(
       createTestDocumentPreferences(),
       database,
     );
@@ -211,7 +211,7 @@ describe('createOptionsDependencies Asset Role integration', () => {
   });
 });
 
-describe('createOptionsDependencies Asset retirement integration', () => {
+describe('createWorkflowStudioDependencies Asset retirement integration', () => {
   test('atomically replaces direct references, transfers Role and deletes source', async () => {
     const database = createDatabase();
     const assets = new DexieAssetRepository(database);
@@ -248,7 +248,7 @@ describe('createOptionsDependencies Asset retirement integration', () => {
         ],
       }),
     );
-    const dependencies = createOptionsDependencies(
+    const dependencies = createWorkflowStudioDependencies(
       createTestDocumentPreferences(),
       database,
     );
@@ -283,7 +283,7 @@ describe('createOptionsDependencies Asset retirement integration', () => {
       byteSize: 1,
       createdAt: 1,
     });
-    const dependencies = createOptionsDependencies(
+    const dependencies = createWorkflowStudioDependencies(
       createTestDocumentPreferences(),
       database,
     );

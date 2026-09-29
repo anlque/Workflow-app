@@ -80,6 +80,64 @@ body {
   background: var(--color-canvas);
 }
 
+.focus-document,
+.focus-app-surface {
+  min-height: 100vh;
+}
+
+.workflow-studio-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  visibility: hidden;
+  background: var(--color-canvas);
+  transform: translateX(100%);
+  transition:
+    transform var(--transition-state),
+    visibility 0s linear 180ms;
+  pointer-events: none;
+}
+
+.workflow-studio-overlay[data-open='true'] {
+  visibility: visible;
+  transform: translateX(0);
+  transition-delay: 0s;
+  pointer-events: auto;
+}
+
+.workflow-studio-overlay[data-reduced-motion='true'] {
+  transition: none;
+}
+
+.workflow-studio-overlay__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  min-height: 4rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.workflow-studio-overlay__header > [aria-label='Active session summary'] {
+  min-width: 0;
+  margin-right: auto;
+}
+
+.workflow-studio-overlay__content {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
 .focus-app {
   position: relative;
   display: grid;
@@ -1133,25 +1191,36 @@ textarea {
   font-size: 0.9375rem;
 }
 
-.compact-session-bar__summary {
+.compact-session-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.compact-session-bar .compact-session-summary {
+  flex: 1;
+}
+
+.compact-session-summary__identity {
   display: flex;
   min-width: 0;
   flex: 1;
   flex-direction: column;
 }
 
-.compact-session-bar__summary strong,
-.compact-session-bar__summary span {
+.compact-session-summary__identity strong,
+.compact-session-summary__identity span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.compact-session-bar__summary span {
+.compact-session-summary__identity span {
   color: var(--color-ink-muted);
 }
 
-.compact-session-bar output {
+.compact-session-summary output {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }

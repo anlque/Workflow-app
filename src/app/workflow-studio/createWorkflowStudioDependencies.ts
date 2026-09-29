@@ -43,6 +43,7 @@ import {
 } from '@/features/workflow';
 import { LocusoraDatabase } from '@/platform/storage';
 import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
+import type { WorkflowCatalogEvents } from '@/platform/messaging';
 
 import type { WorkflowStudioDependencies } from '../workflow-studio/WorkflowStudio';
 import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
@@ -77,7 +78,7 @@ function downloadJson(data: string, filename: string): void {
   }
 }
 
-export function createOptionsDependencies(
+export function createWorkflowStudioDependencies(
   preferences: WorkflowStudioDependencies['preferences'],
   database: LocusoraDatabase = new LocusoraDatabase({
     schemas: [
@@ -86,6 +87,7 @@ export function createOptionsDependencies(
       ...assetDatabaseSchemas,
     ],
   }),
+  catalogEvents: WorkflowCatalogEvents = createChromeWorkflowCatalogEvents(),
 ): WorkflowStudioDependencies {
   const workflows = new DexieWorkflowRepository(database);
   const assets = new DexieAssetRepository(database);
@@ -95,7 +97,6 @@ export function createOptionsDependencies(
   const unitOfWork = new DexieWorkflowPackageUnitOfWork(database);
   const roleUnitOfWork = new DexieAssetRoleManagementUnitOfWork(database);
   const retirementUnitOfWork = new DexieAssetRetirementUnitOfWork(database);
-  const catalogEvents = createChromeWorkflowCatalogEvents();
   const activeSessionReferences: ActiveSessionAssetReferences = {
     has: (assetId) => activeSessionReferencesAsset(sessions, assetId),
   };

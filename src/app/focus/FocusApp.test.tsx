@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 import { StrictMode } from 'react';
@@ -12,12 +18,51 @@ import {
   type SessionProjectionClient,
 } from '@/features/session';
 import { createWorkflow } from '@/features/workflow';
+import { defaultSettings } from '@/features/settings';
 import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
 import { createAssetId } from '@/features/assets';
+import type { WorkflowStudioDependencies } from '../workflow-studio/WorkflowStudio';
 
 import { FocusApp, type FocusDependencies } from './FocusApp';
 
-function dependencies(session: Session | null): FocusDependencies {
+function studioDependencies(
+  workflows: Awaited<
+    ReturnType<WorkflowStudioDependencies['load']>
+  >['workflows'] = [],
+): WorkflowStudioDependencies {
+  return {
+    preferences: createTestDocumentPreferences(),
+    load: vi.fn(() =>
+      Promise.resolve({ workflows, assets: [], settings: defaultSettings }),
+    ),
+    saveWorkflow: vi.fn(() => Promise.resolve()),
+    duplicateWorkflow: vi.fn(() => Promise.resolve()),
+    deleteWorkflow: vi.fn(() => Promise.resolve()),
+    reorderWorkflows: vi.fn(() => Promise.resolve()),
+    importAsset: vi.fn(() => Promise.resolve()),
+    inspectAssetRetirement: vi.fn(),
+    retireAsset: vi.fn(() => Promise.resolve()),
+    synchronizeAssetRetirement: vi.fn(() => Promise.resolve()),
+    createAssetRetirementUploadInput: vi.fn(),
+    inspectAssetRoleChange: vi.fn(),
+    applyAssetRoleChange: vi.fn(() => Promise.resolve()),
+    synchronizeAssetRoleChange: vi.fn(() => Promise.resolve()),
+    loadAssetBlob: vi.fn(() => Promise.resolve(null)),
+    createObjectUrl: vi.fn(() => 'blob:test'),
+    revokeObjectUrl: vi.fn(),
+    updateSettings: vi.fn(() => Promise.resolve()),
+    exportSettings: vi.fn(() => Promise.resolve()),
+    importSettings: vi.fn(() => Promise.resolve()),
+    exportWorkflow: vi.fn(() => Promise.resolve()),
+    importWorkflow: vi.fn(() => Promise.resolve()),
+    createId: vi.fn(() => 'new-workflow'),
+  };
+}
+
+function dependencies(
+  session: Session | null,
+  studio: WorkflowStudioDependencies = studioDependencies(),
+): FocusDependencies {
   return {
     preferences: createTestDocumentPreferences(),
     sounds: {
@@ -49,11 +94,214 @@ function dependencies(session: Session | null): FocusDependencies {
     subscribeWorkflowChanges: vi.fn(() => vi.fn()),
     listWorkflows: vi.fn(() => Promise.resolve([])),
     start: vi.fn(() => Promise.resolve()),
-    openOptions: vi.fn(() => Promise.resolve()),
+    loadStudio: vi.fn(() => Promise.resolve(studio)),
   } satisfies FocusDependencies & { sessions: SessionProjectionClient };
 }
 
 describe('FocusApp', () => {
+  test('opens Studio from idle Focus, inerts Focus and restores the trigger', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies(null);
+    const { container } = render(<FocusApp dependencies={deps} />);
+    const trigger = await screen.findByRole('button', {
+      name: 'Open Workflow Studio',
+    });
+    expect(deps.loadStudio).not.toHaveBeenCalled();
+
+    await user.click(trigger);
+
+    expect(
+      await screen.findByRole('button', { name: 'Close Workflow Studio' }),
+    ).toHaveFocus();
+    await waitFor(() => {
+      expect(deps.loadStudio).toHaveBeenCalledOnce();
+    });
+    expect(container.querySelector('.focus-app-surface')).toHaveAttribute(
+      'inert',
+    );
+
+    await user.keyboard('{Escape}');
+    expect(trigger).toHaveFocus();
+    expect(container.querySelector('.focus-app-surface')).not.toHaveAttribute(
+      'inert',
+    );
+  });
+
+  test('keeps the Session subscription and ambient player mounted across Studio toggles', async () => {
+    const user = userEvent.setup();
+    const disconnect = vi.fn();
+    const session = createSession(
+      'overlay-audio-session',
+      createWorkflow({
+        id: 'overlay-audio-workflow',
+        name: 'Ambient focus',
+        phases: [
+          {
+            type: 'focus',
+            durationSeconds: 60,
+            environment: {
+              audioAsset: {
+                type: 'direct',
+                assetId: createAssetId('ambient-overlay'),
+              },
+            },
+          },
+        ],
+      }),
+      Date.now(),
+    );
+    const deps = dependencies(session);
+    vi.mocked(deps.sessions.subscribe).mockReturnValue(disconnect);
+    vi.mocked(deps.loadAssetUrl).mockResolvedValue('blob:ambient-overlay');
+    render(<FocusApp dependencies={deps} />);
+    await screen.findByRole('heading', { name: 'Ambient focus' });
+    await act(async () => Promise.resolve());
+    const audio = document.querySelector('audio');
+    expect(audio).toBeInstanceOf(HTMLAudioElement);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open Workflow Studio' }),
+    );
+    await screen.findByRole('button', { name: 'Close Workflow Studio' });
+    await user.click(
+      screen.getByRole('button', { name: 'Close Workflow Studio' }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Open Workflow Studio' }),
+    );
+
+    expect(document.querySelector('audio')).toBe(audio);
+    expect(deps.sessions.subscribe).toHaveBeenCalledOnce();
+    expect(disconnect).not.toHaveBeenCalled();
+  });
+
+  test('preserves an unsaved Studio draft after close and reopen', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'draft-workflow',
+      name: 'Original name',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    const deps = dependencies(null, studioDependencies([workflow]));
+    vi.mocked(deps.listWorkflows).mockResolvedValue([workflow]);
+    render(<FocusApp dependencies={deps} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Open Workflow Studio' }),
+    );
+    const name = await screen.findByLabelText('Workflow name');
+    await user.clear(name);
+    await user.type(name, 'Unsaved name');
+    await user.click(
+      screen.getByRole('button', { name: 'Close Workflow Studio' }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Open Workflow Studio' }),
+    );
+
+    expect(await screen.findByLabelText('Workflow name')).toHaveValue(
+      'Unsaved name',
+    );
+  });
+
+  test('restores focus to the stable Studio trigger when the opening trigger is removed', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'first-workflow',
+      name: 'First workflow',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    let workflows: readonly (typeof workflow)[] = [];
+    let invalidate: (() => void) | undefined;
+    const studio = studioDependencies();
+    vi.mocked(studio.load).mockImplementation(() =>
+      Promise.resolve({
+        workflows,
+        assets: [],
+        settings: defaultSettings,
+      }),
+    );
+    vi.mocked(studio.saveWorkflow).mockImplementation(() => {
+      workflows = [workflow];
+      invalidate?.();
+      return Promise.resolve();
+    });
+    const deps = dependencies(null, studio);
+    vi.mocked(deps.listWorkflows).mockImplementation(() =>
+      Promise.resolve(workflows),
+    );
+    vi.mocked(deps.subscribeWorkflowChanges).mockImplementation((listener) => {
+      invalidate = listener;
+      return vi.fn();
+    });
+    const { container } = render(<FocusApp dependencies={deps} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Create a Workflow' }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Create workflow' }),
+    );
+    await user.type(screen.getByLabelText('Workflow name'), 'First workflow');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+    await waitFor(() => {
+      expect(container.querySelector('.focus-launcher')).toHaveTextContent(
+        'First workflow',
+      );
+    });
+    await user.click(
+      screen.getByRole('button', { name: 'Close Workflow Studio' }),
+    );
+
+    expect(
+      await screen.findByRole('button', { name: 'Start First workflow' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Open Workflow Studio' }),
+    ).toHaveFocus();
+  });
+
+  test('suppresses a newly active Reward dialog until Studio closes', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'overlay-reward-workflow',
+      name: 'Reward focus',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: '☕', title: 'Tea' },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const running = createSession('overlay-reward-session', workflow, 1_000);
+    const rewardPaused = deriveSessionState(running, 3_000);
+    const deps = dependencies(running);
+    let publish: ((session: Session | null) => void) | undefined;
+    vi.mocked(deps.sessions.subscribe).mockImplementation((listener) => {
+      publish = listener;
+      return vi.fn();
+    });
+    render(<FocusApp dependencies={deps} />);
+    await screen.findByRole('heading', { name: 'Reward focus' });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open Workflow Studio' }),
+    );
+    act(() => {
+      publish?.(rewardPaused);
+    });
+
+    expect(document.querySelector('dialog.dialog--reward')).toBeNull();
+    await user.click(
+      screen.getByRole('button', { name: 'Close Workflow Studio' }),
+    );
+    expect(
+      await screen.findByRole('dialog', { name: 'Reward unlocked' }),
+    ).toBeVisible();
+  });
+
   test('updates active presentation when effective reduced motion changes', async () => {
     const session = createSession(
       'session-1',

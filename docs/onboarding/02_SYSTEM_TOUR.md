@@ -45,10 +45,11 @@ has no DOM and no React root.
 
 ## 4. Compose Dependencies at the Edge
 
-The focus, Options and side-panel bootstraps call matching dependency factories:
+The focus and side-panel bootstraps call surface dependency factories; Focus
+and Options both reuse the Studio factory:
 
 - [`createFocusDependencies()`](../../src/app/focus/createFocusDependencies.ts);
-- [`createOptionsDependencies()`](../../src/app/options/createOptionsDependencies.ts);
+- [`createWorkflowStudioDependencies()`](../../src/app/workflow-studio/createWorkflowStudioDependencies.ts);
 - [`createSidePanelDependencies()`](../../src/app/side-panel/createSidePanelDependencies.ts).
 
 These factories create concrete repositories, browser adapters and use-case

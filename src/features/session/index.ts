@@ -64,3 +64,7 @@ export {
   getActiveSessionSegment,
   type ActiveSessionSegment,
 } from './presentation/getActiveSessionSegment';
+export {
+  CompactSessionSummary,
+  type CompactSessionSummaryProps,
+} from './presentation/CompactSessionSummary';

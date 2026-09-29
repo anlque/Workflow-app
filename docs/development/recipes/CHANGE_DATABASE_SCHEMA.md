@@ -71,7 +71,7 @@ does not import feature concepts or decide their transformation.
    fragment set:
    - `src/app/background/bootstrapBackground.ts`;
    - `src/app/focus/createFocusDependencies.ts`;
-   - `src/app/options/createOptionsDependencies.ts`;
+   - `src/app/workflow-studio/createWorkflowStudioDependencies.ts`;
    - `src/app/side-panel/createSidePanelDependencies.ts`.
 10. Update cross-table transaction scopes when a new table participates in an
     atomic use case.

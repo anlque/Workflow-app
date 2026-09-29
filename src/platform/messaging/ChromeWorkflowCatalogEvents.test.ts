@@ -41,6 +41,17 @@ describe('ChromeWorkflowCatalogEvents', () => {
     });
   });
 
+  test('notifies subscribers in the publishing document after publication', async () => {
+    const fake = createRuntime();
+    const events = new ChromeWorkflowCatalogEvents(fake.runtime);
+    const listener = vi.fn();
+    events.subscribeChanged(listener);
+
+    await events.publishChanged();
+
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
   test('delivers only valid catalog invalidations', () => {
     const fake = createRuntime();
     const events = new ChromeWorkflowCatalogEvents(fake.runtime);

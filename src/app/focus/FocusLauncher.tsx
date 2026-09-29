@@ -6,7 +6,7 @@ export type FocusLauncherProps = Readonly<{
   error: string | null;
   pendingWorkflowId?: WorkflowId | undefined;
   onStart(id: WorkflowId): Promise<void>;
-  onOpenOptions(): Promise<void>;
+  onOpenStudio(trigger: HTMLButtonElement): void;
 }>;
 
 export function FocusLauncher({
@@ -14,7 +14,7 @@ export function FocusLauncher({
   error,
   pendingWorkflowId,
   onStart,
-  onOpenOptions,
+  onOpenStudio,
 }: FocusLauncherProps) {
   return (
     <section className="focus-launcher" aria-labelledby="focus-launcher-title">
@@ -40,7 +40,12 @@ export function FocusLauncher({
       ) : workflows.length === 0 ? (
         <div className="focus-launcher__empty">
           <p>No Workflows yet</p>
-          <Button variant="primary" onClick={() => void onOpenOptions()}>
+          <Button
+            variant="primary"
+            onClick={(event) => {
+              onOpenStudio(event.currentTarget);
+            }}
+          >
             Create a Workflow
           </Button>
         </div>

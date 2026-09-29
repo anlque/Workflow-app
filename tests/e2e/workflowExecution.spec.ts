@@ -45,20 +45,71 @@ test('loads every MVP extension surface in an isolated profile', async ({
   ).toBeVisible();
 });
 
-test('opens the Options page directly from an empty Focus Tab', async ({
+test('embeds Workflow Studio over idle and active Focus without navigation', async ({
   context,
   extensionUrls,
 }) => {
   const focus = await context.newPage();
   await focus.goto(extensionUrls.focus);
 
-  const optionsPage = context.waitForEvent('page');
+  const initialPages = context.pages().length;
   await focus.getByRole('button', { name: 'Create a Workflow' }).click();
-  const options = await optionsPage;
-
-  await expect(options).toHaveURL(extensionUrls.options);
+  const overlay = focus.getByRole('region', { name: 'Workflow Studio' });
+  await expect(overlay).toBeVisible();
   await expect(
-    options.getByRole('heading', { name: 'Locusora' }),
+    focus.getByRole('button', { name: 'Close Workflow Studio' }),
+  ).toBeFocused();
+  expect(context.pages()).toHaveLength(initialPages);
+  await expect(focus).toHaveURL(extensionUrls.focus);
+
+  await focus.getByRole('button', { name: 'Create workflow' }).click();
+  await focus.getByLabel('Workflow name').fill('Embedded focus');
+  await focus.getByLabel('Phase 1 duration in minutes').fill('0.5');
+  await focus.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(focus.getByRole('status')).toHaveText('Workflow saved');
+  await focus.getByRole('button', { name: 'Delete Embedded focus' }).click();
+  await expect(
+    focus.getByRole('dialog', { name: 'Delete Embedded focus?' }),
+  ).toBeVisible();
+  await focus.keyboard.press('Escape');
+  await expect(
+    focus.getByRole('dialog', { name: 'Delete Embedded focus?' }),
+  ).toHaveCount(0);
+  await expect(overlay).toBeVisible();
+  await focus.getByRole('button', { name: 'Close Workflow Studio' }).click();
+  await expect(
+    focus.getByRole('button', { name: 'Open Workflow Studio' }),
+  ).toBeFocused();
+  await focus.getByRole('button', { name: 'Start Embedded focus' }).click();
+  await expect(
+    focus.getByRole('heading', { name: 'Embedded focus' }),
+  ).toBeVisible();
+
+  const trigger = focus.getByRole('button', { name: 'Open Workflow Studio' });
+  await trigger.click();
+  const summary = focus.getByRole('region', {
+    name: 'Active session summary',
+  });
+  await expect(summary).toContainText('Embedded focus');
+  const countdown = summary.getByLabel('Compact time remaining');
+  const initialCountdown = await countdown.textContent();
+  await expect(countdown).not.toHaveText(initialCountdown ?? '', {
+    timeout: 2_000,
+  });
+
+  for (const viewport of [
+    { width: 360, height: 640 },
+    { width: 1280, height: 800 },
+  ]) {
+    await focus.setViewportSize(viewport);
+    const bounds = await overlay.boundingBox();
+    expect(bounds).toEqual({ x: 0, y: 0, ...viewport });
+  }
+
+  await focus.getByRole('button', { name: 'Close Workflow Studio' }).click();
+  await expect(trigger).toBeFocused();
+  await expect(
+    focus.getByRole('heading', { name: 'Embedded focus' }),
   ).toBeVisible();
 });
 
@@ -302,8 +353,15 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
     'true',
   );
 
+  await focus.getByRole('button', { name: 'Open Workflow Studio' }).click();
+  await expect(
+    focus.getByRole('region', { name: 'Workflow Studio' }),
+  ).toBeVisible();
   await expireActiveSessionDeadline(focus);
-
+  await expect(
+    focus.getByRole('dialog', { name: 'Reward unlocked' }),
+  ).toHaveCount(0);
+  await focus.getByRole('button', { name: 'Close Workflow Studio' }).click();
   const reward = focus.getByRole('dialog', { name: 'Reward unlocked' });
   await expect(reward).toBeVisible({ timeout: 15_000 });
   const sidePanel = await context.newPage();

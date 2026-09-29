@@ -6,6 +6,7 @@ import type { Session, SessionId } from '../domain/Session';
 
 export type SessionControlsProps = Readonly<{
   session: Session;
+  dialogsEnabled?: boolean;
   onPause(id: SessionId): Promise<void>;
   onResume(id: SessionId): Promise<void>;
   onRestart?(id: SessionId, rewardRitualId: string): Promise<void>;
@@ -14,6 +15,7 @@ export type SessionControlsProps = Readonly<{
 
 export function SessionControls({
   session,
+  dialogsEnabled = true,
   onPause,
   onResume,
   onRestart,
@@ -101,7 +103,7 @@ export function SessionControls({
       )}
       {error === null ? null : <p role="alert">{error}</p>}
       <Dialog
-        open={confirmingRestart}
+        open={dialogsEnabled && confirmingRestart}
         title="Restart this Bonus Phase?"
         onCancel={() => {
           setConfirmingRestart(false);
@@ -136,7 +138,7 @@ export function SessionControls({
         </div>
       </Dialog>
       <Dialog
-        open={confirmingStop}
+        open={dialogsEnabled && confirmingStop}
         title="Stop this session?"
         onCancel={() => {
           setConfirmingStop(false);

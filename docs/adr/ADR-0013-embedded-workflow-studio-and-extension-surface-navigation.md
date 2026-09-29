@@ -24,11 +24,22 @@ initial snapshot loading/error boundary and explicit dependency interface.
 Concrete repositories, browser adapters and use cases remain supplied by the
 hosting surface's composition root.
 
-`OptionsApp` is a thin fallback wrapper for Chrome's manifest options page. A
-future Focus overlay may host the same Studio with its own dependency factory,
-but the shared Studio must not import Focus-owned modules or control its host's
-overlay, document lifecycle or navigation. An architecture test enforces that
-dependency direction for alias and relative imports.
+`OptionsApp` is a thin fallback wrapper for Chrome's manifest options page.
+Focus hosts the same Studio in a Focus-owned, full-viewport lazy overlay. The
+underlying Focus surface stays mounted and inert while the overlay is open; the
+loaded Studio stays mounted after close so its draft survives for the Focus
+document lifetime. The shared Studio does not import Focus-owned modules or
+control its host's overlay, document lifecycle or navigation. Architecture
+tests enforce that dependency direction and the dynamic Focus loading boundary.
+
+The concrete Studio dependency factory and its transactional adapters belong
+to `src/app/workflow-studio/` and accept host-owned database, preference and
+catalog-event adapters. Options and Focus therefore reuse one composition
+without importing each other's surface roots. Focus shares its catalog-event
+adapter with the embedded Studio so a same-document mutation refreshes the
+underlying launcher as well as other extension documents. Focus dynamically
+imports both Studio presentation and concrete composition on first open; they
+are absent from its initial module-preload graph.
 
 Section selection remains local React state. Extension surfaces continue to
 navigate through injected browser-boundary operations; Locusora does not add a
@@ -45,12 +56,13 @@ client-side router or share mutable React state between document roots.
 
 ## Consequences
 
-There is one owner for all three configuration sections and one contract for
-their dependencies. The options fallback preserves its entrypoint and browser
-lifecycle while carrying almost no presentation state. Hosting surfaces must
-adapt their concrete dependencies to the shared interface, and changes to that
-interface affect every host. Focus embedding, overlay interaction and animation
-remain separate work.
+There is one owner for all three configuration sections, one concrete Studio
+composition and one contract for their dependencies. The options fallback
+preserves its entrypoint and browser lifecycle while carrying almost no
+presentation state. Focus keeps Session projection, timer and audio ownership
+outside the overlay; an active-Session summary is a read-only projection. The
+overlay adds document-lifetime draft retention and explicit focus/inert motion
+semantics without introducing URL routing or cross-root mutable state.
 
 ## Related Documents
 

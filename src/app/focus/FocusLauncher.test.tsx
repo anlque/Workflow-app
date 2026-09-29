@@ -21,7 +21,7 @@ describe('FocusLauncher', () => {
         workflows={[workflow]}
         error={null}
         onStart={onStart}
-        onOpenOptions={() => Promise.resolve()}
+        onOpenStudio={() => undefined}
       />,
     );
 
@@ -30,21 +30,21 @@ describe('FocusLauncher', () => {
     expect(onStart).toHaveBeenCalledWith(workflow.id);
   });
 
-  test('opens Options from the empty state', async () => {
+  test('opens Workflow Studio from the empty state', async () => {
     const user = userEvent.setup();
-    const onOpenOptions = vi.fn(() => Promise.resolve());
+    const onOpenStudio = vi.fn();
     render(
       <FocusLauncher
         workflows={[]}
         error={null}
         onStart={() => Promise.resolve()}
-        onOpenOptions={onOpenOptions}
+        onOpenStudio={onOpenStudio}
       />,
     );
 
     expect(screen.getByText('No Workflows yet')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Create a Workflow' }));
-    expect(onOpenOptions).toHaveBeenCalledOnce();
+    expect(onOpenStudio).toHaveBeenCalledOnce();
   });
 
   test('shows loading and error feedback', () => {
@@ -53,7 +53,7 @@ describe('FocusLauncher', () => {
         workflows={null}
         error={null}
         onStart={() => Promise.resolve()}
-        onOpenOptions={() => Promise.resolve()}
+        onOpenStudio={() => undefined}
       />,
     );
     expect(screen.getByRole('status')).toHaveTextContent('Loading Workflows');
@@ -63,7 +63,7 @@ describe('FocusLauncher', () => {
         workflows={[]}
         error="Workflows unavailable."
         onStart={() => Promise.resolve()}
-        onOpenOptions={() => Promise.resolve()}
+        onOpenStudio={() => undefined}
       />,
     );
     expect(screen.getByRole('alert')).toHaveTextContent(

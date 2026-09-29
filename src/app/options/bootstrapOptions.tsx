@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { createOptionsDependencies } from './createOptionsDependencies';
+import { createWorkflowStudioDependencies } from '../workflow-studio/createWorkflowStudioDependencies';
 import { OptionsApp } from './OptionsApp';
 import { createChromeDocumentPreferences } from '../document-preferences/createChromeDocumentPreferences';
 
@@ -16,7 +16,7 @@ export async function bootstrapOptions(
 
   const preferences = createChromeDocumentPreferences();
   await preferences.start();
-  const dependencies = createOptionsDependencies(preferences);
+  const dependencies = createWorkflowStudioDependencies(preferences);
   window.addEventListener(
     'pagehide',
     () => {

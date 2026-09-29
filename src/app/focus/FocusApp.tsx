@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useStore } from 'zustand';
 
 import {
@@ -19,11 +26,15 @@ import {
 import { Button } from '@/shared';
 import type { DocumentPreferences } from '@/app/document-preferences/DocumentPreferences';
 import { useDocumentPreferences } from '@/app/document-preferences/useDocumentPreferences';
+import type { WorkflowStudioDependencies } from '../workflow-studio/WorkflowStudio';
 
 import { FocusEnvironment } from './FocusEnvironment';
 import { FocusLauncher } from './FocusLauncher';
 import type { UiSoundPlayer } from './createUiSoundPlayer';
 import { useCompletionCue } from './useCompletionCue';
+import { WorkflowStudioOverlay } from './WorkflowStudioOverlay';
+
+const LazyWorkflowStudio = lazy(() => import('./LazyWorkflowStudio'));
 
 export type FocusDependencies = Readonly<{
   preferences: DocumentPreferences;
@@ -44,15 +55,17 @@ export type FocusDependencies = Readonly<{
   listWorkflows(): Promise<readonly Workflow[]>;
   subscribeWorkflowChanges(listener: () => void): () => void;
   start(id: WorkflowId): Promise<void>;
-  openOptions(): Promise<void>;
+  loadStudio(): Promise<WorkflowStudioDependencies>;
 }>;
 
 function IdleFocusLauncher({
   dependencies,
   activateSounds,
+  openStudio,
 }: Readonly<{
   dependencies: FocusDependencies;
   activateSounds(): Promise<void>;
+  openStudio(trigger: HTMLButtonElement): void;
 }>) {
   const [launcherError, setLauncherError] = useState<string | null>(null);
   const [pendingWorkflowId, setPendingWorkflowId] = useState<WorkflowId>();
@@ -70,7 +83,7 @@ function IdleFocusLauncher({
       workflows={workflows}
       error={launcherError ?? refreshError}
       pendingWorkflowId={pendingWorkflowId}
-      onOpenOptions={dependencies.openOptions}
+      onOpenStudio={openStudio}
       onStart={async (id) => {
         void activateSounds();
         setLauncherError(null);
@@ -102,6 +115,10 @@ export function FocusApp({
   );
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [panelPending, setPanelPending] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
+  const [studioRequested, setStudioRequested] = useState(false);
+  const studioTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const studioFallbackRef = useRef<HTMLButtonElement>(null);
 
   async function activateSounds(): Promise<void> {
     await dependencies.sounds.unlock();
@@ -140,6 +157,21 @@ export function FocusApp({
     );
   }
 
+  function openStudio(trigger: HTMLButtonElement): void {
+    studioTriggerRef.current = trigger;
+    setStudioRequested(true);
+    setStudioOpen(true);
+  }
+
+  function closeStudio(): void {
+    setStudioOpen(false);
+    queueMicrotask(() => {
+      const trigger = studioTriggerRef.current;
+      if (trigger?.isConnected === true) trigger.focus();
+      else studioFallbackRef.current?.focus();
+    });
+  }
+
   useEffect(() => {
     const connection = connectSessionMessages(store, dependencies.sessions);
     return () => {
@@ -154,16 +186,24 @@ export function FocusApp({
 
   useCompletionCue(projection.session, dependencies.sounds);
 
+  let focusSurface: ReactNode;
   if (projection.connection === 'connecting') {
-    return <p role="status">Connecting to your session…</p>;
-  }
-  if (projection.connection === 'error') {
-    return <p role="alert">{projection.error}</p>;
-  }
-  if (projection.session === null) {
-    return (
+    focusSurface = <p role="status">Connecting to your session…</p>;
+  } else if (projection.connection === 'error') {
+    focusSurface = <p role="alert">{projection.error}</p>;
+  } else if (projection.session === null) {
+    focusSurface = (
       <main className="focus-app focus-app--empty">
         <div className="focus-app__utility-actions">
+          <Button
+            buttonRef={studioFallbackRef}
+            variant="quiet"
+            onClick={(event) => {
+              openStudio(event.currentTarget);
+            }}
+          >
+            Open Workflow Studio
+          </Button>
           <Button
             className="focus-app__close-panel"
             variant="quiet"
@@ -177,94 +217,129 @@ export function FocusApp({
         <IdleFocusLauncher
           dependencies={dependencies}
           activateSounds={activateSounds}
+          openStudio={openStudio}
         />
+      </main>
+    );
+  } else {
+    const session = projection.session;
+    const segment = getActiveSessionSegment(session);
+    focusSurface = (
+      <main className="focus-app">
+        <div className="focus-app__utility-actions">
+          <Button
+            buttonRef={studioFallbackRef}
+            variant="quiet"
+            onClick={(event) => {
+              openStudio(event.currentTarget);
+            }}
+          >
+            Open Workflow Studio
+          </Button>
+          <div className="focus-app__volume-control">
+            <Button
+              className="focus-app__sound-toggle"
+              variant="quiet"
+              aria-pressed={volumePercent === 0}
+              onClick={toggleSound}
+            >
+              {volumePercent === 0 ? 'Unmute sound' : 'Mute sound'}
+            </Button>
+            <label>
+              <span>Volume</span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={volumePercent}
+                onChange={(event) => {
+                  updateVolume(Number(event.currentTarget.value));
+                }}
+              />
+            </label>
+          </div>
+          {soundState === 'locked' ? (
+            <Button
+              className="focus-app__enable-sounds"
+              variant="quiet"
+              onClick={() => {
+                void activateSounds();
+              }}
+            >
+              Enable sounds
+            </Button>
+          ) : null}
+          <Button
+            className="focus-app__close-panel"
+            variant="quiet"
+            disabled={panelPending}
+            aria-busy={panelPending || undefined}
+            onClick={togglePanel}
+          >
+            {sidePanelOpen ? 'Close side panel' : 'Open side panel'}
+          </Button>
+        </div>
+        <FocusEnvironment
+          environment={segment.environment}
+          reducedMotion={reducedMotion}
+          playing={session.status === 'running'}
+          volume={volumePercent / 100}
+          loadAssetUrl={dependencies.loadAssetUrl}
+          releaseAssetUrl={dependencies.releaseAssetUrl}
+        />
+        <div className="focus-app__content">
+          <ActiveSessionView
+            session={session}
+            dialogsEnabled={!studioOpen}
+            reducedMotion={reducedMotion}
+            onPhaseBoundary={dependencies.sounds.playBell}
+            rewardInteraction={{
+              onRoll: dependencies.sounds.playDiceRoll,
+              rollReward: dependencies.rollReward,
+              rerollReward: dependencies.rerollReward,
+              continueReward: dependencies.continueReward,
+            }}
+            onPause={async (id) => {
+              void activateSounds();
+              await dependencies.pause(id);
+            }}
+            onResume={async (id) => {
+              void activateSounds();
+              await dependencies.resume(id);
+            }}
+            onRestart={dependencies.restartPhase}
+            onStop={async (id) => {
+              void activateSounds();
+              await dependencies.stop(id);
+            }}
+          />
+        </div>
       </main>
     );
   }
 
-  const session = projection.session;
-  const segment = getActiveSessionSegment(session);
   return (
-    <main className="focus-app">
-      <div className="focus-app__utility-actions">
-        <div className="focus-app__volume-control">
-          <Button
-            className="focus-app__sound-toggle"
-            variant="quiet"
-            aria-pressed={volumePercent === 0}
-            onClick={toggleSound}
-          >
-            {volumePercent === 0 ? 'Unmute sound' : 'Mute sound'}
-          </Button>
-          <label>
-            <span>Volume</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={volumePercent}
-              onChange={(event) => {
-                updateVolume(Number(event.currentTarget.value));
-              }}
-            />
-          </label>
-        </div>
-        {soundState === 'locked' ? (
-          <Button
-            className="focus-app__enable-sounds"
-            variant="quiet"
-            onClick={() => {
-              void activateSounds();
-            }}
-          >
-            Enable sounds
-          </Button>
-        ) : null}
-        <Button
-          className="focus-app__close-panel"
-          variant="quiet"
-          disabled={panelPending}
-          aria-busy={panelPending || undefined}
-          onClick={togglePanel}
-        >
-          {sidePanelOpen ? 'Close side panel' : 'Open side panel'}
-        </Button>
+    <div className="focus-document">
+      <div
+        className="focus-app-surface"
+        inert={studioOpen ? true : undefined}
+        aria-hidden={studioOpen ? true : undefined}
+      >
+        {focusSurface}
       </div>
-      <FocusEnvironment
-        environment={segment.environment}
-        reducedMotion={reducedMotion}
-        playing={session.status === 'running'}
-        volume={volumePercent / 100}
-        loadAssetUrl={dependencies.loadAssetUrl}
-        releaseAssetUrl={dependencies.releaseAssetUrl}
-      />
-      <div className="focus-app__content">
-        <ActiveSessionView
-          session={session}
+      {studioRequested ? (
+        <WorkflowStudioOverlay
+          open={studioOpen}
           reducedMotion={reducedMotion}
-          onPhaseBoundary={dependencies.sounds.playBell}
-          rewardInteraction={{
-            onRoll: dependencies.sounds.playDiceRoll,
-            rollReward: dependencies.rollReward,
-            rerollReward: dependencies.rerollReward,
-            continueReward: dependencies.continueReward,
-          }}
-          onPause={async (id) => {
-            void activateSounds();
-            await dependencies.pause(id);
-          }}
-          onResume={async (id) => {
-            void activateSounds();
-            await dependencies.resume(id);
-          }}
-          onRestart={dependencies.restartPhase}
-          onStop={async (id) => {
-            void activateSounds();
-            await dependencies.stop(id);
-          }}
-        />
-      </div>
-    </main>
+          session={
+            projection.connection === 'connected' ? projection.session : null
+          }
+          onClose={closeStudio}
+        >
+          <LazyWorkflowStudio loadDependencies={dependencies.loadStudio} />
+        </WorkflowStudioOverlay>
+      ) : null}
+    </div>
   );
 }

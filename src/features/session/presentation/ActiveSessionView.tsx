@@ -11,6 +11,7 @@ export type ActiveSessionViewProps = Readonly<{
   session: Session;
   now?: () => number;
   reducedMotion?: boolean;
+  dialogsEnabled?: boolean;
   onPhaseBoundary?(): void;
   rewardInteraction?: Readonly<{
     onRoll(durationMs: 600 | 2500): void;
@@ -29,6 +30,7 @@ export function ActiveSessionView({
   session,
   now = systemNow,
   reducedMotion = false,
+  dialogsEnabled = true,
   onPhaseBoundary,
   rewardInteraction,
   onPause,
@@ -69,6 +71,7 @@ export function ActiveSessionView({
       ? null
       : (dice.sides[ritual.selectedSideIndex] ?? null);
   const rewardResult =
+    !dialogsEnabled ||
     ritual === undefined ||
     dice === undefined ||
     rewardInteraction === undefined ? null : (
@@ -128,6 +131,7 @@ export function ActiveSessionView({
       </output>
       <SessionControls
         session={session}
+        dialogsEnabled={dialogsEnabled}
         onPause={onPause}
         onResume={onResume}
         {...(onRestart === undefined ? {} : { onRestart })}
