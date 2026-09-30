@@ -32,6 +32,7 @@ function workflow() {
     name: 'Deep work',
     phases: [
       {
+        name: 'Writing',
         type: 'focus',
         durationSeconds: 60,
         environment: {
@@ -115,6 +116,7 @@ describe('Workflow Asset retirement patches', () => {
     const saved = (await repository.list())[0];
     expect(saved).toBeDefined();
     if (saved === undefined) return;
+    expect(saved.phases[0].name).toBe('Writing');
     expect(saved.phases[0].environment.backgroundAsset).toEqual({
       type: 'direct',
       assetId: replacement.id,
@@ -145,6 +147,7 @@ describe('Workflow Asset retirement patches', () => {
     const saved = (await repository.list())[0];
     expect(saved).toBeDefined();
     if (saved === undefined) return;
+    expect(saved.phases[0].name).toBe('Writing');
     expect(saved.phases[0].environment.backgroundAsset).toBeUndefined();
     expect(saved.phases[1]?.environment.backgroundAsset).toBeUndefined();
     expect(saved.phases[0].environment.audioAsset).toBeUndefined();

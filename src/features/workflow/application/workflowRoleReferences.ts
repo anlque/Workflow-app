@@ -105,6 +105,7 @@ export async function renameWorkflowRoleReferences(
         id: workflow.id,
         name: workflow.name,
         phases: workflow.phases.map((phase, index) => ({
+          ...(phase.name === undefined ? {} : { name: phase.name }),
           type: phase.type,
           durationSeconds: phase.durationSeconds,
           environment: renameEnvironment(workflow, index, from, to),

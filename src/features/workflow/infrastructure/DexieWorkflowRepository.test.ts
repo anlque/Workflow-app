@@ -27,6 +27,7 @@ function workflow(id: string, name: string): Workflow {
     name,
     phases: [
       {
+        name: 'Writing',
         type: 'focus',
         durationSeconds: 1_500,
         environment: {
@@ -105,7 +106,7 @@ describe('DexieWorkflowRepository', () => {
     await expect(
       database.table<unknown, string>('workflows').get(expected.id),
     ).resolves.toMatchObject({
-      schemaVersion: 5,
+      schemaVersion: 6,
       rewardDice: {
         sides: [
           expect.objectContaining({ availability: 'any' }),
@@ -113,6 +114,55 @@ describe('DexieWorkflowRepository', () => {
         ],
       },
     });
+    await expect(
+      database.table<unknown, string>('workflows').get(expected.id),
+    ).resolves.toMatchObject({
+      phases: [{ name: 'Writing' }, {}],
+    });
+  });
+
+  test('restores an unnamed Phase from a version-5 record', async () => {
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
+    await database.table<unknown, string>('workflows').put({
+      id: 'version-5-unnamed',
+      schemaVersion: 5,
+      order: 0,
+      name: 'Legacy unnamed',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+
+    await expect(
+      repository.get('version-5-unnamed' as WorkflowId),
+    ).resolves.toMatchObject({
+      phases: [{ type: 'focus', durationSeconds: 60 }],
+    });
+    await expect(
+      repository.get('version-5-unnamed' as WorkflowId),
+    ).resolves.not.toHaveProperty('phases.0.name');
+  });
+
+  test('rejects a Phase name under the legacy version-5 shape', async () => {
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
+    await database.table<unknown, string>('workflows').put({
+      id: 'version-5-named',
+      schemaVersion: 5,
+      order: 0,
+      name: 'Wrong-version name',
+      phases: [
+        {
+          name: 'Writing',
+          type: 'focus',
+          durationSeconds: 60,
+          environment: {},
+        },
+      ],
+    });
+
+    await expect(
+      repository.get('version-5-named' as WorkflowId),
+    ).rejects.toThrow('Stored Workflow record is invalid.');
   });
 
   test('round-trips a canonical custom Reward schedule', async () => {
@@ -138,7 +188,7 @@ describe('DexieWorkflowRepository', () => {
     await expect(repository.get(expected.id)).resolves.toEqual(expected);
   });
 
-  test('round-trips a version-5 Bonus Reward Phase with direct and Role references', async () => {
+  test('round-trips a version-6 Bonus Reward Phase with direct and Role references', async () => {
     const database = createDatabase();
     const repository = new DexieWorkflowRepository(database);
     const expected = createWorkflow({
@@ -175,7 +225,7 @@ describe('DexieWorkflowRepository', () => {
     await expect(repository.get(expected.id)).resolves.toEqual(expected);
     await expect(
       database.table<unknown, string>('workflows').get(expected.id),
-    ).resolves.toMatchObject({ schemaVersion: 5 });
+    ).resolves.toMatchObject({ schemaVersion: 6 });
   });
 
   test('restores version-4 Sides without a Bonus Reward Phase', async () => {

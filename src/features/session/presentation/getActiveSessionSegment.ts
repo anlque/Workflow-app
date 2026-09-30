@@ -1,4 +1,4 @@
-import type { Environment } from '@/features/workflow';
+import { phaseDisplayName, type Environment } from '@/features/workflow';
 
 import type { Session } from '../domain/Session';
 
@@ -28,7 +28,10 @@ export function getActiveSessionSegment(
     workflow.phases[session.currentPhaseIndex] ?? workflow.phases[0];
   return Object.freeze({
     isBonus: false,
-    label: `${phase.type === 'focus' ? 'Focus' : 'Break'} · Phase ${String(session.currentPhaseIndex + 1)} of ${String(workflow.phases.length)}`,
+    label:
+      phase.name === undefined
+        ? `${phase.type === 'focus' ? 'Focus' : 'Break'} · ${phaseDisplayName(phase, session.currentPhaseIndex)} of ${String(workflow.phases.length)}`
+        : `${phase.type === 'focus' ? 'Focus' : 'Break'} · ${phaseDisplayName(phase, session.currentPhaseIndex)} · Phase ${String(session.currentPhaseIndex + 1)} of ${String(workflow.phases.length)}`,
     environment: phase.environment,
   });
 }

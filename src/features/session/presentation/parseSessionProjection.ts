@@ -219,9 +219,17 @@ function workflow(value: unknown) {
     name: string(input['name']),
     phases: phases.map((value) => {
       const phase = record(value);
-      if (!hasExactKeys(phase, ['type', 'durationSeconds', 'environment']))
+      if (
+        !hasExactKeys(
+          phase,
+          ['type', 'durationSeconds', 'environment'],
+          ['name'],
+        )
+      )
         return invalid();
+      const name = optionalString(phase['name']);
       return {
+        ...(name === undefined ? {} : { name }),
         type: string(phase['type']),
         durationSeconds: number(phase['durationSeconds']),
         environment: environment(phase['environment']),

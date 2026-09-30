@@ -10,12 +10,14 @@ export type DurationSeconds = number & {
 export type PhaseType = 'focus' | 'break';
 
 export type Phase = Readonly<{
+  name?: string;
   type: PhaseType;
   durationSeconds: DurationSeconds;
   environment: Environment;
 }>;
 
 export type PhaseInput = Readonly<{
+  name?: string;
   type: string;
   durationSeconds: number;
   environment: EnvironmentInput;

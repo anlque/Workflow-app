@@ -32,7 +32,9 @@ function createPhaseType(value: string): PhaseType {
 }
 
 function createPhase(input: PhaseInput): Phase {
+  const name = input.name?.trim();
   return Object.freeze({
+    ...(name === undefined || name.length === 0 ? {} : { name }),
     type: createPhaseType(input.type),
     durationSeconds: createDurationSeconds(input.durationSeconds),
     environment: createEnvironment(input.environment),

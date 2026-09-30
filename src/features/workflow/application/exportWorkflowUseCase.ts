@@ -8,7 +8,7 @@ import type { AssetId } from '@/shared';
 import type { Workflow } from '../domain/Workflow';
 import {
   WorkflowPackageValidationError,
-  type WorkflowPackageV5,
+  type WorkflowPackageV6,
 } from './WorkflowPackage';
 import { serializeWorkflow } from './workflowPackageMapping';
 
@@ -89,9 +89,9 @@ export async function exportWorkflowUseCase(
       };
     }),
   );
-  const envelope: WorkflowPackageV5 = {
+  const envelope: WorkflowPackageV6 = {
     kind: 'locusora/workflow',
-    version: 5,
+    version: 6,
     workflow: serializeWorkflow(workflow),
     assets: encodedAssets,
   };

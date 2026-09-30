@@ -61,6 +61,7 @@ describe('getActiveSessionSegment', () => {
         name: 'Ordinary',
         phases: [
           {
+            name: 'Writing',
             type: 'focus',
             durationSeconds: 10,
             environment: { backgroundColor: '#abcdef' },
@@ -71,7 +72,7 @@ describe('getActiveSessionSegment', () => {
     );
     expect(getActiveSessionSegment(session)).toEqual({
       isBonus: false,
-      label: 'Focus · Phase 1 of 1',
+      label: 'Focus · Writing · Phase 1 of 1',
       environment: { backgroundColor: '#abcdef' },
     });
   });

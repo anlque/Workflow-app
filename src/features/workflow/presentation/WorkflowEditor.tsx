@@ -30,6 +30,9 @@ export function WorkflowEditor({
   const [pending, setPending] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [collapsedPhaseKeys, setCollapsedPhaseKeys] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
   const saveStatusTimer = useRef<number | undefined>(undefined);
 
   function setDurationError(errorKey: string, invalid: boolean): void {
@@ -71,6 +74,22 @@ export function WorkflowEditor({
   async function save(): Promise<void> {
     const validation = validateWorkflowDraft(editor.draft);
     if (!validation.valid) {
+      const invalidPhaseKeys = new Set(
+        Object.keys(validation.errors).flatMap((errorKey) => {
+          const match = /^phase:([^:]+):/.exec(errorKey);
+          return match?.[1] === undefined ? [] : [match[1]];
+        }),
+      );
+      if (invalidPhaseKeys.size > 0) {
+        setCollapsedPhaseKeys(
+          (current) =>
+            new Set(
+              [...current].filter(
+                (phaseKey) => !invalidPhaseKeys.has(phaseKey),
+              ),
+            ),
+        );
+      }
       setErrors(validation.errors);
       return;
     }
@@ -154,147 +173,199 @@ export function WorkflowEditor({
           </Button>
         </div>
         <ol className="phase-list">
-          {editor.draft.phases.map((phase, index) => (
-            <li className="phase-item" key={phase.key}>
-              <div className="phase-item__header">
-                <h4>Phase {String(index + 1)}</h4>
-                <div className="phase-item__actions">
-                  <Button
-                    variant="quiet"
-                    aria-label={`Move Phase ${String(index + 1)} up`}
-                    disabled={index === 0}
-                    onClick={() => {
-                      editor.movePhase(index, -1);
-                    }}
-                  >
-                    Move up
-                  </Button>
-                  <Button
-                    variant="quiet"
-                    aria-label={`Move Phase ${String(index + 1)} down`}
-                    disabled={index === editor.draft.phases.length - 1}
-                    onClick={() => {
-                      editor.movePhase(index, 1);
-                    }}
-                  >
-                    Move down
-                  </Button>
-                  <Button
-                    variant="quiet"
-                    aria-label={`Remove Phase ${String(index + 1)}`}
-                    disabled={editor.draft.phases.length === 1}
-                    onClick={() => {
-                      editor.removePhase(phase.key);
-                    }}
-                  >
-                    Remove
-                  </Button>
-                  <Button
-                    variant="quiet"
-                    aria-label={`Duplicate Phase ${String(index + 1)}`}
-                    onClick={() => {
-                      editor.duplicatePhase(index);
-                    }}
-                  >
-                    Duplicate
-                  </Button>
+          {editor.draft.phases.map((phase, index) => {
+            const fallbackName = `Phase ${String(index + 1)}`;
+            const displayName = phase.name.trim() || fallbackName;
+            const collapsed = collapsedPhaseKeys.has(phase.key);
+            const contentId = `phase-${phase.key}-content`;
+            return (
+              <li className="phase-item" key={phase.key}>
+                <div className="phase-item__header">
+                  <h4>{displayName}</h4>
+                  <div className="phase-item__actions">
+                    <Button
+                      variant="quiet"
+                      aria-controls={contentId}
+                      aria-expanded={!collapsed}
+                      aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${displayName}`}
+                      onClick={() => {
+                        setCollapsedPhaseKeys((current) => {
+                          const next = new Set(current);
+                          if (next.has(phase.key)) next.delete(phase.key);
+                          else next.add(phase.key);
+                          return next;
+                        });
+                      }}
+                    >
+                      {collapsed ? 'Expand' : 'Collapse'}
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      aria-label={`Move Phase ${String(index + 1)} up`}
+                      disabled={index === 0}
+                      onClick={() => {
+                        editor.movePhase(index, -1);
+                      }}
+                    >
+                      Move up
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      aria-label={`Move Phase ${String(index + 1)} down`}
+                      disabled={index === editor.draft.phases.length - 1}
+                      onClick={() => {
+                        editor.movePhase(index, 1);
+                      }}
+                    >
+                      Move down
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      aria-label={`Remove Phase ${String(index + 1)}`}
+                      disabled={editor.draft.phases.length === 1}
+                      onClick={() => {
+                        setCollapsedPhaseKeys((current) => {
+                          const next = new Set(current);
+                          next.delete(phase.key);
+                          return next;
+                        });
+                        editor.removePhase(phase.key);
+                      }}
+                    >
+                      Remove
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      aria-label={`Duplicate Phase ${String(index + 1)}`}
+                      onClick={() => {
+                        editor.duplicatePhase(index);
+                      }}
+                    >
+                      Duplicate
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              {editor.draft.rewardDice.enabled ? (
-                <label className="check-control">
-                  <input
-                    type="checkbox"
-                    checked={editor.rewardAfterPhaseKeys.includes(phase.key)}
-                    onChange={() => {
-                      editor.toggleRewardAfterPhase(phase.key);
-                    }}
-                  />
-                  Reward after Phase {String(index + 1)}
-                </label>
-              ) : null}
-              <div className="form-grid">
-                <Select
-                  label={`Phase ${String(index + 1)} type`}
-                  value={phase.type}
-                  onChange={(event) => {
-                    editor.updatePhase(phase.key, {
-                      type: event.target.value === 'break' ? 'break' : 'focus',
-                    });
-                  }}
-                >
-                  <option value="focus">Focus</option>
-                  <option value="break">Break</option>
-                </Select>
-                <Field
-                  label={`Phase ${String(index + 1)} duration in minutes`}
-                  error={errors[`phase:${phase.key}:duration`]}
-                >
-                  <input
-                    inputMode="decimal"
-                    type="text"
-                    value={phase.durationMinutes}
-                    onChange={(event) => {
-                      setDurationError(`phase:${phase.key}:duration`, false);
-                      editor.updatePhase(phase.key, {
-                        durationMinutes: event.target.value,
-                      });
-                    }}
-                    onBlur={() => {
-                      setDurationError(
-                        `phase:${phase.key}:duration`,
-                        !editor.commitPhaseDuration(phase.key),
-                      );
-                    }}
-                    onKeyDown={(event) => {
-                      if (
-                        event.key !== 'ArrowUp' &&
-                        event.key !== 'ArrowDown'
-                      ) {
-                        return;
-                      }
-                      event.preventDefault();
-                      setDurationError(
-                        `phase:${phase.key}:duration`,
-                        !editor.stepPhaseDuration(
-                          phase.key,
-                          event.key === 'ArrowUp' ? 1 : -1,
-                        ),
-                      );
-                    }}
-                  />
-                </Field>
-                <AssetPicker
-                  label="Background image"
-                  kind="image"
-                  assets={assets}
-                  value={phase.backgroundAsset}
-                  onChange={(backgroundAsset) => {
-                    editor.updatePhase(phase.key, { backgroundAsset });
-                  }}
-                />
-                <AssetPicker
-                  label="Ambient audio"
-                  kind="audio"
-                  assets={assets}
-                  value={phase.audioAsset}
-                  onChange={(audioAsset) => {
-                    editor.updatePhase(phase.key, { audioAsset });
-                  }}
-                />
-                <Field label="Background color" hint="Optional CSS color.">
-                  <input
-                    value={phase.backgroundColor}
-                    placeholder="#18342b"
-                    onChange={(event) => {
-                      editor.updatePhase(phase.key, {
-                        backgroundColor: event.target.value,
-                      });
-                    }}
-                  />
-                </Field>
-              </div>
-            </li>
-          ))}
+                {collapsed ? null : (
+                  <div className="phase-item__content" id={contentId}>
+                    {editor.draft.rewardDice.enabled ? (
+                      <label className="check-control">
+                        <input
+                          type="checkbox"
+                          checked={editor.rewardAfterPhaseKeys.includes(
+                            phase.key,
+                          )}
+                          onChange={() => {
+                            editor.toggleRewardAfterPhase(phase.key);
+                          }}
+                        />
+                        Reward after Phase {String(index + 1)}
+                      </label>
+                    ) : null}
+                    <div className="form-grid">
+                      <Field label={`${fallbackName} name`} hint="Optional.">
+                        <input
+                          value={phase.name}
+                          onChange={(event) => {
+                            editor.updatePhase(phase.key, {
+                              name: event.target.value,
+                            });
+                          }}
+                        />
+                      </Field>
+                      <Select
+                        label={`Phase ${String(index + 1)} type`}
+                        value={phase.type}
+                        onChange={(event) => {
+                          editor.updatePhase(phase.key, {
+                            type:
+                              event.target.value === 'break'
+                                ? 'break'
+                                : 'focus',
+                          });
+                        }}
+                      >
+                        <option value="focus">Focus</option>
+                        <option value="break">Break</option>
+                      </Select>
+                      <Field
+                        label={`Phase ${String(index + 1)} duration in minutes`}
+                        error={errors[`phase:${phase.key}:duration`]}
+                      >
+                        <input
+                          inputMode="decimal"
+                          type="text"
+                          value={phase.durationMinutes}
+                          onChange={(event) => {
+                            setDurationError(
+                              `phase:${phase.key}:duration`,
+                              false,
+                            );
+                            editor.updatePhase(phase.key, {
+                              durationMinutes: event.target.value,
+                            });
+                          }}
+                          onBlur={() => {
+                            setDurationError(
+                              `phase:${phase.key}:duration`,
+                              !editor.commitPhaseDuration(phase.key),
+                            );
+                          }}
+                          onKeyDown={(event) => {
+                            if (
+                              event.key !== 'ArrowUp' &&
+                              event.key !== 'ArrowDown'
+                            ) {
+                              return;
+                            }
+                            event.preventDefault();
+                            setDurationError(
+                              `phase:${phase.key}:duration`,
+                              !editor.stepPhaseDuration(
+                                phase.key,
+                                event.key === 'ArrowUp' ? 1 : -1,
+                              ),
+                            );
+                          }}
+                        />
+                      </Field>
+                      <AssetPicker
+                        label="Background image"
+                        kind="image"
+                        assets={assets}
+                        value={phase.backgroundAsset}
+                        onChange={(backgroundAsset) => {
+                          editor.updatePhase(phase.key, { backgroundAsset });
+                        }}
+                      />
+                      <AssetPicker
+                        label="Ambient audio"
+                        kind="audio"
+                        assets={assets}
+                        value={phase.audioAsset}
+                        onChange={(audioAsset) => {
+                          editor.updatePhase(phase.key, { audioAsset });
+                        }}
+                      />
+                      <Field
+                        label="Background color"
+                        hint="Optional CSS color."
+                      >
+                        <input
+                          value={phase.backgroundColor}
+                          placeholder="#18342b"
+                          onChange={(event) => {
+                            editor.updatePhase(phase.key, {
+                              backgroundColor: event.target.value,
+                            });
+                          }}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ol>
       </section>
 

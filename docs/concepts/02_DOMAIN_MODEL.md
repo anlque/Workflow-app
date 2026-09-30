@@ -203,9 +203,14 @@ explicitly evolving the domain model and its serialized schemas.
 
 A Phase defines:
 
+- an optional normalized user-defined name;
 - duration;
 - associated Environment;
 - future phase-specific behavior.
+
+Presentation derives `Phase N` from the Phase's current one-based position when
+the stored name is absent; the fallback is not persisted as another source of
+truth.
 
 A Phase cannot exist independently from its parent Workflow.
 

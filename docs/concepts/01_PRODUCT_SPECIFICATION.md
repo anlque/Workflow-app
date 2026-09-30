@@ -285,10 +285,12 @@ The MVP does not require a popup or content scripts. Additional browsers and
 extension surfaces remain future work.
 
 An MVP Workflow contains an ordered, non-empty sequence of Phases. A Phase is
-either `focus` or `break`; short-break and long-break presets are presentation
-conveniences rather than distinct domain types. A Workflow runs its sequence
-once and then completes. Repeating a Workflow starts a new Session. Skipping
-Phases and editing a running Workflow are outside the MVP.
+either `focus` or `break` and may have a user-defined name; unnamed and legacy
+Phases display the deterministic fallback `Phase N`. Short-break and long-break
+presets are presentation conveniences rather than distinct domain types. A
+Workflow runs its sequence once and then completes. Repeating a Workflow starts
+a new Session. Skipping Phases and editing a running Workflow are outside the
+MVP.
 
 Starting a Workflow creates a Session from an immutable snapshot of its
 configuration. Later Workflow edits do not affect that Session. One active

@@ -45,6 +45,49 @@ test('loads every MVP extension surface in an isolated profile', async ({
   ).toBeVisible();
 });
 
+test('names, duplicates and locally collapses Workflow Phases', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Structured focus');
+  await options.getByLabel('Phase 1 name').fill('Writing');
+  await options.getByRole('button', { name: 'Duplicate Phase 1' }).click();
+  await options.getByLabel('Phase 2 name').fill('Review');
+  await expect(options.getByLabel('Phase 1 name')).toHaveValue('Writing');
+
+  await options.getByLabel('Phase 2 duration in minutes').fill('1.2');
+  await options.getByLabel('Phase 2 duration in minutes').blur();
+  await options.getByRole('button', { name: 'Collapse Review' }).focus();
+  await options.keyboard.press('Enter');
+  await expect(options.getByLabel('Phase 2 name')).toHaveCount(0);
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(options.getByLabel('Phase 2 duration in minutes')).toBeVisible();
+  await expect(
+    options.getByText(
+      'Duration must be at least 0.5 minutes in 0.5-minute increments.',
+    ),
+  ).toBeVisible();
+
+  await options.getByLabel('Phase 2 duration in minutes').fill('5');
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(options.getByRole('status')).toHaveText('Workflow saved');
+  await options.reload();
+  if (
+    (await options
+      .getByRole('button', { name: 'Open Structured focus' })
+      .count()) > 0
+  ) {
+    await options
+      .getByRole('button', { name: 'Open Structured focus' })
+      .click();
+  }
+  await expect(options.getByLabel('Phase 1 name')).toHaveValue('Writing');
+  await expect(options.getByLabel('Phase 2 name')).toHaveValue('Review');
+});
+
 test('embeds Workflow Studio over idle and active Focus without navigation', async ({
   context,
   extensionUrls,

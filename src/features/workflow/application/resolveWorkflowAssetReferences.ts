@@ -46,6 +46,7 @@ export async function resolveWorkflowAssetReferences(
   const phases = await Promise.all(
     workflow.phases.map(async (phase) => {
       return {
+        ...(phase.name === undefined ? {} : { name: phase.name }),
         type: phase.type,
         durationSeconds: phase.durationSeconds,
         environment: await resolveEnvironment(phase.environment, resolver),

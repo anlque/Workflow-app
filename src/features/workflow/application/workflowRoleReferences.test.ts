@@ -64,6 +64,7 @@ describe('Workflow Role references', () => {
       name: 'One',
       phases: [
         {
+          name: 'Writing',
           type: 'focus',
           durationSeconds: 60,
           environment: {
@@ -112,6 +113,7 @@ describe('Workflow Role references', () => {
     );
 
     const [renamed, stillUntouched] = await repository.list();
+    expect(renamed?.phases[0]?.name).toBe('Writing');
     expect(renamed?.phases[0].environment.backgroundAsset).toEqual(
       source.phases[0].environment.backgroundAsset,
     );

@@ -39,6 +39,7 @@ export { eligibleDiceSides } from './domain/eligibleDiceSides';
 export { rewardOpportunityPhaseIndexes } from './domain/rewardOpportunityPhaseIndexes';
 export type { DiceSideAvailability } from './domain/DiceSide';
 export { isRewardDueAfterPhase } from './domain/isRewardDueAfterPhase';
+export { phaseDisplayName } from './domain/phaseDisplayName';
 export { DexieWorkflowRepository } from './infrastructure/DexieWorkflowRepository';
 export { workflowDatabaseSchemas } from './infrastructure/WorkflowRecord';
 export { WorkflowApplicationError } from './application/WorkflowApplicationError';
@@ -70,6 +71,7 @@ export {
   type WorkflowPackageV3,
   type WorkflowPackageV4,
   type WorkflowPackageV5,
+  type WorkflowPackageV6,
 } from './application/WorkflowPackage';
 export { exportWorkflowUseCase } from './application/exportWorkflowUseCase';
 export {

@@ -8,7 +8,7 @@ import {
 import { SessionValidationError } from '../domain/SessionErrors';
 import type { SessionRecord } from './SessionRecord';
 
-type SessionSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+type SessionSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 function invalid(): never {
   throw new SessionValidationError('Stored Session record is invalid.');
@@ -181,7 +181,18 @@ function parseWorkflow(value: unknown, schemaVersion: SessionSchemaVersion) {
     name: string(input['name']),
     phases: phases.map((phaseValue) => {
       const phase = record(phaseValue);
+      if (
+        !hasExactKeys(
+          phase,
+          ['type', 'durationSeconds', 'environment'],
+          schemaVersion === 8 ? ['name'] : [],
+        )
+      ) {
+        return invalid();
+      }
+      const name = optionalString(phase['name']);
       return {
+        ...(name === undefined ? {} : { name }),
         type: string(phase['type']),
         durationSeconds: number(phase['durationSeconds']),
         environment: parseEnvironment(phase['environment'], schemaVersion),
@@ -334,7 +345,8 @@ export function mapSessionRecord(value: unknown): Session {
       outer['schemaVersion'] !== 4 &&
       outer['schemaVersion'] !== 5 &&
       outer['schemaVersion'] !== 6 &&
-      outer['schemaVersion'] !== 7) ||
+      outer['schemaVersion'] !== 7 &&
+      outer['schemaVersion'] !== 8) ||
     (outer['active'] !== 0 && outer['active'] !== 1)
   ) {
     return invalid();
@@ -453,7 +465,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
             : session.stoppedAt;
   return {
     id: session.id,
-    schemaVersion: 7,
+    schemaVersion: 8,
     active,
     updatedAt,
     session: {

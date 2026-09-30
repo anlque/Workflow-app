@@ -62,6 +62,76 @@ afterEach(() => {
 });
 
 describe('WorkflowEditor', () => {
+  test('hydrates, edits and saves an optional Phase name', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-1',
+          name: 'Named phases',
+          phases: [
+            {
+              name: 'Writing',
+              type: 'focus',
+              durationSeconds: 1_500,
+              environment: {},
+            },
+          ],
+        })}
+        workflowId="workflow-1"
+        assets={[]}
+        onSave={onSave}
+      />,
+    );
+
+    const name = screen.getByLabelText('Phase 1 name');
+    expect(name).toHaveValue('Writing');
+    await user.clear(name);
+    await user.type(name, '  Drafting  ');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phases: [expect.objectContaining({ name: 'Drafting' })],
+      }),
+    );
+  });
+
+  test('collapses a Phase locally and reopens it when validation fails', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflowId="workflow-1"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+    await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
+    const duration = screen.getByLabelText('Phase 1 duration in minutes');
+    await user.clear(duration);
+    await user.type(duration, '1.2');
+
+    const disclosure = screen.getByRole('button', {
+      name: 'Collapse Phase 1',
+    });
+    await user.click(disclosure);
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.queryByLabelText('Phase 1 duration in minutes'),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+    expect(screen.getByLabelText('Phase 1 duration in minutes')).toBeVisible();
+    expect(
+      screen.getByText(
+        'Duration must be at least 0.5 minutes in 0.5-minute increments.',
+      ),
+    ).toBeVisible();
+  });
+
   test('preserves a partial decimal while typing and across a rerender', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
@@ -872,6 +942,10 @@ describe('WorkflowEditor', () => {
     const firstKey = result.current.draft.phases[0]?.key ?? 'missing-first';
     const sourceKey = result.current.draft.phases[1]?.key ?? 'missing-source';
     act(() => {
+      result.current.updatePhase(sourceKey, {
+        name: 'Writing',
+        backgroundColor: '#123456',
+      });
       result.current.toggleRewardAfterPhase(firstKey);
       result.current.movePhase(1, 1);
       result.current.duplicatePhase(2);
@@ -885,6 +959,17 @@ describe('WorkflowEditor', () => {
     expect(result.current.draft.rewardDice.customPhaseKeys).toContain(
       duplicateKey,
     );
+    expect(result.current.draft.phases[3]).toMatchObject({
+      name: 'Writing',
+      backgroundColor: '#123456',
+    });
+    act(() => {
+      result.current.updatePhase(duplicateKey, { name: 'Review' });
+    });
+    expect(
+      result.current.draft.phases.find(({ key }) => key === sourceKey)?.name,
+    ).toBe('Writing');
+    expect(result.current.draft.phases[3]?.name).toBe('Review');
     act(() => {
       result.current.removePhase(sourceKey);
     });

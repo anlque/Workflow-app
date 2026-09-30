@@ -6,7 +6,7 @@ import type { Workflow } from '../domain/Workflow';
 import { WorkflowValidationError } from '../domain/WorkflowErrors';
 import type { WorkflowRecord } from './WorkflowRecord';
 
-type WorkflowSchemaVersion = 1 | 2 | 3 | 4 | 5;
+type WorkflowSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6;
 
 function invalidRecord(): never {
   throw new WorkflowValidationError('Stored Workflow record is invalid.');
@@ -124,7 +124,18 @@ function mapPhaseRecord(
   schemaVersion: WorkflowSchemaVersion,
 ): PhaseInput {
   const record = objectRecord(value);
+  if (
+    !hasExactKeys(
+      record,
+      ['type', 'durationSeconds', 'environment'],
+      schemaVersion === 6 ? ['name'] : [],
+    )
+  ) {
+    return invalidRecord();
+  }
+  const name = optionalString(record['name']);
   return {
+    ...(name === undefined ? {} : { name }),
     type: stringValue(record['type']),
     durationSeconds: numberValue(record['durationSeconds']),
     environment: mapEnvironmentRecord(record['environment'], schemaVersion),
@@ -203,7 +214,7 @@ function mapRewardDiceRecord(
         !hasExactKeys(
           side,
           schemaVersion < 4 ? required : [...required, 'availability'],
-          schemaVersion === 5 ? ['description', 'bonusPhase'] : ['description'],
+          schemaVersion >= 5 ? ['description', 'bonusPhase'] : ['description'],
         )
       ) {
         return invalidRecord();
@@ -228,7 +239,7 @@ function mapBonusRewardPhaseRecord(
   value: unknown,
   schemaVersion: WorkflowSchemaVersion,
 ) {
-  if (schemaVersion !== 5) return invalidRecord();
+  if (schemaVersion < 5) return invalidRecord();
   const record = objectRecord(value);
   if (!hasExactKeys(record, ['name', 'durationSeconds', 'environment'])) {
     return invalidRecord();
@@ -247,7 +258,8 @@ export function mapWorkflowRecord(value: unknown): Workflow {
     record['schemaVersion'] !== 2 &&
     record['schemaVersion'] !== 3 &&
     record['schemaVersion'] !== 4 &&
-    record['schemaVersion'] !== 5
+    record['schemaVersion'] !== 5 &&
+    record['schemaVersion'] !== 6
   ) {
     return invalidRecord();
   }
@@ -282,10 +294,11 @@ export function mapWorkflowToRecord(
 ): WorkflowRecord {
   return {
     id: workflow.id,
-    schemaVersion: 5,
+    schemaVersion: 6,
     order,
     name: workflow.name,
     phases: workflow.phases.map((phase) => ({
+      ...(phase.name === undefined ? {} : { name: phase.name }),
       type: phase.type,
       durationSeconds: phase.durationSeconds,
       environment: {

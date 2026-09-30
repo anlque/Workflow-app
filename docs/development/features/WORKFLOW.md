@@ -9,11 +9,12 @@ before Session creation. The editor draft stores one discriminated reference
 per Environment slot, and its picker explicitly offers direct Asset and Role
 modes. Unrelated Phase edits preserve the selected reference variant.
 
-Workflow record version 5 writes the reference union, canonical Reward schedule,
-Side availability and optional Side Bonus Reward Phase. Its mapper reads version-1
+Workflow record version 6 writes optional normalized Phase names, the reference
+union, canonical Reward schedule, Side availability and optional Side Bonus
+Reward Phase. Its mapper reads version-1
 `backgroundAssetId`/`audioAssetId` fields as direct references. Table indexes
-remain `id, order`. Package export writes version 5; import supports versions
-1–5.
+remain `id, order`. Package export writes version 6; import supports versions
+1–6.
 
 ## Purpose
 
@@ -61,7 +62,7 @@ allowlisted Workflow Studio and Side Panel presentation consumers use
 | --- | --- |
 | Domain value types | `BonusRewardPhase`, `BonusRewardPhaseInput`, `DiceSide`, `DiceSideInput`, `DiceSideAvailability`, `AssetId`, `AssetReference`, `AssetReferenceInput`, `Environment`, `EnvironmentInput`, `DurationSeconds`, `Phase`, `PhaseInput`, `PhaseType`, `RewardDice`, `RewardDiceInput`, `RewardPhaseType`, `CreateWorkflowInput`, `Workflow`, `WorkflowId` |
 | Domain behavior and errors | `createWorkflowId`, `createWorkflow`, `rollReward`, `eligibleDiceSides`, `rewardOpportunityPhaseIndexes`, `isRewardDueAfterPhase`, `WorkflowValidationError` |
-| Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`–`WorkflowPackageV5`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
+| Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`–`WorkflowPackageV6`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
 | Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `resolveWorkflowAssetReferences`, Role-summary/rename and Asset-retirement summary/patch operations, `exportWorkflowUseCase`, `importWorkflowUseCase` |
 | Infrastructure composition | `DexieWorkflowRepository`, `workflowDatabaseSchemas`, `DexieWorkflowPackageUnitOfWork` |
 | Presentation components (`/studio`) | `WorkflowLibrary`, `WorkflowLibraryProps`, `WorkflowEditor`, `WorkflowEditorProps`, `RewardDiceEditor`, `RewardDiceEditorProps` |
@@ -114,6 +115,8 @@ It does not know Dexie or Chrome runtime APIs.
 - The trimmed Workflow name is non-empty.
 - A Workflow contains at least one Phase and preserves Phase order.
 - A Phase type is exactly `focus` or `break`.
+- A supplied Phase name is trimmed; blank names normalize to absence. Absent
+  names display as `Phase N` without persisting that fallback.
 - `durationSeconds` is a positive integer.
 - Every Phase owns one Environment value, even when all fields are absent.
 - Direct background/audio identifiers are non-empty shared `AssetId` values;
@@ -179,7 +182,7 @@ Phases are copied by value. Session Domain owns per-opportunity reroll usage.
 | `deleteWorkflowUseCase` | Repository, ID | Requires existence, deletes; repository compacts collection order | `void` or not-found error |
 | `listWorkflowsUseCase` | Repository | Returns repository order | Readonly Workflow list |
 | `reorderWorkflowsUseCase` | Repository, complete ordered IDs | Requires an exact permutation of current IDs, delegates atomic replacement | `void` or Application error |
-| `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced Assets/Blobs, including Bonus Environments, and creates deterministic version-5 JSON | JSON or package validation error |
+| `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced Assets/Blobs, including Bonus Environments, and creates deterministic version-6 JSON | JSON or package validation error |
 | `importWorkflowUseCase` | Repositories, unit of work, JSON, limits/policy/identity | Validates complete package before writes, generates collision-free IDs, rewrites Environment references, atomically writes Assets and Workflow | Imported Workflow or package validation/storage failure |
 
 Composition wraps successful catalog mutations with
@@ -189,16 +192,17 @@ use cases.
 
 ## Persistence
 
-`DexieWorkflowRepository` writes version-5 `WorkflowRecord` rows in the global
-version-1 `workflows: 'id, order'` table definition and reads versions 1–5.
+`DexieWorkflowRepository` writes version-6 `WorkflowRecord` rows in the global
+version-1 `workflows: 'id, order'` table definition and reads versions 1–6.
 
 - Reads treat rows as `unknown`, validate record metadata and reconstruct the
   Domain aggregate.
-- Version 1 accepts only legacy ID Environment fields; versions 2–5 accept only
+- Version 1 accepts only legacy ID Environment fields; versions 2–6 accept only
   exact direct-or-Role reference fields. Versions 1–2 read legacy frequency
-  fields; versions 3–5 read the canonical schedule union. Versions 1–3 default
-  missing Side availability to `any`; versions 4–5 require it. Only version 5
-  accepts the optional exact Bonus Reward Phase shape.
+  fields; versions 3–6 read the canonical schedule union. Versions 1–3 default
+  missing Side availability to `any`; versions 4–6 require it. Versions 5–6
+  accept the optional exact Bonus Reward Phase shape; version 6 additionally
+  accepts an optional Phase name.
 - New rows append after the highest order.
 - Updates preserve the current order.
 - Delete compacts remaining order values.
@@ -226,6 +230,8 @@ compose different capabilities from the same component.
 Owns draft validation feedback, pending state and transient accessible
 `Workflow saved` confirmation. It delegates accepted input through `onSave` and
 does not choose create versus update. It prevents removing the last Phase.
+Phase disclosure state is local to the mounted editor and never persisted;
+save validation expands any collapsed Phase containing an invalid field.
 
 ### `RewardDiceEditor`
 

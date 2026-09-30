@@ -1,7 +1,7 @@
 # Import and Export Flow
 
-Workflow package version 5 includes canonical Reward schedules, Dice Side
-availability, optional Bonus Reward Phases, Asset Roles and direct-or-Role
+Workflow package version 6 includes optional Phase names, canonical Reward
+schedules, Dice Side availability, optional Bonus Reward Phases, Asset Roles and direct-or-Role
 Environment references. Versions 1–2 remain importable with
 legacy frequency schedules. Import never binds a
 colliding Role reference to a local Asset: it generates a deterministic imported
@@ -39,8 +39,9 @@ configured MIME allowlists.
    bytes and Base64-encodes them.
 4. [`serializeWorkflow()`](../../../src/features/workflow/application/workflowPackageMapping.ts)
    creates the public Workflow shape, preserving Phase/side order and emitting
-   the canonical Reward schedule, Side availability, Bonus configuration and reroll fields.
-5. The use case serializes `{ kind: 'locusora/workflow', version: 5, workflow,
+   optional Phase names, the canonical Reward schedule, Side availability,
+   Bonus configuration and reroll fields.
+5. The use case serializes `{ kind: 'locusora/workflow', version: 6, workflow,
    assets }`. Sorted Assets and stable property/array order make repeated export
    deterministic for unchanged input.
 6. Options creates a temporary JSON Blob/object URL, clicks a download link and
@@ -51,17 +52,18 @@ configured MIME allowlists.
 1. [`importWorkflowUseCase()`](../../../src/features/workflow/application/importWorkflowUseCase.ts)
    checks UTF-8 byte size before parsing JSON as `unknown`.
 2. It requires the exact four-field envelope, kind `locusora/workflow`, version
-   1, 2, 3, 4 or 5 and an Asset array.
+   1, 2, 3, 4, 5 or 6 and an Asset array.
 3. Version 1 accepts only legacy direct Environment IDs and role-less exact-key
-   Assets. Versions 2–5 accept only exact direct-or-Role unions and optional
-   Asset Roles. Versions 1–2 read legacy frequency fields; versions 3–5 require a
-   canonical `frequency | custom` Reward schedule. Versions 4–5 require
-   `availability` on every Side; versions 1–3 default it to `any`. Only version
-   5 accepts an optional exact Bonus Reward Phase. Mixed,
+   Assets. Versions 2–6 accept only exact direct-or-Role unions and optional
+   Asset Roles. Versions 1–2 read legacy frequency fields; versions 3–6 require a
+   canonical `frequency | custom` Reward schedule. Versions 4–6 require
+   `availability` on every Side; versions 1–3 default it to `any`. Versions 5–6
+   accept an optional exact Bonus Reward Phase, and version 6 accepts the
+   optional Phase name. Mixed,
    contradictory or
    unknown keys are rejected. `parseWorkflow()` reconstructs a trusted Workflow
    through `createWorkflow()`; accepted legacy omissions receive Domain defaults.
-4. Each v1 embedded Asset requires six exact fields; v2–v5 additionally permit
+4. Each v1 embedded Asset requires six exact fields; v2–v6 additionally permit
    `role`. Base64 must decode, decoded
    length must equal `byteSize`, kind must be `image | audio`, and
    `validateAssetImport()` must accept its content/MIME/size.

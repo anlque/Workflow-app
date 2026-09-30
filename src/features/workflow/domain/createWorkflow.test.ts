@@ -27,6 +27,21 @@ describe('createWorkflow', () => {
     expect(Object.isFrozen(workflow.phases[0].environment)).toBe(true);
   });
 
+  test('normalizes an optional Phase name and omits a blank name', () => {
+    const workflow = createWorkflow({
+      id: 'workflow-1',
+      name: 'Deep work',
+      phases: [
+        { ...validPhase, name: '  Writing  ' },
+        { ...validPhase, name: '   ' },
+      ],
+    });
+
+    expect(workflow.phases[0]).toMatchObject({ name: 'Writing' });
+    expect(workflow.phases[1]).not.toHaveProperty('name');
+    expect(Object.isFrozen(workflow.phases[0])).toBe(true);
+  });
+
   test('creates direct and normalized Role Asset references', () => {
     const workflow = createWorkflow({
       id: 'workflow-1',

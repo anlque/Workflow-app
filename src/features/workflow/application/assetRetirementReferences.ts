@@ -116,6 +116,7 @@ function copyWorkflow(
           : { backgroundColor: phase.environment.backgroundColor }),
       };
       return {
+        ...(phase.name === undefined ? {} : { name: phase.name }),
         type: phase.type,
         durationSeconds: phase.durationSeconds,
         environment,

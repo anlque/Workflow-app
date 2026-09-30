@@ -147,6 +147,68 @@ describe('Workflow package', () => {
     expect(unitOfWork.runs).toBe(0);
   }
 
+  test('round-trips a named Phase through a version-6 package', async () => {
+    const source = createWorkflow({
+      id: 'named-source',
+      name: 'Named source',
+      phases: [
+        {
+          name: 'Writing',
+          type: 'focus',
+          durationSeconds: 60,
+          environment: {},
+        },
+      ],
+    });
+    const exported = await exportWorkflowUseCase(
+      source,
+      new MemoryAssetRepository(),
+    );
+    const encoded = JSON.parse(exported) as {
+      version: number;
+      workflow: { phases: readonly { name?: string }[] };
+    };
+    expect(encoded.version).toBe(6);
+    expect(encoded.workflow.phases[0]?.name).toBe('Writing');
+
+    const workflows = new MemoryWorkflowRepository();
+    await importWorkflowUseCase(
+      workflows,
+      new MemoryAssetRepository(),
+      new MemoryUnitOfWork(),
+      exported,
+      { maxFileBytes: 10_000, assetPolicy: policy },
+      {
+        createWorkflowId: () => 'named-import',
+        createAssetId: () => 'unused',
+        now: () => 2_000,
+      },
+    );
+
+    expect(workflows.values[0]?.phases[0]?.name).toBe('Writing');
+  });
+
+  test('rejects extra Phase fields in a version-6 package', async () => {
+    await expectRejectedPackage({
+      kind: 'locusora/workflow',
+      version: 6,
+      workflow: {
+        id: 'invalid',
+        name: 'Invalid',
+        phases: [
+          {
+            name: 'Writing',
+            type: 'focus',
+            durationSeconds: 60,
+            environment: {},
+            extra: true,
+          },
+        ],
+      },
+      assets: [],
+    });
+  });
+
   test('imports a genuine version-1 direct package', async () => {
     const data = {
       kind: 'locusora/workflow',
@@ -299,7 +361,7 @@ describe('Workflow package', () => {
       packageWith({ type: 'direct', assetId: 'a' }, { ...asset, extra: true }),
     );
   });
-  test('exports version 5 and remaps a colliding imported Role to its imported Asset', async () => {
+  test('exports version 6 and remaps a colliding imported Role to its imported Asset', async () => {
     const sourceAssets = new MemoryAssetRepository();
     await addAsset(sourceAssets, 'source-image', 'Backdrop');
     const source = createWorkflow({
@@ -335,7 +397,7 @@ describe('Workflow package', () => {
       },
     );
 
-    expect(parsed.version).toBe(5);
+    expect(parsed.version).toBe(6);
     expect(parsed.assets).toEqual([
       expect.objectContaining({ role: 'Backdrop' }),
     ]);
@@ -404,10 +466,10 @@ describe('Workflow package', () => {
     });
   });
 
-  test('rejects malformed version-5 Bonus Reward Phase input before writes', async () => {
+  test('rejects malformed version-6 Bonus Reward Phase input before writes', async () => {
     await expectRejectedPackage({
       kind: 'locusora/workflow',
-      version: 5,
+      version: 6,
       workflow: {
         id: 'invalid-bonus',
         name: 'Invalid bonus',
@@ -565,7 +627,7 @@ describe('Workflow package', () => {
 
     expect(JSON.parse(data)).toMatchObject({
       kind: 'locusora/workflow',
-      version: 5,
+      version: 6,
       workflow: {
         rewardDice: {
           schedule: { type: 'frequency', triggerPhaseType: 'break' },
@@ -625,7 +687,7 @@ describe('Workflow package', () => {
     expect(imported.rewardDice?.rerolls).toBe(0);
   });
 
-  test('round-trips a canonical custom Reward schedule in version 5', async () => {
+  test('round-trips a canonical custom Reward schedule in version 6', async () => {
     const source = createWorkflow({
       id: 'custom-reward-workflow',
       name: 'Custom reward',
@@ -660,7 +722,7 @@ describe('Workflow package', () => {
     );
 
     expect(JSON.parse(data)).toMatchObject({
-      version: 5,
+      version: 6,
       workflow: {
         rewardDice: {
           schedule: { type: 'custom', phaseIndexes: [1] },

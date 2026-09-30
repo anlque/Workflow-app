@@ -82,7 +82,7 @@ function parseReference(value: unknown) {
 
 function parseEnvironment(
   value: unknown,
-  version: 1 | 2 | 3 | 4 | 5,
+  version: 1 | 2 | 3 | 4 | 5 | 6,
 ): EnvironmentInput {
   const environment = record(value);
   const environmentKeys =
@@ -121,6 +121,7 @@ export function serializeWorkflow(workflow: Workflow): unknown {
     id: workflow.id,
     name: workflow.name,
     phases: workflow.phases.map((phase) => ({
+      ...(phase.name === undefined ? {} : { name: phase.name }),
       type: phase.type,
       durationSeconds: phase.durationSeconds,
       environment: serializeEnvironment(phase.environment),
@@ -158,7 +159,7 @@ export function serializeWorkflow(workflow: Workflow): unknown {
 
 export function parseWorkflow(
   value: unknown,
-  version: 1 | 2 | 3 | 4 | 5,
+  version: 1 | 2 | 3 | 4 | 5 | 6,
 ): Workflow {
   try {
     const input = record(value);
@@ -228,10 +229,18 @@ export function parseWorkflow(
       name: string(input['name']),
       phases: phaseValues.map((phaseValue) => {
         const phase = record(phaseValue);
-        if (!hasExactKeys(phase, ['type', 'durationSeconds', 'environment'])) {
+        if (
+          !hasExactKeys(
+            phase,
+            ['type', 'durationSeconds', 'environment'],
+            version === 6 ? ['name'] : [],
+          )
+        ) {
           return invalid();
         }
+        const name = optionalString(phase['name']);
         return {
+          ...(name === undefined ? {} : { name }),
           type: string(phase['type']),
           durationSeconds: number(phase['durationSeconds']),
           environment: parseEnvironment(phase['environment'], version),
@@ -250,7 +259,7 @@ export function parseWorkflow(
                   !hasExactKeys(
                     side,
                     version < 4 ? required : [...required, 'availability'],
-                    version === 5
+                    version >= 5
                       ? ['description', 'bonusPhase']
                       : ['description'],
                   )
@@ -260,7 +269,7 @@ export function parseWorkflow(
                 const description = optionalString(side['description']);
                 const bonusPhase = (() => {
                   if (side['bonusPhase'] === undefined) return undefined;
-                  if (version !== 5) return invalid();
+                  if (version < 5) return invalid();
                   const bonus = record(side['bonusPhase']);
                   if (
                     !hasExactKeys(bonus, [

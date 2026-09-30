@@ -110,7 +110,7 @@ function packageReferences(workflow: Workflow): PackageReferences {
 
 function parseAsset(
   value: unknown,
-  version: 1 | 2 | 3 | 4 | 5,
+  version: 1 | 2 | 3 | 4 | 5 | 6,
   policy: AssetImportPolicy,
   identity: WorkflowImportIdentity,
 ): DecodedAsset {
@@ -230,7 +230,8 @@ export async function importWorkflowUseCase(
       envelope['version'] !== 2 &&
       envelope['version'] !== 3 &&
       envelope['version'] !== 4 &&
-      envelope['version'] !== 5) ||
+      envelope['version'] !== 5 &&
+      envelope['version'] !== 6) ||
     !Array.isArray(envelope['assets'])
   ) {
     throw new WorkflowPackageValidationError();
@@ -350,6 +351,7 @@ export async function importWorkflowUseCase(
       id: nextUniqueId(identity.createWorkflowId, reservedWorkflowIds),
       name: sourceWorkflow.name,
       phases: sourceWorkflow.phases.map((phase) => ({
+        ...(phase.name === undefined ? {} : { name: phase.name }),
         type: phase.type,
         durationSeconds: phase.durationSeconds,
         environment: rewriteEnvironment(phase.environment),

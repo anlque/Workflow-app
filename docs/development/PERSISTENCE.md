@@ -4,14 +4,14 @@
 
 Global Dexie version 4 defines `assets: 'id, createdAt, &roleKey'`. The optional
 normalized key is globally unique; role-less rows are not indexed. Asset writers
-remain at record version 2; Workflow writers emit record version 5 and Session
-writers emit version 7. Their readers retain the compatible older versions. Workflow
+remain at record version 2; Workflow writers emit record version 6 and Session
+writers emit version 8. Their readers retain the compatible older versions. Workflow
 and Session indexes are unchanged.
 
-Workflow package export emits version 5 with canonical Reward schedules,
+Workflow package export emits version 6 with optional Phase names, canonical Reward schedules,
 canonical Dice Side availability, optional Bonus Reward Phases,
 direct-or-Role references and optional Asset Roles; import accepts versions
-1–5. Local collisions become
+1–6. Local collisions become
 `<role> (imported)`, `<role> (imported 2)`, and so on. ID/Role reservation,
 reference remapping and every Asset/Workflow write occur in one transaction.
 
@@ -83,10 +83,10 @@ These version numbers solve different compatibility problems:
 | Version | Scope | Current value | Changes when |
 | --- | --- | --- | --- |
 | Dexie database version | Whole `locusora` database structure and upgrade order | 1–4 history; current 4 | A table/index changes or existing stored data needs a database migration |
-| `WorkflowRecord.schemaVersion` | One Workflow record serialization shape | Current writes 5; reads 1–5 | The Workflow record reader/writer needs a new incompatible serialization |
-| `SessionRecord.schemaVersion` | One Session record envelope | Current writes 7; reads 1–7 | The Session record reader/writer needs a new incompatible serialization |
+| `WorkflowRecord.schemaVersion` | One Workflow record serialization shape | Current writes 6; reads 1–6 | The Workflow record reader/writer needs a new incompatible serialization |
+| `SessionRecord.schemaVersion` | One Session record envelope | Current writes 8; reads 1–8 | The Session record reader/writer needs a new incompatible serialization |
 | `AssetRecord.schemaVersion` | One Asset record shape | Current writes 2; reads role-less 1 and 2 | The Asset record reader/writer needs a new incompatible serialization |
-| Workflow package `version` | Public `locusora/workflow` import/export envelope | Current export 5; import 1–5 | The external Workflow package contract changes |
+| Workflow package `version` | Public `locusora/workflow` import/export envelope | Current export 6; import 1–6 | The external Workflow package contract changes |
 | Settings package `version` | Public `locusora/settings` import/export envelope | 1 | The external Settings package contract changes |
 
 A database version must not be copied into a record, and a record
@@ -106,19 +106,20 @@ Sources:
 
 The record stores:
 
-- `id`, current `schemaVersion: 5`, `order` and `name`;
-- ordered Phase values with `type`, `durationSeconds` and Environment fields;
+- `id`, current `schemaVersion: 6`, `order` and `name`;
+- ordered Phase values with optional `name`, `type`, `durationSeconds` and Environment fields;
 - optional Reward Dice with one canonical `frequency | custom` schedule,
   rerolls and sides;
 - each stored side's normalized Domain probability under `probability`, required
   `availability: any | early | late` and optional Bonus Reward Phase.
 
-Reads accept versions 1–5. Version 1 Environment objects accept only legacy
+Reads accept versions 1–6. Version 1 Environment objects accept only legacy
 `backgroundAssetId`, `audioAssetId` and `backgroundColor`; version 2 accepts only
 the direct-or-Role reference fields and legacy frequency configuration. Version
 3 keeps those Environment references and stores the canonical schedule. Version
 4 additionally requires canonical Side availability. Version 5 permits the
-exact optional Bonus shape. Mixed, unknown and
+exact optional Bonus shape. Version 6 additionally permits the optional Phase
+name. Mixed, unknown and
 contradictory fields are rejected, as are invalid order and nested Domain data.
 
 Compatibility defaults:
@@ -150,7 +151,7 @@ The outer record contains:
 ```ts
 {
   id: string;
-  schemaVersion: 7;
+  schemaVersion: 8;
   active: 0 | 1;
   updatedAt: number;
   session: unknown;
@@ -158,15 +159,16 @@ The outer record contains:
 ```
 
 Version 1 snapshots accept only legacy direct ID Environment fields. Versions
-2–7 accept only exact direct-reference objects; Role references, mixed
+2–8 accept only exact direct-reference objects; Role references, mixed
 versions and unknown Environment fields are rejected. Versions 1–2 read legacy
 top-level Reward `triggerPhaseType + frequency` fields and default a missing
-trigger type to `focus`; versions 3–7 require the canonical `frequency | custom`
-schedule union, including `triggerPhaseType` for frequency. Versions 4–7 require
-canonical Side availability; versions 1–3 default it to `any`. Versions 6–7
-accept optional exact Bonus configuration; versions 1–5 do not. Version 7 adds
-the optional exact active Bonus marker and permits `restart` Reward-command
-receipts; versions 1–6 restore without an active Bonus marker. The nested `session`
+trigger type to `focus`; versions 3–8 require the canonical `frequency | custom`
+schedule union, including `triggerPhaseType` for frequency. Versions 4–8 require
+canonical Side availability; versions 1–3 default it to `any`. Versions 6–8
+accept optional exact Bonus configuration; versions 1–5 do not. Versions 7–8 add
+the optional exact active Bonus marker and permit `restart` Reward-command
+receipts; versions 1–6 restore without an active Bonus marker. Version 8 also
+accepts optional Phase names. The nested `session`
 stores the immutable Workflow snapshot, current Phase index,
 state discriminator and the timing fields required by that state. It does not
 store a live reference to the Workflow table.

@@ -27,6 +27,45 @@ function workflowWithReward() {
 }
 
 describe('parseSessionProjection', () => {
+  test('preserves an optional canonical Phase name', () => {
+    const value = createSession(
+      'named-projection',
+      createWorkflow({
+        id: 'named-projection-workflow',
+        name: 'Named projection',
+        phases: [
+          {
+            name: 'Writing',
+            type: 'focus',
+            durationSeconds: 60,
+            environment: {},
+          },
+        ],
+      }),
+      1_000,
+    );
+    const projection = parseSessionProjection(structuredClone(value));
+
+    expect(projection).not.toBeNull();
+    if (projection === null) throw new Error('Expected active projection.');
+    expect(projection.snapshot.workflow.phases[0].name).toBe('Writing');
+  });
+
+  test('rejects a malformed canonical Phase name', () => {
+    const value = structuredClone(
+      createSession('malformed-name', workflowWithReward(), 1_000),
+    ) as unknown as {
+      snapshot: { workflow: { phases: Record<string, unknown>[] } };
+    };
+    const phase = value.snapshot.workflow.phases[0];
+    if (phase === undefined) throw new Error('Expected projected Phase.');
+    phase['name'] = 42;
+
+    expect(() => parseSessionProjection(value)).toThrow(
+      'Session projection is invalid.',
+    );
+  });
+
   test('accepts only canonical active Bonus projection state', () => {
     const rewarded = createWorkflow({
       id: 'projection-bonus-workflow',

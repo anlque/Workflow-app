@@ -16,6 +16,7 @@ describe('resolveWorkflowAssetReferences', () => {
       name: 'Roles',
       phases: [
         {
+          name: 'Writing',
           type: 'focus',
           durationSeconds: 60,
           environment: {
@@ -74,6 +75,7 @@ describe('resolveWorkflowAssetReferences', () => {
       backgroundAsset: { type: 'direct', assetId: 'image-Backdrop' },
       audioAsset: { type: 'direct', assetId: 'audio-Ambient' },
     });
+    expect(firstPhase.name).toBe('Writing');
     expect(secondPhase.environment.backgroundAsset).toEqual(
       sourceSecondPhase.environment.backgroundAsset,
     );

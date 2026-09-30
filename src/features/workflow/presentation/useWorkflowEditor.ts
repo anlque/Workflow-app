@@ -7,6 +7,7 @@ import type { CreateWorkflowInput, Workflow } from '../domain/Workflow';
 
 export type PhaseDraft = Readonly<{
   key: string;
+  name: string;
   type: 'focus' | 'break';
   durationMinutes: string;
   backgroundAsset: AssetReference | undefined;
@@ -63,6 +64,7 @@ function key(): string {
 function newPhase(type: 'focus' | 'break' = 'focus'): PhaseDraft {
   return {
     key: key(),
+    name: '',
     type,
     durationMinutes: type === 'focus' ? '25' : '5',
     backgroundAsset: undefined,
@@ -97,6 +99,7 @@ function newBonusRewardPhase(): BonusRewardPhaseDraft {
 function initialDraft(workflowId: string, workflow?: Workflow): WorkflowDraft {
   const phases = workflow?.phases.map((phase) => ({
     key: key(),
+    name: phase.name ?? '',
     type: phase.type,
     durationMinutes: String(phase.durationSeconds / 60),
     backgroundAsset: phase.environment.backgroundAsset,
@@ -207,6 +210,7 @@ export function validateWorkflowDraft(
         'Duration must be at least 0.5 minutes in 0.5-minute increments.';
     }
     return {
+      ...(phase.name.trim().length === 0 ? {} : { name: phase.name.trim() }),
       type: phase.type,
       durationSeconds: durationSeconds ?? 1,
       environment: {

@@ -6,7 +6,7 @@ Session start receives a Workflow resolver through its Application boundary.
 Roles resolve to same-kind direct IDs before construction, including references
 inside Bonus Environments, and `createSessionSnapshot` rejects any remaining
 Role. Moving a Role affects only future Sessions. New Session records use
-envelope version 7; the mapper reads versions 1–7 and isolates legacy defaults
+envelope version 8; the mapper reads versions 1–8 and isolates legacy defaults
 to versions 1–4. Timing never depends on Role lookup after start.
 
 ## Purpose
@@ -193,16 +193,17 @@ internals. A later lifecycle ADR will supersede ADR-0006 with this boundary.
 
 ## Persistence
 
-`DexieSessionRepository` writes a version-7 envelope in the global version-2
+`DexieSessionRepository` writes a version-8 envelope in the global version-2
 `sessions: 'id, active, updatedAt'` table definition.
 
-The mapper reads versions 1–7 strictly: version 1 snapshots accept only legacy
-Asset ID fields; versions 2–7 accept only exact direct references. Versions 1–2
-map legacy frequency fields; versions 3–7 read canonical schedules. Versions
-4–7 require Side availability while versions 1–3 default it to `any`. Versions
-5–7 require canonical Reward ritual and receipt state; versions 6–7 additionally
-accept the optional exact Bonus Reward Phase shape. Version 7 alone accepts the
-exact active Bonus marker and `restart` receipt type. Only the version-aware
+The mapper reads versions 1–8 strictly: version 1 snapshots accept only legacy
+Asset ID fields; versions 2–8 accept only exact direct references. Versions 1–2
+map legacy frequency fields; versions 3–8 read canonical schedules. Versions
+4–8 require Side availability while versions 1–3 default it to `any`. Versions
+5–8 require canonical Reward ritual and receipt state; versions 6–8 additionally
+accept the optional exact Bonus Reward Phase shape. Versions 7–8 accept the
+exact active Bonus marker and `restart` receipt type. Version 8 additionally
+accepts optional Phase names in the immutable snapshot. Only the version-aware
 v1–v4 mapper may supply legacy defaults. Role,
 mixed-version and unknown Environment fields are rejected because persisted
 Session snapshots must already be resolved and immutable.
