@@ -1,5 +1,6 @@
 import { Button, Field } from '@/shared';
-import { AssetPicker, type Asset } from '@/features/assets';
+import type { Asset } from '@/features/assets';
+import { AssetPicker } from '@/features/assets/studio';
 
 import type { RewardPhaseType } from '../domain/RewardDice';
 import type { DiceSideAvailability } from '../domain/DiceSide';

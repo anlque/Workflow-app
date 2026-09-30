@@ -72,12 +72,24 @@ module crosses a feature boundary. Root exports are deliberately broad enough
 for composition—including selected Infrastructure adapters—but they remain an
 explicit review point: adding an export creates a supported coupling surface.
 
+Assets, Settings and Workflow additionally expose a narrow `studio.ts`
+presentation entrypoint. It exists only to keep the large Studio UI out of the
+initial Focus module graph while preserving an explicit feature-owned API. The
+architecture test allowlists its actual consumers; every other feature subpath
+remains forbidden.
+
 Current feature roots:
 
 - [`assets/index.ts`](../../src/features/assets/index.ts);
 - [`session/index.ts`](../../src/features/session/index.ts);
 - [`settings/index.ts`](../../src/features/settings/index.ts);
 - [`workflow/index.ts`](../../src/features/workflow/index.ts).
+
+Lazy presentation entrypoints:
+
+- [`assets/studio.ts`](../../src/features/assets/studio.ts);
+- [`settings/studio.ts`](../../src/features/settings/studio.ts);
+- [`workflow/studio.ts`](../../src/features/workflow/studio.ts).
 
 ## Browser Adapter Placement
 
@@ -169,7 +181,7 @@ Two automated checks protect the source graph:
 2. [`tests/architecture/importBoundaries.test.ts`](../../tests/architecture/importBoundaries.test.ts)
    scans every TypeScript source import independently of editor lint behavior.
 
-Both reject:
+Both reject unapproved cases of:
 
 - `@/features/<feature>/...` deep imports across a feature boundary;
 - any non-`app` source module importing `@/app/...`;
@@ -180,6 +192,13 @@ Both reject:
 The architecture test additionally rejects Focus-owned imports from the shared
 Workflow Studio after resolving and normalizing alias or relative paths. This
 Studio-specific rule is not duplicated in ESLint.
+
+It also restricts the three documented `studio.ts` presentation APIs to the
+Workflow Studio, Side Panel Workflow Library and Workflow presentation
+consumers. This lazy-bundle exception is not permission for arbitrary feature
+deep imports. ESLint has the matching exact Asset Studio exception only for the
+two Workflow editor modules that render `AssetPicker`; it retains the general
+deep-import restriction there.
 
 Examples of rejected dependencies:
 
@@ -214,7 +233,8 @@ Before adding a module or import:
 1. Name the business or runtime owner.
 2. Decide whether the behavior is Domain, Application, Infrastructure,
    Presentation, Platform or composition.
-3. Cross features only through a root `index.ts`.
+3. Cross features only through a root `index.ts`, except for the three
+   explicitly allowlisted lazy Studio presentation entrypoints.
 4. Define a port inward before selecting a concrete outward adapter.
 5. Keep browser calls in an ADR-0008-approved adapter owner.
 6. Add to Shared Kernel only after ownership review.

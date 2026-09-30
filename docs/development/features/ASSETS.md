@@ -37,7 +37,9 @@ Source root: [`src/features/assets/`](../../../src/features/assets/).
 - version-2 Asset records and the global Dexie version-4 Role-index fragment;
 - browser object URL creation/revocation;
 - the reusable Asset Library, Picker and Preview components;
-- the root public API in [`index.ts`](../../../src/features/assets/index.ts).
+- the root behavior/data API in
+  [`index.ts`](../../../src/features/assets/index.ts) and lazy Studio
+  presentation API in [`studio.ts`](../../../src/features/assets/studio.ts).
 
 ## Does Not Own
 
@@ -54,7 +56,9 @@ policy, not hidden Asset Domain constants.
 
 ## Public API
 
-Consumers import only from `@/features/assets`.
+Consumers import behavior and data from `@/features/assets`. The allowlisted
+Studio/Workflow presentation consumers import UI only from
+`@/features/assets/studio` so Focus does not preload it.
 
 | Group                      | Exports                                                                                                                                                  |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -63,7 +67,7 @@ Consumers import only from `@/features/assets`.
 | Application ports          | `AssetRepository`, `AssetRoleRepository`, `AssetRoleManagementRepository`, `AssetRoleWorkflowUsage`, `AssetRoleManagementUnitOfWork`, `ActiveSessionAssetReferences`, `AssetRetirementWorkflowReferences`, `AssetRetirementUnitOfWork` |
 | Application behavior       | `inspectAssetRoleChangeUseCase`, `applyAssetRoleChangeUseCase`, `inspectAssetRetirementUseCase`, `retireAssetUseCase`, `importAssetUseCase`, `validateAssetImport`, `listAssetsUseCase`, `moveAssetRoleUseCase`, `resolveAssetRoleUseCase`, `AssetRetirementChoice`, `AssetRetirementPreview`, `AssetRetirementUsage`, `AssetRetirementOccurrence` and Role/import policy types |
 | Infrastructure composition | `DexieAssetRepository`, `assetDatabaseSchemas`, `BrowserAssetUrlService`                                                                                 |
-| Presentation               | `AssetLibrary`, `AssetPicker`, `AssetPickerValue`, `AssetRoleDialog`, `AssetRetirementDialog`, `AssetRetirementDialogProps`, `AssetPreview` and their remaining prop types |
+| Presentation (`/studio`)   | `AssetLibrary`, `AssetPicker`, `AssetPickerValue`, `AssetRoleDialog`, `AssetRetirementDialog`, `AssetRetirementDialogProps`, `AssetPreview` and their remaining prop types |
 
 `AssetId` is re-exported from the minimal Shared Kernel. This lets Workflow and
 Assets share one identity contract without either feature importing the other's

@@ -12,6 +12,11 @@ const featureDeepImportRestriction = {
   message: 'Import another feature through its root public API.',
 };
 
+const featureDeepImportExceptAssetStudioRestriction = {
+  regex: '^@/features/(?!assets/studio$)[^/]+/',
+  message: 'Import another feature through its root public API.',
+};
+
 export default defineConfig(
   globalIgnores([
     '.output/**',
@@ -95,6 +100,23 @@ export default defineConfig(
               message:
                 'Domain and Application may depend only on stable inward modules.',
             },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      'src/features/workflow/presentation/RewardDiceEditor.tsx',
+      'src/features/workflow/presentation/WorkflowEditor.tsx',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            lowerLayerAppRestriction,
+            featureDeepImportExceptAssetStudioRestriction,
           ],
         },
       ],

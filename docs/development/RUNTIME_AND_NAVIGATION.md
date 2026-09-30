@@ -42,7 +42,9 @@ permission.
 Focus opens Workflow Studio inside the existing `focus.html` document. The
 Focus composition owns a full-viewport overlay shell and lazy-loads both the
 shared Studio presentation and its concrete dependency composition after the
-first open. Neither Studio module is in the initial Focus preload graph.
+first open. Feature-owned `studio.ts` presentation APIs keep Studio-only UI out
+of the complete initial Focus static script/modulepreload graph; the concrete
+composition is dynamic as well.
 Opening or closing it does not navigate, reload or unmount the underlying Focus
 Session projection, Active Session view or ambient-audio player.
 

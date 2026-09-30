@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import {
-  AssetLibrary,
   type Asset,
   type AssetId,
   type AssetKind,
@@ -10,17 +9,18 @@ import {
   type ImportAssetInput,
   type AssetRoleChangePreview,
 } from '@/features/assets';
-import { SettingsPage, type Settings } from '@/features/settings';
+import { AssetLibrary } from '@/features/assets/studio';
+import type { Settings } from '@/features/settings';
+import { SettingsPage } from '@/features/settings/studio';
 import type { DocumentPreferences } from '@/app/document-preferences/DocumentPreferences';
 import { useDocumentPreferences } from '@/app/document-preferences/useDocumentPreferences';
 import {
   createWorkflowId,
-  WorkflowEditor,
-  WorkflowLibrary,
   type CreateWorkflowInput,
   type Workflow,
   type WorkflowId,
 } from '@/features/workflow';
+import { WorkflowEditor, WorkflowLibrary } from '@/features/workflow/studio';
 
 export type WorkflowStudioSnapshot = Readonly<{
   workflows: readonly Workflow[];

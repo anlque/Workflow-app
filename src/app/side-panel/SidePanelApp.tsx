@@ -13,12 +13,12 @@ import type { DocumentPreferences } from '@/app/document-preferences/DocumentPre
 import { useDocumentPreferences } from '@/app/document-preferences/useDocumentPreferences';
 
 import {
-  WorkflowLibrary,
   useWorkflowCatalog,
   type Workflow,
   type WorkflowCatalogSource,
   type WorkflowId,
 } from '@/features/workflow';
+import { WorkflowLibrary } from '@/features/workflow/studio';
 
 import { CompactActiveSessionBar } from './CompactActiveSessionBar';
 

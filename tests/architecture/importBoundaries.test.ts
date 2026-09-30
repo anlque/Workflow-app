@@ -55,7 +55,28 @@ function findImportViolations(
     ];
   }
 
-  if (/^@\/features\/[^/]+\//.test(importedModule)) {
+  const studioPresentationConsumers: Readonly<
+    Record<string, readonly string[]>
+  > = {
+    '@/features/assets/studio': [
+      'src/app/workflow-studio/',
+      'src/features/workflow/presentation/',
+    ],
+    '@/features/settings/studio': ['src/app/workflow-studio/'],
+    '@/features/workflow/studio': [
+      'src/app/workflow-studio/',
+      'src/app/side-panel/',
+    ],
+  };
+  const allowedStudioConsumers = studioPresentationConsumers[importedModule];
+  const isAllowedStudioPresentationImport = allowedStudioConsumers?.some(
+    (prefix) => projectPath.startsWith(prefix),
+  );
+
+  if (
+    /^@\/features\/[^/]+\//.test(importedModule) &&
+    isAllowedStudioPresentationImport !== true
+  ) {
     return [
       { file: projectPath, importedModule, reason: 'feature deep import' },
     ];
@@ -170,6 +191,27 @@ describe('architectural import boundaries', () => {
         file: studioModule,
         importedModule: '../focus/FocusApp',
         reason: 'shared Studio imports Focus surface',
+      },
+    ]);
+  });
+
+  test('Studio presentation entrypoints are limited to approved consumers', () => {
+    expect(
+      findImportViolations(
+        'src/app/workflow-studio/WorkflowStudio.tsx',
+        '@/features/workflow/studio',
+      ),
+    ).toEqual([]);
+    expect(
+      findImportViolations(
+        'src/app/background/bootstrapBackground.ts',
+        '@/features/workflow/studio',
+      ),
+    ).toEqual([
+      {
+        file: 'src/app/background/bootstrapBackground.ts',
+        importedModule: '@/features/workflow/studio',
+        reason: 'feature deep import',
       },
     ]);
   });

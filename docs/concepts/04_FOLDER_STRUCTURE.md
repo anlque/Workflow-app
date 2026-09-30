@@ -389,14 +389,16 @@ Concrete implementations are connected through the application's composition roo
 
 ## index.ts
 
-Every feature exposes a single public API through its root `index.ts`.
+Every feature exposes a default public API through its root `index.ts`.
+An accepted ADR may add a narrow secondary entrypoint when an intentional
+runtime loading boundary cannot be preserved through the shared root barrel;
+the entrypoint and its consumers must be explicitly enforced.
 
 Only modules intended for external use may be exported.
 
 Example:
 
 ```ts
-export { WorkflowEditor } from './presentation/WorkflowEditor';
 export { createWorkflow } from './application/createWorkflow';
 export type { Workflow } from './domain/Workflow';
 ```

@@ -15,8 +15,10 @@ Source root: [`src/features/settings/`](../../../src/features/settings/).
 - the `locusora/settings` version-1 package parser and import/export;
 - the `chrome.storage.local` adapter under the `settings` key;
 - the Options Settings presentation and operation feedback;
-- the root public API in
-  [`index.ts`](../../../src/features/settings/index.ts).
+- the root behavior/data API in
+  [`index.ts`](../../../src/features/settings/index.ts) and lazy Studio
+  presentation API in
+  [`studio.ts`](../../../src/features/settings/studio.ts).
 
 ## Does Not Own
 
@@ -31,7 +33,9 @@ must not be presented as current fields or silently added to stored input.
 
 ## Public API
 
-Consumers import only from `@/features/settings`.
+Consumers import behavior and data from `@/features/settings`. Workflow Studio
+imports `SettingsPage` from the allowlisted `@/features/settings/studio`
+presentation API.
 
 | Group                      | Exports                                                                                                                 |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -39,7 +43,7 @@ Consumers import only from `@/features/settings`.
 | Application contracts      | `SettingsRepository`, `DocumentPreferenceSource`, `SettingsPackageV1`, `SettingsImportLimits`, `SettingsPackageValidationError` |
 | Application behavior       | `getSettingsUseCase`, `updateSettingsUseCase`, `exportSettingsUseCase`, `importSettingsUseCase`, `parseSettingsPackage` |
 | Infrastructure composition | `ChromeSettingsRepository`, `ChromeDocumentPreferenceSource`, storage adapter types                                      |
-| Presentation               | `SettingsPage`, `SettingsPageProps`                                                                                     |
+| Presentation (`/studio`)   | `SettingsPage`, `SettingsPageProps`                                                                                     |
 
 Infrastructure is public only so `src/app` can compose a concrete adapter.
 Presentation never imports it directly.

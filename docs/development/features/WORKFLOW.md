@@ -34,8 +34,10 @@ Source root: [`src/features/workflow/`](../../../src/features/workflow/).
 - Workflow package contract, mapping, import/export and atomic unit-of-work port;
 - Workflow record mapping, table ordering and Dexie adapters;
 - Workflow Library, editor, Reward Dice editor and catalog/editor hooks;
-- the root public API in
-  [`index.ts`](../../../src/features/workflow/index.ts).
+- the root behavior/data API in
+  [`index.ts`](../../../src/features/workflow/index.ts) and lazy Studio
+  presentation API in
+  [`studio.ts`](../../../src/features/workflow/studio.ts).
 
 ## Does Not Own
 
@@ -51,8 +53,9 @@ Workflows. It is not a separately persisted Entity or aggregate.
 
 ## Public API
 
-External consumers import only from `@/features/workflow`. The root currently
-exports:
+External consumers import behavior/data from `@/features/workflow`. The
+allowlisted Workflow Studio and Side Panel presentation consumers use
+`@/features/workflow/studio`. The public APIs currently export:
 
 | Group | Exports |
 | --- | --- |
@@ -61,8 +64,8 @@ exports:
 | Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`–`WorkflowPackageV5`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
 | Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `resolveWorkflowAssetReferences`, Role-summary/rename and Asset-retirement summary/patch operations, `exportWorkflowUseCase`, `importWorkflowUseCase` |
 | Infrastructure composition | `DexieWorkflowRepository`, `workflowDatabaseSchemas`, `DexieWorkflowPackageUnitOfWork` |
-| Presentation components | `WorkflowLibrary`, `WorkflowLibraryProps`, `WorkflowEditor`, `WorkflowEditorProps`, `RewardDiceEditor`, `RewardDiceEditorProps` |
-| Presentation editor API | `useWorkflowEditor`, `validateWorkflowDraft`, `PhaseDraft`, `RewardDiceDraft`, `RewardSideDraft`, `WorkflowDraft`, `WorkflowDraftErrors`, `WorkflowDraftValidation` |
+| Presentation components (`/studio`) | `WorkflowLibrary`, `WorkflowLibraryProps`, `WorkflowEditor`, `WorkflowEditorProps`, `RewardDiceEditor`, `RewardDiceEditorProps` |
+| Presentation editor API (`/studio`) | `useWorkflowEditor`, `validateWorkflowDraft`, `PhaseDraft`, `RewardDiceDraft`, `RewardSideDraft`, `WorkflowDraft`, `WorkflowDraftErrors`, `WorkflowDraftValidation` |
 | Presentation catalog API | `useWorkflowCatalog`, `WorkflowCatalogSource`, `WorkflowCatalogState` |
 
 Infrastructure exports exist so `src/app` can compose concrete adapters. Their

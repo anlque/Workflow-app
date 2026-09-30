@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { AssetPicker, type Asset } from '@/features/assets';
+import type { Asset } from '@/features/assets';
+import { AssetPicker } from '@/features/assets/studio';
 import { Button, Field, Select } from '@/shared';
 
 import type { CreateWorkflowInput, Workflow } from '../domain/Workflow';

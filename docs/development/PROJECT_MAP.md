@@ -65,7 +65,8 @@ aggregate and everything configured as part of it.
 | [`application/`](../../src/features/workflow/application/) | Workflow use cases | Repository port; create, update, delete, duplicate, list and reorder use cases; Workflow package import/export contracts | Workflow Domain and Assets root API where package operations require Asset contracts | Coordinates changes to Workflows without choosing persistence or UI |
 | [`infrastructure/`](../../src/features/workflow/infrastructure/) | Workflow persistence | IndexedDB records/mapping, Dexie repository and atomic Workflow-package unit of work | Workflow Application/Domain contracts, Assets public contracts and storage platform | Adapts Workflow and package operations to IndexedDB |
 | [`presentation/`](../../src/features/workflow/presentation/) | Workflow UI | Library, editor, Reward Dice editor and catalog/editor hooks | Workflow public behavior, React and shared UI | Provides reusable Workflow screens and local draft/catalog state |
-| [`index.ts`](../../src/features/workflow/index.ts) | Workflow public API | Supported Domain types/functions, use cases/ports/packages, Dexie adapters/schema fragments and presentation exports | Workflow internals | Defines the only supported external import boundary |
+| [`index.ts`](../../src/features/workflow/index.ts) | Workflow public API | Supported Domain types/functions, use cases/ports/packages, Dexie adapters/schema fragments and the lightweight catalog hook | Workflow internals | Defines the default external boundary without loading Studio presentation |
+| [`studio.ts`](../../src/features/workflow/studio.ts) | Lazy Workflow presentation API | Workflow library/editor, Reward editor and editor draft helpers | Workflow internals | Keeps Studio-only presentation outside the initial Focus graph |
 
 `WorkflowLibrary` is the presentation of a collection of Workflows, not another
 persisted Entity or a separate feature.
@@ -95,7 +96,8 @@ audio Assets. It is a business feature, not a static-file directory.
 | [`application/`](../../src/features/assets/application/) | Asset use cases | Repository/reference ports and import, list and reference-aware delete use cases | Asset Domain | Coordinates Asset policy and lifecycle through ports |
 | [`infrastructure/`](../../src/features/assets/infrastructure/) | Asset storage/browser adaptation | Asset record/schema, Dexie repository and browser object-URL service | Asset Application/Domain, storage platform and browser Blob/URL APIs | Stores Asset metadata/blobs and adapts blobs for presentation |
 | [`presentation/`](../../src/features/assets/presentation/) | Asset UI | Asset library, picker and preview | Asset public behavior, React and shared UI | Reuses Asset selection and preview behavior across owning surfaces |
-| [`index.ts`](../../src/features/assets/index.ts) | Assets public API | Supported contracts, use cases, Domain values, adapters/schema and UI | Assets internals | Provides the cross-feature Asset boundary used by Workflow packaging |
+| [`index.ts`](../../src/features/assets/index.ts) | Assets public API | Supported contracts, use cases, Domain values and adapters/schema | Assets internals | Provides the default cross-feature boundary without loading Studio presentation |
+| [`studio.ts`](../../src/features/assets/studio.ts) | Lazy Asset presentation API | Asset library, picker, dialogs and preview | Assets internals | Loads Asset management UI only for Studio and its Workflow editor |
 
 ## Settings Feature
 
@@ -108,7 +110,8 @@ preferences stored outside IndexedDB.
 | [`application/`](../../src/features/settings/application/) | Settings use cases | Repository port, get/update and package import/export | Settings Domain | Coordinates Settings and validates their external package envelope |
 | [`infrastructure/`](../../src/features/settings/infrastructure/) | Settings persistence | `ChromeSettingsRepository` and injected storage-area contract | Settings Application/Domain and Chrome storage through an adapter | Stores the single Settings value under `chrome.storage.local` |
 | [`presentation/`](../../src/features/settings/presentation/) | Settings UI | `SettingsPage` | Settings public behavior, React and shared UI | Edits preferences without exposing storage details |
-| [`index.ts`](../../src/features/settings/index.ts) | Settings public API | Supported Domain, use-case, package, repository, adapter and presentation exports | Settings internals | Defines the supported dependency surface |
+| [`index.ts`](../../src/features/settings/index.ts) | Settings public API | Supported Domain, use-case, package, repository and adapter exports | Settings internals | Defines the default dependency surface without loading Studio presentation |
+| [`studio.ts`](../../src/features/settings/studio.ts) | Lazy Settings presentation API | `SettingsPage` | Settings internals | Keeps the Settings screen in the Studio-loaded graph |
 
 ## Platform and Shared Modules
 

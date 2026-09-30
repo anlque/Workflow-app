@@ -258,12 +258,14 @@ Business logic must remain independent from platform implementations.
 
 Every feature should expose a minimal public API.
 
-Consumers should import from the feature root rather than internal implementation files.
+Consumers should import from the feature root rather than internal
+implementation files. A documented, architecture-tested secondary public
+entrypoint is also valid for an intentional runtime loading boundary.
 
 Preferred:
 
 ```ts
-import { WorkflowEditor } from '@/features/workflow';
+import { createWorkflow } from '@/features/workflow';
 ```
 
 Avoid:

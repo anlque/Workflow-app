@@ -41,6 +41,13 @@ underlying launcher as well as other extension documents. Focus dynamically
 imports both Studio presentation and concrete composition on first open; they
 are absent from its initial module-preload graph.
 
+Feature root barrels retain Domain, Application, Infrastructure and lightweight
+surface contracts. Large Assets, Settings and Workflow Studio presentation
+exports use feature-owned `studio.ts` public entrypoints with an
+architecture-test consumer allowlist. This prevents shared barrels from
+hoisting Studio UI into Focus's initial static graph without exposing feature
+internals.
+
 Section selection remains local React state. Extension surfaces continue to
 navigate through injected browser-boundary operations; Locusora does not add a
 client-side router or share mutable React state between document roots.

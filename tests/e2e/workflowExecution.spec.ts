@@ -50,12 +50,34 @@ test('embeds Workflow Studio over idle and active Focus without navigation', asy
   extensionUrls,
 }) => {
   const focus = await context.newPage();
+  const loadedAssets = new Set<string>();
+  focus.on('response', (response) => {
+    loadedAssets.add(new URL(response.url()).pathname.split('/').at(-1) ?? '');
+  });
   await focus.goto(extensionUrls.focus);
+
+  const loadedStudioChunks = () =>
+    [...loadedAssets].filter((name) =>
+      /^(?:LazyWorkflowStudio|WorkflowStudio|createWorkflowStudioDependencies|studio)-/u.test(
+        name,
+      ),
+    );
+  expect(loadedStudioChunks()).toEqual([]);
 
   const initialPages = context.pages().length;
   await focus.getByRole('button', { name: 'Create a Workflow' }).click();
   const overlay = focus.getByRole('region', { name: 'Workflow Studio' });
   await expect(overlay).toBeVisible();
+  await expect
+    .poll(loadedStudioChunks)
+    .toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^LazyWorkflowStudio-/u),
+        expect.stringMatching(/^WorkflowStudio-/u),
+        expect.stringMatching(/^createWorkflowStudioDependencies-/u),
+        expect.stringMatching(/^studio-/u),
+      ]),
+    );
   await expect(
     focus.getByRole('button', { name: 'Close Workflow Studio' }),
   ).toBeFocused();
