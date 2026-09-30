@@ -60,9 +60,11 @@ test('names, duplicates and locally collapses Workflow Phases', async ({
 
   await options.getByLabel('Phase 2 duration in minutes').fill('1.2');
   await options.getByLabel('Phase 2 duration in minutes').blur();
-  await options.getByRole('button', { name: 'Collapse Review' }).focus();
+  await options
+    .getByRole('button', { name: 'Collapse Phase 2: Review' })
+    .focus();
   await options.keyboard.press('Enter');
-  await expect(options.getByLabel('Phase 2 name')).toHaveCount(0);
+  await expect(options.getByLabel('Phase 2 name')).toBeHidden();
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByLabel('Phase 2 duration in minutes')).toBeVisible();
   await expect(

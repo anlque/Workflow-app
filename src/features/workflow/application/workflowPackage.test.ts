@@ -255,6 +255,85 @@ describe('Workflow package', () => {
     });
   });
 
+  test('imports a genuine version-5 package with Bonus configuration and no Phase name', async () => {
+    const workflows = new MemoryWorkflowRepository();
+    const imported = await importWorkflowUseCase(
+      workflows,
+      new MemoryAssetRepository(),
+      new MemoryUnitOfWork(),
+      JSON.stringify({
+        kind: 'locusora/workflow',
+        version: 5,
+        workflow: {
+          id: 'legacy-v5',
+          name: 'Legacy Bonus',
+          phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+          rewardDice: {
+            schedule: {
+              type: 'frequency',
+              triggerPhaseType: 'focus',
+              frequency: 1,
+            },
+            rerolls: 1,
+            sides: [
+              {
+                icon: '☕',
+                title: 'Tea',
+                weight: 1,
+                availability: 'any',
+                bonusPhase: {
+                  name: 'Tea break',
+                  durationSeconds: 300,
+                  environment: {},
+                },
+              },
+              {
+                icon: '🚶',
+                title: 'Walk',
+                weight: 1,
+                availability: 'any',
+              },
+            ],
+          },
+        },
+        assets: [],
+      }),
+      { maxFileBytes: 10_000, assetPolicy: policy },
+      {
+        createWorkflowId: () => 'legacy-v5-imported',
+        createAssetId: () => 'unused',
+        now: () => 2_000,
+      },
+    );
+
+    expect(imported.phases[0]).not.toHaveProperty('name');
+    expect(imported.rewardDice?.sides[0]?.bonusPhase).toMatchObject({
+      name: 'Tea break',
+      durationSeconds: 300,
+      environment: {},
+    });
+  });
+
+  test('rejects a Phase name inside a version-5 package', async () => {
+    await expectRejectedPackage({
+      kind: 'locusora/workflow',
+      version: 5,
+      workflow: {
+        id: 'invalid-v5-name',
+        name: 'Invalid v5 name',
+        phases: [
+          {
+            name: 'Writing',
+            type: 'focus',
+            durationSeconds: 60,
+            environment: {},
+          },
+        ],
+      },
+      assets: [],
+    });
+  });
+
   test('enforces version-specific Workflow and Asset shapes', async () => {
     const base = {
       kind: 'locusora/workflow',

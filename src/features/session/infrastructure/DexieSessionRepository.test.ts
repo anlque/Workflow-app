@@ -136,6 +136,26 @@ describe('DexieSessionRepository', () => {
     );
   });
 
+  test('restores a version-7 Session snapshot without Phase names', async () => {
+    const store = database();
+    const repository = new DexieSessionRepository(store);
+    const session = createSession('legacy-v7-unnamed', workflow(), 1_000);
+    await repository.save(session);
+    const record = await store
+      .table<SessionRecord, string>('sessions')
+      .get(session.id);
+    if (record === undefined) throw new Error('Expected stored Session.');
+    await store.table<unknown, string>('sessions').put({
+      ...record,
+      schemaVersion: 7,
+    });
+
+    await expect(repository.get(session.id)).resolves.toEqual(session);
+    await expect(repository.get(session.id)).resolves.not.toHaveProperty(
+      'snapshot.workflow.phases.0.name',
+    );
+  });
+
   test('round-trips a v8 user pause in the normal Phase after a non-final Bonus', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);

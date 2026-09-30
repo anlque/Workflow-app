@@ -100,6 +100,38 @@ describe('WorkflowEditor', () => {
     );
   });
 
+  test('distinguishes disclosure names after duplicating a named Phase', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-1',
+          name: 'Named phases',
+          phases: [
+            {
+              name: 'Writing',
+              type: 'focus',
+              durationSeconds: 1_500,
+              environment: {},
+            },
+          ],
+        })}
+        workflowId="workflow-1"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Duplicate Phase 1' }));
+
+    expect(
+      screen.getByRole('button', { name: 'Collapse Phase 1: Writing' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Collapse Phase 2: Writing' }),
+    ).toBeVisible();
+  });
+
   test('collapses a Phase locally and reopens it when validation fails', async () => {
     const user = userEvent.setup();
     render(
@@ -119,11 +151,17 @@ describe('WorkflowEditor', () => {
     });
     await user.click(disclosure);
     expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    const contentId = disclosure.getAttribute('aria-controls');
+    expect(contentId).not.toBeNull();
+    const content = document.getElementById(contentId ?? 'missing');
+    expect(content).toBeInTheDocument();
+    expect(content).toHaveAttribute('hidden');
     expect(
-      screen.queryByLabelText('Phase 1 duration in minutes'),
-    ).not.toBeInTheDocument();
+      screen.getByLabelText('Phase 1 duration in minutes'),
+    ).not.toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+    expect(content).not.toHaveAttribute('hidden');
     expect(screen.getByLabelText('Phase 1 duration in minutes')).toBeVisible();
     expect(
       screen.getByText(
