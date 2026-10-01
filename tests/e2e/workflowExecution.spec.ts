@@ -97,6 +97,12 @@ test('uploads and selects a Phase Asset without losing the Workflow draft', asyn
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
   await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Existing workflow');
+  await options.getByLabel('Phase 1 name').fill('Existing phase');
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(options.getByRole('status')).toHaveText('Workflow saved');
+
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Inline atmosphere');
   await options.getByLabel('Phase 1 name').fill('Drafting');
   await options.getByLabel('Background color').fill('#123456');
@@ -121,6 +127,13 @@ test('uploads and selects a Phase Asset without losing the Workflow draft', asyn
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
   await options.reload();
+  await expect(
+    options.getByRole('button', { name: 'Open Existing workflow' }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('button', { name: 'Open Inline atmosphere' }),
+  ).toBeVisible();
+  await options.getByRole('button', { name: 'Open Inline atmosphere' }).click();
   await expect(options.getByLabel('Background image')).toHaveValue(/direct:/u);
   await expect(
     options.getByRole('option', { name: 'inline-forest.png' }),

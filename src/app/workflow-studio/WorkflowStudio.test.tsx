@@ -100,6 +100,61 @@ function dependencies(
 }
 
 describe('WorkflowStudio', () => {
+  test('keeps a new draft selected while reloading the catalog after inline upload', async () => {
+    const user = userEvent.setup();
+    const existing = createWorkflow({
+      id: 'existing-workflow',
+      name: 'Saved name',
+      phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+    });
+    const uploaded = createAsset({
+      id: 'uploaded-image',
+      name: 'New backdrop',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 5,
+      createdAt: 2,
+    });
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce({
+        workflows: [existing],
+        assets: [],
+        settings: defaultSettings,
+      })
+      .mockResolvedValueOnce({
+        workflows: [existing],
+        assets: [uploaded],
+        settings: defaultSettings,
+      });
+    const importAsset = vi.fn(() => Promise.resolve(uploaded));
+    render(
+      <WorkflowStudio dependencies={dependencies({ load, importAsset })} />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'New workflow' }),
+    );
+    await user.type(screen.getByLabelText('Workflow name'), 'New draft');
+    await user.type(screen.getByLabelText('Phase 1 name'), 'Writing');
+    await user.type(screen.getByLabelText('Background color'), '#123456');
+    await user.upload(
+      screen.getByLabelText('Upload image'),
+      new File(['image'], 'backdrop.png', { type: 'image/png' }),
+    );
+
+    await waitFor(() => {
+      expect(load).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByLabelText('Workflow name')).toHaveValue('New draft');
+    expect(screen.getByLabelText('Phase 1 name')).toHaveValue('Writing');
+    expect(screen.getByLabelText('Background color')).toHaveValue('#123456');
+    expect(screen.getByLabelText('Background image')).toHaveValue(
+      'direct:uploaded-image',
+    );
+    expect(importAsset).toHaveBeenCalledOnce();
+  });
+
   test.each(['publication', 'load'] as const)(
     'preserves the draft and retries only synchronization after an inline upload %s failure',
     async (failure) => {
@@ -156,8 +211,9 @@ describe('WorkflowStudio', () => {
         />,
       );
 
-      await screen.findByLabelText('Workflow name');
-      await user.clear(screen.getByLabelText('Workflow name'));
+      await user.click(
+        await screen.findByRole('button', { name: 'New workflow' }),
+      );
       await user.type(screen.getByLabelText('Workflow name'), 'Uncommitted');
       await user.type(screen.getByLabelText('Phase 1 name'), 'Writing');
       await user.upload(
@@ -182,6 +238,10 @@ describe('WorkflowStudio', () => {
       expect(synchronizeAssetImport).toHaveBeenCalledTimes(2);
       expect(load).toHaveBeenCalledTimes(failure === 'load' ? 3 : 2);
       expect(screen.getByLabelText('Workflow name')).toHaveValue('Uncommitted');
+      expect(screen.getByLabelText('Phase 1 name')).toHaveValue('Writing');
+      expect(screen.getByLabelText('Background image')).toHaveValue(
+        'direct:uploaded-image',
+      );
     },
   );
   test.each(['publication', 'load'] as const)(

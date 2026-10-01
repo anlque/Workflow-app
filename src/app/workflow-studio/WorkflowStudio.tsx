@@ -99,6 +99,10 @@ export function WorkflowStudio({
     );
   }
 
+  async function reloadSnapshot(): Promise<void> {
+    setSnapshot(await dependencies.load());
+  }
+
   useEffect(() => {
     let active = true;
     void dependencies.load().then(
@@ -280,7 +284,7 @@ export function WorkflowStudio({
                   }}
                   onSynchronizeAssetUpload={async () => {
                     await dependencies.synchronizeAssetImport();
-                    await load(selectedWorkflowId);
+                    await reloadSnapshot();
                   }}
                   {...(selectedWorkflow === undefined
                     ? {}
