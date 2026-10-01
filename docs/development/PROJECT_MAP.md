@@ -136,6 +136,8 @@ preferences stored outside IndexedDB.
 | [`playwright.config.ts`](../../playwright.config.ts) and [`tests/e2e/`](../../tests/e2e/) | Extension journey tests | Chromium fixture and assembled MVP journeys | Proves production extension pages and worker behavior together |
 | [`assets/brand/source/`](../../assets/brand/source/) | Brand source | Growth Rings mark, lockups and Store promo SVGs | Keeps editable visual identity separate from generated exports |
 | [`public/brand/`](../../public/brand/) | Extension identity resources | Manifest PNGs, favicon and public SVGs | Supplies stable files copied into every WXT build |
+| [`assets/reward-dice/source/`](../../assets/reward-dice/source/) | Product-owner media source | Approved Reward Dice render and final-frame reference | Keeps reviewable source media outside the runtime bundle |
+| [`public/video/`](../../public/video/) | Packaged Reward media | Optimized deterministic dice WebM and PNG fallback | Supplies offline runtime media copied into every WXT build; playback integration belongs to RW-006 |
 | [`store-assets/`](../../store-assets/) | Chrome Web Store artwork | Store icon, small promo tile and real extension screenshots | Keeps submission assets versioned and reviewable outside the runtime bundle |
 | [`scripts/brand/`](../../scripts/brand/) | Brand toolchain | Deterministic export, screenshot capture and media verification | Reproduces every raster asset from approved sources and real extension states |
 | [`tests/architecture/`](../../tests/architecture/) | Architecture verification | Source import scan | Provides a second executable check of dependency direction |
@@ -143,6 +145,7 @@ preferences stored outside IndexedDB.
 | [`docs/concepts/`](../concepts/) | Normative documentation | Product, Domain, architecture and engineering rules | Defines what implementation must satisfy |
 | [`docs/adr/`](../adr/) | Decision history | Accepted architecture decisions and index | Records why stable choices were made |
 | [`docs/product/BRAND_ASSETS.md`](../product/BRAND_ASSETS.md) | Brand provenance | Asset inventory, rights, export procedure and current Store evidence | Makes production artwork reproducible and attributable |
+| [`docs/product/REWARD_DICE_MEDIA.md`](../product/REWARD_DICE_MEDIA.md) | Reward Dice media provenance | Source/runtime metadata, export procedure, hashes and overlay geometry | Keeps deterministic animation exports and the RW-006 alignment contract reproducible |
 
 Generated `.wxt/`, `.output/`, `coverage/`, `test-results/` and
 `node_modules/` directories are not source owners. Do not edit or document their
