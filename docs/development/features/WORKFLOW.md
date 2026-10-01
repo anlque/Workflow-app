@@ -232,6 +232,11 @@ Owns draft validation feedback, pending state and transient accessible
 does not choose create versus update. It prevents removing the last Phase.
 Phase disclosure state is local to the mounted editor and never persisted;
 save validation expands any collapsed Phase containing an invalid field.
+Normal and Bonus Environment pickers may request a kind-specific Asset import
+through Workflow Studio. The mounted editor retains every draft field while the
+Studio adds the committed Asset to its catalog, selects a direct reference and
+then synchronizes the authoritative catalog. Role assignment remains a separate
+explicit Asset Library operation.
 
 ### `RewardDiceEditor`
 

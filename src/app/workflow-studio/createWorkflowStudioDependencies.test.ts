@@ -63,6 +63,36 @@ async function seedAsset(
   return asset;
 }
 
+describe('createWorkflowStudioDependencies inline Asset upload', () => {
+  test('uses Asset validation, commits once and synchronizes separately', async () => {
+    const database = createDatabase();
+    const dependencies = createWorkflowStudioDependencies(
+      createTestDocumentPreferences(),
+      database,
+    );
+
+    await expect(
+      dependencies.importAsset(
+        new File(['audio'], 'wrong.mp3', { type: 'audio/mpeg' }),
+        'image',
+      ),
+    ).rejects.toThrow('is not supported for image');
+    expect((await dependencies.load()).assets).toHaveLength(0);
+    expect(browserMock.runtime.sendMessage).not.toHaveBeenCalled();
+
+    const asset = await dependencies.importAsset(
+      new File(['image'], 'forest.png', { type: 'image/png' }),
+      'image',
+    );
+    expect(asset).toMatchObject({ name: 'forest.png', kind: 'image' });
+    expect((await dependencies.load()).assets).toEqual([asset]);
+    expect(browserMock.runtime.sendMessage).not.toHaveBeenCalled();
+
+    await dependencies.synchronizeAssetImport();
+    expect(browserMock.runtime.sendMessage).toHaveBeenCalledOnce();
+  });
+});
+
 describe('createWorkflowStudioDependencies Asset Role integration', () => {
   test('renames the Asset Role and every Workflow Role reference', async () => {
     const database = createDatabase();

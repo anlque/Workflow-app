@@ -162,7 +162,7 @@ export function createWorkflowStudioDependencies(
       );
     },
     async importAsset(file, kind) {
-      await importAssetUseCase(assets, assetPolicy, {
+      return importAssetUseCase(assets, assetPolicy, {
         id: crypto.randomUUID(),
         name: file.name,
         kind,
@@ -170,6 +170,7 @@ export function createWorkflowStudioDependencies(
         createdAt: Date.now(),
       });
     },
+    synchronizeAssetImport: () => catalogEvents.publishChanged(),
     inspectAssetRetirement: (id) =>
       inspectAssetRetirementUseCase(
         assets,

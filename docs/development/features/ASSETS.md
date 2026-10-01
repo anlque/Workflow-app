@@ -183,6 +183,14 @@ and `Follow Role`. It emits the complete discriminated reference union. An empty
 selection maps to `undefined`; a currently selected unresolved or wrong-kind
 Role remains visible as unavailable rather than being silently replaced.
 
+Each picker also exposes a compact kind-specific upload. Workflow Studio owns
+the durable `importAssetUseCase` call and catalog synchronization; the picker
+selects the committed Asset as a direct reference and never assigns a Role
+implicitly. MIME and size validation remain in the Asset Application policy.
+Pre-commit failure changes neither selection nor catalog. After commit, a
+publication or reload failure retains the mounted Workflow draft and offers a
+synchronization-only retry, so the durable import cannot be repeated.
+
 ### `AssetPreview`
 
 The preview loads the Blob lazily, creates one object URL and revokes the owned
@@ -250,7 +258,7 @@ channel policy remains deferred to AU-001.
 | Cross-table rollback at every write step          | `src/app/options/DexieAssetRetirementUnitOfWork.test.ts`   |
 | Blob mapping, corrupt rows, quota and object URLs | `infrastructure/DexieAssetRepository.test.ts`               |
 | Library and two-step retirement feedback          | `presentation/AssetLibrary.test.tsx`, `AssetRetirementDialog.test.tsx` |
-| Kind filtering and empty selection                | `presentation/AssetPicker.test.tsx`                         |
+| Kind filtering, inline upload and sync recovery   | `presentation/AssetPicker.test.tsx`, `src/app/workflow-studio/WorkflowStudio.test.tsx` |
 | Blob loading and URL cleanup                      | `presentation/AssetPreview.test.tsx`                        |
 | Workflow package participation                    | `src/features/workflow/application/workflowPackage.test.ts` |
 

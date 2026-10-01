@@ -1,6 +1,8 @@
 export {
   AssetPicker,
   type AssetPickerProps,
+  type AssetPickerUpload,
+  type AssetPickerUploadSynchronization,
   type AssetPickerValue,
 } from './presentation/AssetPicker';
 export {

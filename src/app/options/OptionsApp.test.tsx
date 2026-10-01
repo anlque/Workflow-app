@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { defaultSettings } from '@/features/settings';
+import { createAsset } from '@/features/assets';
 import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
 
 import type { WorkflowStudioDependencies } from '../workflow-studio/WorkflowStudio';
@@ -30,7 +31,18 @@ function dependencies(): WorkflowStudioDependencies {
     duplicateWorkflow: () => Promise.resolve(),
     deleteWorkflow: () => Promise.resolve(),
     reorderWorkflows: () => Promise.resolve(),
-    importAsset: () => Promise.resolve(),
+    importAsset: (_file, kind) =>
+      Promise.resolve(
+        createAsset({
+          id: `options-${kind}`,
+          name: kind,
+          kind,
+          mimeType: kind === 'image' ? 'image/png' : 'audio/mpeg',
+          byteSize: 1,
+          createdAt: 1,
+        }),
+      ),
+    synchronizeAssetImport: () => Promise.resolve(),
     inspectAssetRetirement: () => Promise.reject(new Error('Not used.')),
     retireAsset: () => Promise.resolve(),
     synchronizeAssetRetirement: () => Promise.resolve(),

@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
+import { createAsset } from '@/features/assets';
+
 import { RewardDiceEditor } from './RewardDiceEditor';
 import type { RewardSideDraft } from './useWorkflowEditor';
 
@@ -310,5 +312,92 @@ describe('RewardDiceEditor', () => {
     expect(onSideChange).toHaveBeenCalledOnce();
     expect(onSideChange.mock.calls[0]?.[0]).toBe('tea');
     expect(onSideChange.mock.calls[0]?.[1].bonusPhase?.enabled).toBe(false);
+  });
+
+  test('forwards a Bonus Phase upload as a direct reference without changing other fields', async () => {
+    const user = userEvent.setup();
+    const uploaded = createAsset({
+      id: 'bonus-image',
+      name: 'Bonus backdrop',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 1,
+      createdAt: 1,
+    });
+    const onSideChange =
+      vi.fn<(key: string, patch: Partial<RewardSideDraft>) => void>();
+    const onUploadAsset = vi.fn(() => Promise.resolve(uploaded));
+    const onSynchronizeAssetUpload = vi.fn(() => Promise.resolve());
+    render(
+      <RewardDiceEditor
+        assets={[]}
+        draft={{
+          enabled: true,
+          scheduleMode: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: '1',
+          customPhaseKeys: [],
+          rerolls: '0',
+          sides: [
+            {
+              key: 'tea',
+              icon: '☕',
+              title: 'Tea',
+              description: 'Keep this',
+              weight: '2',
+              availability: 'any',
+              bonusPhase: {
+                enabled: true,
+                name: 'Tea break',
+                durationMinutes: '5',
+                backgroundAsset: undefined,
+                audioAsset: undefined,
+                backgroundColor: '#123456',
+              },
+            },
+            {
+              key: 'walk',
+              icon: '🚶',
+              title: 'Walk',
+              description: '',
+              weight: '1',
+              availability: 'any',
+            },
+          ],
+        }}
+        errors={{}}
+        onUploadAsset={onUploadAsset}
+        onSynchronizeAssetUpload={onSynchronizeAssetUpload}
+        onEnabledChange={() => undefined}
+        onScheduleModeChange={() => undefined}
+        onTriggerPhaseTypeChange={() => undefined}
+        onFrequencyChange={() => undefined}
+        onRerollsChange={() => undefined}
+        onSideChange={onSideChange}
+        onBonusDurationChange={() => undefined}
+        onBonusDurationCommit={() => undefined}
+        onBonusDurationStep={() => undefined}
+        onAddSide={() => undefined}
+        onRemoveSide={() => undefined}
+      />,
+    );
+
+    await user.upload(
+      screen.getByLabelText('Upload image'),
+      new File(['image'], 'bonus.png', { type: 'image/png' }),
+    );
+
+    expect(onUploadAsset).toHaveBeenCalledWith(expect.any(File), 'image');
+    expect(onSynchronizeAssetUpload).toHaveBeenCalledOnce();
+    expect(onSideChange).toHaveBeenCalledWith('tea', {
+      bonusPhase: {
+        enabled: true,
+        name: 'Tea break',
+        durationMinutes: '5',
+        backgroundAsset: { type: 'direct', assetId: uploaded.id },
+        audioAsset: undefined,
+        backgroundColor: '#123456',
+      },
+    });
   });
 });

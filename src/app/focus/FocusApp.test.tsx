@@ -20,7 +20,7 @@ import {
 import { createWorkflow } from '@/features/workflow';
 import { defaultSettings } from '@/features/settings';
 import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
-import { createAssetId } from '@/features/assets';
+import { createAsset, createAssetId } from '@/features/assets';
 import type { WorkflowStudioDependencies } from '../workflow-studio/WorkflowStudio';
 
 import { FocusApp, type FocusDependencies } from './FocusApp';
@@ -39,7 +39,19 @@ function studioDependencies(
     duplicateWorkflow: vi.fn(() => Promise.resolve()),
     deleteWorkflow: vi.fn(() => Promise.resolve()),
     reorderWorkflows: vi.fn(() => Promise.resolve()),
-    importAsset: vi.fn(() => Promise.resolve()),
+    importAsset: vi.fn(() =>
+      Promise.resolve(
+        createAsset({
+          id: 'focus-image',
+          name: 'image',
+          kind: 'image',
+          mimeType: 'image/png',
+          byteSize: 1,
+          createdAt: 1,
+        }),
+      ),
+    ),
+    synchronizeAssetImport: vi.fn(() => Promise.resolve()),
     inspectAssetRetirement: vi.fn(),
     retireAsset: vi.fn(() => Promise.resolve()),
     synchronizeAssetRetirement: vi.fn(() => Promise.resolve()),

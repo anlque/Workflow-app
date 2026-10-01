@@ -90,6 +90,44 @@ test('names, duplicates and locally collapses Workflow Phases', async ({
   await expect(options.getByLabel('Phase 2 name')).toHaveValue('Review');
 });
 
+test('uploads and selects a Phase Asset without losing the Workflow draft', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Inline atmosphere');
+  await options.getByLabel('Phase 1 name').fill('Drafting');
+  await options.getByLabel('Background color').fill('#123456');
+  await options.getByLabel('Phase 1 duration in minutes').fill('35');
+
+  await options.getByLabel('Upload image').setInputFiles({
+    name: 'inline-forest.png',
+    mimeType: 'image/png',
+    buffer: onePixelPng,
+  });
+
+  await expect(options.getByLabel('Background image')).toHaveValue(/direct:/u);
+  await expect(options.getByLabel('Workflow name')).toHaveValue(
+    'Inline atmosphere',
+  );
+  await expect(options.getByLabel('Phase 1 name')).toHaveValue('Drafting');
+  await expect(options.getByLabel('Background color')).toHaveValue('#123456');
+  await expect(options.getByLabel('Phase 1 duration in minutes')).toHaveValue(
+    '35',
+  );
+
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(options.getByRole('status')).toHaveText('Workflow saved');
+  await options.reload();
+  await expect(options.getByLabel('Background image')).toHaveValue(/direct:/u);
+  await expect(
+    options.getByRole('option', { name: 'inline-forest.png' }),
+  ).toBeAttached();
+  await expect(options.getByLabel('Phase 1 name')).toHaveValue('Drafting');
+});
+
 test('embeds Workflow Studio over idle and active Focus without navigation', async ({
   context,
   extensionUrls,

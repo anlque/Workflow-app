@@ -905,6 +905,18 @@ textarea {
   outline-offset: 2px;
 }
 
+.asset-picker__upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.asset-picker > .feedback {
+  margin-top: 0.5rem;
+}
+
 .asset-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));

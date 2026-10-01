@@ -1,6 +1,10 @@
 import { Button, Field } from '@/shared';
 import type { Asset } from '@/features/assets';
-import { AssetPicker } from '@/features/assets/studio';
+import {
+  AssetPicker,
+  type AssetPickerUpload,
+  type AssetPickerUploadSynchronization,
+} from '@/features/assets/studio';
 
 import type { RewardPhaseType } from '../domain/RewardDice';
 import type { DiceSideAvailability } from '../domain/DiceSide';
@@ -15,6 +19,8 @@ export type RewardDiceEditorProps = Readonly<{
   assets: readonly Asset[];
   draft: RewardDiceDraft;
   errors: WorkflowDraftErrors;
+  onUploadAsset?: AssetPickerUpload | undefined;
+  onSynchronizeAssetUpload?: AssetPickerUploadSynchronization | undefined;
   onEnabledChange(enabled: boolean): void;
   onScheduleModeChange(value: 'frequency' | 'custom'): void;
   onTriggerPhaseTypeChange(value: RewardPhaseType): void;
@@ -32,6 +38,8 @@ export function RewardDiceEditor({
   draft,
   assets,
   errors,
+  onUploadAsset,
+  onSynchronizeAssetUpload,
   onEnabledChange,
   onScheduleModeChange,
   onTriggerPhaseTypeChange,
@@ -300,6 +308,8 @@ export function RewardDiceEditor({
                             onChange={(backgroundAsset) => {
                               updateBonus({ backgroundAsset });
                             }}
+                            onUpload={onUploadAsset}
+                            onSynchronizeUpload={onSynchronizeAssetUpload}
                           />
                           <AssetPicker
                             label={`Side ${String(index + 1)} Bonus Phase ambient audio`}
@@ -309,6 +319,8 @@ export function RewardDiceEditor({
                             onChange={(audioAsset) => {
                               updateBonus({ audioAsset });
                             }}
+                            onUpload={onUploadAsset}
+                            onSynchronizeUpload={onSynchronizeAssetUpload}
                           />
                           <Field
                             label={`Side ${String(index + 1)} Bonus Phase background color`}

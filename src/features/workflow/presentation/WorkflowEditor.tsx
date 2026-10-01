@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { Asset } from '@/features/assets';
-import { AssetPicker } from '@/features/assets/studio';
+import {
+  AssetPicker,
+  type AssetPickerUpload,
+  type AssetPickerUploadSynchronization,
+} from '@/features/assets/studio';
 import { Button, Field, Select } from '@/shared';
 
 import type { CreateWorkflowInput, Workflow } from '../domain/Workflow';
@@ -17,6 +21,8 @@ export type WorkflowEditorProps = Readonly<{
   workflowId: string;
   assets: readonly Asset[];
   onSave(input: CreateWorkflowInput): Promise<void>;
+  onUploadAsset?: AssetPickerUpload | undefined;
+  onSynchronizeAssetUpload?: AssetPickerUploadSynchronization | undefined;
 }>;
 
 export function WorkflowEditor({
@@ -24,6 +30,8 @@ export function WorkflowEditor({
   workflowId,
   assets,
   onSave,
+  onUploadAsset,
+  onSynchronizeAssetUpload,
 }: WorkflowEditorProps) {
   const editor = useWorkflowEditor(workflowId, workflow);
   const [errors, setErrors] = useState<WorkflowDraftErrors>({});
@@ -341,6 +349,8 @@ export function WorkflowEditor({
                       onChange={(backgroundAsset) => {
                         editor.updatePhase(phase.key, { backgroundAsset });
                       }}
+                      onUpload={onUploadAsset}
+                      onSynchronizeUpload={onSynchronizeAssetUpload}
                     />
                     <AssetPicker
                       label="Ambient audio"
@@ -350,6 +360,8 @@ export function WorkflowEditor({
                       onChange={(audioAsset) => {
                         editor.updatePhase(phase.key, { audioAsset });
                       }}
+                      onUpload={onUploadAsset}
+                      onSynchronizeUpload={onSynchronizeAssetUpload}
                     />
                     <Field label="Background color" hint="Optional CSS color.">
                       <input
@@ -372,6 +384,8 @@ export function WorkflowEditor({
 
       <RewardDiceEditor
         assets={assets}
+        onUploadAsset={onUploadAsset}
+        onSynchronizeAssetUpload={onSynchronizeAssetUpload}
         draft={editor.draft.rewardDice}
         errors={errors}
         onEnabledChange={(enabled) => {

@@ -35,7 +35,8 @@ export type WorkflowStudioDependencies = Readonly<{
   duplicateWorkflow(id: WorkflowId): Promise<void>;
   deleteWorkflow(id: WorkflowId): Promise<void>;
   reorderWorkflows(ids: readonly WorkflowId[]): Promise<void>;
-  importAsset(file: File, kind: AssetKind): Promise<void>;
+  importAsset(file: File, kind: AssetKind): Promise<Asset>;
+  synchronizeAssetImport(): Promise<void>;
   inspectAssetRetirement(id: AssetId): Promise<AssetRetirementPreview>;
   retireAsset(
     preview: AssetRetirementPreview,
@@ -260,6 +261,27 @@ export function WorkflowStudio({
                     dependencies.createId()
                   }
                   assets={snapshot.assets}
+                  onUploadAsset={async (file, kind) => {
+                    const asset = await dependencies.importAsset(file, kind);
+                    setSnapshot((current) =>
+                      current === null
+                        ? current
+                        : {
+                            ...current,
+                            assets: [
+                              ...current.assets.filter(
+                                ({ id }) => id !== asset.id,
+                              ),
+                              asset,
+                            ],
+                          },
+                    );
+                    return asset;
+                  }}
+                  onSynchronizeAssetUpload={async () => {
+                    await dependencies.synchronizeAssetImport();
+                    await load(selectedWorkflowId);
+                  }}
                   {...(selectedWorkflow === undefined
                     ? {}
                     : { workflow: selectedWorkflow })}

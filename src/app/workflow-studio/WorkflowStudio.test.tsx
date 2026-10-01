@@ -16,6 +16,23 @@ import {
   type WorkflowStudioDependencies,
 } from './WorkflowStudio';
 
+const imageAsset = createAsset({
+  id: 'default-image',
+  name: 'Image',
+  kind: 'image',
+  mimeType: 'image/png',
+  byteSize: 1,
+  createdAt: 1,
+});
+const audioAsset = createAsset({
+  id: 'default-audio',
+  name: 'Audio',
+  kind: 'audio',
+  mimeType: 'audio/mpeg',
+  byteSize: 1,
+  createdAt: 1,
+});
+
 function dependencies(
   overrides: Partial<WorkflowStudioDependencies> = {},
 ): WorkflowStudioDependencies {
@@ -27,7 +44,9 @@ function dependencies(
     duplicateWorkflow: () => Promise.resolve(),
     deleteWorkflow: () => Promise.resolve(),
     reorderWorkflows: () => Promise.resolve(),
-    importAsset: () => Promise.resolve(),
+    importAsset: (_file, kind) =>
+      Promise.resolve(kind === 'image' ? imageAsset : audioAsset),
+    synchronizeAssetImport: () => Promise.resolve(),
     inspectAssetRetirement: (id) =>
       Promise.resolve({
         asset: createAsset({
@@ -81,6 +100,90 @@ function dependencies(
 }
 
 describe('WorkflowStudio', () => {
+  test.each(['publication', 'load'] as const)(
+    'preserves the draft and retries only synchronization after an inline upload %s failure',
+    async (failure) => {
+      const user = userEvent.setup();
+      const uploaded = createAsset({
+        id: 'uploaded-image',
+        name: 'New backdrop',
+        kind: 'image',
+        mimeType: 'image/png',
+        byteSize: 5,
+        createdAt: 2,
+      });
+      const existing = createWorkflow({
+        id: 'existing-workflow',
+        name: 'Saved name',
+        phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+      });
+      const empty = {
+        workflows: [existing],
+        assets: [],
+        settings: defaultSettings,
+      };
+      const populated = {
+        workflows: [existing],
+        assets: [uploaded],
+        settings: defaultSettings,
+      };
+      const load =
+        failure === 'load'
+          ? vi
+              .fn()
+              .mockResolvedValueOnce(empty)
+              .mockRejectedValueOnce(new Error('Reload failed.'))
+              .mockResolvedValueOnce(populated)
+          : vi
+              .fn()
+              .mockResolvedValueOnce(empty)
+              .mockResolvedValueOnce(populated);
+      const importAsset = vi.fn(() => Promise.resolve(uploaded));
+      const synchronizeAssetImport =
+        failure === 'publication'
+          ? vi
+              .fn<() => Promise<void>>()
+              .mockRejectedValueOnce(new Error('Publication failed.'))
+              .mockResolvedValueOnce()
+          : vi.fn(() => Promise.resolve());
+      render(
+        <WorkflowStudio
+          dependencies={dependencies({
+            load,
+            importAsset,
+            synchronizeAssetImport,
+          })}
+        />,
+      );
+
+      await screen.findByLabelText('Workflow name');
+      await user.clear(screen.getByLabelText('Workflow name'));
+      await user.type(screen.getByLabelText('Workflow name'), 'Uncommitted');
+      await user.type(screen.getByLabelText('Phase 1 name'), 'Writing');
+      await user.upload(
+        screen.getByLabelText('Upload image'),
+        new File(['image'], 'backdrop.png', { type: 'image/png' }),
+      );
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Asset was added, but the catalog could not be refreshed.',
+      );
+      expect(screen.getByLabelText('Workflow name')).toHaveValue('Uncommitted');
+      expect(screen.getByLabelText('Phase 1 name')).toHaveValue('Writing');
+      expect(screen.getByLabelText('Background image')).toHaveValue(
+        'direct:uploaded-image',
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Retry sync' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: 'Retry sync' })).toBeNull();
+      });
+      expect(importAsset).toHaveBeenCalledOnce();
+      expect(synchronizeAssetImport).toHaveBeenCalledTimes(2);
+      expect(load).toHaveBeenCalledTimes(failure === 'load' ? 3 : 2);
+      expect(screen.getByLabelText('Workflow name')).toHaveValue('Uncommitted');
+    },
+  );
   test.each(['publication', 'load'] as const)(
     'retries %s after committed retirement without repeating the mutation',
     async (failure) => {
@@ -296,7 +399,7 @@ describe('WorkflowStudio', () => {
       revokeObjectUrl: vi.fn(),
       importAsset: vi.fn(() => {
         assets = [audio, image];
-        return Promise.resolve();
+        return Promise.resolve(image);
       }),
     });
     render(<WorkflowStudio dependencies={deps} />);
