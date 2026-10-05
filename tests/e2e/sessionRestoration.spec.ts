@@ -151,7 +151,10 @@ test('restores a final Bonus Reward Phase and completes only after its deadline'
   await expect(
     focus.getByRole('dialog', { name: 'Reward unlocked' }),
   ).toBeVisible();
+  await focus.emulateMedia({ reducedMotion: 'reduce' });
   await focus.getByRole('button', { name: 'Roll dice' }).click();
+  await expect(focus.getByTestId('reward-dice-video')).toHaveCount(0);
+  await expect(focus.getByTestId('reward-dice-poster')).toBeVisible();
   const title = await focus.locator('.reward-result h3').textContent();
   expect(title).not.toBeNull();
   await focus.reload();

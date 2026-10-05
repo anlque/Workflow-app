@@ -18,8 +18,8 @@ Phase index; it is not a timer or random event.
   [`isRewardDueAfterPhase()`](../../../src/features/workflow/domain/isRewardDueAfterPhase.ts).
 - Reward interaction is composed in Focus and Side Panel from the same
   authoritative commands; Focus additionally owns Dice sound.
-- UI audio must have been unlocked by a user gesture for synthesized cues to be
-  audible.
+- UI audio must have been unlocked by a user gesture for the packaged Dice cue
+  or its synthesized fallback to be audible.
 
 ## Sequence
 
@@ -54,11 +54,19 @@ Phase index; it is not a timer or random event.
 1. The dialog opens in `ready`; no result is chosen automatically.
 2. Clicking **Roll dice** sends `session/roll-reward`. The serialized background
    command invokes Domain selection with injected randomness, persists the
-   result and broadcasts the updated Session. Presentation enters `mixing` and
-   hides the authoritative result while the cube moves.
-3. Focus starts the synthesized Dice sound for the same duration: 2.5 seconds,
-   or 0.6 seconds when reduced motion is active.
-4. When the duration ends, the cube and selected side enter `result`.
+   result and broadcasts the updated Session. Presentation enters `rolling`,
+   starts the packaged WebM from its first frame and hides the authoritative
+   result while the Dice moves.
+3. Focus starts the packaged Dice cue from the same user gesture. Normal motion
+   overlaps a second playback with a 150 ms crossfade to cover the 3.0-second
+   animation; reduced motion uses a 0.6-second interval. Live user volume and
+   the terminal fade use independent gain stages. Decode/playback failure falls
+   back to the existing synthesized roll.
+4. Result disclosure waits for both the successful authoritative command and a
+   terminal presentation event. `ended` retains the final video frame; media
+   error, rejected `play()` or the 3.8-second watchdog uses the approved PNG.
+   Reduced motion never starts video and presents the PNG without entrance
+   motion.
 5. If configured rerolls remain, **Roll again · N left** repeats the same random,
    animation and sound sequence and replaces the previous result. `rerolls` is
    the number of additional rolls, from 0 through 3; the initial roll does not
@@ -126,7 +134,8 @@ selected result.
 | Focus reloads during Reward           | Dialog hydrates the same result and reroll allowance                | Retry only a failed command; remount does not roll                    |
 | Focus misses final transition         | Final Reward remains persisted and actionable                       | Open either Session surface                                           |
 | Invalid random value                  | Workflow Domain throws before a result                             | Fix the injected random source; production uses `Math.random()`      |
-| UI sound synthesis fails              | Sound player swallows the cue failure                              | Interaction and Session authority remain unaffected                  |
+| Dice video fails or exceeds watchdog  | Approved PNG completes the presentation                            | Continue remains available after the command succeeds                |
+| Packaged Dice sound fails             | Stoppable synthesized roll is used                                 | Interaction and Session authority remain unaffected                  |
 
 ## Proof in Tests
 
@@ -137,7 +146,8 @@ selected result.
 - opportunity restoration and projection cue transitions:
   `src/features/session/infrastructure/DexieSessionRepository.test.ts` and
   `src/app/focus/completionCue.test.ts`.
-- click-to-roll, durations and rerolls: `RewardResultDialog.test.tsx`.
+- media terminal states and responsive result composition:
+  `RewardCube.test.tsx` and `RewardResultDialog.test.tsx`.
 - assembled dialog and final Continue behavior: `ActiveSessionView.test.tsx`.
 - audio sequencing: `src/app/focus/createUiSoundPlayer.test.ts`,
   `completionCue.test.ts` and `useCompletionCue.test.tsx`.

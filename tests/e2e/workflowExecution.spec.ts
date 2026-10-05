@@ -510,9 +510,55 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
   await focus.getByRole('button', { name: 'Roll dice' }).click();
   await expect(focus.getByTestId('reward-cube')).toHaveAttribute(
     'data-state',
-    'mixing',
+    'rolling',
   );
+  const rollingVideo = focus.getByTestId('reward-dice-video');
+  await expect
+    .poll(() =>
+      rollingVideo.evaluate((video: HTMLVideoElement) => video.readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
+  const cornerAlpha = await rollingVideo.evaluate((video: HTMLVideoElement) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    if (context === null) throw new Error('Canvas is unavailable.');
+    context.drawImage(video, 0, 0);
+    return context.getImageData(0, 0, 1, 1).data[3];
+  });
+  expect(cornerAlpha).toBeLessThan(16);
+  await rollingVideo.dispatchEvent('error');
   await expect(reward).toContainText(/Tea|Stretch/u);
+  await expect(focus.getByTestId('reward-dice-poster')).toBeVisible();
+  const resultOverlay = focus.getByTestId('reward-dice-overlay');
+  await expect(resultOverlay.locator('.reward-dice-stage__cloud')).toHaveCSS(
+    'animation-duration',
+    '0.2s',
+  );
+  await expect(resultOverlay.locator('.reward-dice-stage__icon')).toHaveCSS(
+    'animation-delay',
+    '0.15s',
+  );
+  await expect(resultOverlay.locator('.reward-dice-stage__icon')).toHaveCSS(
+    'font-size',
+    '36px',
+  );
+  await expect(focus.getByTestId('reward-dice-composition')).toHaveCSS(
+    'transform',
+    'matrix(1.2, 0, 0, 1.2, 0, 0)',
+  );
+  const diceBackdrop = focus.getByTestId('reward-dice-backdrop');
+  await expect(diceBackdrop).toBeVisible();
+  expect(
+    await diceBackdrop.evaluate(
+      (element) => getComputedStyle(element).backgroundImage,
+    ),
+  ).toContain('radial-gradient');
+  await expect(reward.locator('.reward-result')).toHaveCSS(
+    'animation-delay',
+    '0.15s',
+  );
   const persistedResult = await reward
     .locator('.reward-result h3')
     .textContent();
@@ -521,15 +567,21 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
   await expect(
     focus.getByRole('dialog', { name: 'Reward unlocked' }),
   ).toContainText(persistedResult ?? '');
+  await expect(focus.locator('.reward-result')).toHaveCSS(
+    'animation-name',
+    'none',
+  );
   await expect(
     focus.getByRole('button', { name: 'Roll again · 1 left' }),
   ).toBeVisible();
   await focus.getByRole('button', { name: 'Roll again · 1 left' }).click();
   await expect(focus.getByTestId('reward-cube')).toHaveAttribute(
     'data-state',
-    'mixing',
+    'rolling',
   );
   await expect(reward).toContainText(/Tea|Stretch/u);
+  await expect(focus.getByTestId('reward-dice-video')).toBeVisible();
+  await expect(focus.getByTestId('reward-dice-overlay')).toBeVisible();
   await expect(focus.getByRole('button', { name: /Roll again/u })).toHaveCount(
     0,
   );

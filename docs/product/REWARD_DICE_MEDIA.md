@@ -1,59 +1,58 @@
 # Reward Dice Media
 
-This page records the source, packaged exports and geometry contract for the
-deterministic Reward Dice animation. Runtime playback and Reward-result
-presentation belong to RW-006.
+This page records the source, packaged exports, geometry contract and RW-006
+runtime use of the deterministic Reward Dice animation.
 
 ## Ownership and source
 
-The animation and final-frame artwork were supplied by the product owner on
-2026-10-01. Inspection of the external master identified Blender scene
-`Scene.001` and the product-owner working file `blender2.blend`. That master and
-the editable `.blend` remain outside the repository. The repository stores a
-stream-copied WebM derivative with identifying container metadata removed.
+The animation and final-frame artwork were supplied and then shortened by the
+product owner on 2026-10-01. The editable `.blend` and identifying master remain
+outside the repository. The repository stores a stream-copied WebM derivative
+with identifying container metadata removed.
 
-The external master was 2,338,924 bytes with SHA-256
-`a7c7efb5f407ed927e056ec277f2e2285a992993bf692d8f8d6aacec4608e4aa`.
+The updated external master was 1,834,817 bytes with SHA-256
+`02cb1c41227079112e33730ea99e3a285df9668df7b6304e3355d0af03880ed1`.
 
 | Purpose | File | Metadata | Bytes | SHA-256 |
 | --- | --- | --- | ---: | --- |
-| Metadata-free animation source | `assets/reward-dice/source/reward-dice-roll.webm` | WebM/VP9 stream copy; 1920×1080; 16:9; 30 FPS; 4.166 s; yuv420p/BT.709; video only | 2,338,810 | `1fb9a4a62e6ff459a3003ddd16e8cb634604cfd1cae90c81f608df700b384e0d` |
-| Product-owner final frame | `assets/reward-dice/source/reward-dice-final.png` | PNG; 1080×1080; RGBA; 8-bit sRGB | 555,610 | `a2705bd545d7089124a3abf4626fd167caf84e97f24d722921bed2e24d604c6b` |
+| Metadata-free animation source | `assets/reward-dice/source/reward-dice-roll.webm` | WebM/VP9 with alpha stream copy; 1080×1080; 1:1; 30 FPS; 3.000 s; yuva420p/BT.709; video only | 1,834,700 | `90ec0941daee4b6f88afebb79235cd69b6f487e88cb2cdbf1aab2d14d8957413` |
+| Product-owner final frame | `assets/reward-dice/source/reward-dice-final.png` | PNG; 1080×1080; RGBA; 8-bit sRGB | 543,006 | `a386083fcc028a2197168b646b428a6bd1967212399745d77cf37feb60411757` |
 
-The supplied PNG is the approved final frame. It is a square center crop of the
-same 1080-pixel-high composition and was preserved byte-for-byte for runtime.
+The supplied PNG is the approved final frame and was preserved byte-for-byte
+for runtime.
 
 ## Packaged exports
 
 | Purpose | File | Metadata | Bytes | SHA-256 |
 | --- | --- | --- | ---: | --- |
-| Normal-motion animation | `public/video/reward-dice-roll.webm` | WebM/VP9; 1920×1080; 16:9; 30 FPS; 4.400 s; yuv420p/BT.709; about 1.305 Mbps; video only | 717,899 | `f054ea50515d27ac61af86707ee4c07f786a05fef918147819d938331f027a1f` |
-| Poster, decode-error/loading fallback and reduced-motion artwork | `public/video/reward-dice-final.png` | PNG; 1080×1080; RGBA; 8-bit sRGB | 555,610 | `a2705bd545d7089124a3abf4626fd167caf84e97f24d722921bed2e24d604c6b` |
+| Normal-motion animation | `public/video/reward-dice-roll.webm` | WebM/VP9 with alpha; 1080×1080; 1:1; 30 FPS; 3.000 s; yuva420p/BT.709; about 1.421 Mbps; video only | 533,013 | `bb147172e9b2fc90650280e8315d5b85fd3e3d1bbbe37a9312a1c9b4d8ed80a9` |
+| Poster, decode-error/loading fallback and reduced-motion artwork | `public/video/reward-dice-final.png` | PNG; 1080×1080; RGBA; 8-bit sRGB | 543,006 | `a386083fcc028a2197168b646b428a6bd1967212399745d77cf37feb60411757` |
 
-The source animation rotated into the approved face but then faded the entire
-dice. The packaged WebM removes that unwanted terminal fade and clones the
-stable final frame for approximately 500 ms. It is re-encoded because a stream
-copy cannot remove the fade or add the required hold. Metadata containing the
-product owner's local path is stripped. No audio stream is mapped.
+The updated source already ends in the approved pose at 3.000 seconds. Runtime
+encoding preserves that timing without adding a terminal hold, so the cloud can
+start on `ended` without an artificial pause. Metadata containing the product
+owner's local path is stripped and no audio stream is mapped.
 
-The PNG must not replace the last frame during ordinary playback. RW-006 uses
-it only as poster/error/loading fallback and as the reduced-motion artwork.
+The PNG does not replace the last frame during ordinary playback. The runtime
+retains the ended WebM frame and uses the PNG only for initial/hydrated results,
+poster/loading, media fallback and reduced-motion artwork. A rejected `play()`,
+media `error` or 3.8-second watchdog completes through that fallback without
+blocking an already successful Reward command.
 
 ## Result overlay geometry
 
 The selected face is the large front-center dark-green face. Its baked logo
 center is:
 
-- source/runtime video pixel coordinate: `(960, 580)` in 1920×1080;
+- source/runtime video pixel coordinate: `(540, 580)` in 1080×1080;
 - fallback PNG pixel coordinate: `(540, 580)` in 1080×1080;
 - normalized coordinate for both: **`(0.500000, 0.537037)`**, measured from the
   top-left of the displayed media.
 
-The matching normalized coordinate is intentional: the PNG is the video's
-center crop, so responsive scaling preserves the same face center when the
-media itself is scaled without distortion.
+The matching normalized coordinate is intentional, so responsive scaling
+preserves the same face center across video and fallback artwork.
 
-RW-006 will gradually reveal a fog-like `#00401FFF` radial cloud centered on
+RW-006 gradually reveals a fog-like `#00401FFF` radial cloud centered on
 this anchor. It has no border or shadow: an opaque core covers the baked logo,
 then the same green fades broadly to full transparency. The approved geometry
 preview uses a 280 px diameter at 1080 px media height, an approximately 73 px
@@ -62,9 +61,14 @@ map to `0.259259`, `0.067593` and `0.129630` of rendered media height. A small
 8 px (`0.007407`) blur may soften gradient banding but must not read as a
 separate shadow. The cloud forms the backing for the HTML/SVG Reward icon;
 the cloud appears through a combined center-origin scale-up and opacity fade.
-RW-006 owns the exact timing and easing, keeps the settled geometry above, and
-shows the settled cloud without entrance motion under reduced motion. The icon
-itself also remains an RW-006 concern.
+The runtime scales the media and overlay composition to 1.2 inside its clipped
+16:9 stage. A static borderless white radial cloud at 18% maximum opacity sits
+behind the whole Dice composition to separate it from dark environments. Its
+blurred fade spans about 82% of the stage height. The green cloud uses a 200 ms
+ease-out scale/opacity entrance; the smaller
+icon and Reward copy begin their 360 ms entrances after 150 ms, once the cloud's
+core has covered the baked logo. Reduced motion and hydrated results show the
+settled composition immediately.
 
 ## Reproducible export
 
@@ -93,10 +97,10 @@ cd /path/to/locusora
 mkdir -p public/video
 
 "$FFMPEG_BIN" -hide_banner -y \
-  -i assets/reward-dice/source/reward-dice-roll.webm \
+  -c:v libvpx-vp9 -i assets/reward-dice/source/reward-dice-roll.webm \
   -map_metadata -1 -an \
-  -vf "trim=end=3.9,setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=0.5,fps=30,format=yuv420p" \
-  -c:v libvpx-vp9 -b:v 0 -crf 32 -deadline good -cpu-used 2 -row-mt 1 \
+  -vf "fps=30,format=yuva420p" \
+  -c:v libvpx-vp9 -pix_fmt yuva420p -b:v 0 -crf 32 -deadline good -cpu-used 2 -row-mt 1 \
   public/video/reward-dice-roll.webm
 
 cp assets/reward-dice/source/reward-dice-final.png \
@@ -127,19 +131,18 @@ shasum -a 256 \
 
 Inspection on 2026-10-01 confirmed:
 
-- the repository source is a VP9 stream copy of the external master: decoded
-  frame SHA-256 is `91662de75668a3e395c4469a8ef849049b0766de22ff0a10b229016d7cd4ed84`
-  for both files;
-- ffprobe and `strings` find no local path, `blender2.blend` or `Scene.001` in
+- the repository source is a VP9 stream copy of the updated external master;
+- ffprobe and `strings` find no local path, Blender filename or `Scene.001` in
   the repository source;
-- the packaged WebM has exactly one VP9 video stream and no audio stream;
+- the packaged WebM has exactly one alpha-bearing VP9 video stream and no audio
+  stream; Chrome canvas sampling reports transparent corner pixels;
 - Chromium reports VP9 support as `probably`, reaches media `readyState` 4 and
-  decodes the file as 1920×1080 with duration 4.4 s;
+  decodes the file as 1080×1080 with duration 3.0 s;
 - Chromium decodes the PNG as 1080×1080;
 - the final animation frame and approved PNG show the same stable dice pose and
   selected face;
 - the normalized anchor lands on the baked logo in both aspect ratios;
-- the packaged pair adds 1,273,509 bytes before extension-container overhead.
+- the packaged pair adds 1,076,019 bytes before extension-container overhead.
 
 The product owner visually approved the animation, fallback, overlay anchor and
 fog-like backing treatment on 2026-10-01.

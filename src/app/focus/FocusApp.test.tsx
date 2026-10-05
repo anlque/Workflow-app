@@ -694,7 +694,7 @@ describe('FocusApp', () => {
       await Promise.resolve();
     });
     act(() => {
-      vi.advanceTimersByTime(2_500);
+      fireEvent.ended(screen.getByTestId('reward-dice-video'));
     });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Continue' }));

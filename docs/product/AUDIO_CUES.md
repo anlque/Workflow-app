@@ -40,7 +40,7 @@ The dice source is sparse and transient-heavy; its -2.0 dBFS peak ceiling preven
 ## Transformations
 
 - Phase bell: selected excerpt; leading silence removed at -50 dB; mono downmix; content trimmed to 2.850 s; 8 ms fade-in and 120 ms fade-out; loudness processing; 64 kbps MP3.
-- Dice roll: first 1.020 s of the recorded roll repeated three times; two 8 ms equal-power crossfades; content trimmed to exactly 2.500 s; 40 ms terminal fade; peak-constrained loudness processing; 64 kbps MP3. The packaged file covers the complete dice animation and requires no runtime loop.
+- Dice roll: first 1.020 s of the recorded roll repeated three times; two 8 ms equal-power crossfades; content trimmed to exactly 2.500 s; 40 ms terminal fade; peak-constrained loudness processing; 64 kbps MP3. RW-006 schedules a short overlapping second playback so the cue covers the 3.0-second video without modifying the packaged asset.
 - Reward unlocked: leading silence removed at -50 dB; principal coin transient retained; content trimmed to 1.020 s; 8 ms fade-in and 120 ms fade-out; level adjustment; 96 kbps MP3.
 - Session complete: leading silence removed from the fanfare; content trimmed to 3.450 s; 120 ms terminal fade; loudness processing; 112 kbps MP3. Confetti remains a visual concern for AU-001/RW-006 without a separate balloon accent.
 
@@ -107,4 +107,13 @@ afplay public/audio/reward-unlocked.mp3
 afplay public/audio/session-complete.mp3
 ```
 
-Runtime playback integration remains explicitly deferred to AU-001/RW-006. The existing synthesized sounds remain the future fallback.
+RW-006 integrates `dice-roll.mp3` as the primary roll cue. It decodes and caches
+the packaged file through Web Audio, applies the existing UI volume through an
+independent live gain, stops all scheduled sources at the terminal presentation
+event, and uses the existing synthesized roll only when loading, decoding or
+playback fails. Adjacent clips overlap for 150 ms; the outgoing clip remains at
+gain `0.8` until that overlap begins and fades only across it. The other
+production cues remain deferred to AU-001. A separate envelope fades the
+three-second roll over the final 250 ms; the 600 ms reduced-motion interval uses
+a 100 ms fade so neither path ends with an audible cut and mute cannot be undone
+by scheduled terminal automation.

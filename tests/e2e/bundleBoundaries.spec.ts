@@ -81,3 +81,15 @@ test('Focus initial preload graph excludes Workflow Studio modules', () => {
   );
   expect(entrySource).toMatch(/import\([^)]*LazyWorkflowStudio/u);
 });
+
+test('production bundle contains the approved Reward Dice media and roll cue', () => {
+  for (const path of [
+    'video/reward-dice-roll.webm',
+    'video/reward-dice-final.png',
+    'audio/dice-roll.mp3',
+  ]) {
+    expect(readFileSync(resolve(outputRoot, path))).toEqual(
+      readFileSync(resolve(import.meta.dirname, '../../public', path)),
+    );
+  }
+});

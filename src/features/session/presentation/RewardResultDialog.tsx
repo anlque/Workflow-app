@@ -3,17 +3,32 @@ import { useEffect, useRef, useState } from 'react';
 import type { DiceSide } from '@/features/workflow';
 import { Button, Dialog } from '@/shared';
 
-import { RewardCube, type RewardCubeStage } from './RewardCube';
+import {
+  RewardCube,
+  type RewardCubeResultMedia,
+  type RewardCubeTerminalReason,
+} from './RewardCube';
 
-type MixingDuration = 600 | 2500;
-type RewardStage = 'ready' | 'mixing' | 'result';
+type RollDuration = 600 | 3000;
+type RewardStage = 'ready' | 'rolling' | 'result';
+
+export type RewardRollPlayback = Readonly<{ stop(): void }>;
+
+type RollAttempt = {
+  id: number;
+  reroll: boolean;
+  startingRerolls: number;
+  commandSettled: boolean;
+  mediaReason: RewardCubeTerminalReason | null;
+  playback: RewardRollPlayback | undefined;
+};
 
 export type RewardResultDialogProps = Readonly<{
   reward: DiceSide | null;
   usedRerolls: number;
   rerolls: number;
   reducedMotion: boolean;
-  onRoll(durationMs: MixingDuration): void;
+  onRoll(durationMs: RollDuration): RewardRollPlayback | undefined;
   requestRoll(): Promise<void>;
   requestReroll(): Promise<void>;
   onContinue(): Promise<void>;
@@ -29,24 +44,58 @@ export function RewardResultDialog({
   requestReroll,
   onContinue,
 }: RewardResultDialogProps) {
-  const [stage, setStage] = useState<RewardStage>('ready');
-  const [pending, setPending] = useState(false);
+  const [stage, setStage] = useState<RewardStage>(
+    reward === null ? 'ready' : 'result',
+  );
+  const [attempt, setAttempt] = useState<RollAttempt | null>(null);
+  const [resultMedia, setResultMedia] =
+    useState<RewardCubeResultMedia>('poster');
+  const [animateResult, setAnimateResult] = useState(false);
+  const [continuePending, setContinuePending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
-  const duration: MixingDuration = reducedMotion ? 600 : 2_500;
-  useEffect(() => {
-    if (reward !== null && stage === 'ready') setStage('result');
-  }, [reward, stage]);
+  const attemptRef = useRef<RollAttempt | null>(null);
+  const nextAttemptIdRef = useRef(0);
+
+  function publishAttempt(next: RollAttempt | null): void {
+    attemptRef.current = next;
+    setAttempt(next);
+  }
+
+  function stopPlayback(current: RollAttempt): void {
+    const playback = current.playback;
+    current.playback = undefined;
+    playback?.stop();
+  }
 
   useEffect(() => {
-    if (stage !== 'mixing') return;
-    const timer = window.setTimeout(() => {
-      setStage('result');
-    }, duration);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [duration, stage]);
+    if (attempt !== null || stage !== 'ready' || reward === null) return;
+    setResultMedia('poster');
+    setAnimateResult(false);
+    setStage('result');
+  }, [attempt, reward, stage]);
+
+  useEffect(() => {
+    if (!attempt?.commandSettled) return;
+    const projectionSettled = attempt.reroll
+      ? usedRerolls > attempt.startingRerolls && reward !== null
+      : reward !== null;
+    if (!projectionSettled || attempt.mediaReason === null) return;
+
+    setResultMedia(attempt.mediaReason === 'ended' ? 'video' : 'poster');
+    setAnimateResult(true);
+    publishAttempt(null);
+    setStage('result');
+  }, [attempt, reward, usedRerolls]);
+
+  useEffect(
+    () => () => {
+      const current = attemptRef.current;
+      attemptRef.current = null;
+      if (current !== null) stopPlayback(current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (stage === 'result' && usedRerolls > 0 && usedRerolls >= rerolls) {
@@ -54,11 +103,9 @@ export function RewardResultDialog({
     }
   }, [rerolls, stage, usedRerolls]);
 
-  const cubeStage: RewardCubeStage =
-    stage === 'mixing' && reducedMotion ? 'mixing-reduced' : stage;
-
   async function continueSession(): Promise<void> {
-    setPending(true);
+    if (continuePending) return;
+    setContinuePending(true);
     setError(null);
     try {
       await onContinue();
@@ -67,33 +114,62 @@ export function RewardResultDialog({
         cause instanceof Error ? cause.message : 'Continuing Session failed.',
       );
     } finally {
-      setPending(false);
+      setContinuePending(false);
     }
   }
 
   async function roll(reroll: boolean): Promise<void> {
+    if (attemptRef.current !== null) return;
     setError(null);
-    setPending(true);
-    setStage('mixing');
-    onRoll(duration);
+    const id = nextAttemptIdRef.current + 1;
+    nextAttemptIdRef.current = id;
+    const duration: RollDuration = reducedMotion ? 600 : 3_000;
+    const current: RollAttempt = {
+      id,
+      reroll,
+      startingRerolls: usedRerolls,
+      commandSettled: false,
+      mediaReason: null,
+      playback: onRoll(duration) ?? undefined,
+    };
+    attemptRef.current = current;
+    setAttempt(current);
+    setAnimateResult(false);
+    setStage('rolling');
+
     try {
       await (reroll ? requestReroll() : requestRoll());
+      if (attemptRef.current !== current) return;
+      current.commandSettled = true;
+      setAttempt({ ...current });
     } catch (cause) {
-      setStage(reward === null ? 'ready' : 'result');
+      if (attemptRef.current !== current) return;
+      stopPlayback(current);
+      publishAttempt(null);
+      setResultMedia('poster');
+      setAnimateResult(false);
+      setStage(reroll && reward !== null ? 'result' : 'ready');
       setError(
         cause instanceof Error ? cause.message : 'Rolling Reward failed.',
       );
-    } finally {
-      setPending(false);
     }
   }
 
-  function reroll(): void {
-    if (stage !== 'result' || usedRerolls >= rerolls) return;
-    void roll(true);
+  function handleTerminal(
+    attemptId: number,
+    reason: RewardCubeTerminalReason,
+  ): void {
+    const current = attemptRef.current;
+    if (current?.id !== attemptId || current.mediaReason !== null) {
+      return;
+    }
+    stopPlayback(current);
+    current.mediaReason = reason;
+    setAttempt({ ...current });
   }
 
   const rerollsLeft = rerolls - usedRerolls;
+  const displayedAttemptId = attempt?.id ?? nextAttemptIdRef.current;
 
   return (
     <Dialog
@@ -103,13 +179,23 @@ export function RewardResultDialog({
       onCancel={() => undefined}
     >
       <div className="reward-dialog__content">
-        <RewardCube icon={reward?.icon ?? '✦'} stage={cubeStage} />
+        <RewardCube
+          attemptId={displayedAttemptId}
+          icon={reward?.icon ?? '✦'}
+          stage={stage}
+          resultMedia={resultMedia}
+          reducedMotion={reducedMotion}
+          animateResult={animateResult}
+          onTerminal={handleTerminal}
+        />
         {stage === 'result' && reward !== null ? (
           <div
             className="reward-result"
             role="status"
             aria-live="polite"
             aria-atomic="true"
+            data-animate={animateResult || undefined}
+            data-reduced-motion={reducedMotion || undefined}
           >
             <h3>{reward.title}</h3>
             {reward.description === undefined ? null : (
@@ -120,12 +206,11 @@ export function RewardResultDialog({
         {error === null ? null : <p role="alert">{error}</p>}
       </div>
       <div ref={actionsRef} className="dialog__actions">
-        {stage === 'result' || usedRerolls > 0 ? (
+        {stage === 'result' ? (
           <>
             <Button
               variant="primary"
-              disabled={stage === 'mixing'}
-              pending={pending}
+              pending={continuePending}
               pendingLabel="Continuing…"
               onClick={() => {
                 void continueSession();
@@ -133,22 +218,26 @@ export function RewardResultDialog({
             >
               Continue
             </Button>
-            {rerollsLeft > 0 || stage === 'mixing' ? (
+            {rerollsLeft > 0 ? (
               <Button
                 variant="secondary"
-                disabled={stage === 'mixing' || pending}
-                onClick={reroll}
+                disabled={continuePending}
+                onClick={() => {
+                  void roll(true);
+                }}
               >
-                Roll again · {Math.max(rerollsLeft, 1)} left
+                Roll again · {rerollsLeft} left
               </Button>
             ) : null}
           </>
+        ) : stage === 'rolling' ? (
+          <Button variant="primary" disabled>
+            Rolling…
+          </Button>
         ) : (
           <Button
             variant="primary"
-            disabled={stage !== 'ready'}
             onClick={() => {
-              if (stage !== 'ready') return;
               void roll(false);
             }}
           >

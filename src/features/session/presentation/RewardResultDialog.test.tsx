@@ -17,6 +17,18 @@ const side = createWorkflow({
     ],
   },
 }).rewardDice?.sides[0];
+const otherSide = createWorkflow({
+  id: 'workflow-2',
+  name: 'Another reward',
+  phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+  rewardDice: {
+    frequency: 1,
+    sides: [
+      { icon: '🌿', title: 'Fresh air' },
+      { icon: '☕', title: 'Tea' },
+    ],
+  },
+}).rewardDice?.sides[0];
 
 afterEach(() => vi.useRealTimers());
 
@@ -54,6 +66,7 @@ describe('RewardResultDialog', () => {
       />,
     );
     expect(screen.getByText('Tea')).toBeVisible();
+    expect(screen.getByRole('status')).not.toHaveAttribute('data-animate');
     expect(
       screen.getByRole('button', { name: 'Roll again · 1 left' }),
     ).toBeVisible();
@@ -80,7 +93,7 @@ describe('RewardResultDialog', () => {
     expect(requestReroll).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('reward-cube')).toHaveAttribute(
       'data-state',
-      'mixing-reduced',
+      'rolling',
     );
     void act(() => vi.advanceTimersByTime(600));
   });
@@ -152,8 +165,7 @@ describe('RewardResultDialog', () => {
     expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus();
   });
 
-  test('uses the full 2500 ms animation and announces the result atomically', () => {
-    vi.useFakeTimers();
+  test('waits for command, authoritative projection and ended before announcing the result', async () => {
     const onRoll = vi.fn();
     const { rerender } = render(
       <RewardResultDialog
@@ -180,17 +192,169 @@ describe('RewardResultDialog', () => {
         onContinue={() => Promise.resolve()}
       />,
     );
-    expect(onRoll).toHaveBeenCalledWith(2_500);
-    act(() => {
-      vi.advanceTimersByTime(2_499);
-    });
+    expect(onRoll).toHaveBeenCalledWith(3_000);
     expect(screen.queryByText('Tea')).not.toBeInTheDocument();
-    act(() => {
-      vi.advanceTimersByTime(1);
+    fireEvent.ended(screen.getByTestId('reward-dice-video'));
+    expect(screen.queryByText('Tea')).not.toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
     });
     expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
     expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'true');
+    expect(screen.getByRole('status')).toHaveAttribute('data-animate', 'true');
+    expect(screen.getByTestId('reward-dice-video')).toBeVisible();
   });
+
+  test('waits for a delayed command after media ends', async () => {
+    let resolveCommand: (() => void) | undefined;
+    const requestRoll = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCommand = resolve;
+        }),
+    );
+    const { rerender } = render(
+      <RewardResultDialog
+        reward={null}
+        usedRerolls={0}
+        rerolls={0}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        requestRoll={requestRoll}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    fireEvent.ended(screen.getByTestId('reward-dice-video'));
+    rerender(
+      <RewardResultDialog
+        reward={side ?? null}
+        usedRerolls={0}
+        rerolls={0}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        requestRoll={requestRoll}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    expect(screen.queryByText('Tea')).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveCommand?.();
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Tea')).toBeVisible();
+  });
+
+  test('does not reveal the previous reward while a reroll awaits its fresh projection', async () => {
+    const { rerender } = render(
+      <RewardResultDialog
+        reward={side ?? null}
+        usedRerolls={0}
+        rerolls={1}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll again · 1 left' }),
+    );
+    fireEvent.ended(screen.getByTestId('reward-dice-video'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByText('Tea')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+
+    rerender(
+      <RewardResultDialog
+        reward={otherSide ?? null}
+        usedRerolls={1}
+        rerolls={1}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    expect(await screen.findByText('Fresh air')).toBeVisible();
+  });
+
+  test('stops presentation sound on command failure and unmount without double stop', async () => {
+    const stop = vi.fn();
+    const { unmount } = render(
+      <RewardResultDialog
+        reward={null}
+        usedRerolls={0}
+        rerolls={0}
+        reducedMotion={false}
+        onRoll={() => ({ stop })}
+        requestRoll={() => Promise.reject(new Error('Storage failed.'))}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Storage failed.',
+    );
+    expect(stop).toHaveBeenCalledOnce();
+    unmount();
+    expect(stop).toHaveBeenCalledOnce();
+  });
+
+  test.each([
+    { kind: 'roll', outcome: 'resolve' },
+    { kind: 'roll', outcome: 'reject' },
+    { kind: 'reroll', outcome: 'resolve' },
+    { kind: 'reroll', outcome: 'reject' },
+  ] as const)(
+    'invalidates a pending $kind command before unmount cleanup when it later $outcome',
+    async ({ kind, outcome }) => {
+      let settleCommand: (() => void) | undefined;
+      const requestCommand = vi.fn(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            settleCommand = () => {
+              if (outcome === 'resolve') resolve();
+              else reject(new Error('Late failure.'));
+            };
+          }),
+      );
+      const stop = vi.fn();
+      const { unmount } = render(
+        <RewardResultDialog
+          reward={kind === 'reroll' ? (side ?? null) : null}
+          usedRerolls={0}
+          rerolls={kind === 'reroll' ? 1 : 0}
+          reducedMotion={false}
+          onRoll={() => ({ stop })}
+          requestRoll={kind === 'roll' ? requestCommand : vi.fn()}
+          requestReroll={kind === 'reroll' ? requestCommand : vi.fn()}
+          onContinue={() => Promise.resolve()}
+        />,
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: kind === 'roll' ? 'Roll dice' : 'Roll again · 1 left',
+        }),
+      );
+      unmount();
+      await act(async () => {
+        settleCommand?.();
+        await Promise.resolve();
+      });
+
+      expect(stop).toHaveBeenCalledOnce();
+    },
+  );
 
   test('ignores Escape and keeps the authoritative ritual open', () => {
     render(

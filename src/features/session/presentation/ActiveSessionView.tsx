@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { Session, SessionId } from '../domain/Session';
 import { SessionControls } from './SessionControls';
-import { RewardResultDialog } from './RewardResultDialog';
+import {
+  RewardResultDialog,
+  type RewardRollPlayback,
+} from './RewardResultDialog';
 import { didCrossPhaseBoundary } from './didCrossPhaseBoundary';
 import { formatSessionCountdown } from './sessionCountdown';
 import { getActiveSessionSegment } from './getActiveSessionSegment';
@@ -14,7 +17,7 @@ export type ActiveSessionViewProps = Readonly<{
   dialogsEnabled?: boolean;
   onPhaseBoundary?(): void;
   rewardInteraction?: Readonly<{
-    onRoll(durationMs: 600 | 2500): void;
+    onRoll(durationMs: 600 | 3000): RewardRollPlayback | undefined;
     rollReward?(id: SessionId, rewardRitualId: string): Promise<void>;
     rerollReward?(id: SessionId, rewardRitualId: string): Promise<void>;
     continueReward(id: SessionId, rewardRitualId: string): Promise<void>;

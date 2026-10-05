@@ -3,19 +3,47 @@ export type UiSoundPlayer = Readonly<{
   getState(): 'locked' | 'ready' | 'unavailable';
   setVolume(volume: number): void;
   playBell(): void;
-  playDiceRoll(durationMs: 600 | 2500): void;
+  playDiceRoll(durationMs: 600 | 3000): UiSoundPlayback;
   playSessionComplete(): void;
   playRewardUnlocked(): void;
   dispose(): void;
 }>;
 
+export type UiSoundPlayback = Readonly<{ stop(): void }>;
+
+type RollBufferLoader = (context: AudioContext) => Promise<AudioBuffer>;
+
+const ROLL_SOUND_URL = '/audio/dice-roll.mp3';
+const ROLL_CROSSFADE_SECONDS = 0.15;
+
+async function loadRollBuffer(context: AudioContext): Promise<AudioBuffer> {
+  const response = await fetch(ROLL_SOUND_URL);
+  if (!response.ok) throw new Error('Dice roll sound failed to load.');
+  return context.decodeAudioData(await response.arrayBuffer());
+}
+
 export function createUiSoundPlayer(
   createContext: () => AudioContext = () => new AudioContext(),
+  loadDiceRollBuffer: RollBufferLoader = loadRollBuffer,
 ): UiSoundPlayer {
   let context: AudioContext | undefined;
   let disposed = false;
   let state: 'locked' | 'ready' | 'unavailable' = 'locked';
   let volume = 1;
+  let rollBufferPromise: Promise<AudioBuffer> | undefined;
+  let activeRoll:
+    | {
+        stopped: boolean;
+        sources: AudioBufferSourceNode[];
+        volumeGain: GainNode | undefined;
+        handle: UiSoundPlayback;
+      }
+    | undefined;
+
+  function getRollBuffer(audio: AudioContext): Promise<AudioBuffer> {
+    rollBufferPromise ??= loadDiceRollBuffer(audio);
+    return rollBufferPromise;
+  }
 
   async function unlock(): Promise<boolean> {
     if (disposed || state === 'unavailable') return false;
@@ -25,6 +53,7 @@ export function createUiSoundPlayer(
         await context.resume();
       }
       state = context.state === 'running' ? 'ready' : 'locked';
+      if (state === 'ready') void getRollBuffer(context).catch(() => undefined);
       return state === 'ready';
     } catch {
       state = 'unavailable';
@@ -38,6 +67,9 @@ export function createUiSoundPlayer(
 
   function setVolume(nextVolume: number): void {
     volume = Math.min(1, Math.max(0, nextVolume));
+    if (activeRoll?.volumeGain !== undefined && context !== undefined) {
+      activeRoll.volumeGain.gain.setValueAtTime(volume, context.currentTime);
+    }
   }
 
   function getReadyContext(): AudioContext | undefined {
@@ -68,12 +100,37 @@ export function createUiSoundPlayer(
     }
   }
 
-  function playDiceRoll(durationMs: 600 | 2500): void {
+  function stopRollSources(
+    roll: NonNullable<typeof activeRoll>,
+    audio: AudioContext,
+  ): void {
+    for (const source of roll.sources.splice(0)) {
+      try {
+        source.stop(audio.currentTime);
+      } catch {
+        // A naturally ended source needs no further cleanup.
+      }
+    }
+  }
+
+  function scheduleRollFade(
+    gain: AudioParam,
+    start: number,
+    duration: number,
+  ): void {
+    const fadeDuration = duration <= 0.6 ? 0.1 : 0.25;
+    gain.setValueAtTime(1, start);
+    gain.setValueAtTime(1, start + duration - fadeDuration);
+    gain.linearRampToValueAtTime(0, start + duration);
+  }
+
+  function startSyntheticRoll(
+    roll: NonNullable<typeof activeRoll>,
+    audio: AudioContext,
+    duration: number,
+  ): void {
     try {
-      const audio = getReadyContext();
-      if (audio === undefined) return;
       const start = audio.currentTime;
-      const duration = durationMs / 1_000;
       const buffer = audio.createBuffer(
         1,
         Math.round(audio.sampleRate * duration),
@@ -86,19 +143,16 @@ export function createUiSoundPlayer(
       const source = audio.createBufferSource();
       const filter = audio.createBiquadFilter();
       const pulseGain = audio.createGain();
-      const masterGain = audio.createGain();
+      const envelopeGain = audio.createGain();
+      const volumeGain = audio.createGain();
+      roll.volumeGain = volumeGain;
+      roll.sources.push(source);
       source.buffer = buffer;
       filter.type = 'bandpass';
       filter.frequency.value = 1_100;
       filter.Q.value = 0.65;
-      masterGain.gain.setValueAtTime(0.0001, start);
-      const peakVolume = Math.max(0.0001, 0.8 * volume);
-      masterGain.gain.exponentialRampToValueAtTime(peakVolume, start + 0.02);
-      masterGain.gain.setValueAtTime(
-        peakVolume,
-        start + Math.max(0.02, duration - 0.08),
-      );
-      masterGain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      scheduleRollFade(envelopeGain.gain, start, duration);
+      volumeGain.gain.setValueAtTime(volume, start);
       let impactIndex = 0;
       for (let offset = 0; offset < duration; offset += 0.12) {
         const pulseStart = start + offset;
@@ -115,13 +169,100 @@ export function createUiSoundPlayer(
       }
       source.connect(filter);
       filter.connect(pulseGain);
-      pulseGain.connect(masterGain);
-      masterGain.connect(audio.destination);
+      pulseGain.connect(envelopeGain);
+      envelopeGain.connect(volumeGain);
+      volumeGain.connect(audio.destination);
       source.start(start);
-      source.stop(start + duration);
     } catch {
       // UI sounds never interrupt the Session.
     }
+  }
+
+  function startPackagedRoll(
+    roll: NonNullable<typeof activeRoll>,
+    audio: AudioContext,
+    buffer: AudioBuffer,
+    duration: number,
+  ): void {
+    const start = audio.currentTime;
+    const envelopeGain = audio.createGain();
+    const volumeGain = audio.createGain();
+    scheduleRollFade(envelopeGain.gain, start, duration);
+    volumeGain.gain.setValueAtTime(volume, start);
+    envelopeGain.connect(volumeGain);
+    volumeGain.connect(audio.destination);
+    roll.volumeGain = volumeGain;
+    let offset = 0;
+    let previousGain: GainNode | undefined;
+    while (offset < duration) {
+      const source = audio.createBufferSource();
+      const clipGain = audio.createGain();
+      const sourceStart = start + offset;
+      const clipDuration = Math.min(buffer.duration, duration - offset);
+      source.buffer = buffer;
+      if (previousGain === undefined) {
+        clipGain.gain.setValueAtTime(0.8, sourceStart);
+      } else {
+        clipGain.gain.setValueAtTime(0, sourceStart);
+        clipGain.gain.linearRampToValueAtTime(
+          0.8,
+          sourceStart + ROLL_CROSSFADE_SECONDS,
+        );
+        previousGain.gain.setValueAtTime(0.8, sourceStart);
+        previousGain.gain.linearRampToValueAtTime(
+          0,
+          sourceStart + ROLL_CROSSFADE_SECONDS,
+        );
+      }
+      source.connect(clipGain);
+      clipGain.connect(envelopeGain);
+      source.start(sourceStart, 0, clipDuration);
+      roll.sources.push(source);
+      previousGain = clipGain;
+      if (clipDuration < buffer.duration) break;
+      offset += buffer.duration - ROLL_CROSSFADE_SECONDS;
+    }
+  }
+
+  function playDiceRoll(durationMs: 600 | 3000): UiSoundPlayback {
+    activeRoll?.handle.stop();
+    const audio = getReadyContext();
+    const roll = {
+      stopped: false,
+      sources: [] as AudioBufferSourceNode[],
+      volumeGain: undefined as GainNode | undefined,
+      handle: undefined as unknown as UiSoundPlayback,
+    };
+    const handle: UiSoundPlayback = {
+      stop() {
+        if (roll.stopped) return;
+        roll.stopped = true;
+        if (audio !== undefined) stopRollSources(roll, audio);
+        if (activeRoll === roll) activeRoll = undefined;
+      },
+    };
+    roll.handle = handle;
+    activeRoll = roll;
+    if (audio === undefined) return handle;
+
+    const duration = durationMs / 1_000;
+    void getRollBuffer(audio).then(
+      (buffer) => {
+        if (roll.stopped || activeRoll !== roll) return;
+        try {
+          startPackagedRoll(roll, audio, buffer, duration);
+        } catch {
+          stopRollSources(roll, audio);
+          startSyntheticRoll(roll, audio, duration);
+        }
+      },
+      () => {
+        if (!roll.stopped && activeRoll === roll) {
+          startSyntheticRoll(roll, audio, duration);
+        }
+      },
+    );
+    return handle;
   }
 
   function playNotes(
@@ -207,6 +348,7 @@ export function createUiSoundPlayer(
     if (disposed) return;
     disposed = true;
     state = 'unavailable';
+    activeRoll?.handle.stop();
     if (context !== undefined) {
       void context.close().catch(() => undefined);
       context = undefined;

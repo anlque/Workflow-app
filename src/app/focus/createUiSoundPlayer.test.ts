@@ -1,15 +1,16 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { createUiSoundPlayer } from './createUiSoundPlayer';
 
 type Ramp = Readonly<{
-  kind: 'set' | 'exponential';
+  kind: 'set' | 'exponential' | 'linear';
   value: number;
   at: number;
 }>;
 
 function createFakeAudioContext(state: AudioContextState = 'running') {
   let currentState = state;
+  let failNextBufferSourceStart = false;
   const ramps: Ramp[] = [];
   const gainRamps: Ramp[][] = [];
   const oscillatorStarts: number[] = [];
@@ -17,6 +18,7 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
   const oscillatorTypes: OscillatorType[] = [];
   const bufferSourceStarts: number[] = [];
   const bufferSourceStops: number[] = [];
+  const bufferSourceStartArguments: number[][] = [];
   const bufferLengths: number[] = [];
   const stereoPans: number[] = [];
   const resume = vi.fn(() => {
@@ -24,12 +26,18 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
     return Promise.resolve();
   });
   const close = vi.fn(() => Promise.resolve());
+  const decodeAudioData = vi.fn(() =>
+    Promise.resolve({ duration: 2.5 } as AudioBuffer),
+  );
   const parameter = (target: Ramp[] = ramps) => ({
     setValueAtTime(value: number, at: number) {
       target.push({ kind: 'set', value, at });
     },
     exponentialRampToValueAtTime(value: number, at: number) {
       target.push({ kind: 'exponential', value, at });
+    },
+    linearRampToValueAtTime(value: number, at: number) {
+      target.push({ kind: 'linear', value, at });
     },
     value: 0,
   });
@@ -43,6 +51,7 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
     destination: {},
     resume,
     close,
+    decodeAudioData,
     createOscillator: () => {
       let type: OscillatorType = 'sine';
       return {
@@ -72,12 +81,22 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
     },
     createBuffer: (_channels: number, length: number) => {
       bufferLengths.push(length);
-      return { getChannelData: () => new Float32Array(length) };
+      return {
+        duration: length / context.sampleRate,
+        getChannelData: () => new Float32Array(length),
+      };
     },
     createBufferSource: () => ({
       ...connectable,
       buffer: null,
-      start: (at: number) => bufferSourceStarts.push(at),
+      start: (...args: number[]) => {
+        if (failNextBufferSourceStart) {
+          failNextBufferSourceStart = false;
+          throw new Error('playback failed');
+        }
+        bufferSourceStarts.push(args[0] ?? 0);
+        bufferSourceStartArguments.push(args);
+      },
       stop: (at: number) => bufferSourceStops.push(at),
     }),
     createBiquadFilter: () => ({
@@ -105,12 +124,24 @@ function createFakeAudioContext(state: AudioContextState = 'running') {
     oscillatorTypes,
     bufferSourceStarts,
     bufferSourceStops,
+    bufferSourceStartArguments,
     bufferLengths,
     stereoPans,
     resume,
     close,
+    decodeAudioData,
+    failNextBufferSourceStart() {
+      failNextBufferSourceStart = true;
+    },
+    setCurrentTime(value: number) {
+      context.currentTime = value;
+    },
   };
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('createUiSoundPlayer', () => {
   test('synthesizes a short decaying bell after activation and reuses its audio context', async () => {
@@ -142,22 +173,185 @@ describe('createUiSoundPlayer', () => {
     expect(fake.oscillatorStarts).toHaveLength(1);
   });
 
-  test('synthesizes the accepted pulsing full-duration dice roll', async () => {
+  test('plays the packaged roll with overlap across the full animation duration', async () => {
     const fake = createFakeAudioContext();
+    const packagedBuffer = {
+      duration: 2.5,
+    } as AudioBuffer;
+    const loadRollBuffer = vi.fn(() => Promise.resolve(packagedBuffer));
+    const player = createUiSoundPlayer(() => fake.context, loadRollBuffer);
+
+    await player.unlock();
+    const playback = player.playDiceRoll(3_000);
+    await vi.waitFor(() => {
+      expect(fake.bufferSourceStarts).toHaveLength(2);
+    });
+
+    expect(loadRollBuffer).toHaveBeenCalledOnce();
+    expect(fake.bufferSourceStarts).toEqual([1, 3.35]);
+    expect(fake.bufferSourceStartArguments[0]).toEqual([1, 0, 2.5]);
+    expect(fake.bufferSourceStartArguments[1]?.slice(0, 2)).toEqual([3.35, 0]);
+    expect(fake.bufferSourceStartArguments[1]?.[2]).toBeCloseTo(0.65);
+    expect(fake.gainRamps).toEqual([
+      [
+        { kind: 'set', value: 1, at: 1 },
+        { kind: 'set', value: 1, at: 3.75 },
+        { kind: 'linear', value: 0, at: 4 },
+      ],
+      [{ kind: 'set', value: 1, at: 1 }],
+      [
+        { kind: 'set', value: 0.8, at: 1 },
+        { kind: 'set', value: 0.8, at: 3.35 },
+        { kind: 'linear', value: 0, at: 3.5 },
+      ],
+      [
+        { kind: 'set', value: 0, at: 3.35 },
+        { kind: 'linear', value: 0.8, at: 3.5 },
+      ],
+    ]);
+
+    playback.stop();
+    playback.stop();
+    expect(fake.bufferSourceStops).toEqual([1, 1]);
+  });
+
+  test('uses a shorter terminal fade for reduced-motion rolls', async () => {
+    const fake = createFakeAudioContext();
+    const player = createUiSoundPlayer(
+      () => fake.context,
+      () => Promise.resolve({ duration: 2.5 } as AudioBuffer),
+    );
+    await player.unlock();
+
+    player.playDiceRoll(600);
+    await vi.waitFor(() => {
+      expect(fake.bufferSourceStarts).toHaveLength(1);
+    });
+
+    expect(fake.gainRamps.flat()).toEqual(
+      expect.arrayContaining([
+        { kind: 'set', value: 1, at: 1.5 },
+        { kind: 'linear', value: 0, at: 1.6 },
+      ]),
+    );
+  });
+
+  test('loads and decodes the packaged production roll cue by default', async () => {
+    const fake = createFakeAudioContext();
+    const bytes = new ArrayBuffer(16);
+    const fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(bytes),
+      } as Response),
+    );
+    vi.stubGlobal('fetch', fetch);
     const player = createUiSoundPlayer(() => fake.context);
 
     await player.unlock();
-    player.playDiceRoll(2_500);
+    player.playDiceRoll(600);
+    await vi.waitFor(() => {
+      expect(fake.bufferSourceStarts).toHaveLength(1);
+    });
 
-    expect(fake.bufferSourceStarts).toEqual([1]);
-    expect(fake.bufferLengths).toEqual([20_000]);
-    expect(fake.bufferSourceStops).toEqual([3.5]);
-    expect(
-      fake.gainRamps.some(
-        (values) => values.filter(({ value }) => value === 0.5).length > 10,
-      ),
-    ).toBe(true);
-    expect(fake.stereoPans).toEqual([]);
+    expect(fetch).toHaveBeenCalledWith('/audio/dice-roll.mp3');
+    expect(fake.decodeAudioData).toHaveBeenCalledWith(bytes);
+  });
+
+  test('stops an active roll before restart and applies live master volume', async () => {
+    const fake = createFakeAudioContext();
+    const player = createUiSoundPlayer(
+      () => fake.context,
+      () => Promise.resolve({ duration: 2.5 } as AudioBuffer),
+    );
+    await player.unlock();
+    player.playDiceRoll(3_000);
+    await vi.waitFor(() => {
+      expect(fake.bufferSourceStarts).toHaveLength(2);
+    });
+
+    player.setVolume(0.25);
+    expect(fake.gainRamps.flat()).toContainEqual({
+      kind: 'set',
+      value: 0.25,
+      at: 1,
+    });
+
+    player.playDiceRoll(600);
+    await vi.waitFor(() => {
+      expect(fake.bufferSourceStarts).toHaveLength(3);
+    });
+    expect(fake.bufferSourceStops).toEqual([1, 1]);
+    expect(fake.bufferSourceStartArguments[2]).toEqual([1, 0, 0.6]);
+  });
+
+  test('keeps live volume independent from the terminal fade envelope', async () => {
+    const fake = createFakeAudioContext();
+    const player = createUiSoundPlayer(
+      () => fake.context,
+      () => Promise.resolve({ duration: 2.5 } as AudioBuffer),
+    );
+    await player.unlock();
+    player.playDiceRoll(3_000);
+    await vi.waitFor(() => {
+      expect(fake.bufferSourceStarts).toHaveLength(2);
+    });
+
+    fake.setCurrentTime(2.5);
+    player.setVolume(0);
+    fake.setCurrentTime(3.8);
+    player.setVolume(0.35);
+
+    expect(fake.gainRamps).toEqual(
+      expect.arrayContaining([
+        [
+          { kind: 'set', value: 1, at: 1 },
+          { kind: 'set', value: 1, at: 3.75 },
+          { kind: 'linear', value: 0, at: 4 },
+        ],
+        [
+          { kind: 'set', value: 1, at: 1 },
+          { kind: 'set', value: 0, at: 2.5 },
+          { kind: 'set', value: 0.35, at: 3.8 },
+        ],
+      ]),
+    );
+  });
+
+  test('uses stoppable synthesis when packaged roll loading fails', async () => {
+    const fake = createFakeAudioContext();
+    const player = createUiSoundPlayer(
+      () => fake.context,
+      () => Promise.reject(new Error('decode failed')),
+    );
+    await player.unlock();
+
+    const playback = player.playDiceRoll(600);
+    await vi.waitFor(() => {
+      expect(fake.bufferLengths).toEqual([4_800]);
+    });
+    expect(fake.bufferSourceStartArguments).toContainEqual([1]);
+
+    playback.stop();
+    playback.stop();
+    expect(fake.bufferSourceStops).toEqual([1]);
+  });
+
+  test('uses synthesis when packaged roll playback fails', async () => {
+    const fake = createFakeAudioContext();
+    const player = createUiSoundPlayer(
+      () => fake.context,
+      () => Promise.resolve({ duration: 2.5 } as AudioBuffer),
+    );
+    await player.unlock();
+    fake.failNextBufferSourceStart();
+
+    player.playDiceRoll(600);
+    await vi.waitFor(() => {
+      expect(fake.bufferLengths).toEqual([4_800]);
+    });
+
+    expect(fake.bufferSourceStartArguments).toEqual([[1]]);
   });
 
   test('does not consume sounds while locked and unlocks a suspended context', async () => {
@@ -206,10 +400,15 @@ describe('createUiSoundPlayer', () => {
     const player = createUiSoundPlayer(() => fake.context);
 
     await player.unlock();
+    player.playDiceRoll(600);
+    await vi.waitFor(() => {
+      expect(fake.bufferSourceStarts).toHaveLength(1);
+    });
     player.dispose();
     player.dispose();
 
     expect(fake.close).toHaveBeenCalledOnce();
+    expect(fake.bufferSourceStops).toEqual([1]);
   });
 
   test('reports unavailable audio and keeps failures non-blocking', async () => {
