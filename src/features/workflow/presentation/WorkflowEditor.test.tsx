@@ -8,7 +8,7 @@ import {
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { createAsset } from '@/features/assets';
+import { createAsset, createAssetRole } from '@/features/assets';
 
 import type { CreateWorkflowInput } from '../domain/Workflow';
 import { createWorkflow } from '../domain/createWorkflow';
@@ -749,6 +749,164 @@ describe('WorkflowEditor', () => {
     });
   });
 
+  test('announces button reordering, preserves focus and collapse by Phase key', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflowId="workflow-order"
+        workflow={createWorkflow({
+          id: 'workflow-order',
+          name: 'Ordered',
+          phases: [
+            {
+              name: 'Writing',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Review',
+              type: 'break',
+              durationSeconds: 60,
+              environment: {},
+            },
+          ],
+        })}
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Collapse Phase 1: Writing' }),
+    );
+    const move = screen.getByRole('button', { name: 'Move Phase 1 down' });
+    move.focus();
+    await user.click(move);
+    expect(
+      screen.getByText('Moved Writing to position 2 of 2.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Move Phase 2 up' }),
+    ).toHaveFocus();
+    expect(
+      screen.getByRole('button', { name: 'Expand Phase 2: Writing' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Move Phase 1 up' }),
+    ).toBeDisabled();
+  });
+
+  test('previews and commits pointer reorder once from the dedicated handle', () => {
+    render(
+      <WorkflowEditor
+        workflowId="workflow-drag"
+        workflow={createWorkflow({
+          id: 'workflow-drag',
+          name: 'Dragged',
+          phases: [
+            {
+              name: 'One',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Two',
+              type: 'break',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Three',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+          ],
+        })}
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+    const items = screen.getAllByRole('listitem');
+    items.forEach((item, index) => {
+      vi.spyOn(item, 'getBoundingClientRect').mockReturnValue({
+        top: index * 100,
+        bottom: index * 100 + 80,
+        height: 80,
+      } as DOMRect);
+    });
+    const handle = screen.getByLabelText('Drag Phase 1: One');
+    Object.assign(handle, {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+    });
+    fireEvent.pointerDown(handle, {
+      pointerId: 7,
+      button: 0,
+      isPrimary: true,
+      clientY: 20,
+    });
+    fireEvent.pointerMove(handle, { pointerId: 7, clientY: 260 });
+    expect(screen.getByTestId('phase-drop-indicator')).toBeVisible();
+    fireEvent.pointerUp(handle, { pointerId: 7, clientY: 260 });
+    expect(
+      screen
+        .getAllByRole('heading', { level: 4 })
+        .map((heading) => heading.textContent),
+    ).toEqual(['Two', 'Three', 'One']);
+    expect(
+      screen.getByText('Moved One to position 3 of 3.'),
+    ).toBeInTheDocument();
+  });
+
+  test('announces pointer cancellation and unnamed button movement', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflowId="workflow-cancel"
+        workflow={createWorkflow({
+          id: 'workflow-cancel',
+          name: 'Cancel',
+          phases: [
+            { type: 'focus', durationSeconds: 60, environment: {} },
+            { type: 'break', durationSeconds: 60, environment: {} },
+          ],
+        })}
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+    const items = screen.getAllByRole('listitem');
+    items.forEach((item, index) => {
+      vi.spyOn(item, 'getBoundingClientRect').mockReturnValue({
+        top: index * 100,
+        bottom: index * 100 + 80,
+        height: 80,
+      } as DOMRect);
+    });
+    const handle = screen.getByLabelText('Drag Phase 1');
+    Object.assign(handle, {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+    });
+    fireEvent.pointerDown(handle, {
+      pointerId: 11,
+      button: 0,
+      isPrimary: true,
+      clientY: 20,
+    });
+    fireEvent.pointerMove(handle, { pointerId: 11, clientY: 160 });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByText('Phase move cancelled.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Move Phase 1 down' }));
+    expect(
+      screen.getByText('Moved Phase 1 to position 2 of 2.'),
+    ).toBeInTheDocument();
+  });
+
   test('preserves a Role reference through unrelated edits and save', async () => {
     const user = userEvent.setup();
     const roleImage = createAsset({
@@ -985,7 +1143,7 @@ describe('WorkflowEditor', () => {
         backgroundColor: '#123456',
       });
       result.current.toggleRewardAfterPhase(firstKey);
-      result.current.movePhase(1, 1);
+      result.current.movePhaseTo(sourceKey, 2);
       result.current.duplicatePhase(2);
     });
     expect(result.current.draft.rewardDice.customPhaseKeys).toHaveLength(3);
@@ -1017,6 +1175,98 @@ describe('WorkflowEditor', () => {
     expect(result.current.draft.rewardDice.customPhaseKeys).toContain(
       duplicateKey,
     );
+  });
+
+  test('moves complete Phase drafts to deterministic final indexes', () => {
+    const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
+    act(() => {
+      result.current.addPhase();
+      result.current.addPhase();
+    });
+    const [first, second, third] = result.current.draft.phases;
+    if (first === undefined || second === undefined || third === undefined) {
+      throw new Error('Expected three Phase drafts.');
+    }
+    act(() => {
+      result.current.updatePhase(second.key, {
+        name: 'Portable',
+        backgroundAsset: { type: 'direct', assetId: image.id },
+        audioAsset: { type: 'role', role: createAssetRole('Ambient') },
+        backgroundColor: '#123456',
+      });
+      result.current.toggleRewardAfterPhase(first.key);
+      result.current.toggleRewardAfterPhase(third.key);
+      result.current.movePhaseTo(second.key, 2);
+    });
+    expect(result.current.draft.phases.map(({ key }) => key)).toEqual([
+      first.key,
+      third.key,
+      second.key,
+    ]);
+    expect(result.current.draft.phases[2]).toMatchObject({
+      key: second.key,
+      name: 'Portable',
+      backgroundAsset: { type: 'direct', assetId: image.id },
+      audioAsset: { type: 'role', role: roleAudio.role },
+      backgroundColor: '#123456',
+    });
+    const validation = validateWorkflowDraft({
+      ...result.current.draft,
+      name: 'Reordered',
+      rewardDice: {
+        ...result.current.draft.rewardDice,
+        enabled: true,
+        scheduleMode: 'custom',
+        sides: [
+          {
+            key: 'a',
+            icon: 'A',
+            title: 'A',
+            description: '',
+            weight: '',
+            availability: 'any',
+          },
+          {
+            key: 'b',
+            icon: 'B',
+            title: 'B',
+            description: '',
+            weight: '',
+            availability: 'any',
+          },
+        ],
+      },
+    });
+    expect(validation.valid && validation.input.rewardDice?.schedule).toEqual({
+      type: 'custom',
+      phaseIndexes: [2],
+    });
+
+    act(() => {
+      result.current.movePhaseTo(second.key, 0);
+    });
+    expect(result.current.draft.phases.map(({ key }) => key)).toEqual([
+      second.key,
+      first.key,
+      third.key,
+    ]);
+  });
+
+  test.each([
+    ['unknown key', 'missing', 0],
+    ['negative index', 'existing', -1],
+    ['fractional index', 'existing', 0.5],
+    ['past-end index', 'existing', 1],
+    ['same position', 'existing', 0],
+  ] as const)('keeps the draft reference for %s', (_case, key, targetIndex) => {
+    const { result } = renderHook(() => useWorkflowEditor('workflow-1'));
+    const before = result.current.draft;
+    const phaseKey =
+      key === 'existing' ? (before.phases[0]?.key ?? 'missing') : key;
+    act(() => {
+      result.current.movePhaseTo(phaseKey, targetIndex);
+    });
+    expect(result.current.draft).toBe(before);
   });
 
   test('saves the configured Reward Dice rerolls', async () => {

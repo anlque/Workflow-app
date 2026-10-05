@@ -232,6 +232,13 @@ Owns draft validation feedback, pending state and transient accessible
 does not choose create versus update. It prevents removing the last Phase.
 Phase disclosure state is local to the mounted editor and never persisted;
 save validation expands any collapsed Phase containing an invalid field.
+Phase order is also local draft state until **Save workflow**. Pointer drag and
+the visible Move up/down keyboard controls share
+`movePhaseTo(phaseKey, targetIndex)`, where the target is the final index after
+source removal. Drag previews only a drop position and commits once on pointer
+release; Escape, pointer cancellation, lost capture and unmount discard it and
+clean pointer/autoscroll resources. Stable Phase keys carry disclosure state,
+unsaved values, Asset references and custom Reward markers through every move.
 Normal and Bonus Environment pickers may request a kind-specific Asset import
 through Workflow Studio. The mounted editor retains every draft field while the
 Studio adds the committed Asset to its catalog, selects a direct reference and

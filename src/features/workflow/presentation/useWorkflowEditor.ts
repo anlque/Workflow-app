@@ -500,15 +500,23 @@ export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
         };
       });
     },
-    movePhase(index: number, offset: -1 | 1): void {
+    movePhaseTo(phaseKey: string, targetIndex: number): void {
       setDraft((current) => {
+        if (
+          !Number.isInteger(targetIndex) ||
+          targetIndex < 0 ||
+          targetIndex >= current.phases.length
+        ) {
+          return current;
+        }
+        const sourceIndex = current.phases.findIndex(
+          ({ key: value }) => value === phaseKey,
+        );
+        if (sourceIndex < 0 || sourceIndex === targetIndex) return current;
         const phases = [...current.phases];
-        const target = index + offset;
-        const phase = phases[index];
-        const destination = phases[target];
-        if (phase === undefined || destination === undefined) return current;
-        phases[index] = destination;
-        phases[target] = phase;
+        const [phase] = phases.splice(sourceIndex, 1);
+        if (phase === undefined) return current;
+        phases.splice(targetIndex, 0, phase);
         return { ...current, phases };
       });
     },

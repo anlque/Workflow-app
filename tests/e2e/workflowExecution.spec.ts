@@ -90,6 +90,79 @@ test('names, duplicates and locally collapses Workflow Phases', async ({
   await expect(options.getByLabel('Phase 2 name')).toHaveValue('Review');
 });
 
+test('reorders Phases by pointer and keyboard while preserving a custom Reward marker', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Reordered phases');
+  await options.getByLabel('Phase 1 name').fill('One');
+  await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByLabel('Phase 2 name').fill('Two');
+  await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByLabel('Phase 3 name').fill('Three');
+  await options.getByLabel('Enable Reward Dice').check();
+  await options.getByLabel('Reward schedule').selectOption('custom');
+  await options.getByLabel('Reward after Phase 1').uncheck();
+  await options.getByLabel('Reward after Phase 3').uncheck();
+  await options.getByLabel('Reward side 1 icon').fill('☕');
+  await options.getByLabel('Reward side 1 title').fill('Tea');
+  await options.getByLabel('Reward side 2 icon').fill('🌿');
+  await options.getByLabel('Reward side 2 title').fill('Walk');
+  await options.getByRole('button', { name: 'Collapse Phase 1: One' }).click();
+  await options.getByRole('button', { name: 'Collapse Phase 2: Two' }).click();
+  await options
+    .getByRole('button', { name: 'Collapse Phase 3: Three' })
+    .click();
+
+  const handle = options.getByLabel('Drag Phase 1: One');
+  const handleBounds = await handle.boundingBox();
+  const thirdBounds = await options
+    .getByRole('heading', { name: 'Three', level: 4 })
+    .locator('..')
+    .locator('..')
+    .boundingBox();
+  if (handleBounds === null || thirdBounds === null) {
+    throw new Error('Phase drag geometry is unavailable.');
+  }
+  await options.mouse.move(
+    handleBounds.x + handleBounds.width / 2,
+    handleBounds.y + handleBounds.height / 2,
+  );
+  await options.mouse.down();
+  await options.mouse.move(
+    thirdBounds.x + thirdBounds.width / 2,
+    thirdBounds.y + thirdBounds.height - 2,
+    { steps: 4 },
+  );
+  await options.mouse.up();
+  await expect(
+    options.getByText('Moved One to position 3 of 3.'),
+  ).toBeAttached();
+
+  await options.getByRole('button', { name: 'Move Phase 1 down' }).focus();
+  await options.keyboard.press('Enter');
+  await expect(
+    options.getByText('Moved Two to position 2 of 3.'),
+  ).toBeAttached();
+  await expect(options.getByLabel('Phase 1 name')).toHaveValue('Three');
+  await expect(options.getByLabel('Phase 2 name')).toHaveValue('Two');
+  await expect(options.getByLabel('Phase 3 name')).toHaveValue('One');
+
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(options.getByText('Workflow saved')).toBeVisible();
+  await options.reload();
+  await options.getByRole('button', { name: 'Open Reordered phases' }).click();
+  await expect(options.getByLabel('Phase 1 name')).toHaveValue('Three');
+  await expect(options.getByLabel('Phase 2 name')).toHaveValue('Two');
+  await expect(options.getByLabel('Phase 3 name')).toHaveValue('One');
+  await expect(options.getByLabel('Reward after Phase 1')).not.toBeChecked();
+  await expect(options.getByLabel('Reward after Phase 2')).toBeChecked();
+  await expect(options.getByLabel('Reward after Phase 3')).not.toBeChecked();
+});
+
 test('uploads and selects a Phase Asset without losing the Workflow draft', async ({
   context,
   extensionUrls,
