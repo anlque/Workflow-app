@@ -907,6 +907,55 @@ describe('WorkflowEditor', () => {
     ).toBeInTheDocument();
   });
 
+  test('replaces the live-region node for repeated identical announcements', () => {
+    render(
+      <WorkflowEditor
+        workflowId="workflow-repeat-announcement"
+        workflow={createWorkflow({
+          id: 'workflow-repeat-announcement',
+          name: 'Repeat announcement',
+          phases: [
+            { type: 'focus', durationSeconds: 60, environment: {} },
+            { type: 'break', durationSeconds: 60, environment: {} },
+          ],
+        })}
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+    const items = screen.getAllByRole('listitem');
+    items.forEach((item, index) => {
+      vi.spyOn(item, 'getBoundingClientRect').mockReturnValue({
+        top: index * 100,
+        bottom: index * 100 + 80,
+        height: 80,
+      } as DOMRect);
+    });
+    const handle = screen.getByLabelText('Drag Phase 1');
+    Object.assign(handle, {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+    });
+    const cancelDrag = (pointerId: number) => {
+      fireEvent.pointerDown(handle, {
+        pointerId,
+        button: 0,
+        isPrimary: true,
+        clientY: 20,
+      });
+      fireEvent.pointerMove(handle, { pointerId, clientY: 80 });
+      fireEvent.pointerCancel(handle, { pointerId });
+    };
+
+    cancelDrag(31);
+    const firstAnnouncement = screen.getByText('Phase move cancelled.');
+    cancelDrag(32);
+    const secondAnnouncement = screen.getByText('Phase move cancelled.');
+
+    expect(secondAnnouncement).not.toBe(firstAnnouncement);
+  });
+
   test('preserves a Role reference through unrelated edits and save', async () => {
     const user = userEvent.setup();
     const roleImage = createAsset({

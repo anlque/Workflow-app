@@ -39,7 +39,10 @@ export function WorkflowEditor({
   const [pending, setPending] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [phaseAnnouncement, setPhaseAnnouncement] = useState('');
+  const [phaseAnnouncement, setPhaseAnnouncement] = useState({
+    id: 0,
+    message: '',
+  });
   const [collapsedPhaseKeys, setCollapsedPhaseKeys] = useState<
     ReadonlySet<string>
   >(() => new Set());
@@ -74,9 +77,10 @@ export function WorkflowEditor({
     }
     const name = phaseName(phaseKey);
     editor.movePhaseTo(phaseKey, targetIndex);
-    setPhaseAnnouncement(
-      `Moved ${name} to position ${String(targetIndex + 1)} of ${String(editor.draft.phases.length)}.`,
-    );
+    setPhaseAnnouncement((current) => ({
+      id: current.id + 1,
+      message: `Moved ${name} to position ${String(targetIndex + 1)} of ${String(editor.draft.phases.length)}.`,
+    }));
   }
 
   const phaseDrag = usePhaseDrag({
@@ -84,7 +88,10 @@ export function WorkflowEditor({
     listRef: phaseListRef,
     onMove: movePhase,
     onCancel: () => {
-      setPhaseAnnouncement('Phase move cancelled.');
+      setPhaseAnnouncement((current) => ({
+        id: current.id + 1,
+        message: 'Phase move cancelled.',
+      }));
     },
   });
   const remainingDragKeys = editor.draft.phases
@@ -514,7 +521,7 @@ export function WorkflowEditor({
           ) : null}
         </ol>
         <div className="visually-hidden" aria-live="polite">
-          {phaseAnnouncement}
+          <span key={phaseAnnouncement.id}>{phaseAnnouncement.message}</span>
         </div>
       </section>
 

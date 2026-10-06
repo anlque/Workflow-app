@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useRef } from 'react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
@@ -187,11 +187,92 @@ describe('usePhaseDrag', () => {
       clientY: 120,
     });
     fireEvent.pointerMove(handle, { pointerId: 9, clientY: 195 });
+    fireEvent.pointerMove(handle, { pointerId: 9, clientY: 194 });
     expect(request).toHaveBeenCalledOnce();
     frame?.(1);
     expect(scrollBy).toHaveBeenCalled();
     fireEvent.pointerCancel(handle, { pointerId: 9 });
     expect(cancel).toHaveBeenCalled();
+  });
+
+  test('falls back to the document viewport for autoscroll', () => {
+    let frame: FrameRequestCallback | undefined;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frame = callback;
+      return 1;
+    });
+    const scrollBy = vi
+      .spyOn(window, 'scrollBy')
+      .mockImplementation(() => undefined);
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: 300,
+    });
+    render(<Harness />);
+    setGeometry();
+    const handle = screen.getByTestId('handle-two');
+    Object.assign(handle, {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+    });
+
+    fireEvent.pointerDown(handle, {
+      pointerId: 11,
+      button: 0,
+      isPrimary: true,
+      clientY: 120,
+    });
+    fireEvent.pointerMove(handle, { pointerId: 11, clientY: 295 });
+    frame?.(1);
+
+    expect(scrollBy).toHaveBeenCalledWith({ top: 10 });
+    fireEvent.pointerCancel(handle, { pointerId: 11 });
+  });
+
+  test('recalculates the drop target during autoscroll without pointer movement', () => {
+    let frame: FrameRequestCallback | undefined;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frame = callback;
+      return 1;
+    });
+    render(<Harness />);
+    setGeometry();
+    const list = screen.getByTestId('list');
+    Object.defineProperties(list, {
+      scrollHeight: { value: 600 },
+      clientHeight: { value: 200 },
+    });
+    vi.spyOn(list, 'getBoundingClientRect').mockReturnValue({
+      top: 0,
+      bottom: 200,
+    } as DOMRect);
+    Object.assign(list.style, { overflowY: 'auto' });
+    Object.assign(list, { scrollBy: vi.fn() });
+    const third = screen.getByTestId('phase-three');
+    vi.spyOn(third, 'getBoundingClientRect')
+      .mockReturnValueOnce({ top: 200, height: 80 } as DOMRect)
+      .mockReturnValue({ top: 100, height: 80 } as DOMRect);
+    const handle = screen.getByTestId('handle-one');
+    Object.assign(handle, {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+    });
+
+    fireEvent.pointerDown(handle, {
+      pointerId: 12,
+      button: 0,
+      isPrimary: true,
+      clientY: 20,
+    });
+    fireEvent.pointerMove(handle, { pointerId: 12, clientY: 195 });
+    expect(screen.getByTestId('state')).toHaveTextContent('one:1');
+    act(() => {
+      frame?.(1);
+    });
+    expect(screen.getByTestId('state')).toHaveTextContent('one:2');
+    fireEvent.pointerCancel(handle, { pointerId: 12 });
   });
 
   test('releases capture without committing when unmounted during drag', () => {
