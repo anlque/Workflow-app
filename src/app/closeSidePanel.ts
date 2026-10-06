@@ -45,15 +45,31 @@ export async function openSidePanel(): Promise<void> {
 export function subscribeSidePanelState(
   listener: (open: boolean) => void,
 ): () => void {
-  const opened = (): void => {
-    listener(true);
+  let active = true;
+  const currentWindowId = browser.windows
+    .getCurrent()
+    .then((currentWindow) => currentWindow.id)
+    .catch(() => undefined);
+  const notifyIfCurrentWindow = (
+    open: boolean,
+    event: { windowId: number },
+  ): void => {
+    void currentWindowId.then((windowId) => {
+      if (active && windowId !== undefined && event.windowId === windowId) {
+        listener(open);
+      }
+    });
   };
-  const closed = (): void => {
-    listener(false);
+  const opened = (event: { windowId: number }): void => {
+    notifyIfCurrentWindow(true, event);
+  };
+  const closed = (event: { windowId: number }): void => {
+    notifyIfCurrentWindow(false, event);
   };
   browser.sidePanel.onOpened.addListener(opened);
   browser.sidePanel.onClosed.addListener(closed);
   return () => {
+    active = false;
     browser.sidePanel.onOpened.removeListener(opened);
     browser.sidePanel.onClosed.removeListener(closed);
   };

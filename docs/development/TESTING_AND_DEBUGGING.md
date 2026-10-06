@@ -258,19 +258,22 @@ speaker output manually in the focus tab.
 ### Side-Panel Button State or Open/Close Behavior Is Wrong
 
 - **First check:** confirm Chrome 142+ and use the native side-panel control once
-  while watching whether the focus button label changes. The focus projection is
-  driven by `sidePanel.onOpened`/`onClosed`; the current adapter does not query an
-  initial open state.
-- **Owner:** [`closeSidePanel.ts`](../../src/app/closeSidePanel.ts) and focus
-  `togglePanel()` in [`FocusApp.tsx`](../../src/app/focus/FocusApp.tsx). Focus-tab
-  creation is separately owned by `createFocusTabController`.
+  while watching whether the Focus or Workflow Studio button label changes. The
+  controller is driven by window-scoped `sidePanel.onOpened`/`onClosed` events;
+  it deliberately has no initial Side Panel state query.
+- **Owner:** [`closeSidePanel.ts`](../../src/app/closeSidePanel.ts) scopes native
+  lifecycle events to the current Chrome window, while
+  [`useSidePanelControl.ts`](../../src/app/useSidePanelControl.ts) owns shared
+  Focus and Workflow Studio presentation state. Focus-tab creation is separately
+  owned by `createFocusTabController`.
 - **Failure behavior:** the button updates optimistically and rolls back when the
-  browser call rejects. Inspect the focus console for browser API rejection and
-  verify the current window has an ID.
+  browser call rejects. Inspect the console of the active Focus or Options
+  extension document for browser API rejection and verify the current window
+  has an ID.
 - **Proof command:**
 
   ```bash
-  pnpm vitest run src/app/focus/FocusApp.test.tsx src/app/focus/createChromeFocusTabController.test.ts src/app/background/createFocusTabController.test.ts
+  pnpm vitest run src/app/closeSidePanel.test.ts src/app/useSidePanelControl.test.tsx src/app/focus/FocusApp.test.tsx src/app/workflow-studio/WorkflowStudio.test.tsx
   ```
 
 The Playwright fixture does not prove the native container; finish with manual

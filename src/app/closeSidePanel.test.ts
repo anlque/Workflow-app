@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+type SidePanelEvent = { windowId: number };
+type SidePanelListener = (event: SidePanelEvent) => void;
+
 const browserMock = vi.hoisted(() => ({
   windows: {
     getCurrent: vi.fn(),
@@ -8,12 +11,12 @@ const browserMock = vi.hoisted(() => ({
     close: vi.fn(),
     open: vi.fn(),
     onOpened: {
-      addListener: vi.fn<(listener: () => void) => void>(),
-      removeListener: vi.fn<(listener: () => void) => void>(),
+      addListener: vi.fn<(listener: SidePanelListener) => void>(),
+      removeListener: vi.fn<(listener: SidePanelListener) => void>(),
     },
     onClosed: {
-      addListener: vi.fn<(listener: () => void) => void>(),
-      removeListener: vi.fn<(listener: () => void) => void>(),
+      addListener: vi.fn<(listener: SidePanelListener) => void>(),
+      removeListener: vi.fn<(listener: SidePanelListener) => void>(),
     },
   },
 }));
@@ -97,24 +100,74 @@ describe('openSidePanel', () => {
   });
 });
 
-test('subscribes and unsubscribes both Side Panel lifecycle events', () => {
-  const listener = vi.fn();
-  const unsubscribe = subscribeSidePanelState(listener);
-  const opened =
-    browserMock.sidePanel.onOpened.addListener.mock.calls.at(-1)?.[0];
-  const closed =
-    browserMock.sidePanel.onClosed.addListener.mock.calls.at(-1)?.[0];
+describe('subscribeSidePanelState', () => {
+  beforeEach(() => {
+    browserMock.windows.getCurrent.mockReset();
+    browserMock.sidePanel.onOpened.addListener.mockReset();
+    browserMock.sidePanel.onOpened.removeListener.mockReset();
+    browserMock.sidePanel.onClosed.addListener.mockReset();
+    browserMock.sidePanel.onClosed.removeListener.mockReset();
+  });
 
-  opened?.();
-  closed?.();
-  expect(listener).toHaveBeenNthCalledWith(1, true);
-  expect(listener).toHaveBeenNthCalledWith(2, false);
+  test('delivers open and close events for the current window', async () => {
+    browserMock.windows.getCurrent.mockResolvedValue({ id: 42 });
+    const listener = vi.fn();
+    const unsubscribe = subscribeSidePanelState(listener);
+    const opened =
+      browserMock.sidePanel.onOpened.addListener.mock.calls.at(-1)?.[0];
+    const closed =
+      browserMock.sidePanel.onClosed.addListener.mock.calls.at(-1)?.[0];
 
-  unsubscribe();
-  expect(browserMock.sidePanel.onOpened.removeListener).toHaveBeenCalledWith(
-    opened,
-  );
-  expect(browserMock.sidePanel.onClosed.removeListener).toHaveBeenCalledWith(
-    closed,
-  );
+    opened?.({ windowId: 42 });
+    closed?.({ windowId: 42 });
+    await vi.waitFor(() => {
+      expect(listener).toHaveBeenNthCalledWith(1, true);
+      expect(listener).toHaveBeenNthCalledWith(2, false);
+    });
+
+    unsubscribe();
+    expect(browserMock.sidePanel.onOpened.removeListener).toHaveBeenCalledWith(
+      opened,
+    );
+    expect(browserMock.sidePanel.onClosed.removeListener).toHaveBeenCalledWith(
+      closed,
+    );
+  });
+
+  test('ignores open and close events for another window', async () => {
+    browserMock.windows.getCurrent.mockResolvedValue({ id: 42 });
+    const listener = vi.fn();
+    subscribeSidePanelState(listener);
+    const opened =
+      browserMock.sidePanel.onOpened.addListener.mock.calls.at(-1)?.[0];
+    const closed =
+      browserMock.sidePanel.onClosed.addListener.mock.calls.at(-1)?.[0];
+
+    opened?.({ windowId: 7 });
+    closed?.({ windowId: 7 });
+    await Promise.resolve();
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  test('does not notify after cleanup while current window resolution is pending', async () => {
+    let resolveCurrentWindow: ((window: { id: number }) => void) | undefined;
+    browserMock.windows.getCurrent.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCurrentWindow = resolve;
+      }),
+    );
+    const listener = vi.fn();
+    const unsubscribe = subscribeSidePanelState(listener);
+    const opened =
+      browserMock.sidePanel.onOpened.addListener.mock.calls.at(-1)?.[0];
+
+    opened?.({ windowId: 42 });
+    unsubscribe();
+    resolveCurrentWindow?.({ id: 42 });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(listener).not.toHaveBeenCalled();
+  });
 });
