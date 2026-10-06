@@ -31,6 +31,11 @@ import {
 } from '@/features/workflow';
 import { LocusoraDatabase } from '@/platform/storage';
 import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
+import {
+  closeSidePanel,
+  openSidePanel,
+  subscribeSidePanelState,
+} from '../closeSidePanel';
 
 import { createWorkflowStudioDependencies } from './createWorkflowStudioDependencies';
 
@@ -64,6 +69,17 @@ async function seedAsset(
 }
 
 describe('createWorkflowStudioDependencies inline Asset upload', () => {
+  test('provides the existing Side Panel browser boundary', () => {
+    const dependencies = createWorkflowStudioDependencies(
+      createTestDocumentPreferences(),
+      createDatabase(),
+    );
+
+    expect(dependencies.openSidePanel).toBe(openSidePanel);
+    expect(dependencies.closeSidePanel).toBe(closeSidePanel);
+    expect(dependencies.subscribeSidePanelState).toBe(subscribeSidePanelState);
+  });
+
   test('uses Asset validation, commits once and synchronizes separately', async () => {
     const database = createDatabase();
     const dependencies = createWorkflowStudioDependencies(

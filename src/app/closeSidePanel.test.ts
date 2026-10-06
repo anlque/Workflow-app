@@ -7,14 +7,24 @@ const browserMock = vi.hoisted(() => ({
   sidePanel: {
     close: vi.fn(),
     open: vi.fn(),
-    onOpened: { addListener: vi.fn(), removeListener: vi.fn() },
-    onClosed: { addListener: vi.fn(), removeListener: vi.fn() },
+    onOpened: {
+      addListener: vi.fn<(listener: () => void) => void>(),
+      removeListener: vi.fn<(listener: () => void) => void>(),
+    },
+    onClosed: {
+      addListener: vi.fn<(listener: () => void) => void>(),
+      removeListener: vi.fn<(listener: () => void) => void>(),
+    },
   },
 }));
 
 vi.mock('wxt/browser', () => ({ browser: browserMock }));
 
-import { closeSidePanel } from './closeSidePanel';
+import {
+  closeSidePanel,
+  openSidePanel,
+  subscribeSidePanelState,
+} from './closeSidePanel';
 
 describe('closeSidePanel', () => {
   beforeEach(() => {
@@ -60,4 +70,51 @@ describe('closeSidePanel', () => {
       'Unable to close the Side Panel. Try again.',
     );
   });
+});
+
+describe('openSidePanel', () => {
+  beforeEach(() => {
+    browserMock.windows.getCurrent.mockReset();
+    browserMock.sidePanel.open.mockReset();
+  });
+
+  test('passes the current windowId to the browser open API', async () => {
+    browserMock.windows.getCurrent.mockResolvedValue({ id: 42 });
+    browserMock.sidePanel.open.mockResolvedValue(undefined);
+
+    await openSidePanel();
+
+    expect(browserMock.sidePanel.open).toHaveBeenCalledWith({ windowId: 42 });
+  });
+
+  test('normalizes a browser open rejection', async () => {
+    browserMock.windows.getCurrent.mockResolvedValue({ id: 42 });
+    browserMock.sidePanel.open.mockRejectedValue(new Error('Browser failure'));
+
+    await expect(openSidePanel()).rejects.toThrow(
+      'Unable to open the Side Panel. Try again.',
+    );
+  });
+});
+
+test('subscribes and unsubscribes both Side Panel lifecycle events', () => {
+  const listener = vi.fn();
+  const unsubscribe = subscribeSidePanelState(listener);
+  const opened =
+    browserMock.sidePanel.onOpened.addListener.mock.calls.at(-1)?.[0];
+  const closed =
+    browserMock.sidePanel.onClosed.addListener.mock.calls.at(-1)?.[0];
+
+  opened?.();
+  closed?.();
+  expect(listener).toHaveBeenNthCalledWith(1, true);
+  expect(listener).toHaveBeenNthCalledWith(2, false);
+
+  unsubscribe();
+  expect(browserMock.sidePanel.onOpened.removeListener).toHaveBeenCalledWith(
+    opened,
+  );
+  expect(browserMock.sidePanel.onClosed.removeListener).toHaveBeenCalledWith(
+    closed,
+  );
 });

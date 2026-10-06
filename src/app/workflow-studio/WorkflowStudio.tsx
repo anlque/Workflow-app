@@ -12,8 +12,13 @@ import {
 import { AssetLibrary } from '@/features/assets/studio';
 import type { Settings } from '@/features/settings';
 import { SettingsPage } from '@/features/settings/studio';
+import { Button } from '@/shared';
 import type { DocumentPreferences } from '@/app/document-preferences/DocumentPreferences';
 import { useDocumentPreferences } from '@/app/document-preferences/useDocumentPreferences';
+import {
+  useSidePanelControl,
+  type SidePanelControlDependencies,
+} from '@/app/useSidePanelControl';
 import {
   createWorkflowId,
   type CreateWorkflowInput,
@@ -62,7 +67,8 @@ export type WorkflowStudioDependencies = Readonly<{
   exportWorkflow(id: WorkflowId | undefined): Promise<void>;
   importWorkflow(file: File): Promise<void>;
   createId(): string;
-}>;
+}> &
+  SidePanelControlDependencies;
 
 type Tab = 'workflows' | 'assets' | 'settings';
 const tabs: readonly Tab[] = ['workflows', 'assets', 'settings'];
@@ -75,6 +81,7 @@ export function WorkflowStudio({
   dependencies,
 }: Readonly<{ dependencies: WorkflowStudioDependencies }>) {
   const documentPreferences = useDocumentPreferences(dependencies.preferences);
+  const sidePanel = useSidePanelControl(dependencies);
   const [snapshot, setSnapshot] = useState<WorkflowStudioSnapshot | null>(null);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<
     WorkflowId | undefined
@@ -165,6 +172,9 @@ export function WorkflowStudio({
   const selectedWorkflow = snapshot.workflows.find(
     ({ id }) => id === selectedWorkflowId,
   );
+  const sidePanelLabel = sidePanel.isOpen
+    ? 'Close side panel'
+    : 'Open side panel';
 
   return (
     <main className="workflow-studio">
@@ -183,7 +193,22 @@ export function WorkflowStudio({
             </p>
           </div>
         </div>
+        <Button
+          variant="secondary"
+          pending={sidePanel.pending}
+          pendingLabel={sidePanelLabel}
+          onClick={() => {
+            void sidePanel.toggle();
+          }}
+        >
+          {sidePanelLabel}
+        </Button>
       </header>
+      {sidePanel.error === null ? null : (
+        <p className="feedback feedback--error" role="alert">
+          {sidePanel.error}
+        </p>
+      )}
       <div className="tabs" role="tablist" aria-label="Configuration">
         {tabs.map((tab) => {
           const label = tabLabel(tab);

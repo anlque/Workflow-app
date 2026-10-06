@@ -20,7 +20,7 @@ same kind of state even when they describe the same Session or Workflow.
 | Form, tab, dialog and feedback state | Owning React component or hook | `useState`, refs and editor drafts | Current component tree | Owning UI only | Direct callbacks; persisted only when an Application operation succeeds |
 | Countdown text | Session Presentation | Value computed by `formatSessionCountdown(session, now)` | One render/tick | Active Session and compact views | Recomputed from Session anchors and current time; never persisted as a counter |
 | Asset object URL | `BrowserAssetUrlService` consumer | Temporary `blob:` URL | Until the consumer releases it or the document unloads | Asset preview and focus Environment media | Created from a loaded Blob, then explicitly revoked |
-| Side-panel visibility label | Focus `app` composition and React state | Boolean projection of browser lifecycle | Current focus document | Focus open/close button | Optimistic action plus `sidePanel.onOpened`/`onClosed` events |
+| Side-panel visibility control | Shared `useSidePanelControl` in each owning React document | Boolean lifecycle projection plus pending and recoverable error state | Current Focus or Workflow Studio mount | Focus and Studio open/close buttons | Optimistic action guarded synchronously; `sidePanel.onOpened`/`onClosed` events supersede stale Promise completion |
 
 Normative ownership is defined by
 [Architecture](../concepts/03_ARCHITECTURE.md#state-management) and

@@ -70,7 +70,7 @@ the same behavior under `options_ui`.
 
 ## Opening and Closing the Side Panel
 
-The focus view receives three injected operations from
+Focus and Workflow Studio receive three injected operations from
 [`src/app/closeSidePanel.ts`](../../src/app/closeSidePanel.ts):
 
 - `openSidePanel()` gets the current window and calls
@@ -79,10 +79,18 @@ The focus view receives three injected operations from
 - `subscribeSidePanelState()` maps `sidePanel.onOpened` and
   `sidePanel.onClosed` to a Boolean presentation value.
 
+[`useSidePanelControl`](../../src/app/useSidePanelControl.ts) owns the shared
+document-local projection for both surfaces: optimistic label, synchronous
+single-flight guard, pending/error feedback and subscription cleanup. Browser
+`onOpened`/`onClosed` events remain authoritative over late operation Promise
+completion. The Focus button still activates sounds before toggling; the Studio
+button never closes its overlay. Workflow Studio receives only the three
+functions through dependencies and never imports WXT/browser APIs.
+
 Opening or activating the focus tab does not implicitly close the side panel.
-The focus button is an explicit independent control. While an operation is
-pending, its optimistic label is rolled back if Chrome rejects the call and
-subsequent browser lifecycle events update it.
+Each button is an explicit independent control. Chrome rejection rolls back an
+unchanged optimistic projection, and Workflow Studio keeps its content mounted
+while showing a recoverable inline error.
 
 The Side Panel composition injects the same `closeSidePanel()` boundary into
 `SidePanelApp`. Its accessible close button is single-flight and disabled while
@@ -176,6 +184,8 @@ browser navigation API.
   proves create, activation, window focus and request coalescing.
 - [`closeSidePanel.ts`](../../src/app/closeSidePanel.ts) owns focus-view and
   Side Panel lifecycle integration.
+- [`useSidePanelControl.ts`](../../src/app/useSidePanelControl.ts) owns the
+  reusable optimistic/lifecycle controller used by Focus and Workflow Studio.
 - [`WorkflowStudio.tsx`](../../src/app/workflow-studio/WorkflowStudio.tsx) owns
   configuration-section and Workflow-selection state;
   [`WorkflowStudioOverlay.tsx`](../../src/app/focus/WorkflowStudioOverlay.tsx)

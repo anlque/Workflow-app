@@ -26,11 +26,20 @@ export async function closeSidePanel(): Promise<void> {
 }
 
 export async function openSidePanel(): Promise<void> {
-  const currentWindow = await browser.windows.getCurrent();
+  let currentWindow: { id?: number | undefined };
+  try {
+    currentWindow = await browser.windows.getCurrent();
+  } catch (cause) {
+    throw new Error('Unable to open the Side Panel. Try again.', { cause });
+  }
   if (currentWindow.id === undefined) {
     throw new Error('Current browser window is unavailable.');
   }
-  await browser.sidePanel.open({ windowId: currentWindow.id });
+  try {
+    await browser.sidePanel.open({ windowId: currentWindow.id });
+  } catch (cause) {
+    throw new Error('Unable to open the Side Panel. Try again.', { cause });
+  }
 }
 
 export function subscribeSidePanelState(

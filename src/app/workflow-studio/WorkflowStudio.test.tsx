@@ -38,6 +38,9 @@ function dependencies(
 ): WorkflowStudioDependencies {
   return {
     preferences: createTestDocumentPreferences(),
+    openSidePanel: () => Promise.resolve(),
+    closeSidePanel: () => Promise.resolve(),
+    subscribeSidePanelState: () => () => undefined,
     load: () =>
       Promise.resolve({ workflows: [], assets: [], settings: defaultSettings }),
     saveWorkflow: () => Promise.resolve(),
@@ -100,6 +103,70 @@ function dependencies(
 }
 
 describe('WorkflowStudio', () => {
+  test('controls Side Panel state from lifecycle events and pending actions', async () => {
+    const user = userEvent.setup();
+    let notify: ((open: boolean) => void) | undefined;
+    let finishOpen: (() => void) | undefined;
+    const deps = dependencies();
+    Object.assign(deps, {
+      openSidePanel: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishOpen = resolve;
+          }),
+      ),
+      closeSidePanel: vi.fn(() => Promise.resolve()),
+      subscribeSidePanelState: vi.fn((listener: (open: boolean) => void) => {
+        notify = listener;
+        return vi.fn();
+      }),
+    });
+    render(<WorkflowStudio dependencies={deps} />);
+
+    const open = await screen.findByRole('button', {
+      name: 'Open side panel',
+    });
+    await user.click(open);
+    const close = screen.getByRole('button', { name: 'Close side panel' });
+    expect(close).toBeDisabled();
+    expect(close).toHaveAttribute('aria-busy', 'true');
+
+    act(() => finishOpen?.());
+    await waitFor(() => expect(close).toBeEnabled());
+    act(() => notify?.(false));
+    expect(
+      screen.getByRole('button', { name: 'Open side panel' }),
+    ).toBeVisible();
+  });
+
+  test('shows a recoverable Side Panel error and allows retry', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies();
+    const openSidePanel = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('Unable to open the Side Panel.'))
+      .mockResolvedValueOnce();
+    Object.assign(deps, {
+      openSidePanel,
+      closeSidePanel: vi.fn(() => Promise.resolve()),
+      subscribeSidePanelState: vi.fn(() => vi.fn()),
+    });
+    render(<WorkflowStudio dependencies={deps} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Open side panel' }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to open the Side Panel.',
+    );
+    expect(screen.getByRole('tab', { name: 'Workflows' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Open side panel' }));
+    expect(openSidePanel).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+  });
+
   test('keeps a new draft selected while reloading the catalog after inline upload', async () => {
     const user = userEvent.setup();
     const existing = createWorkflow({

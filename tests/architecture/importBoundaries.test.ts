@@ -55,6 +55,20 @@ function findImportViolations(
     ];
   }
 
+  if (
+    projectPath.endsWith('/WorkflowStudio.tsx') &&
+    (importedModule === 'wxt/browser' ||
+      importedModule.includes('closeSidePanel'))
+  ) {
+    return [
+      {
+        file: projectPath,
+        importedModule,
+        reason: 'Studio presentation imports browser integration',
+      },
+    ];
+  }
+
   const studioPresentationConsumers: Readonly<
     Record<string, readonly string[]>
   > = {
@@ -212,6 +226,27 @@ describe('architectural import boundaries', () => {
         file: 'src/app/background/bootstrapBackground.ts',
         importedModule: '@/features/workflow/studio',
         reason: 'feature deep import',
+      },
+    ]);
+  });
+
+  test('Workflow Studio presentation cannot import browser integration', () => {
+    const studioModule = 'src/app/workflow-studio/WorkflowStudio.tsx';
+
+    expect(
+      ['wxt/browser', '../closeSidePanel'].flatMap((importedModule) =>
+        findImportViolations(studioModule, importedModule),
+      ),
+    ).toEqual([
+      {
+        file: studioModule,
+        importedModule: 'wxt/browser',
+        reason: 'Studio presentation imports browser integration',
+      },
+      {
+        file: studioModule,
+        importedModule: '../closeSidePanel',
+        reason: 'Studio presentation imports browser integration',
       },
     ]);
   });

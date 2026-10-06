@@ -26,6 +26,7 @@ import {
 import { Button } from '@/shared';
 import type { DocumentPreferences } from '@/app/document-preferences/DocumentPreferences';
 import { useDocumentPreferences } from '@/app/document-preferences/useDocumentPreferences';
+import { useSidePanelControl } from '@/app/useSidePanelControl';
 import type { WorkflowStudioDependencies } from '../workflow-studio/WorkflowStudio';
 
 import { FocusEnvironment } from './FocusEnvironment';
@@ -113,8 +114,7 @@ export function FocusApp({
   const { effectiveReducedMotion: reducedMotion } = useDocumentPreferences(
     dependencies.preferences,
   );
-  const [sidePanelOpen, setSidePanelOpen] = useState(false);
-  const [panelPending, setPanelPending] = useState(false);
+  const sidePanel = useSidePanelControl(dependencies);
   const [studioOpen, setStudioOpen] = useState(false);
   const [studioRequested, setStudioRequested] = useState(false);
   const studioTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -138,23 +138,8 @@ export function FocusApp({
   }
 
   function togglePanel(): void {
-    if (panelPending) return;
     void activateSounds();
-    const wasOpen = sidePanelOpen;
-    const action = wasOpen
-      ? dependencies.closeSidePanel
-      : dependencies.openSidePanel;
-    setSidePanelOpen(!wasOpen);
-    setPanelPending(true);
-    void action().then(
-      () => {
-        setPanelPending(false);
-      },
-      () => {
-        setSidePanelOpen(wasOpen);
-        setPanelPending(false);
-      },
-    );
+    void sidePanel.toggle();
   }
 
   function openStudio(trigger: HTMLButtonElement): void {
@@ -179,11 +164,6 @@ export function FocusApp({
     };
   }, [dependencies, store]);
 
-  useEffect(
-    () => dependencies.subscribeSidePanelState(setSidePanelOpen),
-    [dependencies],
-  );
-
   useCompletionCue(projection.session, dependencies.sounds);
 
   let focusSurface: ReactNode;
@@ -207,11 +187,13 @@ export function FocusApp({
           <Button
             className="focus-app__close-panel"
             variant="quiet"
-            disabled={panelPending}
-            aria-busy={panelPending || undefined}
+            pending={sidePanel.pending}
+            pendingLabel={
+              sidePanel.isOpen ? 'Close side panel' : 'Open side panel'
+            }
             onClick={togglePanel}
           >
-            {sidePanelOpen ? 'Close side panel' : 'Open side panel'}
+            {sidePanel.isOpen ? 'Close side panel' : 'Open side panel'}
           </Button>
         </div>
         <IdleFocusLauncher
@@ -273,11 +255,13 @@ export function FocusApp({
           <Button
             className="focus-app__close-panel"
             variant="quiet"
-            disabled={panelPending}
-            aria-busy={panelPending || undefined}
+            pending={sidePanel.pending}
+            pendingLabel={
+              sidePanel.isOpen ? 'Close side panel' : 'Open side panel'
+            }
             onClick={togglePanel}
           >
-            {sidePanelOpen ? 'Close side panel' : 'Open side panel'}
+            {sidePanel.isOpen ? 'Close side panel' : 'Open side panel'}
           </Button>
         </div>
         <FocusEnvironment

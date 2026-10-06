@@ -32,6 +32,9 @@ function studioDependencies(
 ): WorkflowStudioDependencies {
   return {
     preferences: createTestDocumentPreferences(),
+    openSidePanel: vi.fn(() => Promise.resolve()),
+    closeSidePanel: vi.fn(() => Promise.resolve()),
+    subscribeSidePanelState: vi.fn(() => vi.fn()),
     load: vi.fn(() =>
       Promise.resolve({ workflows, assets: [], settings: defaultSettings }),
     ),
@@ -137,6 +140,31 @@ describe('FocusApp', () => {
     expect(container.querySelector('.focus-app-surface')).not.toHaveAttribute(
       'inert',
     );
+  });
+
+  test('toggles the Side Panel inside Studio without closing the overlay', async () => {
+    const user = userEvent.setup();
+    const studio = studioDependencies();
+    const openSidePanel = vi.fn(() => Promise.resolve());
+    Object.assign(studio, {
+      openSidePanel,
+      closeSidePanel: vi.fn(() => Promise.resolve()),
+      subscribeSidePanelState: vi.fn(() => vi.fn()),
+    });
+    const deps = dependencies(null, studio);
+    render(<FocusApp dependencies={deps} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Open Workflow Studio' }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Open side panel' }),
+    );
+
+    expect(openSidePanel).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('button', { name: 'Close Workflow Studio' }),
+    ).toBeVisible();
   });
 
   test('keeps the Session subscription and ambient player mounted across Studio toggles', async () => {

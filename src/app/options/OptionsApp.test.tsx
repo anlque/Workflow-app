@@ -25,6 +25,9 @@ vi.mock('../workflow-studio/WorkflowStudio', () => ({
 function dependencies(): WorkflowStudioDependencies {
   return {
     preferences: createTestDocumentPreferences(),
+    openSidePanel: vi.fn(() => Promise.resolve()),
+    closeSidePanel: vi.fn(() => Promise.resolve()),
+    subscribeSidePanelState: vi.fn(() => vi.fn()),
     load: () =>
       Promise.resolve({ workflows: [], assets: [], settings: defaultSettings }),
     saveWorkflow: () => Promise.resolve(),
