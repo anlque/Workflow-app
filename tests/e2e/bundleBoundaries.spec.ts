@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, normalize, resolve } from 'node:path';
 
@@ -82,14 +83,26 @@ test('Focus initial preload graph excludes Workflow Studio modules', () => {
   expect(entrySource).toMatch(/import\([^)]*LazyWorkflowStudio/u);
 });
 
-test('production bundle contains the approved Reward Dice media and roll cue', () => {
+test('production bundle contains the approved Reward Dice media and audio cues', () => {
   for (const path of [
     'video/reward-dice-roll.webm',
     'video/reward-dice-final.png',
     'audio/dice-roll.mp3',
+    'audio/session-complete.mp3',
   ]) {
     expect(readFileSync(resolve(outputRoot, path))).toEqual(
       readFileSync(resolve(import.meta.dirname, '../../public', path)),
     );
   }
+
+  expect(
+    createHash('sha256')
+      .update(readFileSync(resolve(outputRoot, 'audio/session-complete.mp3')))
+      .digest('hex'),
+  ).toBe('db88cbaf8233e98c72bb35b029aa5f191efd77925ac9c0b0c2d867777e0a8158');
+  expect(
+    createHash('sha256')
+      .update(readFileSync(resolve(outputRoot, 'audio/phase-bell.mp3')))
+      .digest('hex'),
+  ).toBe('6a22a9a4663344c7a22b0a785c383ebca2d9bb9ddc0cf62ca49e09a083faec02');
 });

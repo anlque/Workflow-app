@@ -13,7 +13,7 @@ type CompletionSounds = Pick<
 export function useCompletionCue(
   session: Session | null,
   sounds: CompletionSounds,
-  delayMs = 1_000,
+  delayMs = 250,
 ): void {
   const previousSession = useRef<Session | null>(null);
   const cueTimers = useRef(new Set<number>());

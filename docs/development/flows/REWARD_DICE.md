@@ -44,8 +44,9 @@ Phase index; it is not a timer or random event.
 1. After the last Phase transition, an eligible Reward creates the same
    authoritative Reward pause with a `complete` continuation target.
 2. Any newly opened Session surface reconstructs the dialog from that state.
-3. Focus plays the distinct reward-unlocked cue. The ordinary completion cue is
-   emitted only when Continue persists the Completed transition. Both cues are
+3. Focus plays the distinct reward-unlocked cue 250 ms after the authoritative
+   Reward transition. The ordinary completion cue is emitted 250 ms after
+   Continue persists the Completed transition. Both cues are
    derived from authoritative projection transitions, regardless of which
    surface sends Continue; remount and roll/reroll updates do not replay Reward.
 

@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 describe('useCompletionCue', () => {
-  test('plays one classified cue after one second', () => {
+  test('plays one classified cue after 250 milliseconds', () => {
     vi.useFakeTimers();
     const initial = createSession('session-1', workflow, 1_000);
     const completed = deriveSessionState(initial, 3_000);
@@ -53,7 +53,7 @@ describe('useCompletionCue', () => {
 
     rerender({ session: completed });
     act(() => {
-      vi.advanceTimersByTime(999);
+      vi.advanceTimersByTime(249);
     });
     expect(sounds.playSessionComplete).not.toHaveBeenCalled();
 
@@ -65,7 +65,7 @@ describe('useCompletionCue', () => {
 
     rerender({ session: completed });
     act(() => {
-      vi.advanceTimersByTime(1_000);
+      vi.advanceTimersByTime(250);
     });
     expect(sounds.playSessionComplete).toHaveBeenCalledOnce();
   });
@@ -88,7 +88,7 @@ describe('useCompletionCue', () => {
     rerender({ session: completed });
     unmount();
     act(() => {
-      vi.advanceTimersByTime(1_000);
+      vi.advanceTimersByTime(250);
     });
 
     expect(sounds.playSessionComplete).not.toHaveBeenCalled();
@@ -111,7 +111,7 @@ describe('useCompletionCue', () => {
 
     rerender({ session: completed });
     act(() => {
-      vi.advanceTimersByTime(1_000);
+      vi.advanceTimersByTime(250);
     });
     expect(sounds.playRewardUnlocked).toHaveBeenCalledOnce();
     expect(sounds.playSessionComplete).not.toHaveBeenCalled();
@@ -123,7 +123,7 @@ describe('useCompletionCue', () => {
     );
     rerender({ session: acknowledged });
     act(() => {
-      vi.advanceTimersByTime(999);
+      vi.advanceTimersByTime(249);
     });
     expect(sounds.playSessionComplete).not.toHaveBeenCalled();
 
@@ -151,7 +151,7 @@ describe('useCompletionCue', () => {
     rerender({ session: paused });
     rerender({ session: rollSessionReward(paused, () => 0, 'roll-1') });
     act(() => {
-      vi.advanceTimersByTime(1_000);
+      vi.advanceTimersByTime(250);
     });
 
     expect(sounds.playRewardUnlocked).toHaveBeenCalledOnce();
@@ -180,7 +180,7 @@ describe('useCompletionCue', () => {
     rerender({ session: paused });
     rerender({ session: completed });
     act(() => {
-      vi.advanceTimersByTime(1_000);
+      vi.advanceTimersByTime(250);
     });
 
     expect(sounds.playRewardUnlocked).toHaveBeenCalledOnce();

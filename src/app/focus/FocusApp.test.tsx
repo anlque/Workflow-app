@@ -761,7 +761,7 @@ describe('FocusApp', () => {
     });
     expect(screen.getByText('Session complete')).toBeVisible();
     act(() => {
-      vi.advanceTimersByTime(999);
+      vi.advanceTimersByTime(249);
     });
     expect(deps.sounds.playSessionComplete).not.toHaveBeenCalled();
     act(() => {
