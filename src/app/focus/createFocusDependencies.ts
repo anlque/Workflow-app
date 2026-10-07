@@ -1,6 +1,11 @@
 import { browser } from 'wxt/browser';
 
 import {
+  ChromeSettingsRepository,
+  getSettingsUseCase,
+  updateSettingsUseCase,
+} from '@/features/settings';
+import {
   assetDatabaseSchemas,
   BrowserAssetUrlService,
   DexieAssetRepository,
@@ -38,6 +43,7 @@ export function createFocusDependencies(
   });
   const assets = new DexieAssetRepository(database);
   const workflows = new DexieWorkflowRepository(database);
+  const settings = new ChromeSettingsRepository();
   const urls = new BrowserAssetUrlService();
   const runtime: SessionRuntime = {
     sendMessage: (message) => browser.runtime.sendMessage(message),
@@ -54,6 +60,10 @@ export function createFocusDependencies(
   return {
     preferences,
     sounds: createUiSoundPlayer(),
+    async updateAudioSettings(patch) {
+      const current = await getSettingsUseCase(settings);
+      await updateSettingsUseCase(settings, { ...current, ...patch });
+    },
     closeSidePanel,
     openSidePanel,
     subscribeSidePanelState,

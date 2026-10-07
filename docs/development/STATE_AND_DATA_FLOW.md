@@ -145,7 +145,8 @@ Local React state owns values that do not need cross-context durability:
 - selected Workflow and unsaved editor draft;
 - open dialogs and roll animation progress;
 - pending, success and error feedback;
-- focus volume, audio lock and side-panel button state.
+- audio lock and side-panel button state. Ambient/cue volumes and mute choices
+  are durable Settings, not local Focus state.
 
 Reloading or closing the document may discard these values. If losing a value
 would violate a business invariant or destroy accepted user data, it does not

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -8,6 +8,11 @@ import { SettingsPage } from './SettingsPage';
 const settings: Settings = {
   theme: 'system',
   reducedMotion: 'system',
+  ambientVolumePercent: 80,
+  ambientMuted: false,
+  cueVolumePercent: 60,
+  cuesMuted: false,
+  muteCuesWithMusic: false,
 };
 
 function setup(
@@ -41,6 +46,32 @@ function setup(
 }
 
 describe('SettingsPage', () => {
+  test('updates independent audio channels and optional mute coupling', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = setup();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Mute music' }));
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      ...settings,
+      ambientMuted: true,
+    });
+
+    fireEvent.change(screen.getByRole('slider', { name: 'Cue volume' }), {
+      target: { value: '35' },
+    });
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      ...settings,
+      cueVolumePercent: 35,
+    });
+
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Mute cues with music' }),
+    );
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      ...settings,
+      muteCuesWithMusic: true,
+    });
+  });
   test('updates theme and reduced-motion preferences independently', async () => {
     const user = userEvent.setup();
     const { onUpdate } = setup();
@@ -49,11 +80,11 @@ describe('SettingsPage', () => {
     await user.selectOptions(screen.getByLabelText('Reduced motion'), 'reduce');
 
     expect(onUpdate).toHaveBeenNthCalledWith(1, {
+      ...settings,
       theme: 'dark',
-      reducedMotion: 'system',
     });
     expect(onUpdate).toHaveBeenNthCalledWith(2, {
-      theme: 'system',
+      ...settings,
       reducedMotion: 'reduce',
     });
   });

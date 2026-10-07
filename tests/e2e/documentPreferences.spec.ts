@@ -44,6 +44,10 @@ test('loads before visibility and synchronizes preferences across open documents
   await options
     .getByRole('combobox', { name: 'Reduced motion' })
     .selectOption('no-preference');
+  await options.getByRole('slider', { name: 'Cue volume' }).fill('42');
+  const muteMusic = options.getByRole('checkbox', { name: 'Mute music' });
+  await muteMusic.click();
+  await expect(muteMusic).toBeChecked();
 
   for (const page of [options, focus, sidePanel]) {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
@@ -52,6 +56,29 @@ test('loads before visibility and synchronizes preferences across open documents
       'no-preference',
     );
   }
+
+  await expect
+    .poll(() =>
+      focus.evaluate(async () => {
+        const extension = globalThis as typeof globalThis & {
+          chrome: {
+            storage: {
+              local: {
+                get(key: string): Promise<Record<string, unknown>>;
+              };
+            };
+          };
+        };
+        return extension.chrome.storage.local.get('settings');
+      }),
+    )
+    .toMatchObject({
+      settings: {
+        ambientMuted: true,
+        cueVolumePercent: 42,
+        muteCuesWithMusic: false,
+      },
+    });
 
   const attributesBefore = await focus.locator('html').evaluate((root) => ({
     theme: root.dataset['theme'],

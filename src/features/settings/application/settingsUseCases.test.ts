@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest';
 
 import { createWorkflowId } from '@/features/workflow';
+import {
+  defaultSettings,
+  effectiveAmbientVolume,
+  effectiveCueVolume,
+} from '../domain/Settings';
 
 import type { SettingsRepository } from './SettingsRepository';
 import { exportSettingsUseCase } from './exportSettingsUseCase';
@@ -28,12 +33,47 @@ class MemorySettingsRepository implements SettingsRepository {
 }
 
 describe('Settings use cases', () => {
+  test('keeps ambient and cue mute semantics independent unless coupled', () => {
+    const musicMuted = { ...defaultSettings, ambientMuted: true };
+    expect(effectiveAmbientVolume(musicMuted)).toBe(0);
+    expect(effectiveCueVolume(musicMuted)).toBe(1);
+    expect(effectiveCueVolume({ ...musicMuted, muteCuesWithMusic: true })).toBe(
+      0,
+    );
+    expect(effectiveCueVolume({ ...defaultSettings, cuesMuted: true })).toBe(0);
+  });
+
   test('returns defaults when no settings are stored', async () => {
     await expect(
       getSettingsUseCase(new MemorySettingsRepository()),
     ).resolves.toEqual({
       theme: 'system',
       reducedMotion: 'system',
+      ambientVolumePercent: 100,
+      ambientMuted: false,
+      cueVolumePercent: 100,
+      cuesMuted: false,
+      muteCuesWithMusic: false,
+    });
+  });
+
+  test('migrates a legacy shared volume into both independent channels', async () => {
+    await expect(
+      getSettingsUseCase(
+        new MemorySettingsRepository({
+          theme: 'dark',
+          reducedMotion: 'reduce',
+          volumePercent: 35,
+        }),
+      ),
+    ).resolves.toEqual({
+      theme: 'dark',
+      reducedMotion: 'reduce',
+      ambientVolumePercent: 35,
+      ambientMuted: false,
+      cueVolumePercent: 35,
+      cuesMuted: false,
+      muteCuesWithMusic: false,
     });
   });
 
@@ -42,6 +82,11 @@ describe('Settings use cases', () => {
     const updated = await updateSettingsUseCase(repository, {
       theme: 'dark',
       reducedMotion: 'reduce',
+      ambientVolumePercent: 25,
+      ambientMuted: true,
+      cueVolumePercent: 60,
+      cuesMuted: false,
+      muteCuesWithMusic: true,
       lastSelectedWorkflowId: createWorkflowId('workflow-1'),
     });
 
@@ -58,6 +103,11 @@ describe('Settings use cases', () => {
     const source = new MemorySettingsRepository({
       theme: 'light',
       reducedMotion: 'no-preference',
+      ambientVolumePercent: 40,
+      ambientMuted: false,
+      cueVolumePercent: 70,
+      cuesMuted: true,
+      muteCuesWithMusic: false,
     });
     const target = new MemorySettingsRepository();
 
@@ -65,21 +115,59 @@ describe('Settings use cases', () => {
     await importSettingsUseCase(target, exported, { maxFileBytes: 1_024 });
 
     expect(exported).toBe(
-      '{"kind":"locusora/settings","version":1,"settings":{"theme":"light","reducedMotion":"no-preference"}}',
+      '{"kind":"locusora/settings","version":2,"settings":{"theme":"light","reducedMotion":"no-preference","ambientVolumePercent":40,"ambientMuted":false,"cueVolumePercent":70,"cuesMuted":true,"muteCuesWithMusic":false}}',
     );
-    expect(target.value).toEqual(source.value);
+    expect(target.value).toEqual({
+      theme: 'light',
+      reducedMotion: 'no-preference',
+      ambientVolumePercent: 40,
+      ambientMuted: false,
+      cueVolumePercent: 70,
+      cuesMuted: true,
+      muteCuesWithMusic: false,
+    });
+  });
+
+  test('imports a legacy v1 package with canonical audio defaults', async () => {
+    const target = new MemorySettingsRepository();
+
+    await importSettingsUseCase(
+      target,
+      '{"kind":"locusora/settings","version":1,"settings":{"theme":"light","reducedMotion":"no-preference"}}',
+      { maxFileBytes: 1_024 },
+    );
+
+    expect(target.value).toMatchObject({
+      ambientVolumePercent: 100,
+      ambientMuted: false,
+      cueVolumePercent: 100,
+      cuesMuted: false,
+      muteCuesWithMusic: false,
+    });
   });
 
   test.each([
     [
       'unsupported version',
-      '{"kind":"locusora/settings","version":2,"settings":{}}',
+      '{"kind":"locusora/settings","version":3,"settings":{}}',
     ],
     [
       'corrupt data',
       '{"kind":"locusora/settings","version":1,"settings":{"theme":"bad"}}',
     ],
     ['invalid JSON', '{'],
+    [
+      'partial canonical audio settings',
+      '{"kind":"locusora/settings","version":2,"settings":{"theme":"light","reducedMotion":"reduce","ambientVolumePercent":50}}',
+    ],
+    [
+      'legacy shape in v2',
+      '{"kind":"locusora/settings","version":2,"settings":{"theme":"light","reducedMotion":"reduce"}}',
+    ],
+    [
+      'canonical shape in v1',
+      '{"kind":"locusora/settings","version":1,"settings":{"theme":"light","reducedMotion":"reduce","ambientVolumePercent":50,"ambientMuted":false,"cueVolumePercent":50,"cuesMuted":false,"muteCuesWithMusic":false}}',
+    ],
   ])('rejects %s without writes', async (_case, data) => {
     const repository = new MemorySettingsRepository();
 

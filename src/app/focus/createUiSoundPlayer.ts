@@ -11,26 +11,43 @@ export type UiSoundPlayer = Readonly<{
 
 export type UiSoundPlayback = Readonly<{ stop(): void }>;
 
-type RollBufferLoader = (context: AudioContext) => Promise<AudioBuffer>;
+export type CueType =
+  'phase-bell' | 'dice-roll' | 'reward-unlocked' | 'session-complete';
+type CueBufferLoader = (
+  context: AudioContext,
+  cue: CueType,
+) => Promise<AudioBuffer>;
 
-const ROLL_SOUND_URL = '/audio/dice-roll.mp3';
+const CUE_URLS: Readonly<Record<CueType, string>> = Object.freeze({
+  'phase-bell': '/audio/phase-bell.mp3',
+  'dice-roll': '/audio/dice-roll.mp3',
+  'reward-unlocked': '/audio/reward-unlocked.mp3',
+  'session-complete': '/audio/session-complete.mp3',
+});
+const CUE_TYPES = Object.freeze(Object.keys(CUE_URLS) as CueType[]);
 const ROLL_CROSSFADE_SECONDS = 0.15;
 
-async function loadRollBuffer(context: AudioContext): Promise<AudioBuffer> {
-  const response = await fetch(ROLL_SOUND_URL);
-  if (!response.ok) throw new Error('Dice roll sound failed to load.');
+async function loadCueBuffer(
+  context: AudioContext,
+  cue: CueType,
+): Promise<AudioBuffer> {
+  const response = await fetch(CUE_URLS[cue]);
+  if (!response.ok) throw new Error('UI cue failed to load.');
   return context.decodeAudioData(await response.arrayBuffer());
 }
 
 export function createUiSoundPlayer(
   createContext: () => AudioContext = () => new AudioContext(),
-  loadDiceRollBuffer: RollBufferLoader = loadRollBuffer,
+  loadBuffer: CueBufferLoader = loadCueBuffer,
 ): UiSoundPlayer {
   let context: AudioContext | undefined;
   let disposed = false;
   let state: 'locked' | 'ready' | 'unavailable' = 'locked';
   let volume = 1;
-  let rollBufferPromise: Promise<AudioBuffer> | undefined;
+  const bufferPromises = new Map<CueType, Promise<AudioBuffer>>();
+  const activeOneShots = new Set<
+    Readonly<{ source: AudioBufferSourceNode; volumeGain: GainNode }>
+  >();
   let activeRoll:
     | {
         stopped: boolean;
@@ -40,9 +57,16 @@ export function createUiSoundPlayer(
       }
     | undefined;
 
-  function getRollBuffer(audio: AudioContext): Promise<AudioBuffer> {
-    rollBufferPromise ??= loadDiceRollBuffer(audio);
-    return rollBufferPromise;
+  function getCueBuffer(
+    audio: AudioContext,
+    cue: CueType,
+  ): Promise<AudioBuffer> {
+    let promise = bufferPromises.get(cue);
+    if (promise === undefined) {
+      promise = loadBuffer(audio, cue);
+      bufferPromises.set(cue, promise);
+    }
+    return promise;
   }
 
   async function unlock(): Promise<boolean> {
@@ -53,7 +77,11 @@ export function createUiSoundPlayer(
         await context.resume();
       }
       state = context.state === 'running' ? 'ready' : 'locked';
-      if (state === 'ready') void getRollBuffer(context).catch(() => undefined);
+      if (state === 'ready') {
+        for (const cue of CUE_TYPES) {
+          void getCueBuffer(context, cue).catch(() => undefined);
+        }
+      }
       return state === 'ready';
     } catch {
       state = 'unavailable';
@@ -70,13 +98,18 @@ export function createUiSoundPlayer(
     if (activeRoll?.volumeGain !== undefined && context !== undefined) {
       activeRoll.volumeGain.gain.setValueAtTime(volume, context.currentTime);
     }
+    if (context !== undefined) {
+      for (const oneShot of activeOneShots) {
+        oneShot.volumeGain.gain.setValueAtTime(volume, context.currentTime);
+      }
+    }
   }
 
   function getReadyContext(): AudioContext | undefined {
     return state === 'ready' && volume > 0 ? context : undefined;
   }
 
-  function playBell(): void {
+  function playSyntheticBell(): void {
     try {
       const audio = getReadyContext();
       if (audio === undefined) return;
@@ -98,6 +131,42 @@ export function createUiSoundPlayer(
     } catch {
       // UI sounds never interrupt the Session.
     }
+  }
+
+  function playOneShot(cue: Exclude<CueType, 'dice-roll'>): void {
+    const audio = getReadyContext();
+    if (audio === undefined) return;
+    const fallback =
+      cue === 'phase-bell'
+        ? playSyntheticBell
+        : cue === 'reward-unlocked'
+          ? playSyntheticRewardUnlocked
+          : playSyntheticSessionComplete;
+    let fallbackUsed = false;
+    const useFallback = (): void => {
+      if (fallbackUsed || disposed || getReadyContext() === undefined) return;
+      fallbackUsed = true;
+      fallback();
+    };
+    void getCueBuffer(audio, cue).then((buffer) => {
+      if (disposed || getReadyContext() !== audio) return;
+      try {
+        const source = audio.createBufferSource();
+        const gain = audio.createGain();
+        source.buffer = buffer;
+        gain.gain.setValueAtTime(volume, audio.currentTime);
+        source.connect(gain);
+        gain.connect(audio.destination);
+        const oneShot = { source, volumeGain: gain };
+        source.onended = () => {
+          activeOneShots.delete(oneShot);
+        };
+        source.start(audio.currentTime);
+        activeOneShots.add(oneShot);
+      } catch {
+        useFallback();
+      }
+    }, useFallback);
   }
 
   function stopRollSources(
@@ -246,7 +315,7 @@ export function createUiSoundPlayer(
     if (audio === undefined) return handle;
 
     const duration = durationMs / 1_000;
-    void getRollBuffer(audio).then(
+    void getCueBuffer(audio, 'dice-roll').then(
       (buffer) => {
         if (roll.stopped || activeRoll !== roll) return;
         try {
@@ -303,7 +372,7 @@ export function createUiSoundPlayer(
     }
   }
 
-  function playSessionComplete(): void {
+  function playSyntheticSessionComplete(): void {
     playNotes([
       { frequency: 523.25, offset: 0, duration: 0.75, gain: 0.13 },
       { frequency: 659.25, offset: 0, duration: 0.75, gain: 0.13 },
@@ -311,7 +380,7 @@ export function createUiSoundPlayer(
     ]);
   }
 
-  function playRewardUnlocked(): void {
+  function playSyntheticRewardUnlocked(): void {
     playNotes([
       {
         frequency: 1_046.5,
@@ -344,12 +413,32 @@ export function createUiSoundPlayer(
     ]);
   }
 
+  function playBell(): void {
+    playOneShot('phase-bell');
+  }
+
+  function playSessionComplete(): void {
+    playOneShot('session-complete');
+  }
+
+  function playRewardUnlocked(): void {
+    playOneShot('reward-unlocked');
+  }
+
   function dispose(): void {
     if (disposed) return;
     disposed = true;
     state = 'unavailable';
     activeRoll?.handle.stop();
     if (context !== undefined) {
+      for (const { source } of activeOneShots) {
+        try {
+          source.stop(context.currentTime);
+        } catch {
+          // A naturally ended source needs no further cleanup.
+        }
+      }
+      activeOneShots.clear();
       void context.close().catch(() => undefined);
       context = undefined;
     }

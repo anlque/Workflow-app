@@ -32,7 +32,8 @@ deadline, not callback frequency, determines progress.
    use case saves it, then the coordinator publishes it and schedules the same
    alarm name for `transitionEndsAt`.
 6. Focus Presentation observes the authoritative boundary once. It plays the
-   synthesized bell, stops/fades ambient audio over one second, hides Session
+   packaged phase bell (with synthetic fallback), stops/fades ambient audio over
+   one second, hides Session
    controls and applies the lighter blur/opacity treatment to the complete timer
    card. Countdown displays `00:00`.
 7. At or after `transitionEndsAt`, derivation selects one outcome:
@@ -97,7 +98,7 @@ the deadlines needed to reconstruct truth.
 - one observed bell and transition UI:
   `src/features/session/presentation/didCrossPhaseBoundary.test.ts` and
   `ActiveSessionView.test.tsx`.
-- audio fade and synthesized bell:
+- ambient fade and packaged-bell fallback:
   `src/app/focus/FocusEnvironment.test.tsx`, `createUiSoundPlayer.test.ts`.
 - assembled transition: `tests/e2e/workflowExecution.spec.ts`.
 

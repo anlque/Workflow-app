@@ -136,6 +136,114 @@ export function SettingsPage({
             <option value="no-preference">Allow motion</option>
           </Select>
         </div>
+      </fieldset>
+
+      <fieldset className="settings-group">
+        <legend>Audio</legend>
+        <p>Control ambient music and interface cues independently.</p>
+        <div className="form-grid settings-audio-grid">
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.ambientMuted}
+              disabled={pending === 'preferences'}
+              onChange={(event) => {
+                void perform(
+                  'preferences',
+                  () =>
+                    onUpdate({
+                      ...settings,
+                      ambientMuted: event.currentTarget.checked,
+                    }),
+                  'Audio preferences updated.',
+                );
+              }}
+            />
+            Mute music
+          </label>
+          <label>
+            <span>Music volume</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={settings.ambientVolumePercent}
+              disabled={pending === 'preferences'}
+              onChange={(event) => {
+                void perform(
+                  'preferences',
+                  () =>
+                    onUpdate({
+                      ...settings,
+                      ambientVolumePercent: Number(event.currentTarget.value),
+                    }),
+                  'Audio preferences updated.',
+                );
+              }}
+            />
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.cuesMuted}
+              disabled={pending === 'preferences'}
+              onChange={(event) => {
+                void perform(
+                  'preferences',
+                  () =>
+                    onUpdate({
+                      ...settings,
+                      cuesMuted: event.currentTarget.checked,
+                    }),
+                  'Audio preferences updated.',
+                );
+              }}
+            />
+            Mute cues
+          </label>
+          <label>
+            <span>Cue volume</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={settings.cueVolumePercent}
+              disabled={pending === 'preferences'}
+              onChange={(event) => {
+                void perform(
+                  'preferences',
+                  () =>
+                    onUpdate({
+                      ...settings,
+                      cueVolumePercent: Number(event.currentTarget.value),
+                    }),
+                  'Audio preferences updated.',
+                );
+              }}
+            />
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.muteCuesWithMusic}
+              disabled={pending === 'preferences'}
+              onChange={(event) => {
+                void perform(
+                  'preferences',
+                  () =>
+                    onUpdate({
+                      ...settings,
+                      muteCuesWithMusic: event.currentTarget.checked,
+                    }),
+                  'Audio preferences updated.',
+                );
+              }}
+            />
+            Mute cues with music
+          </label>
+        </div>
         {status('preferences')}
       </fieldset>
 

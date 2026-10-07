@@ -35,6 +35,19 @@ MP3 container durations include approximately 30–50 ms of encoder delay/paddin
 
 Total packaged size: 106,668 bytes.
 
+## Runtime integration
+
+AU-001 loads all four packaged files as the primary cue path through one shared
+Web Audio context. Each cue has a cached decode promise. Load, decode or start
+failure uses the matching synthesized cue at most once for that event; primary
+and fallback never overlap. Dice retains the RW-006 repeat/crossfade and
+terminal envelope so it covers the complete roll and restarts cleanly on
+reroll.
+
+Cue volume/mute are independent from ambient music by default. The global
+`Mute cues with music` preference is the only setting that couples ambient mute
+to cues. Audio lock or playback failure never changes Session timing.
+
 The dice source is sparse and transient-heavy; its -2.0 dBFS peak ceiling prevents clipping while its three closely joined recorded rolls eliminate silent gaps. LUFS-I is consequently lower than the sustained tonal cues and should not be compared as perceived loudness without listening.
 
 ## Transformations

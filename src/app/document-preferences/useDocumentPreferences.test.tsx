@@ -12,6 +12,11 @@ test('renders live snapshots and unsubscribes on unmount', () => {
     theme: 'light',
     reducedMotion: 'no-preference',
     effectiveReducedMotion: false,
+    ambientVolumePercent: 100,
+    ambientMuted: false,
+    cueVolumePercent: 100,
+    cuesMuted: false,
+    muteCuesWithMusic: false,
   };
   let listener: (() => void) | undefined;
   const unsubscribe = vi.fn();
@@ -38,6 +43,11 @@ test('renders live snapshots and unsubscribes on unmount', () => {
       theme: 'dark',
       reducedMotion: 'reduce',
       effectiveReducedMotion: true,
+      ambientVolumePercent: 25,
+      ambientMuted: true,
+      cueVolumePercent: 75,
+      cuesMuted: false,
+      muteCuesWithMusic: true,
     };
     listener?.();
   });

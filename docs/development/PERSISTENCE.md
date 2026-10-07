@@ -87,7 +87,7 @@ These version numbers solve different compatibility problems:
 | `SessionRecord.schemaVersion` | One Session record envelope | Current writes 8; reads 1–8 | The Session record reader/writer needs a new incompatible serialization |
 | `AssetRecord.schemaVersion` | One Asset record shape | Current writes 2; reads role-less 1 and 2 | The Asset record reader/writer needs a new incompatible serialization |
 | Workflow package `version` | Public `locusora/workflow` import/export envelope | Current export 6; import 1–6 | The external Workflow package contract changes |
-| Settings package `version` | Public `locusora/settings` import/export envelope | 1 | The external Settings package contract changes |
+| Settings package `version` | Public `locusora/settings` import/export envelope | Current export 2; import 1–2 | The external Settings package contract changes |
 
 A database version must not be copied into a record, and a record
 `schemaVersion` must not be used to order Dexie migrations. Public package
@@ -309,9 +309,10 @@ a storage dump.
 
 ### Settings import
 
-Settings import has a separate `locusora/settings` version-1 envelope. It
-validates file size, exact envelope keys and Domain Settings, then performs one
-`chrome.storage.local.set`.
+Settings import has a separate `locusora/settings` envelope. Version 1 carries
+legacy appearance/shared-volume data; version 2 requires canonical independent
+ambient/cue channels. It validates file size, exact version-specific keys and
+Domain Settings, then performs one `chrome.storage.local.set`.
 
 Chrome Storage cannot participate in a Dexie transaction. This is safe for the
 current separate Settings-only package; do not create an import that pretends a

@@ -560,6 +560,7 @@ describe('WorkflowStudio', () => {
     );
     act(() => {
       preferences.setSnapshot({
+        ...preferences.getSnapshot(),
         theme: 'dark',
         reducedMotion: 'reduce',
         effectiveReducedMotion: true,

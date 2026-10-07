@@ -77,9 +77,10 @@ function studioDependencies(
 function dependencies(
   session: Session | null,
   studio: WorkflowStudioDependencies = studioDependencies(),
+  preferences = createTestDocumentPreferences(),
 ): FocusDependencies {
   return {
-    preferences: createTestDocumentPreferences(),
+    preferences,
     sounds: {
       unlock: vi.fn(() => Promise.resolve(true)),
       getState: vi.fn(() => 'ready' as const),
@@ -101,6 +102,7 @@ function dependencies(
     rollReward: vi.fn(() => Promise.resolve()),
     rerollReward: vi.fn(() => Promise.resolve()),
     stop: vi.fn(() => Promise.resolve()),
+    updateAudioSettings: vi.fn(() => Promise.resolve()),
     loadAssetUrl: vi.fn(() => Promise.resolve(null)),
     releaseAssetUrl: vi.fn(),
     closeSidePanel: vi.fn(() => Promise.resolve()),
@@ -364,6 +366,7 @@ describe('FocusApp', () => {
     );
     act(() => {
       preferences.setSnapshot({
+        ...preferences.getSnapshot(),
         theme: 'system',
         reducedMotion: 'reduce',
         effectiveReducedMotion: true,
@@ -436,7 +439,7 @@ describe('FocusApp', () => {
     expect(deps.listWorkflows).not.toHaveBeenCalled();
   });
 
-  test('controls master sound volume during an active Session', async () => {
+  test('controls independently persisted music and cue channels', async () => {
     const user = userEvent.setup();
     const session = createSession(
       'session-1',
@@ -447,22 +450,50 @@ describe('FocusApp', () => {
       }),
       Date.now(),
     );
-    const deps = dependencies(session);
+    const preferences = createTestDocumentPreferences({
+      theme: 'system',
+      reducedMotion: 'system',
+      effectiveReducedMotion: false,
+      ambientVolumePercent: 80,
+      ambientMuted: false,
+      cueVolumePercent: 60,
+      cuesMuted: false,
+      muteCuesWithMusic: false,
+    });
+    const deps = dependencies(session, studioDependencies(), preferences);
     render(<FocusApp dependencies={deps} />);
 
-    const volume = await screen.findByRole('slider', { name: 'Volume' });
-    expect(volume).toHaveValue('100');
+    const musicVolume = await screen.findByRole('slider', {
+      name: 'Music volume',
+    });
+    const cueVolume = screen.getByRole('slider', { name: 'Cue volume' });
+    expect(musicVolume).toHaveValue('80');
+    expect(cueVolume).toHaveValue('60');
+    expect(deps.sounds.setVolume).toHaveBeenLastCalledWith(0.6);
 
-    fireEvent.change(volume, { target: { value: '35' } });
-    expect(deps.sounds.setVolume).toHaveBeenLastCalledWith(0.35);
+    fireEvent.change(musicVolume, { target: { value: '35' } });
+    expect(deps.updateAudioSettings).toHaveBeenLastCalledWith({
+      ambientVolumePercent: 35,
+    });
 
-    await user.click(screen.getByRole('button', { name: 'Mute sound' }));
+    await user.click(screen.getByRole('button', { name: 'Mute music' }));
+    expect(deps.updateAudioSettings).toHaveBeenLastCalledWith({
+      ambientMuted: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Mute cues' }));
+    expect(deps.updateAudioSettings).toHaveBeenLastCalledWith({
+      cuesMuted: true,
+    });
+
+    act(() => {
+      preferences.setSnapshot({
+        ...preferences.getSnapshot(),
+        ambientMuted: true,
+        muteCuesWithMusic: true,
+      });
+    });
     expect(deps.sounds.setVolume).toHaveBeenLastCalledWith(0);
-    expect(screen.getByRole('button', { name: 'Unmute sound' })).toBeVisible();
-
-    await user.click(screen.getByRole('button', { name: 'Unmute sound' }));
-    expect(deps.sounds.setVolume).toHaveBeenLastCalledWith(0.35);
-    expect(volume).toHaveValue('35');
   });
 
   test('keeps the Session countdown running when ambient audio pauses', async () => {

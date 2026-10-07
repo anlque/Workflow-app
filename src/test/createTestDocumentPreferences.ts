@@ -2,6 +2,11 @@ type DocumentPreferencesSnapshot = Readonly<{
   theme: 'system' | 'light' | 'dark';
   reducedMotion: 'system' | 'reduce' | 'no-preference';
   effectiveReducedMotion: boolean;
+  ambientVolumePercent: number;
+  ambientMuted: boolean;
+  cueVolumePercent: number;
+  cuesMuted: boolean;
+  muteCuesWithMusic: boolean;
 }>;
 
 export function createTestDocumentPreferences(
@@ -9,6 +14,11 @@ export function createTestDocumentPreferences(
     theme: 'system',
     reducedMotion: 'system',
     effectiveReducedMotion: false,
+    ambientVolumePercent: 100,
+    ambientMuted: false,
+    cueVolumePercent: 100,
+    cuesMuted: false,
+    muteCuesWithMusic: false,
   },
 ): {
   start(): Promise<void>;

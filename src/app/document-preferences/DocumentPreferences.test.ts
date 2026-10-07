@@ -58,6 +58,34 @@ describe('createDocumentPreferences', () => {
       theme: 'dark',
       reducedMotion: 'reduce',
       effectiveReducedMotion: true,
+      ambientVolumePercent: 100,
+      ambientMuted: false,
+      cueVolumePercent: 100,
+      cuesMuted: false,
+      muteCuesWithMusic: false,
+    });
+  });
+
+  test('synchronizes audio channels from storage changes', async () => {
+    const state = setup();
+    await state.preferences.start();
+
+    state.emitStorage({
+      theme: 'dark',
+      reducedMotion: 'reduce',
+      ambientVolumePercent: 25,
+      ambientMuted: true,
+      cueVolumePercent: 65,
+      cuesMuted: false,
+      muteCuesWithMusic: true,
+    });
+
+    expect(state.preferences.getSnapshot()).toMatchObject({
+      ambientVolumePercent: 25,
+      ambientMuted: true,
+      cueVolumePercent: 65,
+      cuesMuted: false,
+      muteCuesWithMusic: true,
     });
   });
 

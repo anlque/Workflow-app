@@ -4,6 +4,7 @@ export {
   parseSettingsPackage,
   SettingsPackageValidationError,
   type SettingsPackageV1,
+  type SettingsPackageV2,
 } from './application/SettingsPackage';
 export { exportSettingsUseCase } from './application/exportSettingsUseCase';
 export { getSettingsUseCase } from './application/getSettingsUseCase';
@@ -15,6 +16,8 @@ export { updateSettingsUseCase } from './application/updateSettingsUseCase';
 export {
   createSettings,
   defaultSettings,
+  effectiveAmbientVolume,
+  effectiveCueVolume,
   SettingsValidationError,
   type ReducedMotion,
   type Settings,

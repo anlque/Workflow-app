@@ -12,6 +12,11 @@ export type DocumentPreferencesSnapshot = Readonly<{
   theme: Theme;
   reducedMotion: ReducedMotion;
   effectiveReducedMotion: boolean;
+  ambientVolumePercent: number;
+  ambientMuted: boolean;
+  cueVolumePercent: number;
+  cuesMuted: boolean;
+  muteCuesWithMusic: boolean;
 }>;
 
 export type DocumentPreferences = Readonly<{
@@ -83,7 +88,12 @@ export function createDocumentPreferences({
     const changed =
       next.theme !== snapshot.theme ||
       next.reducedMotion !== snapshot.reducedMotion ||
-      next.effectiveReducedMotion !== snapshot.effectiveReducedMotion;
+      next.effectiveReducedMotion !== snapshot.effectiveReducedMotion ||
+      next.ambientVolumePercent !== snapshot.ambientVolumePercent ||
+      next.ambientMuted !== snapshot.ambientMuted ||
+      next.cueVolumePercent !== snapshot.cueVolumePercent ||
+      next.cuesMuted !== snapshot.cuesMuted ||
+      next.muteCuesWithMusic !== snapshot.muteCuesWithMusic;
     snapshot = changed ? next : snapshot;
     root.dataset['theme'] = snapshot.theme;
     root.dataset['reducedMotion'] = snapshot.effectiveReducedMotion
@@ -140,5 +150,10 @@ function resolveSnapshot(
     effectiveReducedMotion:
       settings.reducedMotion === 'reduce' ||
       (settings.reducedMotion === 'system' && systemReducedMotion),
+    ambientVolumePercent: settings.ambientVolumePercent,
+    ambientMuted: settings.ambientMuted,
+    cueVolumePercent: settings.cueVolumePercent,
+    cuesMuted: settings.cuesMuted,
+    muteCuesWithMusic: settings.muteCuesWithMusic,
   });
 }

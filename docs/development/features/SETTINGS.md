@@ -4,7 +4,8 @@
 
 The Settings feature owns the small, local application preference value and its
 separate import/export package. Current settings are theme, reduced-motion
-preference and the optional last-selected Workflow identifier.
+preference, independent ambient/cue audio channels and the optional
+last-selected Workflow identifier.
 
 Source root: [`src/features/settings/`](../../../src/features/settings/).
 
@@ -12,7 +13,7 @@ Source root: [`src/features/settings/`](../../../src/features/settings/).
 
 - the validated immutable Settings value and defaults;
 - Settings repository and use-case contracts;
-- the `locusora/settings` version-1 package parser and import/export;
+- the `locusora/settings` version-2 writer and version-1/2 parser;
 - the `chrome.storage.local` adapter under the `settings` key;
 - the Options Settings presentation and operation feedback;
 - the root behavior/data API in
@@ -39,8 +40,8 @@ presentation API.
 
 | Group                      | Exports                                                                                                                 |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Domain                     | `Settings`, `Theme`, `ReducedMotion`, `createSettings`, `defaultSettings`, `SettingsValidationError`                    |
-| Application contracts      | `SettingsRepository`, `DocumentPreferenceSource`, `SettingsPackageV1`, `SettingsImportLimits`, `SettingsPackageValidationError` |
+| Domain                     | `Settings`, `Theme`, `ReducedMotion`, `createSettings`, effective audio-volume helpers, defaults and validation errors |
+| Application contracts      | `SettingsRepository`, `DocumentPreferenceSource`, Settings package v1/v2 types, import limits and validation errors     |
 | Application behavior       | `getSettingsUseCase`, `updateSettingsUseCase`, `exportSettingsUseCase`, `importSettingsUseCase`, `parseSettingsPackage` |
 | Infrastructure composition | `ChromeSettingsRepository`, `ChromeDocumentPreferenceSource`, storage adapter types                                      |
 | Presentation (`/studio`)   | `SettingsPage`, `SettingsPageProps`                                                                                     |
@@ -79,10 +80,14 @@ All I/O is injected by Options.
 - `theme` is exactly `system`, `light` or `dark`.
 - `reducedMotion` is exactly `system`, `reduce` or `no-preference`.
 - `lastSelectedWorkflowId`, when present, is a non-empty branded Workflow ID.
-- The input must be a plain object with no keys beyond those three fields.
+- Ambient and cue volumes are integer percentages from 0 through 100; their
+  mute flags are independent booleans. `muteCuesWithMusic` is opt-in.
+- Legacy values without audio fields receive defaults. Legacy `volumePercent`
+  is copied to both channel volumes while mute flags remain false.
+- Canonical input is exact and cannot mix `volumePercent` with channel fields.
 - The returned Settings object is frozen.
-- Missing persisted settings resolve to frozen defaults: system theme and
-  system motion preference.
+- Missing persisted settings resolve to frozen defaults: system theme/motion,
+  both channels at 100%, both unmuted and coupling disabled.
 - Invalid persisted settings fail validation; they do not silently fall back to
   defaults.
 
@@ -95,9 +100,9 @@ Options checks whether it still exists and falls back to the first Workflow.
 | ----------------------- | --------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `getSettingsUseCase`    | Repository                        | Loads `unknown`; returns defaults only when absent, otherwise validates                     | Trusted Settings or validation/storage failure     |
 | `updateSettingsUseCase` | Repository and `unknown` input    | Validates first, then saves                                                                 | Updated Settings; no write on invalid input        |
-| `exportSettingsUseCase` | Repository                        | Loads validated/default settings and serializes a version-1 envelope                        | Deterministic compact JSON                         |
+| `exportSettingsUseCase` | Repository                        | Loads validated/default settings and serializes a canonical version-2 envelope              | Deterministic compact JSON                         |
 | `importSettingsUseCase` | Repository, JSON text, byte limit | Checks UTF-8 size, parses `unknown`, validates exact envelope and Settings, then saves      | Imported Settings; no write on validation failure  |
-| `parseSettingsPackage`  | `unknown` value                   | Requires exactly `kind`, `version`, `settings` with kind `locusora/settings` and version 1 | Frozen package or `SettingsPackageValidationError` |
+| `parseSettingsPackage`  | `unknown` value                   | Strictly reads legacy version 1 or canonical version 2 with exact envelope keys              | Frozen package or `SettingsPackageValidationError` |
 
 The Options composition currently limits a Settings package to 1 MiB and owns
 file reading/download. Side panel writes `lastSelectedWorkflowId` before opening
@@ -107,8 +112,8 @@ Options for a chosen Workflow.
 
 `ChromeSettingsRepository` reads and writes one `settings` key in
 `chrome.storage.local`. There is no Dexie table, database migration or record
-`schemaVersion` for Settings. The public package `version: 1` belongs only to
-the import/export envelope.
+`schemaVersion` for Settings. The public package version belongs only to the
+import/export envelope; current export is 2 and import supports 1–2.
 
 Chrome Storage cannot share a transaction with IndexedDB. The current Settings
 package is deliberately independent, so its single `set` is the only import
@@ -120,9 +125,9 @@ write. See [Persistence and Compatibility](../PERSISTENCE.md) and
 Every document composition root starts its own document-preference controller
 before mounting React. The controller validates the durable value, applies
 `data-theme` and effective `data-reduced-motion` to the root, then reveals the
-document. It subscribes to local `settings` changes, so Focus, Side Panel and
-Options update without reload. Options also uses that live snapshot for its two
-appearance controls while retaining its normal reload for operation feedback.
+document. Its live snapshot also carries both audio channels, so Focus receives
+Settings changes without reload or a second storage listener. Options uses the
+same durable value for appearance/audio controls and normal reload feedback.
 
 `theme: system` remains CSS-driven. `reducedMotion: system` is resolved through
 `matchMedia`; only this mode owns a media-query listener. Explicit `reduce` and
@@ -132,6 +137,7 @@ and React subscriptions on `pagehide`.
 `SettingsPage` provides:
 
 - theme and reduced-motion selects;
+- ambient/cue volume and mute controls plus `Mute cues with music`;
 - separate Workflow package and Settings package actions;
 - per-operation pending state;
 - accessible success status or error alert feedback.

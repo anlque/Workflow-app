@@ -237,11 +237,11 @@ The manifest E2E assertion also catches unexpected production permissions.
 
 ### Audio Is Silent or Locked by Autoplay
 
-- **First check:** in focus, look for **Enable sounds**. Click it and confirm the
-  volume is non-zero. Ambient audio may separately show **Enable audio** if
-  `HTMLMediaElement.play()` was blocked.
+- **First check:** in Focus, look for **Enable sounds**. Click it and confirm the
+  relevant Music or Cues channel is unmuted with non-zero volume. Ambient audio
+  may separately show **Enable audio** if `HTMLMediaElement.play()` was blocked.
 - **Owner:** [`createUiSoundPlayer.ts`](../../src/app/focus/createUiSoundPlayer.ts)
-  for bell/Dice/celebration Web Audio and
+  for packaged bell/Dice/celebration Web Audio plus synthetic fallback and
   [`useAmbientAudio.ts`](../../src/app/focus/useAmbientAudio.ts) for the hidden
   looping media element/fades.
 - **Boundary:** sounds are Presentation feedback. Failure is swallowed or shown

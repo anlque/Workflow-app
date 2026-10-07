@@ -1,8 +1,18 @@
-import { createSettings, type Settings } from '../domain/Settings';
+import {
+  createCanonicalSettings,
+  createLegacySettings,
+  type Settings,
+} from '../domain/Settings';
 
 export type SettingsPackageV1 = Readonly<{
   kind: 'locusora/settings';
   version: 1;
+  settings: unknown;
+}>;
+
+export type SettingsPackageV2 = Readonly<{
+  kind: 'locusora/settings';
+  version: 2;
   settings: Settings;
 }>;
 
@@ -13,7 +23,9 @@ export class SettingsPackageValidationError extends Error {
   }
 }
 
-export function parseSettingsPackage(value: unknown): SettingsPackageV1 {
+export function parseSettingsPackage(
+  value: unknown,
+): Readonly<{ kind: 'locusora/settings'; version: 1 | 2; settings: Settings }> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new SettingsPackageValidationError();
   }
@@ -21,15 +33,18 @@ export function parseSettingsPackage(value: unknown): SettingsPackageV1 {
   if (
     Object.keys(record).length !== 3 ||
     record['kind'] !== 'locusora/settings' ||
-    record['version'] !== 1
+    (record['version'] !== 1 && record['version'] !== 2)
   ) {
     throw new SettingsPackageValidationError();
   }
   try {
     return Object.freeze({
       kind: 'locusora/settings',
-      version: 1,
-      settings: createSettings(record['settings']),
+      version: record['version'],
+      settings:
+        record['version'] === 1
+          ? createLegacySettings(record['settings'])
+          : createCanonicalSettings(record['settings']),
     });
   } catch {
     throw new SettingsPackageValidationError();

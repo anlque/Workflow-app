@@ -18,6 +18,10 @@ import {
 } from '@/features/session';
 import type { AssetId } from '@/features/assets';
 import {
+  effectiveAmbientVolume,
+  effectiveCueVolume,
+} from '@/features/settings';
+import {
   useWorkflowCatalog,
   type Workflow,
   type WorkflowCatalogSource,
@@ -57,6 +61,14 @@ export type FocusDependencies = Readonly<{
   subscribeWorkflowChanges(listener: () => void): () => void;
   start(id: WorkflowId): Promise<void>;
   loadStudio(): Promise<WorkflowStudioDependencies>;
+  updateAudioSettings(
+    patch: Readonly<{
+      ambientVolumePercent?: number;
+      ambientMuted?: boolean;
+      cueVolumePercent?: number;
+      cuesMuted?: boolean;
+    }>,
+  ): Promise<void>;
 }>;
 
 function IdleFocusLauncher({
@@ -109,11 +121,9 @@ export function FocusApp({
   const store = useMemo(createActiveSessionStore, []);
   const projection = useStore(store);
   const [soundState, setSoundState] = useState(dependencies.sounds.getState);
-  const [volumePercent, setVolumePercent] = useState(100);
-  const lastAudibleVolumeRef = useRef(100);
-  const { effectiveReducedMotion: reducedMotion } = useDocumentPreferences(
-    dependencies.preferences,
-  );
+  const preferences = useDocumentPreferences(dependencies.preferences);
+  const reducedMotion = preferences.effectiveReducedMotion;
+  const [audioError, setAudioError] = useState<string | null>(null);
   const sidePanel = useSidePanelControl(dependencies);
   const [studioOpen, setStudioOpen] = useState(false);
   const [studioRequested, setStudioRequested] = useState(false);
@@ -125,16 +135,28 @@ export function FocusApp({
     setSoundState(dependencies.sounds.getState());
   }
 
-  function updateVolume(nextVolumePercent: number): void {
-    const normalizedVolume = Math.min(100, Math.max(0, nextVolumePercent));
-    if (normalizedVolume > 0) lastAudibleVolumeRef.current = normalizedVolume;
-    setVolumePercent(normalizedVolume);
-    dependencies.sounds.setVolume(normalizedVolume / 100);
+  function audioSettings() {
+    return {
+      theme: preferences.theme,
+      reducedMotion: preferences.reducedMotion,
+      ambientVolumePercent: preferences.ambientVolumePercent,
+      ambientMuted: preferences.ambientMuted,
+      cueVolumePercent: preferences.cueVolumePercent,
+      cuesMuted: preferences.cuesMuted,
+      muteCuesWithMusic: preferences.muteCuesWithMusic,
+    };
   }
 
-  function toggleSound(): void {
+  function updateAudio(
+    patch: Parameters<FocusDependencies['updateAudioSettings']>[0],
+  ): void {
     void activateSounds();
-    updateVolume(volumePercent === 0 ? lastAudibleVolumeRef.current : 0);
+    setAudioError(null);
+    void dependencies.updateAudioSettings(patch).catch((cause: unknown) => {
+      setAudioError(
+        cause instanceof Error ? cause.message : 'Audio settings failed.',
+      );
+    });
   }
 
   function togglePanel(): void {
@@ -165,6 +187,16 @@ export function FocusApp({
   }, [dependencies, store]);
 
   useCompletionCue(projection.session, dependencies.sounds);
+
+  useEffect(() => {
+    dependencies.sounds.setVolume(effectiveCueVolume(audioSettings()));
+  }, [
+    dependencies.sounds,
+    preferences.ambientMuted,
+    preferences.cueVolumePercent,
+    preferences.cuesMuted,
+    preferences.muteCuesWithMusic,
+  ]);
 
   let focusSurface: ReactNode;
   if (projection.connection === 'connecting') {
@@ -219,28 +251,62 @@ export function FocusApp({
             Open Workflow Studio
           </Button>
           <div className="focus-app__volume-control">
-            <Button
-              className="focus-app__sound-toggle"
-              variant="quiet"
-              aria-pressed={volumePercent === 0}
-              onClick={toggleSound}
-            >
-              {volumePercent === 0 ? 'Unmute sound' : 'Mute sound'}
-            </Button>
-            <label>
-              <span>Volume</span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={volumePercent}
-                onChange={(event) => {
-                  updateVolume(Number(event.currentTarget.value));
+            <div>
+              <Button
+                className="focus-app__sound-toggle"
+                variant="quiet"
+                aria-pressed={preferences.ambientMuted}
+                onClick={() => {
+                  updateAudio({ ambientMuted: !preferences.ambientMuted });
                 }}
-              />
-            </label>
+              >
+                {preferences.ambientMuted ? 'Unmute music' : 'Mute music'}
+              </Button>
+              <label>
+                <span>Music volume</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={preferences.ambientVolumePercent}
+                  onChange={(event) => {
+                    updateAudio({
+                      ambientVolumePercent: Number(event.currentTarget.value),
+                    });
+                  }}
+                />
+              </label>
+            </div>
+            <div>
+              <Button
+                className="focus-app__sound-toggle"
+                variant="quiet"
+                aria-pressed={preferences.cuesMuted}
+                onClick={() => {
+                  updateAudio({ cuesMuted: !preferences.cuesMuted });
+                }}
+              >
+                {preferences.cuesMuted ? 'Unmute cues' : 'Mute cues'}
+              </Button>
+              <label>
+                <span>Cue volume</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={preferences.cueVolumePercent}
+                  onChange={(event) => {
+                    updateAudio({
+                      cueVolumePercent: Number(event.currentTarget.value),
+                    });
+                  }}
+                />
+              </label>
+            </div>
           </div>
+          {audioError === null ? null : <p role="alert">{audioError}</p>}
           {soundState === 'locked' ? (
             <Button
               className="focus-app__enable-sounds"
@@ -268,7 +334,7 @@ export function FocusApp({
           environment={segment.environment}
           reducedMotion={reducedMotion}
           playing={session.status === 'running'}
-          volume={volumePercent / 100}
+          volume={effectiveAmbientVolume(audioSettings())}
           loadAssetUrl={dependencies.loadAssetUrl}
           releaseAssetUrl={dependencies.releaseAssetUrl}
         />

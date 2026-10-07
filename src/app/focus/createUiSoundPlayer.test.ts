@@ -147,11 +147,17 @@ describe('createUiSoundPlayer', () => {
   test('synthesizes a short decaying bell after activation and reuses its audio context', async () => {
     const fake = createFakeAudioContext();
     const createContext = vi.fn(() => fake.context);
-    const player = createUiSoundPlayer(createContext);
+    const player = createUiSoundPlayer(createContext, () =>
+      Promise.reject(new Error('decode failed')),
+    );
 
     await expect(player.unlock()).resolves.toBe(true);
     player.playBell();
     player.playBell();
+
+    await vi.waitFor(() => {
+      expect(fake.oscillatorStarts).toHaveLength(2);
+    });
 
     expect(createContext).toHaveBeenCalledOnce();
     expect(fake.oscillatorStarts).toHaveLength(2);
@@ -160,17 +166,54 @@ describe('createUiSoundPlayer', () => {
 
   test('applies master volume to generated UI sounds', async () => {
     const fake = createFakeAudioContext();
-    const player = createUiSoundPlayer(() => fake.context);
+    const player = createUiSoundPlayer(
+      () => fake.context,
+      () => Promise.reject(new Error('decode failed')),
+    );
     await player.unlock();
 
     player.setVolume(0.25);
     player.playBell();
 
+    await vi.waitFor(() => {
+      expect(fake.oscillatorStarts).toHaveLength(1);
+    });
+
     expect(fake.gainRamps.flat().some(({ value }) => value === 0.1)).toBe(true);
 
     player.setVolume(0);
     player.playBell();
+    await Promise.resolve();
     expect(fake.oscillatorStarts).toHaveLength(1);
+  });
+
+  test('loads every packaged production cue as its primary sound', async () => {
+    const fake = createFakeAudioContext();
+    const fetch = vi.fn<(url: string) => Promise<Response>>(() =>
+      Promise.resolve({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(16)),
+      } as Response),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const player = createUiSoundPlayer(() => fake.context);
+
+    await player.unlock();
+    player.playBell();
+    player.playRewardUnlocked();
+    player.playSessionComplete();
+    player.playDiceRoll(600);
+
+    await vi.waitFor(() => {
+      expect(fake.bufferSourceStarts).toHaveLength(4);
+    });
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      '/audio/phase-bell.mp3',
+      '/audio/dice-roll.mp3',
+      '/audio/reward-unlocked.mp3',
+      '/audio/session-complete.mp3',
+    ]);
+    expect(fake.oscillatorStarts).toHaveLength(0);
   });
 
   test('plays the packaged roll with overlap across the full animation duration', async () => {
@@ -187,7 +230,7 @@ describe('createUiSoundPlayer', () => {
       expect(fake.bufferSourceStarts).toHaveLength(2);
     });
 
-    expect(loadRollBuffer).toHaveBeenCalledOnce();
+    expect(loadRollBuffer).toHaveBeenCalledWith(fake.context, 'dice-roll');
     expect(fake.bufferSourceStarts).toEqual([1, 3.35]);
     expect(fake.bufferSourceStartArguments[0]).toEqual([1, 0, 2.5]);
     expect(fake.bufferSourceStartArguments[1]?.slice(0, 2)).toEqual([3.35, 0]);
@@ -234,28 +277,6 @@ describe('createUiSoundPlayer', () => {
         { kind: 'linear', value: 0, at: 1.6 },
       ]),
     );
-  });
-
-  test('loads and decodes the packaged production roll cue by default', async () => {
-    const fake = createFakeAudioContext();
-    const bytes = new ArrayBuffer(16);
-    const fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        arrayBuffer: () => Promise.resolve(bytes),
-      } as Response),
-    );
-    vi.stubGlobal('fetch', fetch);
-    const player = createUiSoundPlayer(() => fake.context);
-
-    await player.unlock();
-    player.playDiceRoll(600);
-    await vi.waitFor(() => {
-      expect(fake.bufferSourceStarts).toHaveLength(1);
-    });
-
-    expect(fetch).toHaveBeenCalledWith('/audio/dice-roll.mp3');
-    expect(fake.decodeAudioData).toHaveBeenCalledWith(bytes);
   });
 
   test('stops an active roll before restart and applies live master volume', async () => {
@@ -354,9 +375,50 @@ describe('createUiSoundPlayer', () => {
     expect(fake.bufferSourceStartArguments).toEqual([[1]]);
   });
 
+  test('uses a one-shot synthetic fallback when a packaged cue cannot start', async () => {
+    const fake = createFakeAudioContext();
+    const player = createUiSoundPlayer(
+      () => fake.context,
+      () => Promise.resolve({ duration: 1 } as AudioBuffer),
+    );
+    await player.unlock();
+    fake.failNextBufferSourceStart();
+
+    player.playBell();
+
+    await vi.waitFor(() => {
+      expect(fake.oscillatorStarts).toHaveLength(1);
+    });
+    expect(fake.bufferSourceStarts).toHaveLength(0);
+  });
+
+  test('applies cue volume changes to an active packaged one-shot', async () => {
+    const fake = createFakeAudioContext();
+    const player = createUiSoundPlayer(
+      () => fake.context,
+      () => Promise.resolve({ duration: 1 } as AudioBuffer),
+    );
+    await player.unlock();
+    player.playBell();
+    await vi.waitFor(() => {
+      expect(fake.bufferSourceStarts).toHaveLength(1);
+    });
+
+    fake.setCurrentTime(1.5);
+    player.setVolume(0);
+
+    expect(fake.gainRamps).toContainEqual([
+      { kind: 'set', value: 1, at: 1 },
+      { kind: 'set', value: 0, at: 1.5 },
+    ]);
+  });
+
   test('does not consume sounds while locked and unlocks a suspended context', async () => {
     const fake = createFakeAudioContext('suspended');
-    const player = createUiSoundPlayer(() => fake.context);
+    const player = createUiSoundPlayer(
+      () => fake.context,
+      () => Promise.reject(new Error('decode failed')),
+    );
 
     player.playBell();
 
@@ -365,15 +427,23 @@ describe('createUiSoundPlayer', () => {
     await expect(player.unlock()).resolves.toBe(true);
     expect(player.getState()).toBe('ready');
     player.playBell();
-    expect(fake.oscillatorStarts).toHaveLength(1);
+    await vi.waitFor(() => {
+      expect(fake.oscillatorStarts).toHaveLength(1);
+    });
   });
 
   test('synthesizes distinct completion and Reward celebrations', async () => {
     const fake = createFakeAudioContext();
-    const player = createUiSoundPlayer(() => fake.context);
+    const player = createUiSoundPlayer(
+      () => fake.context,
+      () => Promise.reject(new Error('decode failed')),
+    );
     await player.unlock();
 
     player.playSessionComplete();
+    await vi.waitFor(() => {
+      expect(fake.oscillatorStarts).toHaveLength(3);
+    });
     expect(fake.oscillatorStarts).toEqual([1, 1, 1]);
     expect(fake.oscillatorTypes).toEqual(['triangle', 'triangle', 'triangle']);
 
@@ -381,6 +451,9 @@ describe('createUiSoundPlayer', () => {
     fake.oscillatorFrequencies.length = 0;
     fake.oscillatorTypes.length = 0;
     player.playRewardUnlocked();
+    await vi.waitFor(() => {
+      expect(fake.oscillatorStarts).toHaveLength(4);
+    });
     expect(
       fake.oscillatorStarts.map((value) => Number(value.toFixed(2))),
     ).toEqual([1, 1.12, 1.24, 1.36]);
