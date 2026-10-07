@@ -365,6 +365,11 @@ export function WorkflowStudio({
               ...snapshot.settings,
               theme: documentPreferences.theme,
               reducedMotion: documentPreferences.reducedMotion,
+              ambientVolumePercent: documentPreferences.ambientVolumePercent,
+              ambientMuted: documentPreferences.ambientMuted,
+              cueVolumePercent: documentPreferences.cueVolumePercent,
+              cuesMuted: documentPreferences.cuesMuted,
+              muteCuesWithMusic: documentPreferences.muteCuesWithMusic,
             }}
             onUpdate={async (settings) => {
               await dependencies.updateSettings(settings);

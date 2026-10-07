@@ -39,6 +39,16 @@ test('loads before visibility and synchronizes preferences across open documents
     await expect(page.locator('body')).toBeVisible();
   }
 
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Preference sync focus');
+  await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(options.getByRole('status')).toHaveText('Workflow saved');
+  await focus
+    .getByRole('button', { name: 'Start Preference sync focus' })
+    .click();
+  await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
+
   await options.getByRole('tab', { name: 'Settings' }).click();
   await options.getByRole('combobox', { name: 'Theme' }).selectOption('light');
   await options
@@ -48,6 +58,25 @@ test('loads before visibility and synchronizes preferences across open documents
   const muteMusic = options.getByRole('checkbox', { name: 'Mute music' });
   await muteMusic.click();
   await expect(muteMusic).toBeChecked();
+
+  await expect(focus.getByRole('slider', { name: 'Cue volume' })).toHaveValue(
+    '42',
+  );
+  await expect(
+    focus.getByRole('button', { name: 'Unmute music' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(options.getByRole('slider', { name: 'Cue volume' })).toHaveValue(
+    '42',
+  );
+
+  await focus.getByRole('slider', { name: 'Music volume' }).fill('37');
+  await focus.getByRole('button', { name: 'Mute cues' }).click();
+  await expect(
+    options.getByRole('slider', { name: 'Music volume' }),
+  ).toHaveValue('37');
+  await expect(
+    options.getByRole('checkbox', { name: 'Mute cues', exact: true }),
+  ).toBeChecked();
 
   for (const page of [options, focus, sidePanel]) {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
@@ -75,7 +104,9 @@ test('loads before visibility and synchronizes preferences across open documents
     .toMatchObject({
       settings: {
         ambientMuted: true,
+        ambientVolumePercent: 37,
         cueVolumePercent: 42,
+        cuesMuted: true,
         muteCuesWithMusic: false,
       },
     });

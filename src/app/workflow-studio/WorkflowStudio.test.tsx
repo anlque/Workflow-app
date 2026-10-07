@@ -7,6 +7,7 @@ import { defaultSettings } from '@/features/settings';
 import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
 import {
   createWorkflow,
+  createWorkflowId,
   type CreateWorkflowInput,
   type Workflow,
 } from '@/features/workflow';
@@ -103,6 +104,64 @@ function dependencies(
 }
 
 describe('WorkflowStudio', () => {
+  test('keeps every live audio preference while theme and motion change', async () => {
+    const user = userEvent.setup();
+    const preferences = createTestDocumentPreferences();
+    const load = vi.fn(() =>
+      Promise.resolve({
+        workflows: [],
+        assets: [],
+        settings: {
+          ...defaultSettings,
+          lastSelectedWorkflowId: createWorkflowId('saved-workflow'),
+        },
+      }),
+    );
+    render(
+      <WorkflowStudio dependencies={dependencies({ preferences, load })} />,
+    );
+
+    await user.click(await screen.findByRole('tab', { name: 'Settings' }));
+    act(() => {
+      preferences.setSnapshot({
+        ...preferences.getSnapshot(),
+        ambientVolumePercent: 24,
+        ambientMuted: true,
+        cueVolumePercent: 46,
+        cuesMuted: true,
+        muteCuesWithMusic: true,
+      });
+    });
+
+    expect(screen.getByRole('slider', { name: 'Music volume' })).toHaveValue(
+      '24',
+    );
+    expect(screen.getByRole('slider', { name: 'Cue volume' })).toHaveValue(
+      '46',
+    );
+    expect(screen.getByRole('checkbox', { name: 'Mute music' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Mute cues' })).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Mute cues with music' }),
+    ).toBeChecked();
+
+    act(() => {
+      preferences.setSnapshot({
+        ...preferences.getSnapshot(),
+        theme: 'dark',
+        reducedMotion: 'reduce',
+        effectiveReducedMotion: true,
+      });
+    });
+
+    expect(screen.getByRole('slider', { name: 'Music volume' })).toHaveValue(
+      '24',
+    );
+    expect(screen.getByRole('slider', { name: 'Cue volume' })).toHaveValue(
+      '46',
+    );
+  });
+
   test('controls Side Panel state from lifecycle events and pending actions', async () => {
     const user = userEvent.setup();
     let notify: ((open: boolean) => void) | undefined;

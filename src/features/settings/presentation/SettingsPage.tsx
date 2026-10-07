@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 
 import { Button, Select } from '@/shared';
 
@@ -29,22 +29,42 @@ export function SettingsPage({
   onImportWorkflow,
 }: SettingsPageProps) {
   const [pending, setPending] = useState<Operation | null>(null);
+  const [ambientVolumeDraft, setAmbientVolumeDraft] = useState(
+    settings.ambientVolumePercent,
+  );
+  const [cueVolumeDraft, setCueVolumeDraft] = useState(
+    settings.cueVolumePercent,
+  );
+  const committedVolumes = useRef({
+    ambientVolumePercent: settings.ambientVolumePercent,
+    cueVolumePercent: settings.cueVolumePercent,
+  });
   const [feedback, setFeedback] = useState<Readonly<{
     operation: Operation;
     message: string;
     error: boolean;
   }> | null>(null);
 
+  useEffect(() => {
+    setAmbientVolumeDraft(settings.ambientVolumePercent);
+    setCueVolumeDraft(settings.cueVolumePercent);
+    committedVolumes.current = {
+      ambientVolumePercent: settings.ambientVolumePercent,
+      cueVolumePercent: settings.cueVolumePercent,
+    };
+  }, [settings.ambientVolumePercent, settings.cueVolumePercent]);
+
   async function perform(
     operation: Operation,
     action: () => Promise<void>,
     success: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     setPending(operation);
     setFeedback(null);
     try {
       await action();
       setFeedback({ operation, message: success, error: false });
+      return true;
     } catch (cause) {
       setFeedback({
         operation,
@@ -52,8 +72,35 @@ export function SettingsPage({
           cause instanceof Error ? cause.message : 'The operation failed.',
         error: true,
       });
+      return false;
     } finally {
       setPending(null);
+    }
+  }
+
+  async function commitVolume(
+    field: 'ambientVolumePercent' | 'cueVolumePercent',
+    value: number,
+  ): Promise<void> {
+    const previous = committedVolumes.current[field];
+    if (value === previous) return;
+    committedVolumes.current = { ...committedVolumes.current, [field]: value };
+    const saved = await perform(
+      'preferences',
+      () =>
+        onUpdate({
+          ...settings,
+          ambientVolumePercent: ambientVolumeDraft,
+          cueVolumePercent: cueVolumeDraft,
+          [field]: value,
+        }),
+      'Audio preferences updated.',
+    );
+    if (!saved) {
+      committedVolumes.current = {
+        ...committedVolumes.current,
+        [field]: previous,
+      };
     }
   }
 
@@ -146,13 +193,14 @@ export function SettingsPage({
             <input
               type="checkbox"
               checked={settings.ambientMuted}
-              disabled={pending === 'preferences'}
               onChange={(event) => {
                 void perform(
                   'preferences',
                   () =>
                     onUpdate({
                       ...settings,
+                      ambientVolumePercent: ambientVolumeDraft,
+                      cueVolumePercent: cueVolumeDraft,
                       ambientMuted: event.currentTarget.checked,
                     }),
                   'Audio preferences updated.',
@@ -168,32 +216,30 @@ export function SettingsPage({
               min="0"
               max="100"
               step="1"
-              value={settings.ambientVolumePercent}
-              disabled={pending === 'preferences'}
+              value={ambientVolumeDraft}
               onChange={(event) => {
-                void perform(
-                  'preferences',
-                  () =>
-                    onUpdate({
-                      ...settings,
-                      ambientVolumePercent: Number(event.currentTarget.value),
-                    }),
-                  'Audio preferences updated.',
-                );
+                setAmbientVolumeDraft(Number(event.currentTarget.value));
               }}
+              onPointerUp={() =>
+                void commitVolume('ambientVolumePercent', ambientVolumeDraft)
+              }
+              onBlur={() =>
+                void commitVolume('ambientVolumePercent', ambientVolumeDraft)
+              }
             />
           </label>
           <label>
             <input
               type="checkbox"
               checked={settings.cuesMuted}
-              disabled={pending === 'preferences'}
               onChange={(event) => {
                 void perform(
                   'preferences',
                   () =>
                     onUpdate({
                       ...settings,
+                      ambientVolumePercent: ambientVolumeDraft,
+                      cueVolumePercent: cueVolumeDraft,
                       cuesMuted: event.currentTarget.checked,
                     }),
                   'Audio preferences updated.',
@@ -209,32 +255,30 @@ export function SettingsPage({
               min="0"
               max="100"
               step="1"
-              value={settings.cueVolumePercent}
-              disabled={pending === 'preferences'}
+              value={cueVolumeDraft}
               onChange={(event) => {
-                void perform(
-                  'preferences',
-                  () =>
-                    onUpdate({
-                      ...settings,
-                      cueVolumePercent: Number(event.currentTarget.value),
-                    }),
-                  'Audio preferences updated.',
-                );
+                setCueVolumeDraft(Number(event.currentTarget.value));
               }}
+              onPointerUp={() =>
+                void commitVolume('cueVolumePercent', cueVolumeDraft)
+              }
+              onBlur={() =>
+                void commitVolume('cueVolumePercent', cueVolumeDraft)
+              }
             />
           </label>
           <label>
             <input
               type="checkbox"
               checked={settings.muteCuesWithMusic}
-              disabled={pending === 'preferences'}
               onChange={(event) => {
                 void perform(
                   'preferences',
                   () =>
                     onUpdate({
                       ...settings,
+                      ambientVolumePercent: ambientVolumeDraft,
+                      cueVolumePercent: cueVolumeDraft,
                       muteCuesWithMusic: event.currentTarget.checked,
                     }),
                   'Audio preferences updated.',

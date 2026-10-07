@@ -56,9 +56,11 @@ describe('SettingsPage', () => {
       ambientMuted: true,
     });
 
-    fireEvent.change(screen.getByRole('slider', { name: 'Cue volume' }), {
+    const cueVolume = screen.getByRole('slider', { name: 'Cue volume' });
+    fireEvent.change(cueVolume, {
       target: { value: '35' },
     });
+    fireEvent.pointerUp(cueVolume);
     expect(onUpdate).toHaveBeenLastCalledWith({
       ...settings,
       cueVolumePercent: 35,
@@ -69,7 +71,43 @@ describe('SettingsPage', () => {
     );
     expect(onUpdate).toHaveBeenLastCalledWith({
       ...settings,
+      cueVolumePercent: 35,
       muteCuesWithMusic: true,
+    });
+  });
+
+  test('keeps a multi-step volume interaction enabled and saves its latest value', () => {
+    const onUpdate = vi.fn<(value: Settings) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    setup({ onUpdate });
+    const musicVolume = screen.getByRole('slider', { name: 'Music volume' });
+
+    fireEvent.change(musicVolume, { target: { value: '61' } });
+    fireEvent.change(musicVolume, { target: { value: '62' } });
+    fireEvent.change(musicVolume, { target: { value: '63' } });
+    expect(musicVolume).toBeEnabled();
+    expect(musicVolume).toHaveValue('63');
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(musicVolume);
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      ...settings,
+      ambientVolumePercent: 63,
+    });
+
+    const cueVolume = screen.getByRole('slider', { name: 'Cue volume' });
+    cueVolume.focus();
+    fireEvent.keyDown(cueVolume, { key: 'ArrowRight' });
+    fireEvent.change(cueVolume, { target: { value: '61' } });
+    fireEvent.keyDown(cueVolume, { key: 'ArrowRight' });
+    fireEvent.change(cueVolume, { target: { value: '62' } });
+    expect(cueVolume).toBeEnabled();
+    fireEvent.blur(cueVolume);
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      ...settings,
+      ambientVolumePercent: 63,
+      cueVolumePercent: 62,
     });
   });
   test('updates theme and reduced-motion preferences independently', async () => {
