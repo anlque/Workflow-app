@@ -35,9 +35,17 @@ export function SettingsPage({
   const [cueVolumeDraft, setCueVolumeDraft] = useState(
     settings.cueVolumePercent,
   );
+  const [blurDraft, setBlurDraft] = useState(settings.backgroundBlurPx);
+  const [brightnessDraft, setBrightnessDraft] = useState(
+    settings.backgroundBrightnessPercent,
+  );
   const committedVolumes = useRef({
     ambientVolumePercent: settings.ambientVolumePercent,
     cueVolumePercent: settings.cueVolumePercent,
+  });
+  const committedAppearance = useRef({
+    backgroundBlurPx: settings.backgroundBlurPx,
+    backgroundBrightnessPercent: settings.backgroundBrightnessPercent,
   });
   const [feedback, setFeedback] = useState<Readonly<{
     operation: Operation;
@@ -53,6 +61,15 @@ export function SettingsPage({
       cueVolumePercent: settings.cueVolumePercent,
     };
   }, [settings.ambientVolumePercent, settings.cueVolumePercent]);
+
+  useEffect(() => {
+    setBlurDraft(settings.backgroundBlurPx);
+    setBrightnessDraft(settings.backgroundBrightnessPercent);
+    committedAppearance.current = {
+      backgroundBlurPx: settings.backgroundBlurPx,
+      backgroundBrightnessPercent: settings.backgroundBrightnessPercent,
+    };
+  }, [settings.backgroundBlurPx, settings.backgroundBrightnessPercent]);
 
   async function perform(
     operation: Operation,
@@ -99,6 +116,35 @@ export function SettingsPage({
     if (!saved) {
       committedVolumes.current = {
         ...committedVolumes.current,
+        [field]: previous,
+      };
+    }
+  }
+
+  async function commitAppearance(
+    field: 'backgroundBlurPx' | 'backgroundBrightnessPercent',
+    value: number,
+  ): Promise<void> {
+    const previous = committedAppearance.current[field];
+    if (value === previous) return;
+    committedAppearance.current = {
+      ...committedAppearance.current,
+      [field]: value,
+    };
+    const saved = await perform(
+      'preferences',
+      () =>
+        onUpdate({
+          ...settings,
+          backgroundBlurPx: blurDraft,
+          backgroundBrightnessPercent: brightnessDraft,
+          [field]: value,
+        }),
+      'Appearance preferences updated.',
+    );
+    if (!saved) {
+      committedAppearance.current = {
+        ...committedAppearance.current,
         [field]: previous,
       };
     }
@@ -182,7 +228,54 @@ export function SettingsPage({
             <option value="reduce">Reduce motion</option>
             <option value="no-preference">Allow motion</option>
           </Select>
+          <label>
+            <span>Background blur</span>
+            <input
+              type="range"
+              min="0"
+              max="24"
+              step="1"
+              value={blurDraft}
+              onChange={(event) => {
+                setBlurDraft(Number(event.currentTarget.value));
+              }}
+              onPointerUp={() =>
+                void commitAppearance('backgroundBlurPx', blurDraft)
+              }
+              onBlur={() =>
+                void commitAppearance('backgroundBlurPx', blurDraft)
+              }
+            />
+            <output>{blurDraft} px</output>
+          </label>
+          <label>
+            <span>Background brightness</span>
+            <input
+              type="range"
+              min="50"
+              max="150"
+              step="5"
+              value={brightnessDraft}
+              onChange={(event) => {
+                setBrightnessDraft(Number(event.currentTarget.value));
+              }}
+              onPointerUp={() =>
+                void commitAppearance(
+                  'backgroundBrightnessPercent',
+                  brightnessDraft,
+                )
+              }
+              onBlur={() =>
+                void commitAppearance(
+                  'backgroundBrightnessPercent',
+                  brightnessDraft,
+                )
+              }
+            />
+            <output>{brightnessDraft}%</output>
+          </label>
         </div>
+        {status('preferences')}
       </fieldset>
 
       <fieldset className="settings-group">
@@ -288,7 +381,6 @@ export function SettingsPage({
             Mute cues with music
           </label>
         </div>
-        {status('preferences')}
       </fieldset>
 
       <fieldset className="settings-group">

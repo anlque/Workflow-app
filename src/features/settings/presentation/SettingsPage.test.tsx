@@ -13,6 +13,8 @@ const settings: Settings = {
   cueVolumePercent: 60,
   cuesMuted: false,
   muteCuesWithMusic: false,
+  backgroundBlurPx: 0,
+  backgroundBrightnessPercent: 100,
 };
 
 function setup(
@@ -51,7 +53,7 @@ describe('SettingsPage', () => {
     const { onUpdate } = setup();
 
     await user.click(screen.getByRole('checkbox', { name: 'Mute music' }));
-    expect(onUpdate).toHaveBeenLastCalledWith({
+    expect(onUpdate).toHaveBeenCalledWith({
       ...settings,
       ambientMuted: true,
     });
@@ -125,6 +127,31 @@ describe('SettingsPage', () => {
       ...settings,
       reducedMotion: 'reduce',
     });
+  });
+
+  test('updates blur and brightness without extra appearance controls', () => {
+    const { onUpdate } = setup();
+    const blur = screen.getByRole('slider', { name: /^Background blur/ });
+    const brightness = screen.getByRole('slider', {
+      name: /^Background brightness/,
+    });
+
+    fireEvent.change(blur, { target: { value: '8' } });
+    fireEvent.pointerUp(blur);
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      ...settings,
+      backgroundBlurPx: 8,
+    });
+
+    fireEvent.change(brightness, { target: { value: '125' } });
+    fireEvent.blur(brightness);
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      ...settings,
+      backgroundBlurPx: 8,
+      backgroundBrightnessPercent: 125,
+    });
+
+    expect(screen.getAllByRole('combobox')).toHaveLength(2);
   });
 
   test('runs separate Workflow and Settings exports with feedback', async () => {

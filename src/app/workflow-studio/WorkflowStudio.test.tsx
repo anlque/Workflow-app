@@ -104,7 +104,7 @@ function dependencies(
 }
 
 describe('WorkflowStudio', () => {
-  test('keeps every live audio preference while theme and motion change', async () => {
+  test('keeps every live audio and appearance preference while theme and motion change', async () => {
     const user = userEvent.setup();
     const preferences = createTestDocumentPreferences();
     const load = vi.fn(() =>
@@ -130,6 +130,8 @@ describe('WorkflowStudio', () => {
         cueVolumePercent: 46,
         cuesMuted: true,
         muteCuesWithMusic: true,
+        backgroundBlurPx: 14,
+        backgroundBrightnessPercent: 125,
       });
     });
 
@@ -144,6 +146,12 @@ describe('WorkflowStudio', () => {
     expect(
       screen.getByRole('checkbox', { name: 'Mute cues with music' }),
     ).toBeChecked();
+    expect(
+      screen.getByRole('slider', { name: /^Background blur/ }),
+    ).toHaveValue('14');
+    expect(
+      screen.getByRole('slider', { name: /^Background brightness/ }),
+    ).toHaveValue('125');
 
     act(() => {
       preferences.setSnapshot({
@@ -160,6 +168,9 @@ describe('WorkflowStudio', () => {
     expect(screen.getByRole('slider', { name: 'Cue volume' })).toHaveValue(
       '46',
     );
+    expect(
+      screen.getByRole('slider', { name: /^Background blur/ }),
+    ).toHaveValue('14');
   });
 
   test('controls Side Panel state from lifecycle events and pending actions', async () => {

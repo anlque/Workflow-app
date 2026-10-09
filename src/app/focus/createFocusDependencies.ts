@@ -25,7 +25,7 @@ import {
 } from '../session/ChromeSessionClient';
 import type { FocusDependencies } from './FocusApp';
 import { createUiSoundPlayer } from './createUiSoundPlayer';
-import { createAudioSettingsUpdater } from './createAudioSettingsUpdater';
+import { createSettingsUpdater } from './createSettingsUpdater';
 import {
   closeSidePanel,
   openSidePanel,
@@ -57,7 +57,7 @@ export function createFocusDependencies(
   };
   const sessions = new ChromeSessionClient(runtime, () => crypto.randomUUID());
   const catalogEvents = createChromeWorkflowCatalogEvents();
-  const updateAudioSettings = createAudioSettingsUpdater({
+  const updateSettings = createSettingsUpdater({
     load: () => getSettingsUseCase(settings),
     async save(next) {
       await updateSettingsUseCase(settings, next);
@@ -67,7 +67,7 @@ export function createFocusDependencies(
   return {
     preferences,
     sounds: createUiSoundPlayer(),
-    updateAudioSettings,
+    updateSettings,
     closeSidePanel,
     openSidePanel,
     subscribeSidePanelState,

@@ -1,20 +1,23 @@
 import type { Settings } from '@/features/settings';
 
-export type AudioSettingsPatch = Partial<
+export type SettingsPatch = Partial<
   Pick<
     Settings,
+    | 'theme'
     | 'ambientVolumePercent'
     | 'ambientMuted'
     | 'cueVolumePercent'
     | 'cuesMuted'
     | 'muteCuesWithMusic'
+    | 'backgroundBlurPx'
+    | 'backgroundBrightnessPercent'
   >
 >;
 
-export function createAudioSettingsUpdater(dependencies: {
+export function createSettingsUpdater(dependencies: {
   load(): Promise<Settings>;
   save(settings: Settings): Promise<void>;
-}): (patch: AudioSettingsPatch) => Promise<void> {
+}): (patch: SettingsPatch) => Promise<void> {
   let queue = Promise.resolve();
 
   return (patch) => {

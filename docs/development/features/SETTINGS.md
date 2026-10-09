@@ -4,8 +4,8 @@
 
 The Settings feature owns the small, local application preference value and its
 separate import/export package. Current settings are theme, reduced-motion
-preference, independent ambient/cue audio channels and the optional
-last-selected Workflow identifier.
+preference, global Focus background blur/brightness, independent
+ambient/cue audio channels and the optional last-selected Workflow identifier.
 
 Source root: [`src/features/settings/`](../../../src/features/settings/).
 
@@ -13,7 +13,7 @@ Source root: [`src/features/settings/`](../../../src/features/settings/).
 
 - the validated immutable Settings value and defaults;
 - Settings repository and use-case contracts;
-- the `locusora/settings` version-2 writer and version-1/2 parser;
+- the `locusora/settings` version-3 writer and version-1–3 parser;
 - the `chrome.storage.local` adapter under the `settings` key;
 - the Options Settings presentation and operation feedback;
 - the root behavior/data API in
@@ -40,8 +40,8 @@ presentation API.
 
 | Group                      | Exports                                                                                                                 |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Domain                     | `Settings`, `Theme`, `ReducedMotion`, `createSettings`, effective audio-volume helpers, defaults and validation errors |
-| Application contracts      | `SettingsRepository`, `DocumentPreferenceSource`, Settings package v1/v2 types, import limits and validation errors     |
+| Domain                     | `Settings`, `Theme`, `ReducedMotion`, `createSettings`, effective audio-volume helpers, defaults and validation errors                  |
+| Application contracts      | `SettingsRepository`, `DocumentPreferenceSource`, Settings package v1/v2/v3 types, import limits and validation errors  |
 | Application behavior       | `getSettingsUseCase`, `updateSettingsUseCase`, `exportSettingsUseCase`, `importSettingsUseCase`, `parseSettingsPackage` |
 | Infrastructure composition | `ChromeSettingsRepository`, `ChromeDocumentPreferenceSource`, storage adapter types                                      |
 | Presentation (`/studio`)   | `SettingsPage`, `SettingsPageProps`                                                                                     |
@@ -82,12 +82,17 @@ All I/O is injected by Options.
 - `lastSelectedWorkflowId`, when present, is a non-empty branded Workflow ID.
 - Ambient and cue volumes are integer percentages from 0 through 100; their
   mute flags are independent booleans. `muteCuesWithMusic` is opt-in.
+- `backgroundBlurPx` is an integer from 0 through 24 and
+  `backgroundBrightnessPercent` is a step-5 integer from 50 through 150.
 - Legacy values without audio fields receive defaults. Legacy `volumePercent`
   is copied to both channel volumes while mute flags remain false.
-- Canonical input is exact and cannot mix `volumePercent` with channel fields.
+- Values without appearance fields receive appearance defaults. A present
+  appearance field requires the complete valid appearance group.
+- Canonical input is exact and cannot mix legacy with current fields.
 - The returned Settings object is frozen.
 - Missing persisted settings resolve to frozen defaults: system theme/motion,
-  both channels at 100%, both unmuted and coupling disabled.
+  both channels at 100%, both unmuted, coupling disabled, 0 px blur, 100%
+  brightness.
 - Invalid persisted settings fail validation; they do not silently fall back to
   defaults.
 
@@ -100,9 +105,9 @@ Options checks whether it still exists and falls back to the first Workflow.
 | ----------------------- | --------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `getSettingsUseCase`    | Repository                        | Loads `unknown`; returns defaults only when absent, otherwise validates                     | Trusted Settings or validation/storage failure     |
 | `updateSettingsUseCase` | Repository and `unknown` input    | Validates first, then saves                                                                 | Updated Settings; no write on invalid input        |
-| `exportSettingsUseCase` | Repository                        | Loads validated/default settings and serializes a canonical version-2 envelope              | Deterministic compact JSON                         |
+| `exportSettingsUseCase` | Repository                        | Loads validated/default settings and serializes a canonical version-3 envelope              | Deterministic compact JSON                         |
 | `importSettingsUseCase` | Repository, JSON text, byte limit | Checks UTF-8 size, parses `unknown`, validates exact envelope and Settings, then saves      | Imported Settings; no write on validation failure  |
-| `parseSettingsPackage`  | `unknown` value                   | Strictly reads legacy version 1 or canonical version 2 with exact envelope keys              | Frozen package or `SettingsPackageValidationError` |
+| `parseSettingsPackage`  | `unknown` value                   | Strictly reads legacy v1, audio-canonical v2 or fully canonical v3 with exact keys            | Frozen package or `SettingsPackageValidationError` |
 
 The Options composition currently limits a Settings package to 1 MiB and owns
 file reading/download. Side panel writes `lastSelectedWorkflowId` before opening
@@ -113,7 +118,7 @@ Options for a chosen Workflow.
 `ChromeSettingsRepository` reads and writes one `settings` key in
 `chrome.storage.local`. There is no Dexie table, database migration or record
 `schemaVersion` for Settings. The public package version belongs only to the
-import/export envelope; current export is 2 and import supports 1–2.
+import/export envelope; current export is 3 and import supports 1–3.
 
 Chrome Storage cannot share a transaction with IndexedDB. The current Settings
 package is deliberately independent, so its single `set` is the only import
@@ -126,8 +131,9 @@ Every document composition root starts its own document-preference controller
 before mounting React. The controller validates the durable value, applies
 `data-theme` and effective `data-reduced-motion` to the root, then reveals the
 document. Its live snapshot also carries both audio channels, so Focus receives
-Settings changes without reload or a second storage listener. Options uses the
-same durable value for appearance/audio controls and normal reload feedback.
+Settings changes without reload or a second storage listener. The snapshot also
+carries blur and brightness to Focus. Options uses the same
+durable value for appearance/audio controls and normal reload feedback.
 
 `theme: system` remains CSS-driven. `reducedMotion: system` is resolved through
 `matchMedia`; only this mode owns a media-query listener. Explicit `reduce` and
@@ -137,6 +143,7 @@ and React subscriptions on `pagehide`.
 `SettingsPage` provides:
 
 - theme and reduced-motion selects;
+- background blur and brightness ranges;
 - ambient/cue volume and mute controls plus `Mute cues with music`;
 - separate Workflow package and Settings package actions;
 - per-operation pending state;

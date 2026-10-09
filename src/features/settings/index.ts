@@ -5,6 +5,7 @@ export {
   SettingsPackageValidationError,
   type SettingsPackageV1,
   type SettingsPackageV2,
+  type SettingsPackageV3,
 } from './application/SettingsPackage';
 export { exportSettingsUseCase } from './application/exportSettingsUseCase';
 export { getSettingsUseCase } from './application/getSettingsUseCase';

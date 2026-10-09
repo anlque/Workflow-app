@@ -102,7 +102,7 @@ function dependencies(
     rollReward: vi.fn(() => Promise.resolve()),
     rerollReward: vi.fn(() => Promise.resolve()),
     stop: vi.fn(() => Promise.resolve()),
-    updateAudioSettings: vi.fn(() => Promise.resolve()),
+    updateSettings: vi.fn(() => Promise.resolve()),
     loadAssetUrl: vi.fn(() => Promise.resolve(null)),
     releaseAssetUrl: vi.fn(),
     closeSidePanel: vi.fn(() => Promise.resolve()),
@@ -432,7 +432,7 @@ describe('FocusApp', () => {
     expect(
       await screen.findByRole('heading', { name: 'Deep work' }),
     ).toBeVisible();
-    expect(screen.getByTestId('focus-environment')).toHaveStyle({
+    expect(screen.getByTestId('focus-environment-backdrop')).toHaveStyle({
       backgroundColor: '#123456',
     });
     invalidate?.();
@@ -459,6 +459,8 @@ describe('FocusApp', () => {
       cueVolumePercent: 60,
       cuesMuted: false,
       muteCuesWithMusic: false,
+      backgroundBlurPx: 0,
+      backgroundBrightnessPercent: 100,
     });
     const deps = dependencies(session, studioDependencies(), preferences);
     render(<FocusApp dependencies={deps} />);
@@ -472,17 +474,17 @@ describe('FocusApp', () => {
     expect(deps.sounds.setVolume).toHaveBeenLastCalledWith(0.6);
 
     fireEvent.change(musicVolume, { target: { value: '35' } });
-    expect(deps.updateAudioSettings).toHaveBeenLastCalledWith({
+    expect(deps.updateSettings).toHaveBeenLastCalledWith({
       ambientVolumePercent: 35,
     });
 
     await user.click(screen.getByRole('button', { name: 'Mute music' }));
-    expect(deps.updateAudioSettings).toHaveBeenLastCalledWith({
+    expect(deps.updateSettings).toHaveBeenLastCalledWith({
       ambientMuted: true,
     });
 
     await user.click(screen.getByRole('button', { name: 'Mute cues' }));
-    expect(deps.updateAudioSettings).toHaveBeenLastCalledWith({
+    expect(deps.updateSettings).toHaveBeenLastCalledWith({
       cuesMuted: true,
     });
 

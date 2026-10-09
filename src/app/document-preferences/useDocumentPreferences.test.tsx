@@ -17,6 +17,8 @@ test('renders live snapshots and unsubscribes on unmount', () => {
     cueVolumePercent: 100,
     cuesMuted: false,
     muteCuesWithMusic: false,
+    backgroundBlurPx: 0,
+    backgroundBrightnessPercent: 100,
   };
   let listener: (() => void) | undefined;
   const unsubscribe = vi.fn();
@@ -48,6 +50,8 @@ test('renders live snapshots and unsubscribes on unmount', () => {
       cueVolumePercent: 75,
       cuesMuted: false,
       muteCuesWithMusic: true,
+      backgroundBlurPx: 12,
+      backgroundBrightnessPercent: 80,
     };
     listener?.();
   });

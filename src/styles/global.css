@@ -252,6 +252,58 @@ body {
   width: clamp(5rem, 10vw, 8rem);
 }
 
+.focus-appearance {
+  position: relative;
+  color: var(--color-ink);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-ink-muted);
+  border-radius: var(--radius-control);
+  box-shadow: 0 2px 6px oklch(0.2 0.02 160 / 28%);
+}
+
+.focus-appearance > summary {
+  padding: 0.65rem 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.focus-appearance__controls {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  display: grid;
+  width: min(19rem, calc(100vw - 2rem));
+  gap: 0.75rem;
+  padding: 0.875rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  box-shadow: 0 8px 24px oklch(0.2 0.02 160 / 28%);
+}
+
+.focus-appearance__controls label {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) minmax(5rem, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.focus-appearance__controls select {
+  grid-column: 2 / -1;
+}
+
+.focus-appearance__controls input[type='range'] {
+  min-width: 0;
+}
+
+.focus-appearance__controls output {
+  min-width: 3.5rem;
+  color: var(--color-ink-muted);
+  text-align: right;
+}
+
 @media (max-width: 52rem) {
   .focus-app__volume-control {
     flex-direction: column;
@@ -263,10 +315,19 @@ body {
   position: absolute;
   inset: 0;
   z-index: -1;
+  overflow: hidden;
   background: var(--color-canvas);
 }
 
-.focus-environment img {
+.focus-environment__backdrop {
+  position: absolute;
+  inset: calc(-1 * var(--focus-background-blur));
+  filter: blur(var(--focus-background-blur))
+    brightness(var(--focus-background-brightness));
+  transition: filter 240ms ease;
+}
+
+.focus-environment__backdrop img {
   width: 100%;
   height: 100%;
   object-fit: cover;

@@ -7,6 +7,8 @@ type DocumentPreferencesSnapshot = Readonly<{
   cueVolumePercent: number;
   cuesMuted: boolean;
   muteCuesWithMusic: boolean;
+  backgroundBlurPx: number;
+  backgroundBrightnessPercent: number;
 }>;
 
 export function createTestDocumentPreferences(
@@ -19,6 +21,8 @@ export function createTestDocumentPreferences(
     cueVolumePercent: 100,
     cuesMuted: false,
     muteCuesWithMusic: false,
+    backgroundBlurPx: 0,
+    backgroundBrightnessPercent: 100,
   },
 ): {
   start(): Promise<void>;

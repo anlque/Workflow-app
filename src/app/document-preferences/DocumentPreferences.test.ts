@@ -63,6 +63,8 @@ describe('createDocumentPreferences', () => {
       cueVolumePercent: 100,
       cuesMuted: false,
       muteCuesWithMusic: false,
+      backgroundBlurPx: 0,
+      backgroundBrightnessPercent: 100,
     });
   });
 
@@ -78,6 +80,8 @@ describe('createDocumentPreferences', () => {
       cueVolumePercent: 65,
       cuesMuted: false,
       muteCuesWithMusic: true,
+      backgroundBlurPx: 18,
+      backgroundBrightnessPercent: 75,
     });
 
     expect(state.preferences.getSnapshot()).toMatchObject({
@@ -86,7 +90,32 @@ describe('createDocumentPreferences', () => {
       cueVolumePercent: 65,
       cuesMuted: false,
       muteCuesWithMusic: true,
+      backgroundBlurPx: 18,
+      backgroundBrightnessPercent: 75,
     });
+  });
+
+  test('synchronizes appearance from storage without a second subscription', async () => {
+    const state = setup();
+    await state.preferences.start();
+
+    state.emitStorage({
+      theme: 'light',
+      reducedMotion: 'no-preference',
+      ambientVolumePercent: 100,
+      ambientMuted: false,
+      cueVolumePercent: 100,
+      cuesMuted: false,
+      muteCuesWithMusic: false,
+      backgroundBlurPx: 9,
+      backgroundBrightnessPercent: 120,
+    });
+
+    expect(state.preferences.getSnapshot()).toMatchObject({
+      backgroundBlurPx: 9,
+      backgroundBrightnessPercent: 120,
+    });
+    expect(state.hasStorageListener()).toBe(true);
   });
 
   test.each([undefined, null, { theme: 'broken' }])(

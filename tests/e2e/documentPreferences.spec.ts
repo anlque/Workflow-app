@@ -55,6 +55,18 @@ test('loads before visibility and synchronizes preferences across open documents
     .getByRole('combobox', { name: 'Reduced motion' })
     .selectOption('no-preference');
   await options.getByRole('slider', { name: 'Cue volume' }).fill('42');
+  const backgroundBlur = options.getByRole('slider', {
+    name: /Background blur/,
+  });
+  await backgroundBlur.fill('10');
+  await backgroundBlur.press('Tab');
+  await expect(options.getByLabel('Theme')).toBeEnabled();
+  const backgroundBrightness = options.getByRole('slider', {
+    name: /Background brightness/,
+  });
+  await backgroundBrightness.fill('120');
+  await backgroundBrightness.press('Tab');
+  await expect(options.getByLabel('Theme')).toBeEnabled();
   const muteMusic = options.getByRole('checkbox', { name: 'Mute music' });
   await muteMusic.click();
   await expect(muteMusic).toBeChecked();
@@ -68,6 +80,13 @@ test('loads before visibility and synchronizes preferences across open documents
   await expect(options.getByRole('slider', { name: 'Cue volume' })).toHaveValue(
     '42',
   );
+  await focus.getByText('Appearance').click();
+  await expect(focus.getByRole('slider', { name: /Focus blur/ })).toHaveValue(
+    '10',
+  );
+  await expect(
+    focus.getByRole('slider', { name: /Focus brightness/ }),
+  ).toHaveValue('120');
 
   await focus.getByRole('slider', { name: 'Music volume' }).fill('37');
   await focus.getByRole('button', { name: 'Mute cues' }).click();
@@ -108,6 +127,8 @@ test('loads before visibility and synchronizes preferences across open documents
         cueVolumePercent: 42,
         cuesMuted: true,
         muteCuesWithMusic: false,
+        backgroundBlurPx: 10,
+        backgroundBrightnessPercent: 120,
       },
     });
 

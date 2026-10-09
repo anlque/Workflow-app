@@ -370,6 +370,9 @@ export function WorkflowStudio({
               cueVolumePercent: documentPreferences.cueVolumePercent,
               cuesMuted: documentPreferences.cuesMuted,
               muteCuesWithMusic: documentPreferences.muteCuesWithMusic,
+              backgroundBlurPx: documentPreferences.backgroundBlurPx,
+              backgroundBrightnessPercent:
+                documentPreferences.backgroundBrightnessPercent,
             }}
             onUpdate={async (settings) => {
               await dependencies.updateSettings(settings);

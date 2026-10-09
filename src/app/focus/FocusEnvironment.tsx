@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 
 import type { AssetId } from '@/features/assets';
 import type { Environment } from '@/features/workflow';
@@ -14,6 +14,8 @@ export type FocusEnvironmentProps = Readonly<{
   reducedMotion: boolean;
   playing: boolean;
   volume: number;
+  backgroundBlurPx?: number;
+  backgroundBrightnessPercent?: number;
   deviceChanges?: AmbientAudioDeviceChanges | null;
   loadAssetUrl(id: AssetId): Promise<string | null>;
   releaseAssetUrl(url: string): void;
@@ -61,6 +63,8 @@ export function FocusEnvironment({
   reducedMotion,
   playing,
   volume,
+  backgroundBlurPx = 0,
+  backgroundBrightnessPercent = 100,
   deviceChanges,
   loadAssetUrl,
   releaseAssetUrl,
@@ -92,9 +96,20 @@ export function FocusEnvironment({
         className="focus-environment"
         data-testid="focus-environment"
         data-reduced-motion={String(reducedMotion)}
-        style={{ backgroundColor: environment.backgroundColor }}
       >
-        {image.url === null ? null : <img src={image.url} alt="" />}
+        <div
+          className="focus-environment__backdrop"
+          data-testid="focus-environment-backdrop"
+          style={
+            {
+              backgroundColor: environment.backgroundColor,
+              '--focus-background-blur': `${String(backgroundBlurPx)}px`,
+              '--focus-background-brightness': `${String(backgroundBrightnessPercent)}%`,
+            } as CSSProperties
+          }
+        >
+          {image.url === null ? null : <img src={image.url} alt="" />}
+        </div>
         {ambientAudio.sourceUrl === null ? null : (
           <audio
             ref={ambientAudio.audioRef}

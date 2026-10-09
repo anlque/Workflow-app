@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import { createWorkflowId } from '@/features/workflow';
 import {
+  createSettings,
   defaultSettings,
   effectiveAmbientVolume,
   effectiveCueVolume,
@@ -54,6 +55,8 @@ describe('Settings use cases', () => {
       cueVolumePercent: 100,
       cuesMuted: false,
       muteCuesWithMusic: false,
+      backgroundBlurPx: 0,
+      backgroundBrightnessPercent: 100,
     });
   });
 
@@ -74,6 +77,8 @@ describe('Settings use cases', () => {
       cueVolumePercent: 35,
       cuesMuted: false,
       muteCuesWithMusic: false,
+      backgroundBlurPx: 0,
+      backgroundBrightnessPercent: 100,
     });
   });
 
@@ -87,6 +92,8 @@ describe('Settings use cases', () => {
       cueVolumePercent: 60,
       cuesMuted: false,
       muteCuesWithMusic: true,
+      backgroundBlurPx: 24,
+      backgroundBrightnessPercent: 150,
       lastSelectedWorkflowId: createWorkflowId('workflow-1'),
     });
 
@@ -108,6 +115,8 @@ describe('Settings use cases', () => {
       cueVolumePercent: 70,
       cuesMuted: true,
       muteCuesWithMusic: false,
+      backgroundBlurPx: 12,
+      backgroundBrightnessPercent: 85,
     });
     const target = new MemorySettingsRepository();
 
@@ -115,7 +124,7 @@ describe('Settings use cases', () => {
     await importSettingsUseCase(target, exported, { maxFileBytes: 1_024 });
 
     expect(exported).toBe(
-      '{"kind":"locusora/settings","version":2,"settings":{"theme":"light","reducedMotion":"no-preference","ambientVolumePercent":40,"ambientMuted":false,"cueVolumePercent":70,"cuesMuted":true,"muteCuesWithMusic":false}}',
+      '{"kind":"locusora/settings","version":3,"settings":{"theme":"light","reducedMotion":"no-preference","ambientVolumePercent":40,"ambientMuted":false,"cueVolumePercent":70,"cuesMuted":true,"muteCuesWithMusic":false,"backgroundBlurPx":12,"backgroundBrightnessPercent":85}}',
     );
     expect(target.value).toEqual({
       theme: 'light',
@@ -125,6 +134,8 @@ describe('Settings use cases', () => {
       cueVolumePercent: 70,
       cuesMuted: true,
       muteCuesWithMusic: false,
+      backgroundBlurPx: 12,
+      backgroundBrightnessPercent: 85,
     });
   });
 
@@ -143,13 +154,72 @@ describe('Settings use cases', () => {
       cueVolumePercent: 100,
       cuesMuted: false,
       muteCuesWithMusic: false,
+      backgroundBlurPx: 0,
+      backgroundBrightnessPercent: 100,
     });
+  });
+
+  test('imports a v2 package with appearance defaults', async () => {
+    const target = new MemorySettingsRepository();
+
+    await importSettingsUseCase(
+      target,
+      '{"kind":"locusora/settings","version":2,"settings":{"theme":"dark","reducedMotion":"reduce","ambientVolumePercent":20,"ambientMuted":true,"cueVolumePercent":80,"cuesMuted":false,"muteCuesWithMusic":true}}',
+      { maxFileBytes: 1_024 },
+    );
+
+    expect(target.value).toMatchObject({
+      backgroundBlurPx: 0,
+      backgroundBrightnessPercent: 100,
+    });
+  });
+
+  test.each([
+    { backgroundBlurPx: 0, backgroundBrightnessPercent: 50 },
+    { backgroundBlurPx: 24, backgroundBrightnessPercent: 150 },
+  ])('accepts appearance boundaries', (appearance) => {
+    expect(
+      createSettings({
+        ...defaultSettings,
+        ...appearance,
+      }),
+    ).toMatchObject(appearance);
+  });
+
+  test.each([
+    ['negative blur', { backgroundBlurPx: -1 }],
+    ['oversized blur', { backgroundBlurPx: 25 }],
+    ['fractional blur', { backgroundBlurPx: 1.5 }],
+    ['low brightness', { backgroundBrightnessPercent: 45 }],
+    ['high brightness', { backgroundBrightnessPercent: 155 }],
+    ['unaligned brightness', { backgroundBrightnessPercent: 101 }],
+  ])('rejects %s', (_case, patch) => {
+    expect(() => createSettings({ ...defaultSettings, ...patch })).toThrow(
+      'Settings are invalid.',
+    );
+  });
+
+  test('rejects a partial appearance group', () => {
+    const partial: Record<string, unknown> = { ...defaultSettings };
+    delete partial['backgroundBrightnessPercent'];
+    expect(() => createSettings(partial)).toThrow('Settings are invalid.');
+  });
+
+  test('rejects the removed effect field', () => {
+    const removedField = ['ambient', 'Effect'].join('');
+    expect(() =>
+      createSettings({ ...defaultSettings, [removedField]: 'removed' }),
+    ).toThrow('Settings are invalid.');
+  });
+
+  test('returns a frozen canonical value', () => {
+    expect(Object.isFrozen(createSettings(defaultSettings))).toBe(true);
   });
 
   test.each([
     [
       'unsupported version',
-      '{"kind":"locusora/settings","version":3,"settings":{}}',
+      '{"kind":"locusora/settings","version":4,"settings":{}}',
     ],
     [
       'corrupt data',
@@ -167,6 +237,14 @@ describe('Settings use cases', () => {
     [
       'canonical shape in v1',
       '{"kind":"locusora/settings","version":1,"settings":{"theme":"light","reducedMotion":"reduce","ambientVolumePercent":50,"ambientMuted":false,"cueVolumePercent":50,"cuesMuted":false,"muteCuesWithMusic":false}}',
+    ],
+    [
+      'v2 appearance fields',
+      '{"kind":"locusora/settings","version":2,"settings":{"theme":"light","reducedMotion":"reduce","ambientVolumePercent":50,"ambientMuted":false,"cueVolumePercent":50,"cuesMuted":false,"muteCuesWithMusic":false,"backgroundBlurPx":0,"backgroundBrightnessPercent":100}}',
+    ],
+    [
+      'partial v3 appearance',
+      '{"kind":"locusora/settings","version":3,"settings":{"theme":"light","reducedMotion":"reduce","ambientVolumePercent":50,"ambientMuted":false,"cueVolumePercent":50,"cuesMuted":false,"muteCuesWithMusic":false,"backgroundBlurPx":0}}',
     ],
   ])('rejects %s without writes', async (_case, data) => {
     const repository = new MemorySettingsRepository();

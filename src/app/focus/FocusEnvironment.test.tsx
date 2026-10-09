@@ -134,6 +134,31 @@ describe('FocusEnvironment', () => {
     );
   });
 
+  test('renders a filtered background without an effect layer', () => {
+    render(
+      <FocusEnvironment
+        environment={{ backgroundColor: '#123456' }}
+        reducedMotion
+        playing={false}
+        volume={1}
+        backgroundBlurPx={12}
+        backgroundBrightnessPercent={75}
+        loadAssetUrl={() => Promise.resolve(null)}
+        releaseAssetUrl={vi.fn()}
+      />,
+    );
+
+    const backdrop = screen.getByTestId('focus-environment-backdrop');
+    expect(backdrop).toHaveStyle({ backgroundColor: '#123456' });
+    expect(backdrop).toHaveStyle({
+      '--focus-background-blur': '12px',
+      '--focus-background-brightness': '75%',
+    });
+    expect(
+      screen.queryByTestId('focus-environment-effect'),
+    ).not.toBeInTheDocument();
+  });
+
   test('reports a missing referenced Asset without failing the view', async () => {
     const loadAssetUrl = vi.fn(() => Promise.resolve(null));
     render(

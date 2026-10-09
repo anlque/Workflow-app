@@ -17,6 +17,8 @@ export type DocumentPreferencesSnapshot = Readonly<{
   cueVolumePercent: number;
   cuesMuted: boolean;
   muteCuesWithMusic: boolean;
+  backgroundBlurPx: number;
+  backgroundBrightnessPercent: number;
 }>;
 
 export type DocumentPreferences = Readonly<{
@@ -93,7 +95,9 @@ export function createDocumentPreferences({
       next.ambientMuted !== snapshot.ambientMuted ||
       next.cueVolumePercent !== snapshot.cueVolumePercent ||
       next.cuesMuted !== snapshot.cuesMuted ||
-      next.muteCuesWithMusic !== snapshot.muteCuesWithMusic;
+      next.muteCuesWithMusic !== snapshot.muteCuesWithMusic ||
+      next.backgroundBlurPx !== snapshot.backgroundBlurPx ||
+      next.backgroundBrightnessPercent !== snapshot.backgroundBrightnessPercent;
     snapshot = changed ? next : snapshot;
     root.dataset['theme'] = snapshot.theme;
     root.dataset['reducedMotion'] = snapshot.effectiveReducedMotion
@@ -155,5 +159,7 @@ function resolveSnapshot(
     cueVolumePercent: settings.cueVolumePercent,
     cuesMuted: settings.cuesMuted,
     muteCuesWithMusic: settings.muteCuesWithMusic,
+    backgroundBlurPx: settings.backgroundBlurPx,
+    backgroundBrightnessPercent: settings.backgroundBrightnessPercent,
   });
 }

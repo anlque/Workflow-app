@@ -713,7 +713,7 @@ test('executes and restores a non-final Bonus Reward Phase authoritatively', asy
   await focus.getByRole('button', { name: 'Continue' }).click();
 
   await expect(focus.getByText('Bonus · Bonus reset')).toBeVisible();
-  await expect(focus.locator('.focus-environment')).toHaveCSS(
+  await expect(focus.locator('.focus-environment__backdrop')).toHaveCSS(
     'background-color',
     'rgb(18, 52, 86)',
   );

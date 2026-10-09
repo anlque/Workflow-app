@@ -32,7 +32,9 @@ import type { DocumentPreferences } from '@/app/document-preferences/DocumentPre
 import { useDocumentPreferences } from '@/app/document-preferences/useDocumentPreferences';
 import { useSidePanelControl } from '@/app/useSidePanelControl';
 import type { WorkflowStudioDependencies } from '../workflow-studio/WorkflowStudio';
+import type { SettingsPatch } from './createSettingsUpdater';
 
+import { FocusAppearanceControls } from './FocusAppearanceControls';
 import { FocusEnvironment } from './FocusEnvironment';
 import { FocusLauncher } from './FocusLauncher';
 import type { UiSoundPlayer } from './createUiSoundPlayer';
@@ -61,14 +63,7 @@ export type FocusDependencies = Readonly<{
   subscribeWorkflowChanges(listener: () => void): () => void;
   start(id: WorkflowId): Promise<void>;
   loadStudio(): Promise<WorkflowStudioDependencies>;
-  updateAudioSettings(
-    patch: Readonly<{
-      ambientVolumePercent?: number;
-      ambientMuted?: boolean;
-      cueVolumePercent?: number;
-      cuesMuted?: boolean;
-    }>,
-  ): Promise<void>;
+  updateSettings(patch: SettingsPatch): Promise<void>;
 }>;
 
 function IdleFocusLauncher({
@@ -144,15 +139,15 @@ export function FocusApp({
       cueVolumePercent: preferences.cueVolumePercent,
       cuesMuted: preferences.cuesMuted,
       muteCuesWithMusic: preferences.muteCuesWithMusic,
+      backgroundBlurPx: preferences.backgroundBlurPx,
+      backgroundBrightnessPercent: preferences.backgroundBrightnessPercent,
     };
   }
 
-  function updateAudio(
-    patch: Parameters<FocusDependencies['updateAudioSettings']>[0],
-  ): void {
+  function updateAudio(patch: SettingsPatch): void {
     void activateSounds();
     setAudioError(null);
-    void dependencies.updateAudioSettings(patch).catch((cause: unknown) => {
+    void dependencies.updateSettings(patch).catch((cause: unknown) => {
       setAudioError(
         cause instanceof Error ? cause.message : 'Audio settings failed.',
       );
@@ -216,6 +211,10 @@ export function FocusApp({
           >
             Open Workflow Studio
           </Button>
+          <FocusAppearanceControls
+            preferences={preferences}
+            onUpdate={dependencies.updateSettings}
+          />
           <Button
             className="focus-app__close-panel"
             variant="quiet"
@@ -250,6 +249,10 @@ export function FocusApp({
           >
             Open Workflow Studio
           </Button>
+          <FocusAppearanceControls
+            preferences={preferences}
+            onUpdate={dependencies.updateSettings}
+          />
           <div className="focus-app__volume-control">
             <div>
               <Button
@@ -335,6 +338,8 @@ export function FocusApp({
           reducedMotion={reducedMotion}
           playing={session.status === 'running'}
           volume={effectiveAmbientVolume(audioSettings())}
+          backgroundBlurPx={preferences.backgroundBlurPx}
+          backgroundBrightnessPercent={preferences.backgroundBrightnessPercent}
           loadAssetUrl={dependencies.loadAssetUrl}
           releaseAssetUrl={dependencies.releaseAssetUrl}
         />
