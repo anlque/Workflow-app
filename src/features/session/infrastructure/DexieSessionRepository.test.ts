@@ -10,6 +10,8 @@ import {
   continueRewardSession,
   createSession,
   pauseSession,
+  restartSessionPhase,
+  restartSessionWorkflow,
   rollSessionReward,
   stopSession,
   type Session,
@@ -43,6 +45,105 @@ function workflow() {
   });
 }
 
+test('round-trips version-9 restart receipts and keeps Dexie schema unchanged', async () => {
+  const store = database();
+  const repository = new DexieSessionRepository(store);
+  const phaseRestarted = restartSessionPhase(
+    createSession('restart-v9', workflow(), 1_000),
+    2_000,
+    'restart-command',
+    { type: 'phase', phaseIndex: 0 },
+  );
+  const restarted = restartSessionWorkflow(
+    phaseRestarted,
+    3_000,
+    'restart-workflow-command',
+  );
+
+  await repository.save(restarted);
+
+  await expect(repository.get(restarted.id)).resolves.toEqual(restarted);
+  await expect(
+    store.table<SessionRecord, string>('sessions').get(restarted.id),
+  ).resolves.toMatchObject({
+    schemaVersion: 9,
+    session: {
+      restartCommandReceipts: [
+        {
+          commandId: 'restart-command',
+          type: 'restart-phase',
+          target: { type: 'phase', phaseIndex: 0 },
+        },
+        {
+          commandId: 'restart-workflow-command',
+          type: 'restart-workflow',
+        },
+      ],
+    },
+  });
+  expect(sessionDatabaseSchemas).toHaveLength(1);
+});
+
+test.each([1, 2, 3, 4, 5, 6, 7, 8] as const)(
+  'restores version-%s with empty restart history',
+  async (schemaVersion) => {
+    const store = database();
+    const repository = new DexieSessionRepository(store);
+    const value = createSession(
+      `legacy-restart-${String(schemaVersion)}`,
+      workflow(),
+      1_000,
+    );
+    await repository.save(value);
+    const table = store.table<SessionRecord, string>('sessions');
+    const stored = structuredClone(await table.get(value.id)) as unknown as {
+      schemaVersion: SessionRecord['schemaVersion'];
+      session: Record<string, unknown>;
+    };
+    stored.schemaVersion = schemaVersion;
+    delete stored.session['restartCommandReceipts'];
+    if (schemaVersion === 1) {
+      const phases = (
+        stored.session['workflow'] as {
+          phases: { environment: Record<string, unknown> }[];
+        }
+      ).phases;
+      for (const phase of phases) {
+        delete phase.environment['backgroundAsset'];
+        delete phase.environment['audioAsset'];
+      }
+    }
+    await table.put(stored as unknown as SessionRecord);
+
+    await expect(repository.get(value.id)).resolves.toMatchObject({
+      restartCommandReceipts: [],
+    });
+  },
+);
+
+test('rejects malformed version-9 restart receipts', async () => {
+  const store = database();
+  const repository = new DexieSessionRepository(store);
+  const value = createSession('invalid-restart-v9', workflow(), 1_000);
+  await repository.save(value);
+  const table = store.table<SessionRecord, string>('sessions');
+  const stored = structuredClone(await table.get(value.id)) as unknown as {
+    session: Record<string, unknown>;
+  };
+  stored.session['restartCommandReceipts'] = [
+    {
+      commandId: 'bad',
+      type: 'restart-phase',
+      target: { type: 'phase', phaseIndex: -1 },
+    },
+  ];
+  await table.put(stored as unknown as SessionRecord);
+
+  await expect(repository.get(value.id)).rejects.toBeInstanceOf(
+    SessionValidationError,
+  );
+});
+
 afterEach(async () => {
   await Promise.all(
     [...new Set(databaseNames.splice(0))].map((name) => Dexie.delete(name)),
@@ -50,7 +151,7 @@ afterEach(async () => {
 });
 
 describe('DexieSessionRepository', () => {
-  test('round-trips a named Phase in a version-8 Session snapshot', async () => {
+  test('round-trips a named Phase in a version-9 Session snapshot', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
     const session = createSession(
@@ -76,7 +177,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(session.id),
     ).resolves.toMatchObject({
-      schemaVersion: 8,
+      schemaVersion: 9,
       session: {
         workflow: { phases: [{ name: 'Writing' }] },
       },
@@ -156,7 +257,7 @@ describe('DexieSessionRepository', () => {
     );
   });
 
-  test('round-trips a v8 user pause in the normal Phase after a non-final Bonus', async () => {
+  test('round-trips a v9 user pause in the normal Phase after a non-final Bonus', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
     const rewarded = createWorkflow({
@@ -201,7 +302,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(paused.id),
     ).resolves.toMatchObject({
-      schemaVersion: 8,
+      schemaVersion: 9,
       session: {
         status: 'paused',
         pauseReason: 'user',
@@ -213,7 +314,7 @@ describe('DexieSessionRepository', () => {
     });
   });
 
-  test('round-trips canonical version-8 active Bonus state and rejects corrupt markers', async () => {
+  test('round-trips canonical version-9 active Bonus state and rejects corrupt markers', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
     const rewarded = createWorkflow({
@@ -248,20 +349,34 @@ describe('DexieSessionRepository', () => {
       4_000,
       'continue-v7',
     );
-    await repository.save(running);
+    const restarted = restartSessionPhase(running, 5_000, 'restart-bonus-v9', {
+      type: 'bonus',
+      rewardRitualId: 'v7-bonus-session:0',
+    });
+    await repository.save(restarted);
 
-    await expect(repository.get(running.id)).resolves.toEqual(running);
+    await expect(repository.get(restarted.id)).resolves.toEqual(restarted);
     const table = store.table<SessionRecord, string>('sessions');
-    await expect(table.get(running.id)).resolves.toMatchObject({
-      schemaVersion: 8,
+    await expect(table.get(restarted.id)).resolves.toMatchObject({
+      schemaVersion: 9,
       session: {
         activeBonusPhase: {
           rewardRitualId: 'v7-bonus-session:0',
           selectedSideIndex: 0,
         },
+        restartCommandReceipts: [
+          {
+            commandId: 'restart-bonus-v9',
+            type: 'restart-phase',
+            target: {
+              type: 'bonus',
+              rewardRitualId: 'v7-bonus-session:0',
+            },
+          },
+        ],
       },
     });
-    const stored = await table.get(running.id);
+    const stored = await table.get(restarted.id);
     if (stored === undefined) throw new Error('Expected stored Session.');
     const corruptions: ((record: Record<string, unknown>) => void)[] = [
       (record) => {
@@ -283,7 +398,7 @@ describe('DexieSessionRepository', () => {
       };
       corruptMarker(corrupt.session.activeBonusPhase);
       await table.put(corrupt as unknown as SessionRecord);
-      await expect(repository.get(running.id)).rejects.toBeInstanceOf(
+      await expect(repository.get(restarted.id)).rejects.toBeInstanceOf(
         SessionValidationError,
       );
     }
@@ -292,7 +407,7 @@ describe('DexieSessionRepository', () => {
     };
     delete missingTiming.session['phaseEndsAt'];
     await table.put(missingTiming as unknown as SessionRecord);
-    await expect(repository.get(running.id)).rejects.toBeInstanceOf(
+    await expect(repository.get(restarted.id)).rejects.toBeInstanceOf(
       SessionValidationError,
     );
   });
@@ -519,7 +634,7 @@ describe('DexieSessionRepository', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  test('round-trips authoritative Reward ritual and Bonus configuration in v8', async () => {
+  test('round-trips authoritative Reward ritual and Bonus configuration in v9', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
     const rewarded = createWorkflow({
@@ -559,7 +674,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(rolled.id),
     ).resolves.toMatchObject({
-      schemaVersion: 8,
+      schemaVersion: 9,
       session: {
         rewardRitual: {
           id: 'reward-session:0',
@@ -744,7 +859,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(expected.id),
     ).resolves.toMatchObject({
-      schemaVersion: 8,
+      schemaVersion: 9,
       session: {
         workflow: {
           rewardDice: {

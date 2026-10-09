@@ -18,7 +18,18 @@ export type SessionCommand =
       type: 'session/restart-phase';
       commandId: string;
       sessionId: string;
+      phaseIndex: number;
+    }>
+  | Readonly<{
+      type: 'session/restart-phase';
+      commandId: string;
+      sessionId: string;
       rewardRitualId: string;
+    }>
+  | Readonly<{
+      type: 'session/restart-workflow';
+      commandId: string;
+      sessionId: string;
     }>
   | Readonly<{ type: 'session/stop'; commandId: string; sessionId: string }>;
 

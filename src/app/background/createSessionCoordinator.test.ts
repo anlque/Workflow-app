@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import type { AlarmScheduler } from '@/platform/alarms';
 import type {
@@ -337,6 +337,7 @@ describe('createSessionCoordinator', () => {
         workflow: persisted.snapshot.workflow,
         currentPhaseIndex: persisted.currentPhaseIndex,
         rewardCommandReceipts: persisted.rewardCommandReceipts,
+        restartCommandReceipts: persisted.restartCommandReceipts,
         rewardRitual,
         status: 'paused',
         pauseReason: 'user',
@@ -453,6 +454,65 @@ describe('createSessionCoordinator', () => {
     expect(second).toEqual(first);
     await expect(sessions.getActive()).resolves.toEqual(first);
     expect(messages.events).toHaveLength(2);
+  });
+
+  test('routes normal phase and workflow restarts with durable duplicate safety', async () => {
+    const { value, sessions, clock, messages, alarms, coordinator } = setup();
+    await coordinator.initialize();
+    const started = (await messages.dispatch({
+      type: 'session/start',
+      commandId: 'start-restart-flow',
+      workflowId: value.id,
+    })) as Session;
+    clock.set(5_000);
+    const phaseCommand = {
+      type: 'session/restart-phase',
+      commandId: 'restart-normal',
+      sessionId: started.id,
+      phaseIndex: 0,
+    } as const;
+    await messages.dispatch(phaseCommand);
+    expect(messages.events.at(-1)?.session).toMatchObject({
+      id: started.id,
+      phaseStartedAt: 5_000,
+      phaseEndsAt: 15_000,
+    });
+    expect(alarms.scheduled).toEqual({
+      name: 'locusora.session-phase',
+      when: 15_000,
+    });
+
+    clock.set(6_000);
+    await messages.dispatch({
+      type: 'session/restart-workflow',
+      commandId: 'restart-workflow',
+      sessionId: started.id,
+    });
+    const workflowRestart = messages.events.at(-1)?.session;
+    expect(workflowRestart).toMatchObject({
+      id: started.id,
+      currentPhaseIndex: 0,
+      phaseStartedAt: 6_000,
+      phaseEndsAt: 16_000,
+      rewardCommandReceipts: [],
+    });
+
+    const save = vi.spyOn(sessions, 'save');
+    const secondMessages = new FakeMessageBus();
+    const secondCoordinator = createSessionCoordinator({
+      workflows: workflowRepository(value),
+      sessions,
+      clock,
+      messages: secondMessages,
+      alarms,
+      createSessionId: () => 'unused',
+      workflowResolver: { resolve: (workflow) => Promise.resolve(workflow) },
+    });
+    await secondCoordinator.initialize();
+    await expect(secondMessages.dispatch(phaseCommand)).resolves.toEqual(
+      workflowRestart,
+    );
+    expect(save).not.toHaveBeenCalled();
   });
 
   test('does not evict pending commands when the recent cache exceeds its bound', async () => {

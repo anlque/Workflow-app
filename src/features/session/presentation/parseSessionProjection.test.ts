@@ -6,6 +6,7 @@ import {
   continueRewardSession,
   createSession,
   pauseSession,
+  restartSessionPhase,
   rollSessionReward,
 } from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
@@ -350,6 +351,41 @@ describe('parseSessionProjection', () => {
     expect(() => parseSessionProjection(value)).toThrow(
       'Session projection is invalid.',
     );
+  });
+
+  test('requires and validates canonical restart receipts', () => {
+    const value = structuredClone(
+      createSession('session-restart', workflowWithReward(), 1_000),
+    ) as Record<string, unknown>;
+    delete value['restartCommandReceipts'];
+    expect(() => parseSessionProjection(value)).toThrow(
+      'Session projection is invalid.',
+    );
+
+    value['restartCommandReceipts'] = [
+      {
+        commandId: 'restart-1',
+        type: 'restart-phase',
+        target: { type: 'phase', phaseIndex: 0, extra: true },
+      },
+    ];
+    expect(() => parseSessionProjection(value)).toThrow(
+      'Session projection is invalid.',
+    );
+
+    const restarted = restartSessionPhase(
+      createSession('projection-restart', workflowWithReward(), 1_000),
+      2_000,
+      'restart-valid',
+      { type: 'phase', phaseIndex: 0 },
+    );
+    const parsed = parseSessionProjection(structuredClone(restarted));
+    expect(parsed).toEqual(restarted);
+    expect(Object.isFrozen(parsed?.restartCommandReceipts)).toBe(true);
+    expect(Object.isFrozen(parsed?.restartCommandReceipts[0])).toBe(true);
+    const receipt = parsed?.restartCommandReceipts[0];
+    if (receipt?.type !== 'restart-phase') throw new Error('Expected receipt.');
+    expect(Object.isFrozen(receipt.target)).toBe(true);
   });
 
   test('rejects a final Reward projection without its ritual', () => {

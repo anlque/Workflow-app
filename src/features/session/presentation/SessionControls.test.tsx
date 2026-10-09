@@ -104,7 +104,7 @@ describe('SessionControls', () => {
     ).not.toBeInTheDocument();
   });
 
-  test('confirms Restart phase only for an active Bonus', async () => {
+  test('confirms Restart phase for an active Bonus', async () => {
     const user = userEvent.setup();
     const rewarded = createWorkflow({
       id: 'bonus-controls',
@@ -140,13 +140,14 @@ describe('SessionControls', () => {
     );
     const actions = {
       ...callbacks(),
-      onRestart: vi.fn(() => Promise.resolve()),
+      onRestartPhase: vi.fn(() => Promise.resolve()),
+      onRestartWorkflow: vi.fn(() => Promise.resolve()),
     };
     render(<SessionControls session={bonus} {...actions} />);
 
     await user.click(screen.getByRole('button', { name: 'Restart phase' }));
     expect(
-      screen.getByRole('dialog', { name: 'Restart this Bonus Phase?' }),
+      screen.getByRole('dialog', { name: 'Restart this phase?' }),
     ).toBeVisible();
     const restartButtons = screen.getAllByRole('button', {
       name: 'Restart phase',
@@ -155,10 +156,10 @@ describe('SessionControls', () => {
     if (confirm === undefined)
       throw new Error('Expected restart confirmation.');
     await user.click(confirm);
-    expect(actions.onRestart).toHaveBeenCalledWith(
-      bonus.id,
-      'bonus-controls-session:0',
-    );
+    expect(actions.onRestartPhase).toHaveBeenCalledWith(bonus.id, {
+      type: 'bonus',
+      rewardRitualId: 'bonus-controls-session:0',
+    });
   });
 
   test('keeps a failed Bonus restart recoverable in the confirmation dialog', async () => {
@@ -197,9 +198,10 @@ describe('SessionControls', () => {
     );
     const actions = {
       ...callbacks(),
-      onRestart: vi
+      onRestartPhase: vi
         .fn(() => Promise.resolve())
         .mockRejectedValueOnce(new Error('Restart unavailable.')),
+      onRestartWorkflow: vi.fn(() => Promise.resolve()),
     };
     render(<SessionControls session={bonus} {...actions} />);
 
@@ -215,13 +217,87 @@ describe('SessionControls', () => {
       'Restart unavailable.',
     );
     expect(
-      screen.getByRole('dialog', { name: 'Restart this Bonus Phase?' }),
+      screen.getByRole('dialog', { name: 'Restart this phase?' }),
     ).toBeVisible();
 
     await user.click(confirm);
-    expect(actions.onRestart).toHaveBeenCalledTimes(2);
+    expect(actions.onRestartPhase).toHaveBeenCalledTimes(2);
     expect(
-      screen.queryByRole('dialog', { name: 'Restart this Bonus Phase?' }),
+      screen.queryByRole('dialog', { name: 'Restart this phase?' }),
     ).not.toBeInTheDocument();
+  });
+
+  test('confirms normal phase and workflow restarts with explicit loss copy', async () => {
+    const user = userEvent.setup();
+    const session = createSession('normal-restart', workflow, 1_000);
+    const actions = {
+      ...callbacks(),
+      onRestartPhase: vi.fn(() => Promise.resolve()),
+      onRestartWorkflow: vi.fn(() => Promise.resolve()),
+    };
+    render(<SessionControls session={session} {...actions} />);
+
+    const phaseTrigger = screen.getByRole('button', { name: 'Restart phase' });
+    await user.click(phaseTrigger);
+    expect(
+      screen.getByText('Elapsed progress in this phase will be lost.'),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(phaseTrigger).toHaveFocus();
+    await user.click(phaseTrigger);
+    const phaseConfirmation = screen
+      .getAllByRole('button', { name: 'Restart phase' })
+      .at(-1);
+    if (phaseConfirmation === undefined)
+      throw new Error('Expected phase confirmation.');
+    await user.click(phaseConfirmation);
+    expect(actions.onRestartPhase).toHaveBeenCalledWith(session.id, {
+      type: 'phase',
+      phaseIndex: 0,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Restart workflow' }));
+    expect(
+      screen.getByText(
+        'All Session progress and Reward progress will be lost.',
+      ),
+    ).toBeVisible();
+    const workflowConfirmation = screen
+      .getAllByRole('button', { name: 'Restart workflow' })
+      .at(-1);
+    if (workflowConfirmation === undefined)
+      throw new Error('Expected workflow confirmation.');
+    await user.click(workflowConfirmation);
+    expect(actions.onRestartWorkflow).toHaveBeenCalledWith(session.id);
+  });
+
+  test('keeps restart confirmation single-flight and available while user-paused', async () => {
+    const user = userEvent.setup();
+    let finish = (): void => undefined;
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const session = pauseSession(
+      createSession('paused-restart', workflow, 1_000),
+      2_000,
+    );
+    const actions = {
+      ...callbacks(),
+      onRestartPhase: vi.fn(() => pending),
+      onRestartWorkflow: vi.fn(() => Promise.resolve()),
+    };
+    render(<SessionControls session={session} {...actions} />);
+
+    await user.click(screen.getByRole('button', { name: 'Restart phase' }));
+    const confirm = screen.getAllByRole('button', {
+      name: 'Restart phase',
+    })[1];
+    if (confirm === undefined) throw new Error('Expected confirmation.');
+    await user.click(confirm);
+    await user.click(confirm);
+
+    expect(actions.onRestartPhase).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Restarting…' })).toBeDisabled();
+    finish();
   });
 });

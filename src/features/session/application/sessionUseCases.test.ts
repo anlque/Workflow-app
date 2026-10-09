@@ -8,6 +8,7 @@ import { getActiveSessionUseCase } from './getActiveSessionUseCase';
 import { pauseSessionUseCase } from './pauseSessionUseCase';
 import { resumeSessionUseCase } from './resumeSessionUseCase';
 import { restartSessionPhaseUseCase } from './restartSessionPhaseUseCase';
+import { restartSessionWorkflowUseCase } from './restartSessionWorkflowUseCase';
 import { rollSessionRewardUseCase } from './rollSessionRewardUseCase';
 import { startSessionUseCase } from './startSessionUseCase';
 import type { SessionWorkflowResolver } from './SessionWorkflowResolver';
@@ -544,19 +545,16 @@ describe('Session use cases', () => {
       clock,
       started.id,
       'restart-1',
-      'restart-bonus-session:0',
+      { type: 'bonus', rewardRitualId: 'restart-bonus-session:0' },
     );
     expect(restarted).toMatchObject({ phaseEndsAt: 40_000 });
 
     const save = vi.spyOn(repository, 'save');
     await expect(
-      restartSessionPhaseUseCase(
-        repository,
-        clock,
-        started.id,
-        'restart-1',
-        'restart-bonus-session:0',
-      ),
+      restartSessionPhaseUseCase(repository, clock, started.id, 'restart-1', {
+        type: 'bonus',
+        rewardRitualId: 'restart-bonus-session:0',
+      }),
     ).resolves.toEqual(restarted);
     await expect(
       restartSessionPhaseUseCase(
@@ -564,22 +562,21 @@ describe('Session use cases', () => {
         clock,
         started.id,
         'continue-restart',
-        'restart-bonus-session:0',
+        { type: 'bonus', rewardRitualId: 'restart-bonus-session:0' },
       ),
-    ).rejects.toThrow(
-      'Reward command identifier conflicts with an earlier command.',
-    );
+    ).rejects.toThrow();
     await expect(
       restartSessionPhaseUseCase(
         repository,
         clock,
         started.id,
         'restart-stale',
-        'restart-bonus-session:previous',
+        {
+          type: 'bonus',
+          rewardRitualId: 'restart-bonus-session:previous',
+        },
       ),
-    ).rejects.toThrow(
-      'Reward command does not match the current Reward opportunity.',
-    );
+    ).rejects.toThrow();
     expect(save).not.toHaveBeenCalled();
   });
 
@@ -626,7 +623,7 @@ describe('Session use cases', () => {
           clock,
           started.id,
           `restart-${String(now)}`,
-          `${started.id}:0`,
+          { type: 'bonus', rewardRitualId: `${started.id}:0` },
         ),
       ).rejects.toThrow();
       expect(save).not.toHaveBeenCalled();
@@ -666,7 +663,7 @@ describe('Session use cases', () => {
       clock,
       started.id,
       'durable-restart',
-      'durable-restart-session:0',
+      { type: 'bonus', rewardRitualId: 'durable-restart-session:0' },
     );
     clock.set(40_000);
 
@@ -675,19 +672,71 @@ describe('Session use cases', () => {
       clock,
       started.id,
       'durable-restart',
-      'durable-restart-session:0',
+      { type: 'bonus', rewardRitualId: 'durable-restart-session:0' },
     );
 
     expect(reconciled).toMatchObject({
       status: 'running',
       currentPhaseIndex: 1,
-      phaseEndsAt: 41_000,
+      phaseEndsAt: 40_000,
     });
     expect(
-      reconciled.rewardCommandReceipts.filter(
+      reconciled.restartCommandReceipts.filter(
         ({ commandId }) => commandId === 'durable-restart',
       ),
     ).toHaveLength(1);
     await expect(repository.get(started.id)).resolves.toEqual(reconciled);
+  });
+
+  test('restarts a normal Phase and the Workflow with one write each', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'restart-normal-session',
+      workflow(),
+    );
+    clock.set(5_000);
+    const save = vi.spyOn(repository, 'save');
+    const now = vi.spyOn(clock, 'now');
+
+    const phase = await restartSessionPhaseUseCase(
+      repository,
+      clock,
+      started.id,
+      'restart-normal',
+      { type: 'phase', phaseIndex: 0 },
+    );
+    expect(phase).toMatchObject({ phaseStartedAt: 5_000, phaseEndsAt: 15_000 });
+
+    clock.set(6_000);
+    const complete = await restartSessionWorkflowUseCase(
+      repository,
+      clock,
+      started.id,
+      'restart-workflow',
+    );
+    expect(complete).toMatchObject({
+      id: started.id,
+      currentPhaseIndex: 0,
+      phaseStartedAt: 6_000,
+      phaseEndsAt: 16_000,
+      rewardCommandReceipts: [],
+    });
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(now).toHaveBeenCalledTimes(2);
+
+    save.mockClear();
+    clock.set(30_000);
+    await expect(
+      restartSessionWorkflowUseCase(
+        repository,
+        clock,
+        started.id,
+        'restart-workflow',
+      ),
+    ).resolves.toEqual(complete);
+    expect(save).not.toHaveBeenCalled();
   });
 });

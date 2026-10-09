@@ -7,6 +7,7 @@ import {
   pauseSessionUseCase,
   resumeSessionUseCase,
   restartSessionPhaseUseCase,
+  restartSessionWorkflowUseCase,
   rollSessionRewardUseCase,
   startSessionUseCase,
   stopSessionUseCase,
@@ -105,7 +106,16 @@ export function createSessionCoordinator({
         clock,
         command.sessionId,
         command.commandId,
-        command.rewardRitualId,
+        'phaseIndex' in command
+          ? { type: 'phase', phaseIndex: command.phaseIndex }
+          : { type: 'bonus', rewardRitualId: command.rewardRitualId },
+      );
+    } else if (command.type === 'session/restart-workflow') {
+      session = await restartSessionWorkflowUseCase(
+        sessions,
+        clock,
+        command.sessionId,
+        command.commandId,
       );
     } else if (
       command.type === 'session/roll-reward' ||

@@ -70,6 +70,7 @@ function session(
     workflow: workflow(reference),
     currentPhaseIndex: pauseReason === 'reward' ? 1 : 0,
     rewardCommandReceipts: [],
+    restartCommandReceipts: [],
     ...(pauseReason === 'reward'
       ? {
           rewardRitual: {

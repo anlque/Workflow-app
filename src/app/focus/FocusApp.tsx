@@ -13,6 +13,7 @@ import {
   connectSessionMessages,
   createActiveSessionStore,
   type SessionId,
+  type RestartPhaseTarget,
   type SessionProjectionClient,
   getActiveSessionSegment,
 } from '@/features/session';
@@ -49,7 +50,8 @@ export type FocusDependencies = Readonly<{
   sessions: SessionProjectionClient;
   pause(id: SessionId): Promise<void>;
   resume(id: SessionId): Promise<void>;
-  restartPhase(id: SessionId, rewardRitualId: string): Promise<void>;
+  restartPhase(id: SessionId, target: RestartPhaseTarget): Promise<void>;
+  restartWorkflow(id: SessionId): Promise<void>;
   continueReward(id: SessionId, rewardRitualId: string): Promise<void>;
   rollReward(id: SessionId, rewardRitualId: string): Promise<void>;
   rerollReward(id: SessionId, rewardRitualId: string): Promise<void>;
@@ -363,7 +365,8 @@ export function FocusApp({
               void activateSounds();
               await dependencies.resume(id);
             }}
-            onRestart={dependencies.restartPhase}
+            onRestartPhase={dependencies.restartPhase}
+            onRestartWorkflow={dependencies.restartWorkflow}
             onStop={async (id) => {
               void activateSounds();
               await dependencies.stop(id);

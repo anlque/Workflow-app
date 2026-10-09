@@ -1,20 +1,15 @@
-import {
-  restartSessionPhase,
-  type RestartPhaseTarget,
-  type Session,
-} from '../domain/Session';
+import { restartSessionWorkflow, type Session } from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
 import { SessionTransitionError } from '../domain/SessionErrors';
 import type { Clock } from './Clock';
 import { loadSession } from './loadSession';
 import type { SessionRepository } from './SessionRepository';
 
-export async function restartSessionPhaseUseCase(
+export async function restartSessionWorkflowUseCase(
   repository: SessionRepository,
   clock: Clock,
   sessionId: string,
   commandId: string,
-  target: RestartPhaseTarget,
 ): Promise<Session> {
   const current = await loadSession(repository, sessionId);
   const now = clock.now();
@@ -27,9 +22,12 @@ export async function restartSessionPhaseUseCase(
   const duplicate = current.restartCommandReceipts.some(
     (receipt) => receipt.commandId === commandId,
   );
-  if (duplicate) return restartSessionPhase(current, now, commandId, target);
-  const reconciled = deriveSessionState(current, now);
-  const restarted = restartSessionPhase(reconciled, now, commandId, target);
+  if (duplicate) return restartSessionWorkflow(current, now, commandId);
+  const restarted = restartSessionWorkflow(
+    deriveSessionState(current, now),
+    now,
+    commandId,
+  );
   await repository.save(restarted);
   return restarted;
 }

@@ -119,12 +119,27 @@ export class ChromeSessionClient implements SessionProjectionClient {
     });
   }
 
-  public restartPhase(id: SessionId, rewardRitualId: string): Promise<void> {
+  public restartPhase(
+    id: SessionId,
+    target:
+      | Readonly<{ type: 'phase'; phaseIndex: number }>
+      | Readonly<{ type: 'bonus'; rewardRitualId: string }>,
+  ): Promise<void> {
     return this.#command({
       type: 'session/restart-phase',
       commandId: this.#createId(),
       sessionId: id,
-      rewardRitualId,
+      ...(target.type === 'phase'
+        ? { phaseIndex: target.phaseIndex }
+        : { rewardRitualId: target.rewardRitualId }),
+    });
+  }
+
+  public restartWorkflow(id: SessionId): Promise<void> {
+    return this.#command({
+      type: 'session/restart-workflow',
+      commandId: this.#createId(),
+      sessionId: id,
     });
   }
 

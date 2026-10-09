@@ -25,6 +25,7 @@ export function deriveSessionState(session: Session, now: number): Session {
             snapshot: current.snapshot,
             currentPhaseIndex: current.currentPhaseIndex,
             rewardCommandReceipts: current.rewardCommandReceipts,
+            restartCommandReceipts: current.restartCommandReceipts,
             rewardRitual: ritual,
             status: 'completed',
             completedAt: current.phaseEndsAt,
@@ -45,6 +46,7 @@ export function deriveSessionState(session: Session, now: number): Session {
             snapshot: current.snapshot,
             currentPhaseIndex: current.currentPhaseIndex,
             rewardCommandReceipts: current.rewardCommandReceipts,
+            restartCommandReceipts: current.restartCommandReceipts,
             rewardRitual: ritual,
             status: 'running',
             phaseStartedAt: current.phaseEndsAt,
@@ -60,6 +62,7 @@ export function deriveSessionState(session: Session, now: number): Session {
         snapshot: current.snapshot,
         currentPhaseIndex: current.currentPhaseIndex,
         rewardCommandReceipts: current.rewardCommandReceipts,
+        restartCommandReceipts: current.restartCommandReceipts,
         status: 'transitioning',
         transitionEndsAt: current.phaseEndsAt + 1_000,
       });
@@ -83,6 +86,7 @@ export function deriveSessionState(session: Session, now: number): Session {
         currentPhaseIndex:
           nextPhase === undefined ? current.currentPhaseIndex : nextPhaseIndex,
         rewardCommandReceipts: current.rewardCommandReceipts,
+        restartCommandReceipts: current.restartCommandReceipts,
         status: 'paused',
         pauseReason: 'reward',
         pausedAt: current.transitionEndsAt,
@@ -111,6 +115,7 @@ export function deriveSessionState(session: Session, now: number): Session {
         snapshot: current.snapshot,
         currentPhaseIndex: current.currentPhaseIndex,
         rewardCommandReceipts: current.rewardCommandReceipts,
+        restartCommandReceipts: current.restartCommandReceipts,
         status: 'completed',
         completedAt: current.transitionEndsAt,
       });
@@ -123,6 +128,7 @@ export function deriveSessionState(session: Session, now: number): Session {
       snapshot: current.snapshot,
       currentPhaseIndex: nextPhaseIndex,
       rewardCommandReceipts: current.rewardCommandReceipts,
+      restartCommandReceipts: current.restartCommandReceipts,
       status: 'running',
       phaseStartedAt: current.transitionEndsAt,
       phaseEndsAt: current.transitionEndsAt + nextPhase.durationSeconds * 1_000,

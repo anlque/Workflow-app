@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { Session, SessionId } from '../domain/Session';
+import type { RestartPhaseTarget, Session, SessionId } from '../domain/Session';
 import { SessionControls } from './SessionControls';
 import {
   RewardResultDialog,
@@ -24,7 +24,8 @@ export type ActiveSessionViewProps = Readonly<{
   }>;
   onPause(id: SessionId): Promise<void>;
   onResume(id: SessionId): Promise<void>;
-  onRestart?(id: SessionId, rewardRitualId: string): Promise<void>;
+  onRestartPhase?(id: SessionId, target: RestartPhaseTarget): Promise<void>;
+  onRestartWorkflow?(id: SessionId): Promise<void>;
   onStop(id: SessionId): Promise<void>;
 }>;
 
@@ -38,7 +39,8 @@ export function ActiveSessionView({
   rewardInteraction,
   onPause,
   onResume,
-  onRestart,
+  onRestartPhase,
+  onRestartWorkflow,
   onStop,
 }: ActiveSessionViewProps) {
   const [displayNow, setDisplayNow] = useState(now);
@@ -137,7 +139,8 @@ export function ActiveSessionView({
         dialogsEnabled={dialogsEnabled}
         onPause={onPause}
         onResume={onResume}
-        {...(onRestart === undefined ? {} : { onRestart })}
+        {...(onRestartPhase === undefined ? {} : { onRestartPhase })}
+        {...(onRestartWorkflow === undefined ? {} : { onRestartWorkflow })}
         onStop={onStop}
       />
       {rewardResult}

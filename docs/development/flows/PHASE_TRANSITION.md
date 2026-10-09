@@ -54,6 +54,19 @@ The same Domain reconciliation is used by `getActiveSessionUseCase()` during
 background initialization and document hydration, so a delayed or suspended
 worker does not create a separate transition algorithm.
 
+## Confirmed restart commands
+
+Focus and Side Panel send restart intent through the same serialized background
+coordinator. `session/restart-phase` carries the current normal Phase index or
+active Bonus ritual ID as a stale-target guard; `session/restart-workflow`
+targets the whole current Session. Domain accepts only Running or user-paused
+state, starts the selected duration from one sampled epoch and persists the
+result plus a bounded receipt in one write. Workflow restart preserves Session
+identity/snapshot, returns to Phase 0 and clears Reward progress. Exact retained
+redelivery writes nothing; transition, unresolved Reward and terminal states
+reject. Publication and alarm rescheduling occur only after the authoritative
+operation succeeds.
+
 ## Authoritative Changes
 
 - `status`, `currentPhaseIndex` and the next state-specific timing anchors change

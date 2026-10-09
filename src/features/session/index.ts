@@ -10,6 +10,7 @@ export { getActiveSessionUseCase } from './application/getActiveSessionUseCase';
 export { pauseSessionUseCase } from './application/pauseSessionUseCase';
 export { resumeSessionUseCase } from './application/resumeSessionUseCase';
 export { restartSessionPhaseUseCase } from './application/restartSessionPhaseUseCase';
+export { restartSessionWorkflowUseCase } from './application/restartSessionWorkflowUseCase';
 export { rollSessionRewardUseCase } from './application/rollSessionRewardUseCase';
 export { startSessionUseCase } from './application/startSessionUseCase';
 export { stopSessionUseCase } from './application/stopSessionUseCase';
@@ -21,6 +22,7 @@ export {
   pauseSession,
   rerollSessionReward,
   restartSessionPhase,
+  restartSessionWorkflow,
   resumeSession,
   rollSessionReward,
   restoreSession,
@@ -30,6 +32,8 @@ export {
   type PausedSession,
   type RewardContinuationTarget,
   type RewardRitual,
+  type RestartCommandReceipt,
+  type RestartPhaseTarget,
   type RunningSession,
   type RestoreSessionInput,
   type Session,

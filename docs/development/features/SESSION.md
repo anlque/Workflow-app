@@ -6,7 +6,7 @@ Session start receives a Workflow resolver through its Application boundary.
 Roles resolve to same-kind direct IDs before construction, including references
 inside Bonus Environments, and `createSessionSnapshot` rejects any remaining
 Role. Moving a Role affects only future Sessions. New Session records use
-envelope version 8; the mapper reads versions 1–8 and isolates legacy defaults
+envelope version 9; the mapper reads versions 1–9 and isolates legacy defaults
 to versions 1–4. Timing never depends on Role lookup after start.
 
 ## Purpose
@@ -50,9 +50,9 @@ exports:
 | Group | Exports |
 | --- | --- |
 | Application contracts/errors/events | `Clock`, `SessionRepository`, `SessionChangedEvent`, `SessionApplicationError` |
-| Application queries/use cases | `activeSessionReferencesAsset`, `advanceSessionUseCase`, `continueRewardSessionUseCase`, `getActiveSessionUseCase`, `pauseSessionUseCase`, `restartSessionPhaseUseCase`, `resumeSessionUseCase`, `rollSessionRewardUseCase`, `startSessionUseCase`, `stopSessionUseCase` |
-| Domain types | `Session`, `SessionId`, `RunningSession`, `TransitioningSession`, `PausedSession`, `CompletedSession`, `StoppedSession`, `RestoreSessionInput`, `SessionSnapshot`, `ActiveBonusRewardPhase`, `RewardContinuationTarget`, `RewardRitual` |
-| Domain behavior/errors | `createSession`, `createSessionId`, `restoreSession`, `pauseSession`, `restartSessionPhase`, `resumeSession`, `rollSessionReward`, `rerollSessionReward`, `continueRewardSession`, `stopSession`, `getRemainingSeconds`, `deriveSessionState`, `SessionValidationError`, `SessionTransitionError` |
+| Application queries/use cases | `activeSessionReferencesAsset`, `advanceSessionUseCase`, `continueRewardSessionUseCase`, `getActiveSessionUseCase`, `pauseSessionUseCase`, `restartSessionPhaseUseCase`, `restartSessionWorkflowUseCase`, `resumeSessionUseCase`, `rollSessionRewardUseCase`, `startSessionUseCase`, `stopSessionUseCase` |
+| Domain types | `Session`, `SessionId`, `RunningSession`, `TransitioningSession`, `PausedSession`, `CompletedSession`, `StoppedSession`, `RestoreSessionInput`, `SessionSnapshot`, `ActiveBonusRewardPhase`, `RewardContinuationTarget`, `RewardRitual`, `RestartPhaseTarget`, `RestartCommandReceipt` |
+| Domain behavior/errors | `createSession`, `createSessionId`, `restoreSession`, `pauseSession`, `restartSessionPhase`, `restartSessionWorkflow`, `resumeSession`, `rollSessionReward`, `rerollSessionReward`, `continueRewardSession`, `stopSession`, `getRemainingSeconds`, `deriveSessionState`, `SessionValidationError`, `SessionTransitionError` |
 | Infrastructure composition | `DexieSessionRepository`, `sessionDatabaseSchemas` |
 | Presentation store | `createActiveSessionStore`, `ActiveSessionState`, `ActiveSessionStore` |
 | Presentation view | `ActiveSessionView`, `ActiveSessionViewProps` |
@@ -159,9 +159,14 @@ target is `complete`, so the Session becomes Completed only after acknowledgment
 - Reward Continue accepts only `pauseReason: 'reward'`. A selected Side without
   Bonus follows the saved continuation immediately; a Side with Bonus starts
   its full configured duration from the continuation epoch.
-- Pause/resume preserve an active Bonus and its remaining time. Restart is
-  available only for an active Bonus and resets its full configured duration;
-  ordinary Phase restart belongs to FX-002.
+- Pause/resume preserve an active Bonus and its remaining time. Restart phase
+  accepts a Running or user-paused normal/Bonus Phase, starts it immediately at
+  full snapshot duration and preserves prior acknowledged Reward history.
+- Restart workflow preserves Session identity/snapshot, starts Phase 0 at full
+  duration and clears Reward ritual, active Bonus and Reward receipts.
+- Transitioning, unresolved Reward and terminal states reject both restarts.
+  Bounded restart receipts make retained exact retries no-ops and reject ID
+  collisions.
 - Ordinary Resume cannot bypass a Reward.
 - Stop reconciles first and accepts only Running or Paused; Transitioning and
   terminal states reject it.
@@ -179,7 +184,8 @@ target is `complete`, so the Session becomes Completed only after acknowledgment
 | `pauseSessionUseCase` | Loads, reconciles and applies user pause | Saves Paused Session |
 | `resumeSessionUseCase` | Loads and resumes only user pause | Saves Running Session with new anchors |
 | `continueRewardSessionUseCase` | Loads and continues only Reward pause | Saves Running next Phase with new anchors |
-| `restartSessionPhaseUseCase` | Validates an active Bonus ritual fingerprint and resets its full duration | Saves the restarted active Bonus exactly once |
+| `restartSessionPhaseUseCase` | Reconciles once, validates the normal index or Bonus ritual target and resets full duration | Saves once; retained exact retry writes nothing |
+| `restartSessionWorkflowUseCase` | Reconciles once and resets the immutable run to Phase 0 | Saves once with cleared Reward progress and a restart receipt |
 | `stopSessionUseCase` | Loads, reconciles and stops a valid active state | Saves Stopped history row |
 
 All clock and repository dependencies are explicit. The use cases do not know
@@ -193,18 +199,19 @@ internals. A later lifecycle ADR will supersede ADR-0006 with this boundary.
 
 ## Persistence
 
-`DexieSessionRepository` writes a version-8 envelope in the global version-2
+`DexieSessionRepository` writes a version-9 envelope in the global version-2
 `sessions: 'id, active, updatedAt'` table definition.
 
-The mapper reads versions 1–8 strictly: version 1 snapshots accept only legacy
-Asset ID fields; versions 2–8 accept only exact direct references. Versions 1–2
-map legacy frequency fields; versions 3–8 read canonical schedules. Versions
-4–8 require Side availability while versions 1–3 default it to `any`. Versions
-5–8 require canonical Reward ritual and receipt state; versions 6–8 additionally
-accept the optional exact Bonus Reward Phase shape. Versions 7–8 accept the
-exact active Bonus marker and `restart` receipt type. Version 8 additionally
-accepts optional Phase names in the immutable snapshot. Only the version-aware
-v1–v4 mapper may supply legacy defaults. Role,
+The mapper reads versions 1–9 strictly: version 1 snapshots accept only legacy
+Asset ID fields; versions 2–9 accept only exact direct references. Versions 1–2
+map legacy frequency fields; versions 3–9 read canonical schedules. Versions
+4–9 require Side availability while versions 1–3 default it to `any`. Versions
+5–9 require canonical Reward ritual and receipt state; versions 6–9 additionally
+accept the optional exact Bonus Reward Phase shape. Versions 7–9 accept the
+exact active Bonus marker and legacy Reward `restart` receipt type. Versions
+8–9 accept optional Phase names. Version 9 requires exact restart receipts;
+versions 1–8 restore an empty restart history. Only the version-aware v1–v4
+mapper may supply legacy defaults. Role,
 mixed-version and unknown Environment fields are rejected because persisted
 Session snapshots must already be resolved and immutable.
 
@@ -248,7 +255,9 @@ interval only refreshes `now`; it does not decrement or persist Session state.
 - replaces controls with **Reward pending** for a Reward pause;
 - hides all controls during Transitioning and terminal states;
 - confirms Stop in a Dialog and reports command errors.
-- offers a confirmed **Restart phase** action only while a Bonus is active.
+- offers confirmed **Restart phase** and **Restart workflow** actions for
+  Running and user-paused normal/Bonus states, with explicit loss copy and
+  recoverable command errors.
 
 Focus and Side Panel provide the same authoritative Reward commands. Focus also
 provides the production Dice sound; either surface can resolve a Reward pause.

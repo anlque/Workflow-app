@@ -8,7 +8,7 @@ import {
 import { SessionValidationError } from '../domain/SessionErrors';
 import type { SessionRecord } from './SessionRecord';
 
-type SessionSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+type SessionSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 function invalid(): never {
   throw new SessionValidationError('Stored Session record is invalid.');
@@ -185,7 +185,7 @@ function parseWorkflow(value: unknown, schemaVersion: SessionSchemaVersion) {
         !hasExactKeys(
           phase,
           ['type', 'durationSeconds', 'environment'],
-          schemaVersion === 8 ? ['name'] : [],
+          schemaVersion >= 8 ? ['name'] : [],
         )
       ) {
         return invalid();
@@ -336,6 +336,42 @@ function parseActiveBonusPhase(value: unknown) {
   };
 }
 
+function parseRestartCommandReceipts(value: unknown) {
+  if (!Array.isArray(value)) return invalid();
+  return value.map((entry) => {
+    const receipt = record(entry);
+    if (receipt['type'] === 'restart-workflow') {
+      if (!hasExactKeys(receipt, ['commandId', 'type'])) return invalid();
+      return {
+        commandId: string(receipt['commandId']),
+        type: 'restart-workflow' as const,
+      };
+    }
+    if (receipt['type'] !== 'restart-phase') return invalid();
+    if (!hasExactKeys(receipt, ['commandId', 'type', 'target']))
+      return invalid();
+    const target = record(receipt['target']);
+    const parsedTarget =
+      target['type'] === 'phase' && hasExactKeys(target, ['type', 'phaseIndex'])
+        ? ({
+            type: 'phase' as const,
+            phaseIndex: number(target['phaseIndex']),
+          } as const)
+        : target['type'] === 'bonus' &&
+            hasExactKeys(target, ['type', 'rewardRitualId'])
+          ? ({
+              type: 'bonus' as const,
+              rewardRitualId: string(target['rewardRitualId']),
+            } as const)
+          : invalid();
+    return {
+      commandId: string(receipt['commandId']),
+      type: 'restart-phase' as const,
+      target: parsedTarget,
+    };
+  });
+}
+
 export function mapSessionRecord(value: unknown): Session {
   const outer = record(value);
   if (
@@ -346,7 +382,8 @@ export function mapSessionRecord(value: unknown): Session {
       outer['schemaVersion'] !== 5 &&
       outer['schemaVersion'] !== 6 &&
       outer['schemaVersion'] !== 7 &&
-      outer['schemaVersion'] !== 8) ||
+      outer['schemaVersion'] !== 8 &&
+      outer['schemaVersion'] !== 9) ||
     (outer['active'] !== 0 && outer['active'] !== 1)
   ) {
     return invalid();
@@ -369,11 +406,16 @@ export function mapSessionRecord(value: unknown): Session {
     outer['schemaVersion'] < 7
       ? undefined
       : parseActiveBonusPhase(stored['activeBonusPhase']);
+  const restartCommandReceipts =
+    outer['schemaVersion'] < 9
+      ? []
+      : parseRestartCommandReceipts(stored['restartCommandReceipts']);
   const common = {
     id: string(stored['id']),
     workflow: parseWorkflow(stored['workflow'], outer['schemaVersion']),
     currentPhaseIndex: number(stored['currentPhaseIndex']),
     rewardCommandReceipts,
+    restartCommandReceipts,
     ...(rewardRitual === undefined ? {} : { rewardRitual }),
     ...(activeBonusPhase === undefined ? {} : { activeBonusPhase }),
   };
@@ -465,7 +507,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
             : session.stoppedAt;
   return {
     id: session.id,
-    schemaVersion: 8,
+    schemaVersion: 9,
     active,
     updatedAt,
     session: {
@@ -473,6 +515,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
       workflow: session.snapshot.workflow,
       currentPhaseIndex: session.currentPhaseIndex,
       rewardCommandReceipts: session.rewardCommandReceipts,
+      restartCommandReceipts: session.restartCommandReceipts,
       status: session.status,
       ...(session.rewardRitual === undefined
         ? {}

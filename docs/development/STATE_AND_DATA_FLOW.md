@@ -168,8 +168,9 @@ document.
 - Workflow and Asset CRUD go through their Application/repository boundaries.
 - Settings use `chrome.storage.local`; they are not copied into IndexedDB.
 - Countdown values derive from epoch anchors.
-- Bonus countdown, pause/resume/restart and completion use the same authoritative
-  Session command path; no document owns a separate Bonus timer.
+- Normal/Bonus phase restart and workflow restart use the same serialized,
+  authoritative Session command path. Presentation supplies only a stale-target
+  guard and never owns restart timing; durable receipts protect redelivery.
 - Catalog invalidation contains no Workflow data and does not poll.
 - Active Sessions remain bound to the Workflow snapshot captured at start.
 - Runtime input, persistence records and imported files remain `unknown` until

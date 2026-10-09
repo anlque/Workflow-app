@@ -14,7 +14,8 @@ The catalog lists every current application runtime message exactly once.
 | `session/pause` | Focus or side panel → background | Non-empty `commandId`; non-empty `sessionId` | `{ type, commandId, sessionId }` | `parseSessionCommand` → command bus → `pauseSessionUseCase` | Same normalized command response | Successful change also emits `session/changed` | Yes, within the current worker instance |
 | `session/resume` | Focus or side panel → background | Non-empty `commandId`; non-empty `sessionId` | `{ type, commandId, sessionId }` | `parseSessionCommand` → command bus → `resumeSessionUseCase` | Same normalized command response | Successful change also emits `session/changed` | Yes, within the current worker instance |
 | `session/continue-reward` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId`, `rewardRitualId` | `{ type, commandId, sessionId, rewardRitualId }` | `parseSessionCommand` → command bus → `continueRewardSessionUseCase` | Same normalized command response | Successful change also emits `session/changed` | Yes; exact fingerprints are persisted in Session-level history |
-| `session/restart-phase` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId`, `rewardRitualId` | `{ type, commandId, sessionId, rewardRitualId }` | Exact parser → serialized coordinator → `restartSessionPhaseUseCase` | Same normalized command response | Successful change also emits `session/changed` and reschedules the deadline | Yes; exact fingerprints are persisted in Session-level history |
+| `session/restart-phase` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId`; exact normal `phaseIndex` or Bonus `rewardRitualId` target | `{ type, commandId, sessionId, phaseIndex }` or `{ type, commandId, sessionId, rewardRitualId }` | Exact parser → serialized coordinator → `restartSessionPhaseUseCase` | Same normalized command response | Successful change also emits `session/changed` and reschedules the deadline | Yes; exact targets are persisted in restart history |
+| `session/restart-workflow` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId` | `{ type, commandId, sessionId }` | Exact parser → serialized coordinator → `restartSessionWorkflowUseCase` | Same normalized command response | Successful change emits `session/changed` and schedules Phase 0 | Yes; exact fingerprints are persisted in restart history |
 | `session/roll-reward` / `session/reroll-reward` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId`, `rewardRitualId` | `{ type, commandId, sessionId, rewardRitualId }` | Exact parser → serialized coordinator → authoritative Reward use case with injected randomness | Updated Session projection | Successful change emits `session/changed` | Yes; exact fingerprints survive worker restart and distinct commands are serialized |
 | `session/stop` | Focus or side panel → background | Non-empty `commandId`; non-empty `sessionId` | `{ type, commandId, sessionId }` | `parseSessionCommand` → command bus → `stopSessionUseCase` | Same normalized command response | Successful change also emits `session/changed` | Yes, within the current worker instance |
 | `session/get-active` | Focus or side panel → background | Non-empty `requestId` | `{ type, requestId }` | `parseActiveSessionRequest` → `ChromeMessageBus.onActiveSessionRequest` → `getActiveSessionUseCase` | `{ ok: true, result: Session \| null }` or `{ ok: false, error: string }`; client validates result | No | No; `requestId` identifies the request but is not stored in the command map |
@@ -42,7 +43,9 @@ the background listener.
 - a non-empty `commandId`;
 - exactly `type`, `commandId` and `workflowId` for `session/start`;
 - exactly `type`, `commandId`, `sessionId` and `rewardRitualId` for Reward
-  commands; other Session commands omit `rewardRitualId`;
+  commands;
+- exactly one normal `phaseIndex` or Bonus `rewardRitualId` target for
+  `session/restart-phase`; restart workflow has no target field;
 - a non-empty target identifier.
 
 Extra properties are rejected. This prevents silently accepting a producer and
@@ -66,16 +69,17 @@ or has a non-string failure message. It then passes the successful `result` to
 The background coordinator keeps every pending Promise plus at most 64 settled
 recent commands. It fingerprints the full command, so reusing an ID with another
 type, Session or Reward opportunity is rejected. In addition, Session persists
-a bounded receipt history of `{ commandId, type, rewardRitualId }` for roll,
-reroll, continue and active-Bonus restart across later states. A retained exact Reward fingerprint
-therefore does not execute randomness, persistence or reroll consumption after
-restart; a stale opportunity ID is rejected after its receipt is evicted.
+a bounded Reward receipt history and a separate bounded restart receipt history.
+The latter fingerprints restart type plus normal Phase index or Bonus ritual ID,
+and retains workflow restart receipts even though that operation clears Reward
+history. A retained exact fingerprint therefore does not repeat persistence or
+reset timing after worker restart; collisions reject.
 
 Current scope matters:
 
 - the in-memory map exists only for one worker instance;
-- persisted restart idempotency applies to Reward commands whose receipts remain
-  in the bounded Session history;
+- persisted idempotency applies to Reward and restart commands whose receipts
+  remain in their bounded Session histories;
 - the identifier represents one complete Session command;
 - callers generate a new identifier for a new user intent.
 

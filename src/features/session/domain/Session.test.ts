@@ -9,6 +9,7 @@ import {
   pauseSession,
   rerollSessionReward,
   restartSessionPhase,
+  restartSessionWorkflow,
   restoreSession,
   resumeSession,
   rollSessionReward,
@@ -92,6 +93,169 @@ function acceptedNormalPhase(withBonus: boolean) {
 }
 
 describe('Session', () => {
+  test('restarts a normal Phase and the complete Workflow authoritatively', () => {
+    const phaseOne = deriveSessionState(
+      createSession('restart-session', workflow(), 1_000),
+      13_000,
+    );
+    const restartedPhase = restartSessionPhase(
+      phaseOne,
+      14_000,
+      'restart-phase-1',
+      { type: 'phase', phaseIndex: 1 },
+    );
+
+    expect(restartedPhase).toMatchObject({
+      id: 'restart-session',
+      currentPhaseIndex: 1,
+      status: 'running',
+      phaseStartedAt: 14_000,
+      phaseEndsAt: 19_000,
+      restartCommandReceipts: [
+        {
+          commandId: 'restart-phase-1',
+          type: 'restart-phase',
+          target: { type: 'phase', phaseIndex: 1 },
+        },
+      ],
+    });
+
+    const restartedWorkflow = restartSessionWorkflow(
+      restartedPhase,
+      15_000,
+      'restart-workflow-1',
+    );
+    expect(restartedWorkflow).toMatchObject({
+      id: 'restart-session',
+      currentPhaseIndex: 0,
+      status: 'running',
+      phaseStartedAt: 15_000,
+      phaseEndsAt: 25_000,
+      rewardCommandReceipts: [],
+      restartCommandReceipts: [
+        { commandId: 'restart-phase-1' },
+        { commandId: 'restart-workflow-1', type: 'restart-workflow' },
+      ],
+    });
+  });
+
+  test('restarts a user-paused normal Phase, rejects stale targets and keeps bounded immutable receipts', () => {
+    const paused = pauseSession(
+      createSession('restart-paused', workflow(), 1_000),
+      2_000,
+    );
+    expect(() =>
+      restartSessionPhase(paused, 3_000, 'stale', {
+        type: 'phase',
+        phaseIndex: 1,
+      }),
+    ).toThrow();
+
+    let restarted = restartSessionPhase(paused, 3_000, 'restart-0', {
+      type: 'phase',
+      phaseIndex: 0,
+    });
+    expect(restarted).toMatchObject({
+      status: 'running',
+      phaseStartedAt: 3_000,
+      phaseEndsAt: 13_000,
+    });
+    const pausedAfterRestart = pauseSession(restarted, 4_000);
+    expect(
+      restartSessionPhase(pausedAfterRestart, 5_000, 'restart-0', {
+        type: 'phase',
+        phaseIndex: 0,
+      }),
+    ).toBe(pausedAfterRestart);
+    for (let index = 1; index <= 16; index += 1) {
+      restarted = restartSessionPhase(
+        restarted,
+        3_000 + index,
+        `restart-${String(index)}`,
+        { type: 'phase', phaseIndex: 0 },
+      );
+    }
+    expect(restarted.restartCommandReceipts).toHaveLength(16);
+    expect(restarted.restartCommandReceipts[0]?.commandId).toBe('restart-1');
+    expect(Object.isFrozen(restarted.restartCommandReceipts)).toBe(true);
+    expect(Object.isFrozen(restarted.restartCommandReceipts[0])).toBe(true);
+    const target = restarted.restartCommandReceipts[0];
+    if (target?.type !== 'restart-phase') throw new Error('Expected receipt.');
+    expect(Object.isFrozen(target.target)).toBe(true);
+    expect(
+      restartSessionPhase(restarted, 30_000, 'restart-16', {
+        type: 'phase',
+        phaseIndex: 0,
+      }),
+    ).toBe(restarted);
+    expect(() =>
+      restartSessionWorkflow(restarted, 30_000, 'restart-16'),
+    ).toThrow();
+  });
+
+  test('rejects restart commands outside Running and user-paused states', () => {
+    const initial = createSession('restart-rejected', workflow(), 1_000);
+    const transitioning = deriveSessionState(initial, 11_000);
+    const rewardPaused = deriveSessionState(
+      createSession('restart-reward', bonusWorkflow(), 1_000),
+      12_000,
+    );
+    const stopped = stopSession(initial, 2_000);
+    const completed = deriveSessionState(
+      createSession(
+        'restart-complete',
+        createWorkflow({
+          id: 'complete-workflow',
+          name: 'Complete',
+          phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+        }),
+        1_000,
+      ),
+      3_000,
+    );
+
+    for (const session of [transitioning, rewardPaused, stopped, completed]) {
+      expect(() =>
+        restartSessionPhase(session, 4_000, 'phase-rejected', {
+          type: 'phase',
+          phaseIndex: session.currentPhaseIndex,
+        }),
+      ).toThrow();
+      expect(() =>
+        restartSessionWorkflow(session, 4_000, 'workflow-rejected'),
+      ).toThrow();
+    }
+  });
+
+  test('restarts a paused Bonus Workflow at Phase 0 and clears all Reward progress', () => {
+    const bonus = runningBonus();
+    const paused = pauseSession(bonus, 25_000);
+    const restarted = restartSessionWorkflow(
+      paused,
+      30_000,
+      'restart-bonus-workflow',
+    );
+
+    expect(restarted).toMatchObject({
+      id: paused.id,
+      sourceWorkflowId: paused.sourceWorkflowId,
+      currentPhaseIndex: 0,
+      status: 'running',
+      phaseStartedAt: 30_000,
+      phaseEndsAt: 40_000,
+      rewardCommandReceipts: [],
+      restartCommandReceipts: [
+        {
+          commandId: 'restart-bonus-workflow',
+          type: 'restart-workflow',
+        },
+      ],
+    });
+    expect(restarted.snapshot).toBe(paused.snapshot);
+    expect(restarted).not.toHaveProperty('rewardRitual');
+    expect(restarted).not.toHaveProperty('activeBonusPhase');
+  });
+
   test('starts a non-final Bonus without changing Workflow phase identity', () => {
     const bonus = runningBonus();
 
@@ -150,6 +314,7 @@ describe('Session', () => {
         workflow: paused.snapshot.workflow,
         currentPhaseIndex: paused.currentPhaseIndex,
         rewardCommandReceipts: paused.rewardCommandReceipts,
+        restartCommandReceipts: paused.restartCommandReceipts,
         rewardRitual,
         activeBonusPhase,
         status: 'paused',
@@ -158,16 +323,19 @@ describe('Session', () => {
         remainingMilliseconds: paused.remainingMilliseconds,
       }),
     ).not.toThrow();
-    const restarted = restartSessionPhase(paused, 40_000, 'restart-1');
+    const restarted = restartSessionPhase(paused, 40_000, 'restart-1', {
+      type: 'bonus',
+      rewardRitualId: activeBonusPhase.rewardRitualId,
+    });
     expect(restarted).toMatchObject({
       status: 'running',
       phaseStartedAt: 40_000,
       phaseEndsAt: 70_000,
     });
-    expect(restarted.rewardCommandReceipts.at(-1)).toEqual({
+    expect(restarted.restartCommandReceipts.at(-1)).toEqual({
       commandId: 'restart-1',
-      type: 'restart',
-      rewardRitualId: 'bonus-session:0',
+      type: 'restart-phase',
+      target: { type: 'bonus', rewardRitualId: 'bonus-session:0' },
     });
   });
 
@@ -198,6 +366,7 @@ describe('Session', () => {
         workflow: paused.snapshot.workflow,
         currentPhaseIndex: paused.currentPhaseIndex,
         rewardCommandReceipts: paused.rewardCommandReceipts,
+        restartCommandReceipts: paused.restartCommandReceipts,
         rewardRitual: paused.rewardRitual,
         status: 'paused',
         pauseReason: 'user',
@@ -227,6 +396,7 @@ describe('Session', () => {
       workflow: running.snapshot.workflow,
       currentPhaseIndex: running.currentPhaseIndex,
       rewardCommandReceipts: running.rewardCommandReceipts,
+      restartCommandReceipts: running.restartCommandReceipts,
       rewardRitual: running.rewardRitual,
       activeBonusPhase: running.activeBonusPhase,
     };
@@ -285,6 +455,7 @@ describe('Session', () => {
         workflow: finalBonus.snapshot.workflow,
         currentPhaseIndex: finalBonus.currentPhaseIndex,
         rewardCommandReceipts: finalBonus.rewardCommandReceipts,
+        restartCommandReceipts: finalBonus.restartCommandReceipts,
         rewardRitual: finalRitual,
         status: 'running',
         phaseStartedAt: finalBonus.phaseStartedAt,
@@ -783,6 +954,7 @@ describe('Session', () => {
       workflow: paused.snapshot.workflow,
       currentPhaseIndex: paused.currentPhaseIndex,
       rewardCommandReceipts: paused.rewardCommandReceipts,
+      restartCommandReceipts: paused.restartCommandReceipts,
       rewardRitual,
     };
 
@@ -847,6 +1019,7 @@ describe('Session', () => {
         workflow: paused.snapshot.workflow,
         currentPhaseIndex: paused.currentPhaseIndex,
         rewardCommandReceipts: paused.rewardCommandReceipts,
+        restartCommandReceipts: paused.restartCommandReceipts,
         status: 'paused',
         pauseReason: 'reward',
         pausedAt: paused.pausedAt,

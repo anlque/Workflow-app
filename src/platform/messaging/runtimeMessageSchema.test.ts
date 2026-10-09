@@ -108,9 +108,26 @@ describe('parseSessionCommand', () => {
         type: 'session/restart-phase',
         commandId: 'command-6',
         sessionId: 'session-1',
+        phaseIndex: 2,
+      },
+      'session/restart-phase',
+    ],
+    [
+      {
+        type: 'session/restart-phase',
+        commandId: 'command-6b',
+        sessionId: 'session-1',
         rewardRitualId: 'session-1:0',
       },
       'session/restart-phase',
+    ],
+    [
+      {
+        type: 'session/restart-workflow',
+        commandId: 'command-7',
+        sessionId: 'session-1',
+      },
+      'session/restart-workflow',
     ],
   ] as const)('accepts a valid %s command', (value, expectedType) => {
     expect(parseSessionCommand(value).type).toBe(expectedType);
@@ -127,6 +144,13 @@ describe('parseSessionCommand', () => {
       type: 'session/restart-phase',
       commandId: 'command-1',
       sessionId: 'session-1',
+    },
+    {
+      type: 'session/restart-phase',
+      commandId: 'command-1',
+      sessionId: 'session-1',
+      phaseIndex: 0,
+      rewardRitualId: 'session-1:0',
     },
     {
       type: 'session/stop',

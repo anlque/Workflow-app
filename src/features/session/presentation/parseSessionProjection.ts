@@ -120,6 +120,44 @@ function activeBonusPhase(value: unknown) {
   };
 }
 
+function restartCommandReceipts(value: unknown) {
+  if (!Array.isArray(value)) return invalid();
+  return value.map((entry) => {
+    const receipt = record(entry);
+    if (receipt['type'] === 'restart-workflow') {
+      if (!hasExactKeys(receipt, ['commandId', 'type'])) return invalid();
+      return {
+        commandId: string(receipt['commandId']),
+        type: 'restart-workflow' as const,
+      };
+    }
+    if (
+      receipt['type'] !== 'restart-phase' ||
+      !hasExactKeys(receipt, ['commandId', 'type', 'target'])
+    )
+      return invalid();
+    const input = record(receipt['target']);
+    const target =
+      input['type'] === 'phase' && hasExactKeys(input, ['type', 'phaseIndex'])
+        ? ({
+            type: 'phase' as const,
+            phaseIndex: number(input['phaseIndex']),
+          } as const)
+        : input['type'] === 'bonus' &&
+            hasExactKeys(input, ['type', 'rewardRitualId'])
+          ? ({
+              type: 'bonus' as const,
+              rewardRitualId: string(input['rewardRitualId']),
+            } as const)
+          : invalid();
+    return {
+      commandId: string(receipt['commandId']),
+      type: 'restart-phase' as const,
+      target,
+    };
+  });
+}
+
 function hasExactKeys(
   value: Readonly<Record<string, unknown>>,
   required: readonly string[],
@@ -309,6 +347,7 @@ export function parseSessionProjection(value: unknown): Session | null {
         'snapshot',
         'currentPhaseIndex',
         'rewardCommandReceipts',
+        'restartCommandReceipts',
         'status',
         ...statusKeys,
       ],
@@ -329,6 +368,9 @@ export function parseSessionProjection(value: unknown): Session | null {
     currentPhaseIndex: number(input['currentPhaseIndex']),
     rewardCommandReceipts: rewardCommandReceipts(
       input['rewardCommandReceipts'],
+    ),
+    restartCommandReceipts: restartCommandReceipts(
+      input['restartCommandReceipts'],
     ),
     ...(ritual === undefined ? {} : { rewardRitual: ritual }),
     ...(activeBonus === undefined ? {} : { activeBonusPhase: activeBonus }),

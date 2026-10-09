@@ -78,7 +78,7 @@ Phase index; it is not a timer or random event.
    Bonus duration under the authoritative Session clock while preserving that
    continuation target.
 7. Bonus pause/resume uses the existing Session controls and anchors. A
-   confirmed `session/restart-phase` resets only the active Bonus to its full
+   confirmed Bonus-targeted `session/restart-phase` resets only the active Bonus to its full
    configured duration. Its deadline returns directly to the saved next Phase
    or Completed state and never creates another Reward opportunity.
 

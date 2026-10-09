@@ -67,7 +67,7 @@ describe('ChromeSessionClient', () => {
     });
   });
 
-  test('sends an exact restart-phase command for the active Reward ritual', async () => {
+  test('sends exact restart-phase and restart-workflow commands', async () => {
     const session = createSession(
       'session-1',
       createWorkflow({
@@ -86,13 +86,34 @@ describe('ChromeSessionClient', () => {
     };
     const client = new ChromeSessionClient(runtime, () => 'command-restart');
 
-    await client.restartPhase(createSessionId('session-1'), 'session-1:0');
+    await client.restartPhase(createSessionId('session-1'), {
+      type: 'phase',
+      phaseIndex: 0,
+    });
 
     expect(runtime.sendMessage).toHaveBeenCalledWith({
       type: 'session/restart-phase',
       commandId: 'command-restart',
       sessionId: 'session-1',
+      phaseIndex: 0,
+    });
+
+    await client.restartPhase(createSessionId('session-1'), {
+      type: 'bonus',
       rewardRitualId: 'session-1:0',
+    });
+    expect(runtime.sendMessage).toHaveBeenLastCalledWith({
+      type: 'session/restart-phase',
+      commandId: 'command-restart',
+      sessionId: 'session-1',
+      rewardRitualId: 'session-1:0',
+    });
+
+    await client.restartWorkflow(createSessionId('session-1'));
+    expect(runtime.sendMessage).toHaveBeenLastCalledWith({
+      type: 'session/restart-workflow',
+      commandId: 'command-restart',
+      sessionId: 'session-1',
     });
   });
 });

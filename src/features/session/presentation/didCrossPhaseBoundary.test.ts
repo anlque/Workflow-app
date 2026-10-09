@@ -7,6 +7,8 @@ import {
   createSession,
   pauseSession,
   rollSessionReward,
+  restartSessionPhase,
+  restartSessionWorkflow,
   stopSession,
 } from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
@@ -57,6 +59,25 @@ describe('didCrossPhaseBoundary', () => {
     expect(didCrossPhaseBoundary(initial, stopSession(initial, 1_500))).toBe(
       false,
     );
+  });
+
+  test('does not treat phase or workflow restart as a Phase boundary', () => {
+    const phaseOne = deriveSessionState(
+      createSession('restart-boundary', workflow, 1_000),
+      3_000,
+    );
+    const phaseRestart = restartSessionPhase(phaseOne, 3_500, 'restart-phase', {
+      type: 'phase',
+      phaseIndex: 1,
+    });
+    const workflowRestart = restartSessionWorkflow(
+      phaseRestart,
+      4_000,
+      'restart-workflow',
+    );
+
+    expect(didCrossPhaseBoundary(phaseOne, phaseRestart)).toBe(false);
+    expect(didCrossPhaseBoundary(phaseRestart, workflowRestart)).toBe(false);
   });
 
   test('does not ring again when an observed transition finishes', () => {

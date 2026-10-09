@@ -1,4 +1,4 @@
-import type { Locator } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 import { expect, expireActiveSessionDeadline, test } from './extensionFixture';
 
@@ -17,6 +17,54 @@ async function expectViewportCentered(dialog: Locator): Promise<void> {
   });
   expect(offset.horizontal).toBeLessThan(2);
   expect(offset.vertical).toBeLessThan(2);
+}
+
+async function activeSessionSummary(page: Page) {
+  return page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('locusora');
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        reject(request.error ?? new Error('Opening IndexedDB failed.'));
+      };
+    });
+    const record = await new Promise<{
+      session: {
+        id: string;
+        currentPhaseIndex: number;
+        restartCommandReceipts: unknown[];
+      };
+    }>((resolve, reject) => {
+      const request = database
+        .transaction('sessions', 'readonly')
+        .objectStore('sessions')
+        .index('active')
+        .get(1);
+      request.onsuccess = () => {
+        const result: unknown = request.result;
+        if (typeof result !== 'object' || result === null) {
+          reject(new Error('Active Session record was not found.'));
+          return;
+        }
+        resolve(
+          result as {
+            session: {
+              id: string;
+              currentPhaseIndex: number;
+              restartCommandReceipts: unknown[];
+            };
+          },
+        );
+      };
+      request.onerror = () => {
+        reject(request.error ?? new Error('Reading active Session failed.'));
+      };
+    });
+    database.close();
+    return record.session;
+  });
 }
 
 test('loads every MVP extension surface in an isolated profile', async ({
@@ -724,7 +772,7 @@ test('executes and restores a non-final Bonus Reward Phase authoritatively', asy
   await focus.getByRole('button', { name: 'Resume' }).click();
   await focus.getByRole('button', { name: 'Restart phase' }).click();
   await focus
-    .getByRole('dialog', { name: 'Restart this Bonus Phase?' })
+    .getByRole('dialog', { name: 'Restart this phase?' })
     .getByRole('button', { name: 'Restart phase' })
     .click();
   await expect(focus.getByLabel('Time remaining')).toHaveText(/00:(29|30)/u);
@@ -734,4 +782,51 @@ test('executes and restores a non-final Bonus Reward Phase authoritatively', asy
   await expect(
     focus.getByRole('dialog', { name: 'Reward unlocked' }),
   ).toHaveCount(0);
+});
+
+test('restarts a normal Phase and the Workflow authoritatively across surfaces', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByLabel('Workflow name').fill('Restart journey');
+  await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
+  await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByLabel('Phase 2 type').selectOption('break');
+  await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+
+  const focus = await context.newPage();
+  await focus.goto(extensionUrls.focus);
+  await focus.getByRole('button', { name: 'Start Restart journey' }).click();
+  const original = await activeSessionSummary(focus);
+
+  await expireActiveSessionDeadline(focus);
+  await expireActiveSessionDeadline(focus);
+  await expect(focus.getByText('Break · Phase 2 of 2')).toBeVisible();
+  await focus.getByRole('button', { name: 'Restart phase' }).click();
+  await focus
+    .getByRole('dialog', { name: 'Restart this phase?' })
+    .getByRole('button', { name: 'Restart phase' })
+    .click();
+  await expect(focus.getByLabel('Time remaining')).toHaveText(/00:(29|30)/u);
+
+  const sidePanel = await context.newPage();
+  await sidePanel.goto(extensionUrls.sidePanel);
+  await expect(sidePanel.getByText('Break · Phase 2 of 2')).toBeVisible();
+
+  await focus.getByRole('button', { name: 'Restart workflow' }).click();
+  await focus
+    .getByRole('dialog', { name: 'Restart this workflow?' })
+    .getByRole('button', { name: 'Restart workflow' })
+    .click();
+  await expect(focus.getByText('Focus · Phase 1 of 2')).toBeVisible();
+  await expect(sidePanel.getByText('Focus · Phase 1 of 2')).toBeVisible();
+
+  const restarted = await activeSessionSummary(focus);
+  expect(restarted.id).toBe(original.id);
+  expect(restarted.currentPhaseIndex).toBe(0);
+  expect(restarted.restartCommandReceipts).toHaveLength(2);
 });
