@@ -13,6 +13,7 @@ import { exportSettingsUseCase } from './exportSettingsUseCase';
 import { getSettingsUseCase } from './getSettingsUseCase';
 import { importSettingsUseCase } from './importSettingsUseCase';
 import { updateSettingsUseCase } from './updateSettingsUseCase';
+import type { SettingsPackageV2 } from './SettingsPackage';
 
 class MemorySettingsRepository implements SettingsRepository {
   value: unknown;
@@ -160,18 +161,44 @@ describe('Settings use cases', () => {
   });
 
   test('imports a v2 package with appearance defaults', async () => {
+    const packageV2 = {
+      kind: 'locusora/settings',
+      version: 2,
+      settings: {
+        theme: 'dark',
+        reducedMotion: 'reduce',
+        ambientVolumePercent: 20,
+        ambientMuted: true,
+        cueVolumePercent: 80,
+        cuesMuted: false,
+        muteCuesWithMusic: true,
+      },
+    } satisfies SettingsPackageV2;
     const target = new MemorySettingsRepository();
 
-    await importSettingsUseCase(
-      target,
-      '{"kind":"locusora/settings","version":2,"settings":{"theme":"dark","reducedMotion":"reduce","ambientVolumePercent":20,"ambientMuted":true,"cueVolumePercent":80,"cuesMuted":false,"muteCuesWithMusic":true}}',
-      { maxFileBytes: 1_024 },
-    );
+    await importSettingsUseCase(target, JSON.stringify(packageV2), {
+      maxFileBytes: 1_024,
+    });
 
     expect(target.value).toMatchObject({
       backgroundBlurPx: 0,
       backgroundBrightnessPercent: 100,
     });
+
+    const invalidV2: SettingsPackageV2 = {
+      ...packageV2,
+      settings: {
+        ...packageV2.settings,
+        // @ts-expect-error v3 appearance fields are not part of the v2 wire format.
+        backgroundBlurPx: 0,
+        backgroundBrightnessPercent: 100,
+      },
+    };
+    await expect(
+      importSettingsUseCase(target, JSON.stringify(invalidV2), {
+        maxFileBytes: 1_024,
+      }),
+    ).rejects.toThrow('Settings package is invalid.');
   });
 
   test.each([

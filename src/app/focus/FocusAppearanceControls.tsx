@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Theme } from '@/features/settings';
 
@@ -18,10 +18,43 @@ export function FocusAppearanceControls({
   onUpdate(patch: SettingsPatch): Promise<void>;
 }>) {
   const [error, setError] = useState<string | null>(null);
+  const [blurDraft, setBlurDraft] = useState(preferences.backgroundBlurPx);
+  const [brightnessDraft, setBrightnessDraft] = useState(
+    preferences.backgroundBrightnessPercent,
+  );
+  const committed = useRef({
+    backgroundBlurPx: preferences.backgroundBlurPx,
+    backgroundBrightnessPercent: preferences.backgroundBrightnessPercent,
+  });
+
+  useEffect(() => {
+    setBlurDraft(preferences.backgroundBlurPx);
+    setBrightnessDraft(preferences.backgroundBrightnessPercent);
+    committed.current = {
+      backgroundBlurPx: preferences.backgroundBlurPx,
+      backgroundBrightnessPercent: preferences.backgroundBrightnessPercent,
+    };
+  }, [preferences.backgroundBlurPx, preferences.backgroundBrightnessPercent]);
 
   function update(patch: SettingsPatch): void {
     setError(null);
     void onUpdate(patch).catch((cause: unknown) => {
+      setError(
+        cause instanceof Error ? cause.message : 'Appearance update failed.',
+      );
+    });
+  }
+
+  function commitAppearance(
+    field: 'backgroundBlurPx' | 'backgroundBrightnessPercent',
+    value: number,
+  ): void {
+    const previous = committed.current[field];
+    if (value === previous) return;
+    committed.current = { ...committed.current, [field]: value };
+    setError(null);
+    void onUpdate({ [field]: value }).catch((cause: unknown) => {
+      committed.current = { ...committed.current, [field]: previous };
       setError(
         cause instanceof Error ? cause.message : 'Appearance update failed.',
       );
@@ -55,12 +88,18 @@ export function FocusAppearanceControls({
             min="0"
             max="24"
             step="1"
-            value={preferences.backgroundBlurPx}
+            value={blurDraft}
             onChange={(event) => {
-              update({ backgroundBlurPx: Number(event.currentTarget.value) });
+              setBlurDraft(Number(event.currentTarget.value));
+            }}
+            onPointerUp={() => {
+              commitAppearance('backgroundBlurPx', blurDraft);
+            }}
+            onBlur={() => {
+              commitAppearance('backgroundBlurPx', blurDraft);
             }}
           />
-          <output>{preferences.backgroundBlurPx} px</output>
+          <output>{blurDraft} px</output>
         </label>
         <label>
           <span>Focus brightness</span>
@@ -69,14 +108,18 @@ export function FocusAppearanceControls({
             min="50"
             max="150"
             step="5"
-            value={preferences.backgroundBrightnessPercent}
+            value={brightnessDraft}
             onChange={(event) => {
-              update({
-                backgroundBrightnessPercent: Number(event.currentTarget.value),
-              });
+              setBrightnessDraft(Number(event.currentTarget.value));
+            }}
+            onPointerUp={() => {
+              commitAppearance('backgroundBrightnessPercent', brightnessDraft);
+            }}
+            onBlur={() => {
+              commitAppearance('backgroundBrightnessPercent', brightnessDraft);
             }}
           />
-          <output>{preferences.backgroundBrightnessPercent}%</output>
+          <output>{brightnessDraft}%</output>
         </label>
         {error === null ? null : <p role="alert">{error}</p>}
       </div>

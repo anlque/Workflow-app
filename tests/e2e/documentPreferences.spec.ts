@@ -88,6 +88,21 @@ test('loads before visibility and synchronizes preferences across open documents
     focus.getByRole('slider', { name: /Focus brightness/ }),
   ).toHaveValue('120');
 
+  const focusBlur = focus.getByRole('slider', { name: /Focus blur/ });
+  await focusBlur.fill('14');
+  await focusBlur.press('Tab');
+  const focusBrightness = focus.getByRole('slider', {
+    name: /Focus brightness/,
+  });
+  await focusBrightness.fill('130');
+  await focusBrightness.press('Tab');
+  await expect(
+    options.getByRole('slider', { name: /Background blur/ }),
+  ).toHaveValue('14');
+  await expect(
+    options.getByRole('slider', { name: /Background brightness/ }),
+  ).toHaveValue('130');
+
   await focus.getByRole('slider', { name: 'Music volume' }).fill('37');
   await focus.getByRole('button', { name: 'Mute cues' }).click();
   await expect(
@@ -127,8 +142,8 @@ test('loads before visibility and synchronizes preferences across open documents
         cueVolumePercent: 42,
         cuesMuted: true,
         muteCuesWithMusic: false,
-        backgroundBlurPx: 10,
-        backgroundBrightnessPercent: 120,
+        backgroundBlurPx: 14,
+        backgroundBrightnessPercent: 130,
       },
     });
 

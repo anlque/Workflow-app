@@ -183,6 +183,7 @@ export function SettingsPage({
         <h2 id="settings-title">Settings</h2>
         <p>Choose how Locusora looks, moves and carries your data.</p>
       </header>
+      {status('preferences')}
 
       <fieldset className="settings-group">
         <legend>Appearance</legend>
@@ -275,7 +276,6 @@ export function SettingsPage({
             <output>{brightnessDraft}%</output>
           </label>
         </div>
-        {status('preferences')}
       </fieldset>
 
       <fieldset className="settings-group">

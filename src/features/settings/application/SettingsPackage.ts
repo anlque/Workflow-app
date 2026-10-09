@@ -14,7 +14,17 @@ export type SettingsPackageV1 = Readonly<{
 export type SettingsPackageV2 = Readonly<{
   kind: 'locusora/settings';
   version: 2;
-  settings: Settings;
+  settings: Pick<
+    Settings,
+    | 'theme'
+    | 'reducedMotion'
+    | 'ambientVolumePercent'
+    | 'ambientMuted'
+    | 'cueVolumePercent'
+    | 'cuesMuted'
+    | 'muteCuesWithMusic'
+    | 'lastSelectedWorkflowId'
+  >;
 }>;
 
 export type SettingsPackageV3 = Readonly<{

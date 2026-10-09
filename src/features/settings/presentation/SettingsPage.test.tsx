@@ -154,6 +154,20 @@ describe('SettingsPage', () => {
     expect(screen.getAllByRole('combobox')).toHaveLength(2);
   });
 
+  test('places audio feedback in the neutral preferences status area', async () => {
+    const user = userEvent.setup();
+    setup();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Mute music' }));
+
+    const status = await screen.findByText('Audio preferences updated.');
+    expect(status).toHaveTextContent('Audio preferences updated.');
+    expect(status.parentElement).toHaveClass('settings-page');
+    expect(
+      screen.getByRole('group', { name: 'Appearance' }),
+    ).not.toContainElement(status);
+  });
+
   test('runs separate Workflow and Settings exports with feedback', async () => {
     const user = userEvent.setup();
     const { onExportWorkflow, onExportSettings } = setup();
