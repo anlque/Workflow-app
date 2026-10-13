@@ -243,4 +243,59 @@ describe('ActiveSessionView', () => {
 
     expect(onPhaseBoundary).not.toHaveBeenCalled();
   });
+
+  test('reports a real boundary after the immediate workflow restart update was missed', () => {
+    const bonusWorkflow = createWorkflow({
+      ...workflow,
+      id: 'missed-bonus-restart-cue',
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: '☕',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const rewardPaused = deriveSessionState(
+      createSession('missed-bonus-restart-session', bonusWorkflow, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(rewardPaused, () => 0, 'roll-before-missed-restart'),
+      4_000,
+      'continue-before-missed-restart',
+    );
+    const restarted = restartSessionWorkflow(
+      bonus,
+      5_000,
+      'missed-workflow-restart',
+    );
+    const transitioning = deriveSessionState(restarted, 6_000);
+    const onPhaseBoundary = vi.fn();
+    const { rerender } = render(
+      <ActiveSessionView
+        session={bonus}
+        onPhaseBoundary={onPhaseBoundary}
+        {...actions}
+      />,
+    );
+
+    rerender(
+      <ActiveSessionView
+        session={transitioning}
+        onPhaseBoundary={onPhaseBoundary}
+        {...actions}
+      />,
+    );
+
+    expect(onPhaseBoundary).toHaveBeenCalledOnce();
+  });
 });

@@ -49,6 +49,21 @@ const bonusWorkflow = () =>
     },
   });
 
+function activeBonus() {
+  return continueRewardSession(
+    rollSessionReward(
+      deriveSessionState(
+        createSession('bonus-workflow-restart', bonusWorkflow(), 1_000),
+        12_000,
+      ),
+      () => 0,
+      'roll-before-workflow-restart',
+    ),
+    20_000,
+    'continue-before-workflow-restart',
+  );
+}
+
 describe('didCrossPhaseBoundary', () => {
   test('detects one observed Phase transition', () => {
     const initial = createSession('session-1', workflow, 1_000);
@@ -106,18 +121,7 @@ describe('didCrossPhaseBoundary', () => {
   });
 
   test('does not treat workflow restart from an active Bonus as a Phase boundary', () => {
-    const bonus = continueRewardSession(
-      rollSessionReward(
-        deriveSessionState(
-          createSession('bonus-workflow-restart', bonusWorkflow(), 1_000),
-          12_000,
-        ),
-        () => 0,
-        'roll-before-workflow-restart',
-      ),
-      20_000,
-      'continue-before-workflow-restart',
-    );
+    const bonus = activeBonus();
     const restarted = restartSessionWorkflow(
       bonus,
       21_000,
@@ -125,6 +129,48 @@ describe('didCrossPhaseBoundary', () => {
     );
 
     expect(didCrossPhaseBoundary(bonus, restarted)).toBe(false);
+  });
+
+  test('detects a real boundary when the immediate workflow restart projection was missed', () => {
+    const bonus = activeBonus();
+    const restarted = restartSessionWorkflow(
+      bonus,
+      21_000,
+      'restart-workflow-from-bonus',
+    );
+    const transitioning = deriveSessionState(restarted, 31_000);
+
+    expect(transitioning.status).toBe('transitioning');
+    expect(didCrossPhaseBoundary(bonus, transitioning)).toBe(true);
+  });
+
+  test('does not emit a second boundary after a missed restart projection reached transitioning', () => {
+    const bonus = activeBonus();
+    const restarted = restartSessionWorkflow(
+      bonus,
+      21_000,
+      'restart-workflow-from-bonus',
+    );
+    const transitioning = deriveSessionState(restarted, 31_000);
+    const rewardPaused = deriveSessionState(transitioning, 32_000);
+
+    expect(rewardPaused).toMatchObject({
+      status: 'paused',
+      pauseReason: 'reward',
+    });
+    expect(didCrossPhaseBoundary(transitioning, rewardPaused)).toBe(false);
+  });
+
+  test('suppresses workflow restart received first as a user-paused Phase 0 projection', () => {
+    const bonus = activeBonus();
+    const restarted = restartSessionWorkflow(
+      bonus,
+      21_000,
+      'restart-workflow-from-bonus',
+    );
+    const paused = pauseSession(restarted, 22_000);
+
+    expect(didCrossPhaseBoundary(bonus, paused)).toBe(false);
   });
 
   test('does not ring again when an observed transition finishes', () => {
@@ -217,6 +263,53 @@ describe('didCrossPhaseBoundary', () => {
     const completed = deriveSessionState(bonus, 34_000);
 
     expect(didCrossPhaseBoundary(bonus, completed)).toBe(false);
+    expect(didCrossPhaseBoundary(completed, completed)).toBe(false);
+  });
+
+  test('detects terminal completion after a final Bonus skipped workflow restart projections', () => {
+    const rewarded = createWorkflow({
+      id: 'final-bonus-restart-boundary',
+      name: 'Final Bonus restart boundary',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const firstReward = deriveSessionState(
+      createSession('final-bonus-restart-session', rewarded, 1_000),
+      3_000,
+    );
+    const finalBonus = continueRewardSession(
+      rollSessionReward(firstReward, () => 0, 'first-roll'),
+      4_000,
+      'first-continue',
+    );
+    const restarted = restartSessionWorkflow(
+      finalBonus,
+      5_000,
+      'restart-final-workflow',
+    );
+    const secondReward = deriveSessionState(restarted, 7_000);
+    const completed = continueRewardSession(
+      rollSessionReward(secondReward, () => 0.99, 'second-roll'),
+      8_000,
+      'second-continue',
+    );
+
+    expect(completed.status).toBe('completed');
+    expect(didCrossPhaseBoundary(finalBonus, completed)).toBe(true);
     expect(didCrossPhaseBoundary(completed, completed)).toBe(false);
   });
 
