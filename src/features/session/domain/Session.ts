@@ -362,6 +362,7 @@ export function continueRewardSession(
   commandId: string,
 ): RunningSession | CompletedSession {
   validateEpochMilliseconds(now);
+  validateRewardCommandId(session, commandId);
   if (
     session.status !== 'paused' ||
     session.pauseReason !== 'reward' ||
@@ -549,7 +550,7 @@ export function restartSessionWorkflow(
     sourceWorkflowId: session.sourceWorkflowId,
     snapshot: session.snapshot,
     currentPhaseIndex: 0,
-    rewardCommandReceipts: Object.freeze([]),
+    rewardCommandReceipts: session.rewardCommandReceipts,
     restartCommandReceipts: appendRestartCommandReceipt(
       session.restartCommandReceipts,
       { commandId, type: 'restart-workflow' },
@@ -566,6 +567,7 @@ function selectReward(
   reroll: boolean,
   commandId?: string,
 ): PausedSession {
+  validateRewardCommandId(session, commandId);
   if (
     session.status !== 'paused' ||
     session.pauseReason !== 'reward' ||
@@ -607,6 +609,21 @@ function selectReward(
       rerollsUsed: current.rerollsUsed + (reroll ? 1 : 0),
     }),
   });
+}
+
+function validateRewardCommandId(
+  session: Session,
+  commandId: string | undefined,
+): void {
+  if (commandId === undefined) return;
+  if (
+    commandId.trim() === '' ||
+    session.restartCommandReceipts.some(
+      (receipt) => receipt.commandId === commandId,
+    )
+  ) {
+    throw new SessionTransitionError();
+  }
 }
 
 export function rollSessionReward(

@@ -227,7 +227,7 @@ describe('Session', () => {
     }
   });
 
-  test('restarts a paused Bonus Workflow at Phase 0 and clears all Reward progress', () => {
+  test('restarts a paused Bonus Workflow at Phase 0 and clears user-facing Reward progress', () => {
     const bonus = runningBonus();
     const paused = pauseSession(bonus, 25_000);
     const restarted = restartSessionWorkflow(
@@ -243,7 +243,7 @@ describe('Session', () => {
       status: 'running',
       phaseStartedAt: 30_000,
       phaseEndsAt: 40_000,
-      rewardCommandReceipts: [],
+      rewardCommandReceipts: paused.rewardCommandReceipts,
       restartCommandReceipts: [
         {
           commandId: 'restart-bonus-workflow',
@@ -254,6 +254,24 @@ describe('Session', () => {
     expect(restarted.snapshot).toBe(paused.snapshot);
     expect(restarted).not.toHaveProperty('rewardRitual');
     expect(restarted).not.toHaveProperty('activeBonusPhase');
+  });
+
+  test('rejects Reward commands that reuse an identifier from restart history', () => {
+    const restarted = restartSessionPhase(
+      createSession('shared-command-id', bonusWorkflow(), 1_000),
+      2_000,
+      'restart-owned-id',
+      { type: 'phase', phaseIndex: 0 },
+    );
+    const rewardPaused = deriveSessionState(restarted, 13_000);
+
+    expect(() =>
+      rollSessionReward(rewardPaused, () => 0, 'restart-owned-id'),
+    ).toThrow();
+    const selected = rollSessionReward(rewardPaused, () => 0, 'new-roll-id');
+    expect(() =>
+      continueRewardSession(selected, 14_000, 'restart-owned-id'),
+    ).toThrow();
   });
 
   test('starts a non-final Bonus without changing Workflow phase identity', () => {

@@ -62,7 +62,8 @@ active Bonus ritual ID as a stale-target guard; `session/restart-workflow`
 targets the whole current Session. Domain accepts only Running or user-paused
 state, starts the selected duration from one sampled epoch and persists the
 result plus a bounded receipt in one write. Workflow restart preserves Session
-identity/snapshot, returns to Phase 0 and clears Reward progress. Exact retained
+identity/snapshot, returns to Phase 0, clears user-facing Reward progress and
+retains bounded Reward receipts for durable duplicate protection. Exact retained
 redelivery writes nothing; transition, unresolved Reward and terminal states
 reject. Publication and alarm rescheduling occur only after the authoritative
 operation succeeds.

@@ -233,6 +233,32 @@ function workflow(): Workflow {
   });
 }
 
+function repeatRewardWorkflow(): Workflow {
+  return createWorkflow({
+    id: 'repeat-reward-workflow',
+    name: 'Repeat reward workflow',
+    phases: [
+      { type: 'focus', durationSeconds: 10, environment: {} },
+      { type: 'break', durationSeconds: 5, environment: {} },
+    ],
+    rewardDice: {
+      frequency: 1,
+      sides: [
+        {
+          icon: 'a',
+          title: 'A',
+          bonusPhase: {
+            name: 'Bonus',
+            durationSeconds: 30,
+            environment: {},
+          },
+        },
+        { icon: 'b', title: 'B' },
+      ],
+    },
+  });
+}
+
 function runningBonusSession(final = false): Session {
   const rewarded = createWorkflow({
     id: final ? 'serialized-final-bonus' : 'serialized-bonus',
@@ -513,6 +539,98 @@ describe('createSessionCoordinator', () => {
       workflowRestart,
     );
     expect(save).not.toHaveBeenCalled();
+  });
+
+  test('keeps old Reward receipts authoritative after Workflow restart and coordinator reconstruction', async () => {
+    const value = repeatRewardWorkflow();
+    const sessions = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const messages = new FakeMessageBus();
+    const alarms = new FakeAlarmScheduler();
+    const firstRandom = vi.fn(() => 0);
+    const coordinator = createSessionCoordinator({
+      workflows: workflowRepository(value),
+      sessions,
+      clock,
+      messages,
+      alarms,
+      createSessionId: () => 'repeat-reward-session',
+      workflowResolver: { resolve: (workflow) => Promise.resolve(workflow) },
+      random: firstRandom,
+    });
+    await coordinator.initialize();
+    const started = (await messages.dispatch({
+      type: 'session/start',
+      commandId: 'start-repeat-reward',
+      workflowId: value.id,
+    })) as Session;
+
+    clock.set(12_000);
+    await alarms.fire('locusora.session-phase');
+    const oldRoll = {
+      type: 'session/roll-reward',
+      commandId: 'old-roll',
+      sessionId: started.id,
+      rewardRitualId: `${started.id}:0`,
+    } as const;
+    await messages.dispatch(oldRoll);
+    clock.set(20_000);
+    await messages.dispatch({
+      type: 'session/continue-reward',
+      commandId: 'old-continue',
+      sessionId: started.id,
+      rewardRitualId: `${started.id}:0`,
+    });
+    clock.set(21_000);
+    const restarted = (await messages.dispatch({
+      type: 'session/restart-workflow',
+      commandId: 'restart-after-reward',
+      sessionId: started.id,
+    })) as Session;
+    expect(restarted).toMatchObject({
+      id: started.id,
+      currentPhaseIndex: 0,
+      phaseStartedAt: 21_000,
+      phaseEndsAt: 31_000,
+      rewardCommandReceipts: [
+        { commandId: 'old-roll', type: 'roll' },
+        { commandId: 'old-continue', type: 'continue' },
+      ],
+    });
+    expect(restarted).not.toHaveProperty('rewardRitual');
+    expect(restarted).not.toHaveProperty('activeBonusPhase');
+
+    clock.set(32_000);
+    await alarms.fire('locusora.session-phase');
+    const beforeRetry = await sessions.get(started.id);
+    expect(beforeRetry).toMatchObject({
+      status: 'paused',
+      pauseReason: 'reward',
+      rewardRitual: { id: `${started.id}:0` },
+    });
+
+    const save = vi.spyOn(sessions, 'save');
+    const secondMessages = new FakeMessageBus();
+    const secondRandom = vi.fn(() => 0.75);
+    const secondCoordinator = createSessionCoordinator({
+      workflows: workflowRepository(value),
+      sessions,
+      clock,
+      messages: secondMessages,
+      alarms,
+      createSessionId: () => 'unused',
+      workflowResolver: { resolve: (workflow) => Promise.resolve(workflow) },
+      random: secondRandom,
+    });
+    await secondCoordinator.initialize();
+    save.mockClear();
+
+    await expect(secondMessages.dispatch(oldRoll)).resolves.toEqual(
+      beforeRetry,
+    );
+    expect(secondRandom).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    await expect(sessions.get(started.id)).resolves.toEqual(beforeRetry);
   });
 
   test('does not evict pending commands when the recent cache exceeds its bound', async () => {

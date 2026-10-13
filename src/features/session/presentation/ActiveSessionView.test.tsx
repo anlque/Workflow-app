@@ -3,7 +3,12 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { createWorkflow } from '@/features/workflow';
 
-import { createSession, rollSessionReward } from '../domain/Session';
+import {
+  continueRewardSession,
+  createSession,
+  restartSessionWorkflow,
+  rollSessionReward,
+} from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
 import { ActiveSessionView } from './ActiveSessionView';
 
@@ -183,5 +188,59 @@ describe('ActiveSessionView', () => {
       />,
     );
     expect(screen.getByText('Session complete')).toBeVisible();
+  });
+
+  test('does not report a Phase boundary when restarting the Workflow from Bonus', () => {
+    const bonusWorkflow = createWorkflow({
+      ...workflow,
+      id: 'bonus-restart-cue',
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: '☕',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const rewardPaused = deriveSessionState(
+      createSession('bonus-restart-cue-session', bonusWorkflow, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(rewardPaused, () => 0, 'roll-before-restart'),
+      4_000,
+      'continue-before-restart',
+    );
+    const restarted = restartSessionWorkflow(
+      bonus,
+      5_000,
+      'workflow-restart-from-bonus',
+    );
+    const onPhaseBoundary = vi.fn();
+    const { rerender } = render(
+      <ActiveSessionView
+        session={bonus}
+        onPhaseBoundary={onPhaseBoundary}
+        {...actions}
+      />,
+    );
+
+    rerender(
+      <ActiveSessionView
+        session={restarted}
+        onPhaseBoundary={onPhaseBoundary}
+        {...actions}
+      />,
+    );
+
+    expect(onPhaseBoundary).not.toHaveBeenCalled();
   });
 });

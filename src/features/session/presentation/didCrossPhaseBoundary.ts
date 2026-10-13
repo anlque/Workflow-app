@@ -10,6 +10,14 @@ export function didCrossPhaseBoundary(
     return false;
   }
   if (previous.status === 'transitioning') return false;
+  const restartedWorkflow = current.restartCommandReceipts.some(
+    (receipt) =>
+      receipt.type === 'restart-workflow' &&
+      !previous.restartCommandReceipts.some(
+        (previousReceipt) => previousReceipt.commandId === receipt.commandId,
+      ),
+  );
+  if (restartedWorkflow) return false;
   if (
     previous.activeBonusPhase !== undefined &&
     current.activeBonusPhase === undefined

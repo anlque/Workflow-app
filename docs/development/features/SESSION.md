@@ -163,7 +163,8 @@ target is `complete`, so the Session becomes Completed only after acknowledgment
   accepts a Running or user-paused normal/Bonus Phase, starts it immediately at
   full snapshot duration and preserves prior acknowledged Reward history.
 - Restart workflow preserves Session identity/snapshot, starts Phase 0 at full
-  duration and clears Reward ritual, active Bonus and Reward receipts.
+  duration and clears the Reward ritual, active Bonus, selected reward and
+  reroll state. Bounded Reward receipts remain as technical idempotency history.
 - Transitioning, unresolved Reward and terminal states reject both restarts.
   Bounded restart receipts make retained exact retries no-ops and reject ID
   collisions.
@@ -185,7 +186,7 @@ target is `complete`, so the Session becomes Completed only after acknowledgment
 | `resumeSessionUseCase` | Loads and resumes only user pause | Saves Running Session with new anchors |
 | `continueRewardSessionUseCase` | Loads and continues only Reward pause | Saves Running next Phase with new anchors |
 | `restartSessionPhaseUseCase` | Reconciles once, validates the normal index or Bonus ritual target and resets full duration | Saves once; retained exact retry writes nothing |
-| `restartSessionWorkflowUseCase` | Reconciles once and resets the immutable run to Phase 0 | Saves once with cleared Reward progress and a restart receipt |
+| `restartSessionWorkflowUseCase` | Reconciles once and resets the immutable run to Phase 0 | Saves once with cleared user-facing Reward progress, retained Reward receipts and a restart receipt |
 | `stopSessionUseCase` | Loads, reconciles and stops a valid active state | Saves Stopped history row |
 
 All clock and repository dependencies are explicit. The use cases do not know

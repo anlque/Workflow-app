@@ -34,7 +34,13 @@ async function activeSessionSummary(page: Page) {
       session: {
         id: string;
         currentPhaseIndex: number;
+        status: string;
+        phaseStartedAt?: number;
+        phaseEndsAt?: number;
+        rewardCommandReceipts: unknown[];
         restartCommandReceipts: unknown[];
+        rewardRitual?: unknown;
+        activeBonusPhase?: unknown;
       };
     }>((resolve, reject) => {
       const request = database
@@ -53,7 +59,13 @@ async function activeSessionSummary(page: Page) {
             session: {
               id: string;
               currentPhaseIndex: number;
+              status: string;
+              phaseStartedAt?: number;
+              phaseEndsAt?: number;
+              rewardCommandReceipts: unknown[];
               restartCommandReceipts: unknown[];
+              rewardRitual?: unknown;
+              activeBonusPhase?: unknown;
             };
           },
         );
@@ -796,6 +808,24 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
   await options.getByRole('button', { name: 'Add phase' }).click();
   await options.getByLabel('Phase 2 type').selectOption('break');
   await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
+  await options.getByLabel('Enable Reward Dice').check();
+  for (const side of [1, 2]) {
+    await options
+      .getByLabel(`Reward side ${String(side)} icon`)
+      .fill(side === 1 ? '☕' : '🌿');
+    await options
+      .getByLabel(`Reward side ${String(side)} title`)
+      .fill(`Restart reward ${String(side)}`);
+    await options
+      .getByLabel(`Enable Bonus Phase for side ${String(side)}`)
+      .check();
+    await options
+      .getByLabel(`Side ${String(side)} Bonus Phase name`)
+      .fill('Restart bonus');
+    await options
+      .getByLabel(`Side ${String(side)} Bonus Phase duration in minutes`)
+      .fill('0.5');
+  }
   await options.getByRole('button', { name: 'Save workflow' }).click();
 
   const focus = await context.newPage();
@@ -803,9 +833,6 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
   await focus.getByRole('button', { name: 'Start Restart journey' }).click();
   const original = await activeSessionSummary(focus);
 
-  await expireActiveSessionDeadline(focus);
-  await expireActiveSessionDeadline(focus);
-  await expect(focus.getByText('Break · Phase 2 of 2')).toBeVisible();
   await focus.getByRole('button', { name: 'Restart phase' }).click();
   await focus
     .getByRole('dialog', { name: 'Restart this phase?' })
@@ -813,9 +840,21 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
     .click();
   await expect(focus.getByLabel('Time remaining')).toHaveText(/00:(29|30)/u);
 
+  await expireActiveSessionDeadline(focus);
+  await expireActiveSessionDeadline(focus);
+  await expect(
+    focus.getByRole('dialog', { name: 'Reward unlocked' }),
+  ).toBeVisible();
+  await focus.getByRole('button', { name: 'Roll dice' }).click();
+  await expect(focus.getByRole('button', { name: 'Continue' })).toBeVisible({
+    timeout: 10_000,
+  });
+  await focus.getByRole('button', { name: 'Continue' }).click();
+  await expect(focus.getByText('Bonus · Restart bonus')).toBeVisible();
+
   const sidePanel = await context.newPage();
   await sidePanel.goto(extensionUrls.sidePanel);
-  await expect(sidePanel.getByText('Break · Phase 2 of 2')).toBeVisible();
+  await expect(sidePanel.getByText('Bonus · Restart bonus')).toBeVisible();
 
   await focus.getByRole('button', { name: 'Restart workflow' }).click();
   await focus
@@ -824,9 +863,25 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
     .click();
   await expect(focus.getByText('Focus · Phase 1 of 2')).toBeVisible();
   await expect(sidePanel.getByText('Focus · Phase 1 of 2')).toBeVisible();
+  await expect(focus.getByText('Bonus · Restart bonus')).toHaveCount(0);
+  await expect(sidePanel.getByText('Bonus · Restart bonus')).toHaveCount(0);
+  await expect(
+    focus.getByRole('dialog', { name: 'Reward unlocked' }),
+  ).toHaveCount(0);
+  await expect(focus.getByLabel('Time remaining')).toHaveText(/00:(29|30)/u);
+  await expect(sidePanel.getByLabel('Time remaining')).toHaveText(
+    /00:(29|30)/u,
+  );
 
   const restarted = await activeSessionSummary(focus);
   expect(restarted.id).toBe(original.id);
+  expect(restarted.status).toBe('running');
   expect(restarted.currentPhaseIndex).toBe(0);
+  expect(restarted.rewardCommandReceipts).toHaveLength(2);
   expect(restarted.restartCommandReceipts).toHaveLength(2);
+  expect(restarted.rewardRitual).toBeUndefined();
+  expect(restarted.activeBonusPhase).toBeUndefined();
+  expect((restarted.phaseEndsAt ?? 0) - (restarted.phaseStartedAt ?? 0)).toBe(
+    30_000,
+  );
 });

@@ -7,6 +7,15 @@ export function isDuplicateRewardCommand(
   type: RewardCommandReceipt['type'],
   rewardRitualId: string,
 ): boolean {
+  if (
+    session.restartCommandReceipts.some(
+      (candidate) => candidate.commandId === commandId,
+    )
+  ) {
+    throw new SessionApplicationError(
+      'Reward command identifier conflicts with an earlier command.',
+    );
+  }
   const receipt = session.rewardCommandReceipts.find(
     (candidate) => candidate.commandId === commandId,
   );

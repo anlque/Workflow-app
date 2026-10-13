@@ -70,10 +70,11 @@ The background coordinator keeps every pending Promise plus at most 64 settled
 recent commands. It fingerprints the full command, so reusing an ID with another
 type, Session or Reward opportunity is rejected. In addition, Session persists
 a bounded Reward receipt history and a separate bounded restart receipt history.
-The latter fingerprints restart type plus normal Phase index or Bonus ritual ID,
-and retains workflow restart receipts even though that operation clears Reward
-history. A retained exact fingerprint therefore does not repeat persistence or
-reset timing after worker restart; collisions reject.
+The latter fingerprints restart type plus normal Phase index or Bonus ritual ID.
+Workflow restart retains both bounded receipt histories while clearing only
+user-facing Reward state. Both histories share one command-ID namespace, so a
+retained exact fingerprint does not repeat persistence or reset timing after a
+worker restart, while cross-history collisions reject.
 
 Current scope matters:
 

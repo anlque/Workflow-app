@@ -24,6 +24,31 @@ const workflow = createWorkflow({
   ],
 });
 
+const bonusWorkflow = () =>
+  createWorkflow({
+    id: 'bonus-workflow-restart',
+    name: 'Bonus workflow restart',
+    phases: [
+      { type: 'focus', durationSeconds: 10, environment: {} },
+      { type: 'break', durationSeconds: 5, environment: {} },
+    ],
+    rewardDice: {
+      frequency: 1,
+      sides: [
+        {
+          icon: 'a',
+          title: 'A',
+          bonusPhase: {
+            name: 'Bonus',
+            durationSeconds: 30,
+            environment: {},
+          },
+        },
+        { icon: 'b', title: 'B' },
+      ],
+    },
+  });
+
 describe('didCrossPhaseBoundary', () => {
   test('detects one observed Phase transition', () => {
     const initial = createSession('session-1', workflow, 1_000);
@@ -78,6 +103,28 @@ describe('didCrossPhaseBoundary', () => {
 
     expect(didCrossPhaseBoundary(phaseOne, phaseRestart)).toBe(false);
     expect(didCrossPhaseBoundary(phaseRestart, workflowRestart)).toBe(false);
+  });
+
+  test('does not treat workflow restart from an active Bonus as a Phase boundary', () => {
+    const bonus = continueRewardSession(
+      rollSessionReward(
+        deriveSessionState(
+          createSession('bonus-workflow-restart', bonusWorkflow(), 1_000),
+          12_000,
+        ),
+        () => 0,
+        'roll-before-workflow-restart',
+      ),
+      20_000,
+      'continue-before-workflow-restart',
+    );
+    const restarted = restartSessionWorkflow(
+      bonus,
+      21_000,
+      'restart-workflow-from-bonus',
+    );
+
+    expect(didCrossPhaseBoundary(bonus, restarted)).toBe(false);
   });
 
   test('does not ring again when an observed transition finishes', () => {

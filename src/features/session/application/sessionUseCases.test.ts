@@ -739,4 +739,66 @@ describe('Session use cases', () => {
     ).resolves.toEqual(complete);
     expect(save).not.toHaveBeenCalled();
   });
+
+  test('rejects Reward commands that reuse a restart command ID with zero writes', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'shared-command-namespace',
+      restartBonusWorkflow(),
+    );
+    await restartSessionPhaseUseCase(
+      repository,
+      clock,
+      started.id,
+      'restart-owned-id',
+      { type: 'phase', phaseIndex: 0 },
+    );
+    clock.set(3_000);
+    const rewardPaused = await advanceSessionUseCase(
+      repository,
+      clock,
+      started.id,
+    );
+    const save = vi.spyOn(repository, 'save');
+    const random = vi.fn(() => 0);
+
+    await expect(
+      rollSessionRewardUseCase(
+        repository,
+        started.id,
+        random,
+        false,
+        'restart-owned-id',
+        'shared-command-namespace:0',
+      ),
+    ).rejects.toThrow('Reward command identifier conflicts');
+    expect(random).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    await expect(repository.get(started.id)).resolves.toEqual(rewardPaused);
+
+    await rollSessionRewardUseCase(
+      repository,
+      started.id,
+      () => 0,
+      false,
+      'new-roll-id',
+      'shared-command-namespace:0',
+    );
+    save.mockClear();
+    const selected = await repository.get(started.id);
+    await expect(
+      continueRewardSessionUseCase(
+        repository,
+        clock,
+        started.id,
+        'restart-owned-id',
+        'shared-command-namespace:0',
+      ),
+    ).rejects.toThrow('Reward command identifier conflicts');
+    expect(save).not.toHaveBeenCalled();
+    await expect(repository.get(started.id)).resolves.toEqual(selected);
+  });
 });
