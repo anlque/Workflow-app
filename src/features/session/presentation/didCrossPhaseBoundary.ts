@@ -9,7 +9,6 @@ export function didCrossPhaseBoundary(
   if (previous.status === 'completed' || previous.status === 'stopped') {
     return false;
   }
-  if (previous.status === 'transitioning') return false;
   const hasNewWorkflowRestartReceipt = current.restartCommandReceipts.some(
     (receipt) =>
       receipt.type === 'restart-workflow' &&
@@ -25,14 +24,15 @@ export function didCrossPhaseBoundary(
     current.activeBonusPhase === undefined &&
     hasNewWorkflowRestartReceipt;
   if (isWorkflowRestartProjection) return false;
+  if (hasNewWorkflowRestartReceipt) return true;
+  if (previous.status === 'transitioning') return false;
   if (
     previous.activeBonusPhase !== undefined &&
     current.activeBonusPhase === undefined
   ) {
     const isNaturalFinalBonusCompletion =
       previous.rewardRitual?.continuation.type === 'complete' &&
-      current.status === 'completed' &&
-      !hasNewWorkflowRestartReceipt;
+      current.status === 'completed';
     return !isNaturalFinalBonusCompletion;
   }
   return (

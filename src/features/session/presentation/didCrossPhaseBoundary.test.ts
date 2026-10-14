@@ -173,6 +173,44 @@ describe('didCrossPhaseBoundary', () => {
     expect(didCrossPhaseBoundary(bonus, paused)).toBe(false);
   });
 
+  test('treats a missed workflow restart as a new execution epoch at the same Phase index', () => {
+    const initial = createSession('same-index-restart', workflow, 1_000);
+    const oldPhaseOne = deriveSessionState(initial, 3_000);
+    const restarted = restartSessionWorkflow(
+      oldPhaseOne,
+      4_000,
+      'restart-before-same-index',
+    );
+    const newPhaseOne = deriveSessionState(restarted, 6_000);
+
+    expect(newPhaseOne).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: oldPhaseOne.currentPhaseIndex,
+    });
+    expect(didCrossPhaseBoundary(oldPhaseOne, newPhaseOne)).toBe(true);
+    expect(didCrossPhaseBoundary(newPhaseOne, newPhaseOne)).toBe(false);
+  });
+
+  test('treats a missed workflow restart as a new epoch despite an old transitioning projection', () => {
+    const initial = createSession('transition-restart-epoch', workflow, 1_000);
+    const oldTransitioning = deriveSessionState(initial, 2_000);
+    const oldPhaseOne = deriveSessionState(oldTransitioning, 3_000);
+    const restarted = restartSessionWorkflow(
+      oldPhaseOne,
+      4_000,
+      'restart-after-old-transition',
+    );
+    const newTransitioning = deriveSessionState(restarted, 5_000);
+    const newPhaseOne = deriveSessionState(newTransitioning, 6_000);
+
+    expect(oldTransitioning.status).toBe('transitioning');
+    expect(newTransitioning.status).toBe('transitioning');
+    expect(didCrossPhaseBoundary(oldTransitioning, newTransitioning)).toBe(
+      true,
+    );
+    expect(didCrossPhaseBoundary(newTransitioning, newPhaseOne)).toBe(false);
+  });
+
   test('does not ring again when an observed transition finishes', () => {
     const initial = createSession('session-1', workflow, 1_000);
     const transitioning = deriveSessionState(initial, 2_000);
