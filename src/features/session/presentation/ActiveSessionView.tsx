@@ -9,6 +9,7 @@ import {
 import { didCrossPhaseBoundary } from './didCrossPhaseBoundary';
 import { formatSessionCountdown } from './sessionCountdown';
 import { getActiveSessionSegment } from './getActiveSessionSegment';
+import { Button } from '@/shared';
 
 export type ActiveSessionViewProps = Readonly<{
   session: Session;
@@ -27,6 +28,7 @@ export type ActiveSessionViewProps = Readonly<{
   onRestartPhase?(id: SessionId, target: RestartPhaseTarget): Promise<void>;
   onRestartWorkflow?(id: SessionId): Promise<void>;
   onStop(id: SessionId): Promise<void>;
+  onBackToWorkflows?(): void;
 }>;
 
 const systemNow = (): number => Date.now();
@@ -42,6 +44,7 @@ export function ActiveSessionView({
   onRestartPhase,
   onRestartWorkflow,
   onStop,
+  onBackToWorkflows,
 }: ActiveSessionViewProps) {
   const [displayNow, setDisplayNow] = useState(now);
   const previousSession = useRef(session);
@@ -110,6 +113,11 @@ export function ActiveSessionView({
             ? 'Session complete'
             : 'Session stopped'}
         </p>
+        {onBackToWorkflows === undefined ? null : (
+          <Button variant="primary" onClick={onBackToWorkflows}>
+            Back to workflows
+          </Button>
+        )}
         {rewardResult}
       </section>
     );

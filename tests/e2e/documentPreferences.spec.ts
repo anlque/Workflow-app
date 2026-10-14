@@ -45,7 +45,7 @@ test('loads before visibility and synchronizes preferences across open documents
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
   await focus
-    .getByRole('button', { name: 'Start Preference sync focus' })
+    .getByRole('button', { name: 'Start workflow: Preference sync focus' })
     .click();
   await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
 

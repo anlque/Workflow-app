@@ -114,7 +114,7 @@ try {
   const focus = await context.newPage();
   await focus.goto(`${extensionRoot}/focus.html`);
   await focus
-    .getByRole('button', { name: 'Start Deep writing ritual' })
+    .getByRole('button', { name: 'Start workflow: Deep writing ritual' })
     .click();
   await focus.getByRole('heading', { name: 'Deep writing ritual' }).waitFor();
   await focus.screenshot({

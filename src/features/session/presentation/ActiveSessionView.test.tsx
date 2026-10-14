@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
 import { createWorkflow } from '@/features/workflow';
@@ -8,6 +9,7 @@ import {
   createSession,
   restartSessionWorkflow,
   rollSessionReward,
+  stopSession,
 } from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
 import { ActiveSessionView } from './ActiveSessionView';
@@ -149,6 +151,47 @@ describe('ActiveSessionView', () => {
     ).toBeVisible();
     expect(screen.queryByText('Session complete')).not.toBeInTheDocument();
   });
+
+  test.each([
+    [
+      'completed',
+      deriveSessionState(
+        createSession(
+          'completed-navigation',
+          createWorkflow({
+            id: 'completed-navigation-workflow',
+            name: 'Completed navigation',
+            phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+          }),
+          1_000,
+        ),
+        3_000,
+      ),
+    ],
+    [
+      'stopped',
+      stopSession(createSession('stopped-navigation', workflow, 1_000), 1_500),
+    ],
+  ] as const)(
+    'offers Back to workflows for a %s Session',
+    async (_, session) => {
+      const user = userEvent.setup();
+      const onBackToWorkflows = vi.fn();
+      render(
+        <ActiveSessionView
+          session={session}
+          onBackToWorkflows={onBackToWorkflows}
+          {...actions}
+        />,
+      );
+
+      await user.click(
+        screen.getByRole('button', { name: 'Back to workflows' }),
+      );
+
+      expect(onBackToWorkflows).toHaveBeenCalledOnce();
+    },
+  );
 
   test('renders transitions, reports boundaries and renders terminal state', () => {
     const running = createSession('session-1', workflow, 1_000);

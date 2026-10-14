@@ -137,7 +137,7 @@ export function WorkflowLibrary({
                 {onStart === undefined ? null : (
                   <Button
                     variant="primary"
-                    aria-label={`Start ${workflow.name}`}
+                    aria-label={`Start workflow: ${workflow.name}`}
                     pending={pendingAction === `start:${workflow.id}`}
                     pendingLabel="Starting…"
                     onClick={() =>
@@ -146,7 +146,7 @@ export function WorkflowLibrary({
                       )
                     }
                   >
-                    Start
+                    Start workflow
                   </Button>
                 )}
                 <Button

@@ -14,6 +14,7 @@ import {
   continueRewardSession,
   deriveSessionState,
   rollSessionReward,
+  stopSession,
   type Session,
   type SessionProjectionClient,
 } from '@/features/session';
@@ -117,6 +118,59 @@ function dependencies(
 }
 
 describe('FocusApp', () => {
+  test.each(['completed', 'stopped'] as const)(
+    'returns a %s Session to Workflow selection until a new Session starts',
+    async (status) => {
+      const user = userEvent.setup();
+      const workflow = createWorkflow({
+        id: `terminal-${status}-workflow`,
+        name: `Terminal ${status}`,
+        phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      });
+      const running = createSession(
+        `terminal-${status}-session`,
+        workflow,
+        1_000,
+      );
+      const terminal =
+        status === 'completed'
+          ? deriveSessionState(running, 3_000)
+          : stopSession(running, 1_500);
+      const deps = dependencies(terminal);
+      vi.mocked(deps.listWorkflows).mockResolvedValue([workflow]);
+      let publish: ((session: Session | null) => void) | undefined;
+      vi.mocked(deps.sessions.subscribe).mockImplementation((listener) => {
+        publish = listener;
+        return vi.fn();
+      });
+      render(<FocusApp dependencies={deps} />);
+
+      await user.click(
+        await screen.findByRole('button', { name: 'Back to workflows' }),
+      );
+      expect(
+        await screen.findByRole('button', {
+          name: `Start workflow: ${workflow.name}`,
+        }),
+      ).toBeVisible();
+
+      act(() => {
+        publish?.(terminal);
+      });
+      expect(screen.getByText('Choose a Workflow')).toBeVisible();
+
+      act(() => {
+        publish?.(createSession(`new-${status}-session`, workflow, 4_000));
+      });
+      expect(
+        await screen.findByRole('heading', { name: workflow.name }),
+      ).toBeVisible();
+      expect(
+        screen.queryByRole('button', { name: 'Back to workflows' }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
   test('opens Studio from idle Focus, inerts Focus and restores the trigger', async () => {
     const user = userEvent.setup();
     const deps = dependencies(null);
@@ -297,7 +351,9 @@ describe('FocusApp', () => {
     );
 
     expect(
-      await screen.findByRole('button', { name: 'Start First workflow' }),
+      await screen.findByRole('button', {
+        name: 'Start workflow: First workflow',
+      }),
     ).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Open Workflow Studio' }),
@@ -571,13 +627,15 @@ describe('FocusApp', () => {
       .mockResolvedValueOnce([renamed]);
     render(<FocusApp dependencies={deps} />);
     expect(
-      await screen.findByRole('button', { name: 'Start Deep work' }),
+      await screen.findByRole('button', { name: 'Start workflow: Deep work' }),
     ).toBeVisible();
 
     invalidate?.();
 
     expect(
-      await screen.findByRole('button', { name: 'Start Renamed work' }),
+      await screen.findByRole('button', {
+        name: 'Start workflow: Renamed work',
+      }),
     ).toBeVisible();
   });
 
@@ -610,7 +668,7 @@ describe('FocusApp', () => {
     render(<FocusApp dependencies={deps} />);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Start Deep work' }),
+      await screen.findByRole('button', { name: 'Start workflow: Deep work' }),
     );
 
     expect(deps.sounds.unlock).toHaveBeenCalledOnce();

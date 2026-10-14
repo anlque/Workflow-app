@@ -48,7 +48,9 @@ test('protects Assets referenced by an immutable active Session snapshot', async
 
   const focus = await context.newPage();
   await focus.goto(extensionUrls.focus);
-  await focus.getByRole('button', { name: 'Start Forest focus' }).click();
+  await focus
+    .getByRole('button', { name: 'Start workflow: Forest focus' })
+    .click();
   await expect(
     focus.getByRole('heading', { name: 'Forest focus' }),
   ).toBeVisible();

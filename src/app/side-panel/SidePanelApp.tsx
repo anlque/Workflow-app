@@ -115,10 +115,10 @@ export function SidePanelApp({
     }
   }, [activeSession, hasActiveSession]);
 
-  if (error !== null || (workflows === null && refreshError !== null)) {
+  if (workflows === null && refreshError !== null) {
     return (
       <p className="feedback feedback--error" role="alert">
-        {error ?? refreshError}
+        {refreshError}
       </p>
     );
   }
@@ -155,6 +155,11 @@ export function SidePanelApp({
           {closeError}
         </p>
       )}
+      {error === null ? null : (
+        <p className="feedback feedback--error" role="alert">
+          {error}
+        </p>
+      )}
       {!hasActiveSession || view !== 'session' ? null : (
         <section className="side-panel-session" aria-label="Active session">
           <Button
@@ -183,7 +188,12 @@ export function SidePanelApp({
           <Button
             variant="primary"
             onClick={() => {
-              void dependencies.openFocusView();
+              setError(null);
+              void dependencies.openFocusView().catch((cause: unknown) => {
+                setError(
+                  cause instanceof Error ? cause.message : 'Opening failed.',
+                );
+              });
             }}
           >
             Open focus view
@@ -204,6 +214,7 @@ export function SidePanelApp({
               await reload();
             }}
             onOpen={(id) => {
+              setError(null);
               void dependencies.openWorkflow(id).catch((cause: unknown) => {
                 setError(
                   cause instanceof Error ? cause.message : 'Opening failed.',

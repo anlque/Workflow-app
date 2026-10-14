@@ -25,7 +25,11 @@ describe('FocusLauncher', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Start Deep Work' }));
+    const start = screen.getByRole('button', {
+      name: 'Start workflow: Deep Work',
+    });
+    expect(start).toHaveTextContent(/^Start workflow$/u);
+    await user.click(start);
 
     expect(onStart).toHaveBeenCalledWith(workflow.id);
   });

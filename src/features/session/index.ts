@@ -68,6 +68,7 @@ export {
   getActiveSessionSegment,
   type ActiveSessionSegment,
 } from './presentation/getActiveSessionSegment';
+export { formatSessionCountdown } from './presentation/sessionCountdown';
 export {
   CompactSessionSummary,
   type CompactSessionSummaryProps,

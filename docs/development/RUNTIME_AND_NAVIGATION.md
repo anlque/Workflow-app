@@ -66,7 +66,28 @@ The Options fallback reads that preference while selecting the initial Workflow.
 This is durable selection handoff, not a query-string route.
 
 The Options HTML metadata requests `open_in_tab`; the generated manifest records
-the same behavior under `options_ui`.
+the same behavior under `options_ui`. Its document title is `Locusora Workflow
+Studio`, matching the composition it hosts rather than implying a separate
+Settings application.
+
+## Focus-local Navigation and Document Title
+
+Workflow launch controls use the visible label **Start workflow** on every
+surface. Their accessible names append the Workflow name so multiple launch
+actions remain distinguishable.
+
+Completed and stopped Sessions stay persisted and authoritative. Focus offers
+**Back to workflows**, which only dismisses that terminal projection in the
+current document and reveals the existing Workflow launcher. Repeated delivery
+of the same terminal Session does not undo that local choice; a new Session ID
+automatically restores the active view.
+
+The Focus document title is derived from the current Session projection and its
+authoritative timing anchors. Active Sessions use
+`timer · phase · Locusora`; idle and terminal states use `Locusora focus`.
+Running and transitioning titles tick through one presentation-only interval,
+write to the DOM only when the displayed text changes, and clean up that
+interval with the document view. This title is not a second Session clock.
 
 ## Opening and Closing the Side Panel
 
@@ -127,7 +148,8 @@ different JavaScript bundle. The state belongs to the already loaded document:
   `OptionsApp` hosts the same composition in the manifest options document.
 - The side panel moves to the Session view when a new active Session appears,
   permits returning to the Workflow list, and displays a compact active-Session
-  bar there.
+  bar there. Focus/options navigation failures remain inline and retryable, so
+  neither the Session controls nor the Workflow list is replaced by an error.
 
 Calling these values routes would imply lifecycle, deep-link and history
 contracts that do not exist.
@@ -193,3 +215,6 @@ browser navigation API.
   is the fallback host.
 - [`SidePanelApp.tsx`](../../src/app/side-panel/SidePanelApp.tsx) owns the side
   panel's local view state.
+- [`focusDocumentTitle.ts`](../../src/app/focus/focusDocumentTitle.ts) and
+  [`useFocusDocumentTitle.ts`](../../src/app/focus/useFocusDocumentTitle.ts)
+  derive and maintain the Focus document title without owning Session state.

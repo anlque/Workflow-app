@@ -41,6 +41,7 @@ import { FocusLauncher } from './FocusLauncher';
 import type { UiSoundPlayer } from './createUiSoundPlayer';
 import { useCompletionCue } from './useCompletionCue';
 import { WorkflowStudioOverlay } from './WorkflowStudioOverlay';
+import { useFocusDocumentTitle } from './useFocusDocumentTitle';
 
 const LazyWorkflowStudio = lazy(() => import('./LazyWorkflowStudio'));
 
@@ -124,6 +125,8 @@ export function FocusApp({
   const sidePanel = useSidePanelControl(dependencies);
   const [studioOpen, setStudioOpen] = useState(false);
   const [studioRequested, setStudioRequested] = useState(false);
+  const [dismissedTerminalSessionId, setDismissedTerminalSessionId] =
+    useState<SessionId | null>(null);
   const studioTriggerRef = useRef<HTMLButtonElement | null>(null);
   const studioFallbackRef = useRef<HTMLButtonElement>(null);
 
@@ -184,6 +187,9 @@ export function FocusApp({
   }, [dependencies, store]);
 
   useCompletionCue(projection.session, dependencies.sounds);
+  useFocusDocumentTitle(
+    projection.connection === 'connected' ? projection.session : null,
+  );
 
   useEffect(() => {
     dependencies.sounds.setVolume(effectiveCueVolume(audioSettings()));
@@ -200,7 +206,12 @@ export function FocusApp({
     focusSurface = <p role="status">Connecting to your session…</p>;
   } else if (projection.connection === 'error') {
     focusSurface = <p role="alert">{projection.error}</p>;
-  } else if (projection.session === null) {
+  } else if (
+    projection.session === null ||
+    ((projection.session.status === 'completed' ||
+      projection.session.status === 'stopped') &&
+      dismissedTerminalSessionId === projection.session.id)
+  ) {
     focusSurface = (
       <main className="focus-app focus-app--empty">
         <div className="focus-app__utility-actions">
@@ -370,6 +381,9 @@ export function FocusApp({
             onStop={async (id) => {
               void activateSounds();
               await dependencies.stop(id);
+            }}
+            onBackToWorkflows={() => {
+              setDismissedTerminalSessionId(session.id);
             }}
           />
         </div>

@@ -71,6 +71,33 @@ describe('SidePanelApp', () => {
     expect(deps.openWorkflow).toHaveBeenCalledWith(workflow.id);
   });
 
+  test('keeps Workflow navigation failure inline and allows retry', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'workflow-navigation-retry',
+      name: 'Retry work',
+      phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+    });
+    const deps = dependencies([workflow]);
+    vi.mocked(deps.openWorkflow)
+      .mockRejectedValueOnce(new Error('Workflow Studio unavailable.'))
+      .mockResolvedValueOnce(undefined);
+    render(<SidePanelApp dependencies={deps} />);
+    const open = await screen.findByRole('button', {
+      name: 'Open Retry work',
+    });
+
+    await user.click(open);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Workflow Studio unavailable.',
+    );
+    expect(open).toBeVisible();
+
+    await user.click(open);
+    expect(deps.openWorkflow).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   test('closes the Side Panel through the injected dependency', async () => {
     const user = userEvent.setup();
     const deps = dependencies();
@@ -170,7 +197,7 @@ describe('SidePanelApp', () => {
     render(<SidePanelApp dependencies={deps} />);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Start Deep work' }),
+      await screen.findByRole('button', { name: 'Start workflow: Deep work' }),
     );
     expect(deps.startSession).toHaveBeenCalledWith(workflow.id);
     expect(deps.openFocusView).toHaveBeenCalledOnce();
@@ -195,6 +222,36 @@ describe('SidePanelApp', () => {
       screen.getByRole('button', { name: 'Open focus view' }),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Pause' })).toBeVisible();
+  });
+
+  test('keeps active Session content available when Focus navigation fails and retries', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'focus-navigation-retry',
+      name: 'Focus navigation retry',
+      phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+    });
+    const deps = dependencies(
+      [workflow],
+      createSession('focus-navigation-session', workflow, Date.now()),
+    );
+    vi.mocked(deps.openFocusView)
+      .mockRejectedValueOnce(new Error('Focus unavailable.'))
+      .mockResolvedValueOnce(undefined);
+    render(<SidePanelApp dependencies={deps} />);
+    const openFocus = await screen.findByRole('button', {
+      name: 'Open focus view',
+    });
+
+    await user.click(openFocus);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Focus unavailable.',
+    );
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeVisible();
+
+    await user.click(openFocus);
+    expect(deps.openFocusView).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   test('browses Workflows and returns without changing the active Session', async () => {

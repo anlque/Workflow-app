@@ -57,7 +57,11 @@ describe('WorkflowLibrary', () => {
     const deepWork = workflow('workflow-1', 'Deep work');
     const { onStart } = setup([deepWork]);
 
-    await user.click(screen.getByRole('button', { name: 'Start Deep work' }));
+    const start = screen.getByRole('button', {
+      name: 'Start workflow: Deep work',
+    });
+    expect(start).toHaveTextContent(/^Start workflow$/u);
+    await user.click(start);
     expect(onStart).toHaveBeenCalledWith(deepWork.id);
   });
 

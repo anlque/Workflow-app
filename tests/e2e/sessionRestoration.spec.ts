@@ -29,7 +29,9 @@ async function startWorkflow(
   name: string,
 ): Promise<Page> {
   const focusPagePromise = context.waitForEvent('page');
-  await sidePanel.getByRole('button', { name: `Start ${name}` }).click();
+  await sidePanel
+    .getByRole('button', { name: `Start workflow: ${name}` })
+    .click();
   const focus = await focusPagePromise;
   await focus.waitForLoadState('domcontentloaded');
   return focus;
@@ -140,7 +142,9 @@ test('restores a final Bonus Reward Phase and completes only after its deadline'
   const sidePanel = await context.newPage();
   await sidePanel.goto(extensionUrls.sidePanel);
   await expect(
-    sidePanel.getByRole('button', { name: 'Start Final reward restore' }),
+    sidePanel.getByRole('button', {
+      name: 'Start workflow: Final reward restore',
+    }),
   ).toBeVisible();
   const focus = await startWorkflow(context, sidePanel, 'Final reward restore');
   await expireActiveSessionDeadline(focus);

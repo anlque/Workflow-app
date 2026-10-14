@@ -62,6 +62,7 @@ export function FocusLauncher({
               </div>
               <Button
                 variant="primary"
+                aria-label={`Start workflow: ${workflow.name}`}
                 pending={pendingWorkflowId === workflow.id}
                 pendingLabel="Starting…"
                 disabled={
@@ -70,7 +71,7 @@ export function FocusLauncher({
                 }
                 onClick={() => void onStart(workflow.id)}
               >
-                Start {workflow.name}
+                Start workflow
               </Button>
             </li>
           ))}

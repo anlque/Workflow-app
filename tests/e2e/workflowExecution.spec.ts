@@ -85,7 +85,7 @@ test('loads every MVP extension surface in an isolated profile', async ({
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await expect(options).toHaveTitle('Locusora settings');
+  await expect(options).toHaveTitle('Locusora Workflow Studio');
   await expect(
     options.getByRole('heading', { name: 'Locusora' }),
   ).toBeVisible();
@@ -331,7 +331,9 @@ test('embeds Workflow Studio over idle and active Focus without navigation', asy
   await expect(
     focus.getByRole('button', { name: 'Open Workflow Studio' }),
   ).toBeFocused();
-  await focus.getByRole('button', { name: 'Start Embedded focus' }).click();
+  await focus
+    .getByRole('button', { name: 'Start workflow: Embedded focus' })
+    .click();
   await expect(
     focus.getByRole('heading', { name: 'Embedded focus' }),
   ).toBeVisible();
@@ -412,9 +414,14 @@ test('creates and controls a Workflow across extension contexts', async ({
 
   const focus = await context.newPage();
   await focus.goto(extensionUrls.focus);
-  await focus.getByRole('button', { name: 'Start E2E focus' }).click();
+  await focus
+    .getByRole('button', { name: 'Start workflow: E2E focus' })
+    .click();
 
   await expect(focus.getByRole('heading', { name: 'E2E focus' })).toBeVisible();
+  await expect(focus).toHaveTitle(
+    /^\d{2}:\d{2} · Focus · Phase 1 of 1 · Locusora$/u,
+  );
   const sidePanel = await context.newPage();
   await sidePanel.goto(extensionUrls.sidePanel);
   await sidePanel.getByRole('button', { name: 'Back to workflows' }).click();
@@ -438,6 +445,17 @@ test('creates and controls a Workflow across extension contexts', async ({
   );
   await focus.getByRole('button', { name: 'Stop session' }).click();
   await expect(focus.getByText('Session stopped')).toBeVisible();
+  await expect(focus).toHaveTitle('Locusora focus');
+  await focus.getByRole('button', { name: 'Back to workflows' }).click();
+  const restart = focus.getByRole('button', {
+    name: 'Start workflow: E2E focus',
+  });
+  await expect(restart).toBeVisible();
+  await restart.click();
+  await expect(focus.getByRole('heading', { name: 'E2E focus' })).toBeVisible();
+  await expect(focus).toHaveTitle(
+    /^\d{2}:\d{2} · Focus · Phase 1 of 1 · Locusora$/u,
+  );
 });
 
 test('persists a six-phase custom Reward schedule by phase marker', async ({
@@ -576,7 +594,9 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
 
   const focus = await context.newPage();
   await focus.goto(extensionUrls.focus);
-  await focus.getByRole('button', { name: 'Start Rewarded focus' }).click();
+  await focus
+    .getByRole('button', { name: 'Start workflow: Rewarded focus' })
+    .click();
   await expect(
     focus.getByRole('heading', { name: 'Rewarded focus' }),
   ).toBeVisible();
@@ -759,7 +779,7 @@ test('executes and restores a non-final Bonus Reward Phase authoritatively', asy
   const focus = await context.newPage();
   await focus.goto(extensionUrls.focus);
   await focus
-    .getByRole('button', { name: 'Start Bonus Reward journey' })
+    .getByRole('button', { name: 'Start workflow: Bonus Reward journey' })
     .click();
   await expireActiveSessionDeadline(focus);
   await expect(
@@ -830,7 +850,9 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
 
   const focus = await context.newPage();
   await focus.goto(extensionUrls.focus);
-  await focus.getByRole('button', { name: 'Start Restart journey' }).click();
+  await focus
+    .getByRole('button', { name: 'Start workflow: Restart journey' })
+    .click();
   const original = await activeSessionSummary(focus);
 
   await focus.getByRole('button', { name: 'Restart phase' }).click();
