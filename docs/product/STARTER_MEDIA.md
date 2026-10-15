@@ -29,12 +29,24 @@ bytes.
 
 ## Background Provenance and Composition
 
-The five sources were generated specifically for Locusora with OpenAI's
-built-in image generation on 2026-10-14 under the account's applicable terms.
-They do not incorporate a selected third-party stock asset. Generation is not a
-claim of exclusive rights or legal clearance.
+The five sources were generated specifically for Locusora on 2026-10-14 with
+OpenAI's built-in `image_gen` tool. The tool did not expose its backing model or
+model revision, so no more specific model identifier can be verified. The
+applicable published terms were checked on 2026-10-15: the
+[OpenAI Terms of Use](https://openai.com/policies/terms-of-use/) and
+[Service Terms](https://openai.com/policies/service-terms/). They do not
+incorporate a selected third-party stock asset. Generation is not a claim of
+exclusive rights or legal clearance.
 
-| Name | Prompt direction | Original PNG | Source SHA-256 |
+The exact submitted prompt strings were not retained. The table therefore
+records only the contemporaneous prompt directions that survived in the work
+log; they are not reconstructed exact prompts. The original generator PNGs were
+not retained after export. Their dimensions, byte sizes and SHA-256 values were
+captured while they were available. Resized 2560×1600 PNG intermediates may
+still exist under `/private/tmp/locusora-seed-images/`, but this temporary
+directory is not durable provenance and those files are not the originals.
+
+| Name | Preserved prompt direction | Original PNG | Source SHA-256 |
 | --- | --- | --- | --- |
 | Mosswood Canopy | Ancient moss forest, emerald diffused light, quiet central clearing | 1672×941, 3,002,884 bytes | `f6d7ea1a14349afbea4d95e4dd7c8b703aa86c428e408b41da5f98f503927e31` |
 | Rainlit Window | Rain-streaked window, blue-green garden, muted amber reflections | 1672×941, 2,519,007 bytes | `694b550aa73c48651f6ea2272fb53f1485c52efb3d0ebe32717e5596f038a54d` |
@@ -45,11 +57,15 @@ claim of exclusive rights or legal clearance.
 Every prompt prohibited people, text, logos, watermarks and central focal
 objects. The meaningful safe zone is normalized `x = 0.40–0.60`,
 `y = 0.12–0.88`. Centered `cover` crops were checked at 1600×700, 1024×768
-and 390×844; product-owner visual approval remains the completion checkpoint.
+and 390×844. On 2026-10-15 the product owner approved all five backgrounds in
+the wide, 4:3 and portrait crops.
 
 ### Background export
 
-The production render used ImageMagick 7 and `cwebp`. For each source:
+The production render used `/opt/homebrew/bin/magick` from ImageMagick
+**7.1.2-27** and `/opt/homebrew/bin/cwebp` **1.6.0**. The installed binaries
+predate the 2026-10-14 exports and are the binaries invoked by the recorded
+commands. For each source:
 
 ```sh
 magick SOURCE.png -auto-orient -gravity center -resize '2560x1600^' \
@@ -60,6 +76,28 @@ cwebp -quiet -q QUALITY -m 6 -metadata none \
 ```
 
 `QUALITY` is 66 for Mosswood Canopy and 68 for the other four exports.
+
+The exact upstream versions can be obtained reproducibly from their release
+archives. Verify the archives before following their included build
+instructions; this reproduces the tool versions, not a bit-identical Homebrew
+bottle:
+
+```sh
+mkdir -p /private/tmp/locusora-image-tools
+cd /private/tmp/locusora-image-tools
+
+curl -L \
+  https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0.tar.gz \
+  -o libwebp-1.6.0.tar.gz
+echo 'e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564  libwebp-1.6.0.tar.gz' \
+  | shasum -a 256 -c -
+
+curl -L \
+  https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-27/ImageMagick-7.1.2-27.7z \
+  -o ImageMagick-7.1.2-27.7z
+echo 'dcfbdd8294b3ad6d07fc0edaa2c2071ffa6085b1207b525929b70ffb067300ae  ImageMagick-7.1.2-27.7z' \
+  | shasum -a 256 -c -
+```
 
 ## Audio Provenance and License
 
@@ -107,8 +145,9 @@ FILTER='[0:a]aformat=sample_rates=48000:channel_layouts=stereo,asplit=3[a][b][c]
 
 The output begins and ends at the same source-time boundary: source seconds
 1–30 form the body, while seconds 30–31 crossfade into seconds 0–1. Manual
-listening over at least five repetitions on speakers and headphones remains
-required before SEED-002 completion.
+listening was completed on 2026-10-15: the product owner listened to each of the
+three loops for at least five repetitions on speakers and headphones and
+confirmed that no audible seam, click, pause or level jump was present.
 
 ## Build Accounting
 
