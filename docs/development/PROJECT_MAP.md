@@ -34,6 +34,7 @@ reusable image and audio Asset records and behavior.
 | [`src/app/closeSidePanel.ts`](../../src/app/closeSidePanel.ts) | Side Panel browser integration | Side-panel open, close and state subscription helpers | WXT/browser APIs | Keeps Chrome lifecycle calls behind one injected application boundary |
 | [`src/app/useSidePanelControl.ts`](../../src/app/useSidePanelControl.ts) | Cross-surface Side Panel presentation | Optimistic open/close state, single-flight toggle, lifecycle authority, recoverable error and cleanup | React and injected Side Panel functions | Gives Focus and Workflow Studio identical behavior without importing browser APIs into presentation |
 | [`src/app/runWorkflowCatalogMutation.ts`](../../src/app/runWorkflowCatalogMutation.ts) | Catalog mutation composition | Success-only Workflow catalog invalidation wrapper | Workflow catalog event port | Ensures Options and side-panel mutations publish the same invalidation behavior |
+| [`src/app/seeds/`](../../src/app/seeds/) | Starter catalog definitions | Typed, immutable, data-only background and ambient-loop definitions | Assets public types only | Supplies SEED-001 with an offline catalog without performing persistence or runtime seeding |
 
 Files in `src/app/` are composition code. Lower modules must not import them.
 The shared Workflow Studio may use generic app-owned contracts but must not
@@ -140,6 +141,7 @@ preferences stored outside IndexedDB.
 | [`public/brand/`](../../public/brand/) | Extension identity resources | Manifest PNGs, favicon and public SVGs | Supplies stable files copied into every WXT build |
 | [`assets/reward-dice/source/`](../../assets/reward-dice/source/) | Product-owner media source | Approved Reward Dice render and final-frame reference | Keeps reviewable source media outside the runtime bundle |
 | [`public/video/`](../../public/video/) | Packaged Reward media | Optimized deterministic dice WebM and PNG fallback | Supplies offline runtime media copied into every WXT build; playback integration belongs to RW-006 |
+| [`public/seed/`](../../public/seed/) | Packaged starter media | Five optimized WebP backgrounds and three seamless Ogg Opus ambient loops | Supplies offline files described by the data-only seed catalog; first-run persistence belongs to SEED-001 |
 | [`store-assets/`](../../store-assets/) | Chrome Web Store artwork | Store icon, small promo tile and real extension screenshots | Keeps submission assets versioned and reviewable outside the runtime bundle |
 | [`scripts/brand/`](../../scripts/brand/) | Brand toolchain | Deterministic export, screenshot capture and media verification | Reproduces every raster asset from approved sources and real extension states |
 | [`tests/architecture/`](../../tests/architecture/) | Architecture verification | Source import scan | Provides a second executable check of dependency direction |
@@ -148,6 +150,7 @@ preferences stored outside IndexedDB.
 | [`docs/adr/`](../adr/) | Decision history | Accepted architecture decisions and index | Records why stable choices were made |
 | [`docs/product/BRAND_ASSETS.md`](../product/BRAND_ASSETS.md) | Brand provenance | Asset inventory, rights, export procedure and current Store evidence | Makes production artwork reproducible and attributable |
 | [`docs/product/REWARD_DICE_MEDIA.md`](../product/REWARD_DICE_MEDIA.md) | Reward Dice media provenance | Source/runtime metadata, export procedure, hashes and overlay geometry | Keeps deterministic animation exports and the RW-006 alignment contract reproducible |
+| [`docs/product/STARTER_MEDIA.md`](../product/STARTER_MEDIA.md) | Starter media provenance | Generated/licensed sources, transformations, metadata, hashes, safe zones and package budget | Keeps SEED-002 exports auditable without coupling them to first-run seeding |
 
 Generated `.wxt/`, `.output/`, `coverage/`, `test-results/` and
 `node_modules/` directories are not source owners. Do not edit or document their
