@@ -52,6 +52,13 @@ Source root: [`src/features/workflow/`](../../../src/features/workflow/).
 The Workflow Library is the ordered repository-backed collection of local
 Workflows. It is not a separately persisted Entity or aggregate.
 
+Starter-content version 2 creates Quick Focus, Balanced Flow and Reward Journey
+through the same `CreateWorkflowInput` constructor and repository used by user
+Workflows. Their Environments follow version-1 starter Asset Roles. The records
+have no protected/template state: edit, reorder, duplicate, export and delete
+behavior is identical to every other local Workflow, and completed seeding never
+restores a changed or deleted example.
+
 ## Public API
 
 External consumers import behavior/data from `@/features/workflow`. The

@@ -6,18 +6,24 @@ import { loadPackagedSeedFile } from './loadPackagedSeedFile';
 import { starterContentSeeds } from './starterContentSeeds';
 
 describe('starterContentSeeds', () => {
-  test('defines one immutable Asset-only version with deterministic namespaced IDs', () => {
-    expect(starterContentSeeds).toHaveLength(1);
-    const version = starterContentSeeds[0];
-    if (version === undefined) throw new Error('Seed version missing.');
-    expect(version.version).toBe(1);
-    expect(version.assets).toHaveLength(8);
-    expect(version.workflows).toEqual([]);
+  test('defines unique immutable Asset-only v1 and Workflow-only v2 batches', () => {
+    expect(starterContentSeeds.map(({ version }) => version)).toEqual([1, 2]);
+    const assetVersion = starterContentSeeds[0];
+    const workflowVersion = starterContentSeeds[1];
+    if (assetVersion === undefined || workflowVersion === undefined) {
+      throw new Error('Seed version missing.');
+    }
+    expect(assetVersion.assets).toHaveLength(8);
+    expect(assetVersion.workflows).toEqual([]);
+    expect(workflowVersion.assets).toEqual([]);
+    expect(workflowVersion.workflows).toHaveLength(3);
     expect(Object.isFrozen(starterContentSeeds)).toBe(true);
-    expect(Object.isFrozen(version)).toBe(true);
-    expect(Object.isFrozen(version.assets)).toBe(true);
+    expect(Object.isFrozen(assetVersion)).toBe(true);
+    expect(Object.isFrozen(assetVersion.assets)).toBe(true);
+    expect(Object.isFrozen(workflowVersion)).toBe(true);
+    expect(Object.isFrozen(workflowVersion.workflows)).toBe(true);
 
-    expect(version.assets.map(({ id }) => id)).toEqual([
+    expect(assetVersion.assets.map(({ id }) => id)).toEqual([
       'locusora:seed:v1:asset:background-mosswood-canopy',
       'locusora:seed:v1:asset:background-rainlit-window',
       'locusora:seed:v1:asset:background-deep-tide',
@@ -29,7 +35,9 @@ describe('starterContentSeeds', () => {
     ]);
     expect(
       new Set(
-        version.assets.map(({ role }) => assetRoleKey(createAssetRole(role))),
+        assetVersion.assets.map(({ role }) =>
+          assetRoleKey(createAssetRole(role)),
+        ),
       ).size,
     ).toBe(8);
   });

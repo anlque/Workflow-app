@@ -4,6 +4,7 @@ import type {
 } from '@/features/starter-content';
 
 import { starterAssetSeeds } from './starterAssetSeeds';
+import { starterWorkflowSeeds } from './starterWorkflowSeeds';
 
 const assets: readonly PackagedAssetSeed[] = Object.freeze(
   starterAssetSeeds.map((asset) =>
@@ -20,5 +21,10 @@ export const starterContentSeeds: readonly StarterContentSeedVersion[] =
       version: 1,
       assets,
       workflows: Object.freeze([]),
+    }),
+    Object.freeze({
+      version: 2,
+      assets: Object.freeze([]),
+      workflows: starterWorkflowSeeds,
     }),
   ]);

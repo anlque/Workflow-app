@@ -77,7 +77,7 @@ test('Asset Role dialog has no detectable axe violations', async ({
     options.getByRole('listitem', { name: 'Image: role-image.png' }),
   ).toContainText('Role: Backdrop');
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await expect(
     options.getByRole('option', { name: 'Backdrop — role-image.png' }),
   ).toHaveCount(1);

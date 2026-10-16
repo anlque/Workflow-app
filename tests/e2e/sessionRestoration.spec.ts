@@ -12,7 +12,7 @@ async function createWorkflow(
   name: string,
   durationMinutes: number,
 ): Promise<void> {
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill(name);
   await options
     .getByLabel('Phase 1 duration in minutes')
@@ -116,7 +116,7 @@ test('restores a final Bonus Reward Phase and completes only after its deadline'
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Final reward restore');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByLabel('Enable Reward Dice').check();

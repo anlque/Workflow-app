@@ -29,7 +29,7 @@ test('protects Assets referenced by an immutable active Session snapshot', async
   await expect(options.getByAltText('Preview of forest.png')).toBeVisible();
 
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Forest focus');
   await options.getByLabel('Background image').selectOption({
     label: 'forest.png',
@@ -117,7 +117,7 @@ test('creates, follows and explicitly moves an Asset Role', async ({
 
   await options.getByRole('tab', { name: 'Workflows' }).focus();
   await options.keyboard.press('Enter');
-  await options.getByRole('button', { name: 'Create workflow' }).focus();
+  await options.getByRole('button', { name: 'New workflow' }).focus();
   await options.keyboard.press('Enter');
   await options.getByLabel('Workflow name').focus();
   await options.keyboard.type('Role focus');
@@ -135,6 +135,7 @@ test('creates, follows and explicitly moves an Asset Role', async ({
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
 
   await options.reload();
+  await options.getByRole('button', { name: 'Open Role focus' }).click();
   await expect(options.getByLabel('Background image').nth(0)).toHaveValue(
     'role:hero scene',
   );
@@ -189,7 +190,7 @@ test('retires an Asset by replacing direct Workflow references', async ({
     });
   }
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Replacement focus');
   await options
     .getByLabel('Background image')
@@ -228,7 +229,7 @@ test('retires an Asset with an uploaded replacement', async ({
     buffer: onePixelPng,
   });
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Uploaded replacement');
   await options
     .getByLabel('Background image')

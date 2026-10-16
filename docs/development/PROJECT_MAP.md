@@ -34,7 +34,7 @@ reusable image and audio Asset records and behavior.
 | [`src/app/closeSidePanel.ts`](../../src/app/closeSidePanel.ts) | Side Panel browser integration | Side-panel open, close and state subscription helpers | WXT/browser APIs | Keeps Chrome lifecycle calls behind one injected application boundary |
 | [`src/app/useSidePanelControl.ts`](../../src/app/useSidePanelControl.ts) | Cross-surface Side Panel presentation | Optimistic open/close state, single-flight toggle, lifecycle authority, recoverable error and cleanup | React and injected Side Panel functions | Gives Focus and Workflow Studio identical behavior without importing browser APIs into presentation |
 | [`src/app/runWorkflowCatalogMutation.ts`](../../src/app/runWorkflowCatalogMutation.ts) | Catalog mutation composition | Success-only Workflow catalog invalidation wrapper | Workflow catalog event port | Ensures Options and side-panel mutations publish the same invalidation behavior |
-| [`src/app/seeds/`](../../src/app/seeds/) | Starter catalog composition | Typed immutable definitions, deterministic versioned IDs and packaged-file browser adapter | Starter-content and Assets public types plus WXT/browser only in the loader | Maps the offline SEED-002 catalog into production seed version 1 without owning persistence |
+| [`src/app/seeds/`](../../src/app/seeds/) | Starter catalog composition | Typed immutable Asset and Workflow definitions, deterministic versioned IDs and packaged-file browser adapter | Starter-content, Assets and Workflow public types plus WXT/browser only in the loader | Maps the offline catalog into independent production content versions without owning persistence |
 | [`src/app/databaseSchemas.ts`](../../src/app/databaseSchemas.ts) | Production database composition | One cumulative schema set and database factory | Feature-owned schema fragments and storage platform | Ensures background, Focus, Options and Side Panel all open global Dexie versions 1–5 identically |
 
 Files in `src/app/` are composition code. Lower modules must not import them.
@@ -64,8 +64,9 @@ Consumers outside a feature import from its root, for example
 versioned Application orchestration, narrow file/registry/unit-of-work ports,
 global Dexie version-5 marker fragment and atomic adapter spanning Assets,
 Workflows and completion markers. Its Application layer has no browser or Dexie
-dependency. Production version 1 contains only starter Assets; future example
-Workflows use an independent version instead of changing the completed marker.
+dependency. Production version 1 contains only starter Assets; version 2
+contains the three ordinary example Workflows and cannot be suppressed by the
+completed version-1 marker.
 
 ## Workflow Feature
 
@@ -161,6 +162,7 @@ preferences stored outside IndexedDB.
 | [`docs/product/BRAND_ASSETS.md`](../product/BRAND_ASSETS.md) | Brand provenance | Asset inventory, rights, export procedure and current Store evidence | Makes production artwork reproducible and attributable |
 | [`docs/product/REWARD_DICE_MEDIA.md`](../product/REWARD_DICE_MEDIA.md) | Reward Dice media provenance | Source/runtime metadata, export procedure, hashes and overlay geometry | Keeps deterministic animation exports and the RW-006 alignment contract reproducible |
 | [`docs/product/STARTER_MEDIA.md`](../product/STARTER_MEDIA.md) | Starter media provenance | Generated/licensed sources, transformations, metadata, hashes, safe zones and package budget | Keeps SEED-002 exports auditable without coupling them to first-run seeding |
+| [`docs/product/STARTER_WORKFLOWS.md`](../product/STARTER_WORKFLOWS.md) | Starter Workflow catalog | Purpose and ordinary local-copy lifecycle of the three version-2 examples | Documents bounded onboarding copy without adding description fields to Workflow persistence |
 
 Generated `.wxt/`, `.output/`, `coverage/`, `test-results/` and
 `node_modules/` directories are not source owners. Do not edit or document their

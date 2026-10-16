@@ -111,7 +111,7 @@ test('names, duplicates and locally collapses Workflow Phases', async ({
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Structured focus');
   await options.getByLabel('Phase 1 name').fill('Writing');
   await options.getByRole('button', { name: 'Duplicate Phase 1' }).click();
@@ -156,7 +156,7 @@ test('reorders Phases by pointer and keyboard while preserving a custom Reward m
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Reordered phases');
   await options.getByLabel('Phase 1 name').fill('One');
   await options.getByRole('button', { name: 'Add phase' }).click();
@@ -229,7 +229,7 @@ test('uploads and selects a Phase Asset without losing the Workflow draft', asyn
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Existing workflow');
   await options.getByLabel('Phase 1 name').fill('Existing phase');
   await options.getByRole('button', { name: 'Save workflow' }).click();
@@ -294,7 +294,7 @@ test('embeds Workflow Studio over idle and active Focus without navigation', asy
   expect(loadedStudioChunks()).toEqual([]);
 
   const initialPages = context.pages().length;
-  await focus.getByRole('button', { name: 'Create a Workflow' }).click();
+  await focus.getByRole('button', { name: 'Open Workflow Studio' }).click();
   const overlay = focus.getByRole('region', { name: 'Workflow Studio' });
   await expect(overlay).toBeVisible();
   await expect
@@ -313,7 +313,7 @@ test('embeds Workflow Studio over idle and active Focus without navigation', asy
   expect(context.pages()).toHaveLength(initialPages);
   await expect(focus).toHaveURL(extensionUrls.focus);
 
-  await focus.getByRole('button', { name: 'Create workflow' }).click();
+  await focus.getByRole('button', { name: 'New workflow' }).click();
   await focus.getByLabel('Workflow name').fill('Embedded focus');
   await focus.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await focus.getByRole('button', { name: 'Save workflow' }).click();
@@ -373,12 +373,12 @@ test('synchronizes an open Workflow Library after Options changes', async ({
   const sidePanel = await context.newPage();
   await sidePanel.goto(extensionUrls.sidePanel);
   await expect(
-    sidePanel.getByText('Build your first focus rhythm.'),
+    sidePanel.getByRole('button', { name: 'Open Quick Focus' }),
   ).toBeVisible();
 
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Synced focus');
   await options.getByRole('button', { name: 'Save workflow' }).click();
 
@@ -403,7 +403,7 @@ test('creates and controls a Workflow across extension contexts', async ({
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('E2E focus');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Save workflow' }).click();
@@ -482,7 +482,7 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
   await options.getByRole('button', { name: 'Review role' }).click();
   await options.getByRole('button', { name: 'Assign role' }).click();
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Custom rewards');
   for (let index = 0; index < 5; index += 1) {
     await options.getByRole('button', { name: 'Add phase' }).click();
@@ -572,7 +572,7 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
   ).toBeVisible();
 
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Rewarded focus');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();
@@ -749,7 +749,7 @@ test('executes and restores a non-final Bonus Reward Phase authoritatively', asy
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Bonus Reward journey');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();
@@ -822,7 +822,7 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Restart journey');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();

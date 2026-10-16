@@ -300,8 +300,8 @@ Workflow before opening a transaction. Inside one `assets` + `workflows` +
 deterministic IDs or normalized Roles, inserts without merging and adds the
 marker last. Any failure rolls back the complete version. A completed marker
 makes later runs a no-op, so user-deleted starter records are not restored.
-Production version 1 owns the eight approved starter Assets; SEED-003 will add
-example Workflows as independent version 2.
+Production version 1 owns the eight approved starter Assets; version 2 owns
+the three ordinary example Workflows. Each version executes independently once.
 
 ### Workflow package import
 

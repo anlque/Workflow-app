@@ -34,8 +34,8 @@ composition root supplies the same complete schema fragment set.
 
 Each seed version has deterministic namespaced record identifiers. Version 1
 creates only the SEED-002 Assets, using IDs of the form
-`locusora:seed:v1:asset:<seed-key>`. SEED-003 will provide a separate version 2
-definition for example Workflows; the version-1 marker cannot suppress it.
+`locusora:seed:v1:asset:<seed-key>`. Version 2 creates the three SEED-003 example
+Workflows independently; the version-1 marker cannot suppress it.
 After creation, seeded Assets and Workflows are ordinary user-owned local
 records. Deleting or editing them does not change the registry, and a later
 startup never restores deleted records from an already completed version.
@@ -85,8 +85,10 @@ database version.
 ## Consequences
 
 Starter batches can evolve independently without restoring content a user has
-deleted. Conflicts are explicit and never overwrite local data. Atomicity spans
-Assets, Workflows and the marker, while browser and Dexie details remain outside
+deleted. Production version 1 is Asset-only and version 2 is Workflow-only, so
+profiles that already installed the media receive the examples exactly once.
+Conflicts are explicit and never overwrite local data. Atomicity spans Assets,
+Workflows and the marker, while browser and Dexie details remain outside
 Application.
 
 The database gains an additive global version and every production composition
@@ -102,4 +104,5 @@ registry rather than modifying version 1.
 - `docs/adr/ADR-0010-indexeddb-schema-composition.md`
 - `docs/development/PERSISTENCE.md`
 - `docs/product/STARTER_MEDIA.md`
+- `docs/product/STARTER_WORKFLOWS.md`
 - `docs/roadmap/PRODUCT_EVOLUTION.md`

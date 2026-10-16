@@ -77,7 +77,7 @@ try {
   const extensionRoot = `chrome-extension://${new URL(worker.url()).host}`;
   const options = await context.newPage();
   await options.goto(`${extensionRoot}/options.html`);
-  await options.getByRole('button', { name: 'Create workflow' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByLabel('Workflow name').fill('Deep writing ritual');
   await options.getByLabel('Phase 1 duration in minutes').fill('25');
   await options.getByLabel('Background color').fill('#dfeee6');
