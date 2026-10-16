@@ -30,11 +30,18 @@ export type SessionCoordinatorDependencies = Readonly<{
   createSessionId(): string;
   workflowResolver: SessionWorkflowResolver;
   random?: () => number;
+  onError?(error: unknown): void;
 }>;
 
 export type SessionCoordinator = Readonly<{
+  registerListeners(runWhenReady: RunWhenReady): void;
+  restore(): Promise<void>;
   initialize(): Promise<void>;
 }>;
+
+export type RunWhenReady = <Result>(
+  operation: () => Promise<Result>,
+) => Promise<Result>;
 
 export function createSessionCoordinator({
   workflows,
@@ -45,6 +52,7 @@ export function createSessionCoordinator({
   createSessionId,
   workflowResolver,
   random = Math.random,
+  onError = console.error,
 }: SessionCoordinatorDependencies): SessionCoordinator {
   const handledCommands = new Map<
     string,
@@ -177,17 +185,35 @@ export function createSessionCoordinator({
   }
 
   return {
-    async initialize(): Promise<void> {
-      messages.onSessionCommand(handle);
-      messages.onActiveSessionRequest(() =>
-        enqueue(() => getActiveSessionUseCase(sessions, clock)),
+    registerListeners(runWhenReady): void {
+      messages.onSessionCommand((command) =>
+        runWhenReady(() => handle(command)),
       );
-      alarms.onFired(handleAlarm);
+      messages.onActiveSessionRequest(() =>
+        runWhenReady(() =>
+          enqueue(() => getActiveSessionUseCase(sessions, clock)),
+        ),
+      );
+      alarms.onFired(async (name) => {
+        try {
+          await runWhenReady(() => handleAlarm(name));
+        } catch (error: unknown) {
+          // Background initialization reports the failure. Alarm listeners have
+          // no response channel, so the rejected readiness must not leak.
+          onError(error);
+        }
+      });
+    },
+    async restore(): Promise<void> {
       await enqueue(async () => {
         await publishAndSchedule(
           await getActiveSessionUseCase(sessions, clock),
         );
       });
+    },
+    async initialize(): Promise<void> {
+      this.registerListeners((operation) => operation());
+      await this.restore();
     },
   };
 }

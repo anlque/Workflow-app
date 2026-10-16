@@ -2,7 +2,8 @@
 
 ## AS-001 compatibility update
 
-Global Dexie version 4 defines `assets: 'id, createdAt, &roleKey'`. The optional
+Global Dexie version 4 defines `assets: 'id, createdAt, &roleKey'`; global
+version 5 adds the append-only `starterContentSeeds` registry. The optional
 normalized key is globally unique; role-less rows are not indexed. Asset writers
 remain at record version 2; Workflow writers emit record version 6 and Session
 writers emit version 9. Their readers retain the compatible older versions. Workflow
@@ -27,6 +28,7 @@ changing them safely.
 | Workflows | IndexedDB database `locusora`, table `workflows` | Primary `id`; index `order` | `DexieWorkflowRepository` | `order` is persistence metadata for the Workflow Library collection, not part of the Domain aggregate |
 | Sessions | IndexedDB database `locusora`, table `sessions` | Primary `id`; indexes `active`, `updatedAt` | `DexieSessionRepository` | Running, Transitioning and Paused use `active = 1`; Completed and Stopped use `active = 0` |
 | Asset metadata and Blob content | IndexedDB database `locusora`, table `assets` | Primary `id`; indexes `createdAt`, unique optional `roleKey` | `DexieAssetRepository` | Metadata and Blob are one record; Workflow Environments store direct IDs or Roles |
+| Completed starter-content versions | IndexedDB database `locusora`, table `starterContentSeeds` | Primary `version`; index `completedAt` | `DexieStarterContentUnitOfWork` | Append-only marker history; deleting a seeded record never removes its completed marker |
 | Settings | `chrome.storage.local`, key `settings` | Chrome Storage key only | `ChromeSettingsRepository` | Theme, reduced motion and optional last-selected Workflow; missing value resolves to defaults |
 | React/Zustand state, countdown text, object URLs and audio state | Not persistent | None | Owning Presentation or `app` module | Reconstructed from durable facts and browser state |
 
@@ -52,6 +54,7 @@ fragments; each production runtime composition supplies the same complete list:
   ...workflowDatabaseSchemas,
   ...sessionDatabaseSchemas,
   ...assetDatabaseSchemas,
+  ...starterContentDatabaseSchemas,
 ]
 ```
 
@@ -65,13 +68,15 @@ history is:
 | 2 | Session | `sessions: 'id, active, updatedAt'` | `workflows`, `sessions` |
 | 3 | Assets | `assets: 'id, createdAt'` | `workflows`, `sessions`, `assets` |
 | 4 | Assets | `assets: 'id, createdAt, &roleKey'` | `workflows`, `sessions`, `assets` |
+| 5 | Starter content | `starterContentSeeds: 'version, completedAt'` | `workflows`, `sessions`, `assets`, `starterContentSeeds` |
 
 Versions belong to the complete database, not to a feature. The next schema
-change uses global version 5 regardless of which feature owns it. Store
+change uses global version 6 regardless of which feature owns it. Store
 definitions must remain cumulative.
 
 The background, focus, Options and side-panel production composition roots all
-register versions 1–4 in this order. Focus and side panel include tables they do
+use `createProductionDatabase()` to register versions 1–5 in this order. Focus
+and side panel include tables they do
 not currently query so that opening any context creates the same database
 schema. Focused repository tests may compose only the minimum fragments required
 by that test database.
@@ -82,7 +87,7 @@ These version numbers solve different compatibility problems:
 
 | Version | Scope | Current value | Changes when |
 | --- | --- | --- | --- |
-| Dexie database version | Whole `locusora` database structure and upgrade order | 1–4 history; current 4 | A table/index changes or existing stored data needs a database migration |
+| Dexie database version | Whole `locusora` database structure and upgrade order | 1–5 history; current 5 | A table/index changes or existing stored data needs a database migration |
 | `WorkflowRecord.schemaVersion` | One Workflow record serialization shape | Current writes 6; reads 1–6 | The Workflow record reader/writer needs a new incompatible serialization |
 | `SessionRecord.schemaVersion` | One Session record envelope | Current writes 9; reads 1–9 | The Session record reader/writer needs a new incompatible serialization |
 | `AssetRecord.schemaVersion` | One Asset record shape | Current writes 2; reads role-less 1 and 2 | The Asset record reader/writer needs a new incompatible serialization |
@@ -286,6 +291,18 @@ Catalog-event publication and Options reload occur after commit. Their failure
 is recoverable through synchronization-only retry and never resubmits the
 durable retirement transaction.
 
+### Starter-content installation
+
+`seedStarterContentUseCase` checks its append-only version marker before loading
+packaged files. It then loads and validates every Asset and constructs every
+Workflow before opening a transaction. Inside one `assets` + `workflows` +
+`starterContentSeeds` transaction it rechecks the marker, rejects existing
+deterministic IDs or normalized Roles, inserts without merging and adds the
+marker last. Any failure rolls back the complete version. A completed marker
+makes later runs a no-op, so user-deleted starter records are not restored.
+Production version 1 owns the eight approved starter Assets; SEED-003 will add
+example Workflows as independent version 2.
+
 ### Workflow package import
 
 [`DexieWorkflowPackageUnitOfWork`](../../src/features/workflow/infrastructure/DexieWorkflowPackageUnitOfWork.ts)
@@ -328,7 +345,7 @@ Follow this order for every persistence change:
 
 1. Identify the owning feature record and whether the change affects database
    structure, stored serialization, public packages or several of them.
-2. Allocate the next global Dexie version—currently 5—and never reuse or
+2. Allocate the next global Dexie version—currently 6—and never reuse or
    independently number a feature version.
 3. Keep store definitions cumulative and update every production composition
    root with the identical ordered fragment set.

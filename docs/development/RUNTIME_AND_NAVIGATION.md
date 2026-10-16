@@ -16,6 +16,19 @@ The generated URLs are extension origin URLs, not public web routes. WXT derives
 their manifest entries from the physical `entrypoints/` convention and
 [`wxt.config.ts`](../../wxt.config.ts).
 
+## Background Initialization
+
+The background creates the shared production database and synchronously
+registers toolbar, runtime-message and alarm listeners before its first
+asynchronous operation. Every handler is gated by one readiness Promise. The
+asynchronous path runs declared starter-content versions in ascending order,
+restores the authoritative Session coordinator, and only then releases queued
+events. Starter files are resolved with `browser.runtime.getURL()` and loaded
+locally; no remote provider participates. A seed failure rejects initialization
+and queued request/command operations before dependent behavior starts, while
+the seed transaction leaves no partial records or marker. Alarm listeners report
+the same failure without leaking an unhandled rejection.
+
 ## Toolbar Action to Focus Tab
 
 The manifest action has no popup. The background bootstrap registers

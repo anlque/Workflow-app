@@ -1,5 +1,4 @@
 import {
-  assetDatabaseSchemas,
   BrowserAssetUrlService,
   applyAssetRoleChangeUseCase,
   inspectAssetRetirementUseCase,
@@ -20,7 +19,6 @@ import {
 import {
   activeSessionReferencesAsset,
   DexieSessionRepository,
-  sessionDatabaseSchemas,
 } from '@/features/session';
 import {
   createWorkflowId,
@@ -39,9 +37,8 @@ import {
   summarizeWorkflowAssetReferences,
   summarizeWorkflowRoleReferences,
   updateWorkflowUseCase,
-  workflowDatabaseSchemas,
 } from '@/features/workflow';
-import { LocusoraDatabase } from '@/platform/storage';
+import type { LocusoraDatabase } from '@/platform/storage';
 import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 import type { WorkflowCatalogEvents } from '@/platform/messaging';
 
@@ -54,6 +51,7 @@ import {
 import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
 import { DexieAssetRoleManagementUnitOfWork } from './DexieAssetRoleManagementUnitOfWork';
 import { DexieAssetRetirementUnitOfWork } from './DexieAssetRetirementUnitOfWork';
+import { createProductionDatabase } from '../databaseSchemas';
 
 const assetPolicy: AssetImportPolicy = {
   image: {
@@ -85,13 +83,7 @@ function downloadJson(data: string, filename: string): void {
 
 export function createWorkflowStudioDependencies(
   preferences: WorkflowStudioDependencies['preferences'],
-  database: LocusoraDatabase = new LocusoraDatabase({
-    schemas: [
-      ...workflowDatabaseSchemas,
-      ...sessionDatabaseSchemas,
-      ...assetDatabaseSchemas,
-    ],
-  }),
+  database: LocusoraDatabase = createProductionDatabase(),
   catalogEvents: WorkflowCatalogEvents = createChromeWorkflowCatalogEvents(),
 ): WorkflowStudioDependencies {
   const workflows = new DexieWorkflowRepository(database);

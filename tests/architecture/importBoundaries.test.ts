@@ -165,6 +165,19 @@ describe('architectural import boundaries', () => {
     expect(findViolations()).toEqual([]);
   });
 
+  test.each([
+    'src/app/background/bootstrapBackground.ts',
+    'src/app/focus/createFocusDependencies.ts',
+    'src/app/workflow-studio/createWorkflowStudioDependencies.ts',
+    'src/app/side-panel/createSidePanelDependencies.ts',
+  ])('%s uses the shared production database composition', (projectPath) => {
+    const source = readFileSync(resolve(projectRoot, projectPath), 'utf8');
+
+    expect(source).toContain('createProductionDatabase');
+    expect(source).not.toContain('new LocusoraDatabase');
+    expect(source).not.toContain('DatabaseSchemas');
+  });
+
   test('shared Workflow Studio cannot import the Focus surface', () => {
     const studioModule = 'src/app/workflow-studio/Probe.tsx';
 

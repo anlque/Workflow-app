@@ -338,6 +338,7 @@ async function controlledSetup(final = false) {
   const clock = new FakeClock(25_000);
   const messages = new FakeMessageBus();
   const alarms = new FakeAlarmScheduler();
+  const onError = vi.fn();
   const coordinator = createSessionCoordinator({
     workflows: workflowRepository(session.snapshot.workflow),
     sessions,
@@ -346,11 +347,50 @@ async function controlledSetup(final = false) {
     alarms,
     createSessionId: () => 'unused-session',
     workflowResolver: { resolve: (workflow) => Promise.resolve(workflow) },
+    onError,
   });
-  return { session, sessions, clock, messages, alarms, coordinator };
+  return { session, sessions, clock, messages, alarms, coordinator, onError };
 }
 
 describe('createSessionCoordinator', () => {
+  test('registers message and alarm listeners synchronously while gating their handlers', async () => {
+    const { sessions, messages, alarms, coordinator } = await controlledSetup();
+    const readiness = deferred();
+
+    coordinator.registerListeners((operation) =>
+      readiness.promise.then(operation),
+    );
+
+    const request = messages.requestActiveSession();
+    const command = messages.dispatch({
+      type: 'session/stop',
+      commandId: 'stop-during-seeding',
+      sessionId: 'session-1',
+    });
+    const alarm = alarms.fire('locusora.session-phase');
+    await Promise.resolve();
+    expect(sessions.operations).toEqual([]);
+
+    readiness.resolve();
+    await Promise.all([request, command, alarm]);
+    expect(sessions.operations).not.toEqual([]);
+  });
+
+  test('does not run or leak an alarm rejection when readiness fails', async () => {
+    const { sessions, alarms, coordinator, onError } = await controlledSetup();
+    coordinator.registerListeners(() =>
+      Promise.reject(new Error('initialization failed')),
+    );
+
+    await expect(
+      alarms.fire('locusora.session-phase'),
+    ).resolves.toBeUndefined();
+    expect(sessions.operations).toEqual([]);
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'initialization failed' }),
+    );
+  });
+
   test('initializes and serves get-active from a persisted normal pause after Bonus', async () => {
     const persisted = pausedNormalSessionAfterBonus();
     if (persisted.status !== 'paused' || persisted.rewardRitual === undefined) {

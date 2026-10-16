@@ -13,6 +13,7 @@ same kind of state even when they describe the same Session or Workflow.
 | Workflow records | Workflow Infrastructure | Validated `WorkflowRecord` rows | Durable IndexedDB data | `DexieWorkflowRepository` | IndexedDB transactions and explicit catalog reload |
 | Session records | Session Infrastructure | Validated `SessionRecord` rows | Durable IndexedDB data | `DexieSessionRepository` and background reconciliation | Save per authoritative transition; load on worker startup/wake |
 | Asset metadata and blobs | Assets Infrastructure | Asset record plus Blob | Durable IndexedDB data | Options, focus Environment and package import/export | Repository reads/writes; Workflow stores only Asset identifiers |
+| Starter-content completion history | Starter-content Infrastructure | Append-only `{ version, completedAt }` markers | Durable IndexedDB data | Background bootstrap | Marker fast-path plus one marker-last cross-table transaction per version |
 | Application Settings | Settings Infrastructure | One validated Settings value under `settings`, including theme/motion, Focus appearance and audio channels | Durable `chrome.storage.local` data | Options, focus and side-panel composition | Explicit repository read/update; not Zustand or IndexedDB |
 | Active Session execution | Background worker composition | Current persisted Session plus alarm and in-memory command coordination | Across surface closure; reconstructed after worker restart | Focus view and side panel via messages | Background commands, epoch reconciliation, save, alarm scheduling, broadcast |
 | Active Session projection | Session Presentation in each open focus/side-panel document | One `ActiveSessionStore` containing `session`, connection and error | Current document only | React components in that document | Initial `session/get-active` plus `session/changed` replacement |
@@ -85,6 +86,15 @@ aggregate, but records do not execute behavior. React and Zustand display
 projections, but they do not decide or persist authoritative transitions.
 
 ## Startup and Projection Race Handling
+
+Background startup first composes the complete Dexie schema and synchronously
+registers Chrome event listeners. Their handlers wait on one readiness barrier
+while each uncompleted starter-content version runs and the Session coordinator
+restores. Packaged-file loading and Domain validation occur before writes;
+marker recheck, conflict checks, Asset/Workflow inserts and the final marker
+share one transaction. Only successful seed + restore resolves readiness, so
+Session services cannot observe a partially installed catalog and the MV3 wake
+event cannot arrive before its listener exists.
 
 `connectSessionMessages()` performs startup in this order:
 

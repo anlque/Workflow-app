@@ -24,7 +24,7 @@ reusable image and audio Asset records and behavior.
 
 | Location | Owner | Contains | May depend on | Why it exists |
 | --- | --- | --- | --- | --- |
-| [`src/app/background/`](../../src/app/background/) | Background worker | `bootstrapBackground`, focus-action registration and the authoritative Session coordinator | Feature root APIs, platform adapters and WXT/browser APIs | Composes the non-React MV3 worker that owns active Session execution |
+| [`src/app/background/`](../../src/app/background/) | Background worker | `bootstrapBackground`, versioned starter-content installation, focus-action registration and the authoritative Session coordinator | Feature root APIs, platform adapters and WXT/browser APIs | Opens the database, completes seeding, then composes the non-React MV3 worker that owns active Session execution |
 | [`src/app/focus/`](../../src/app/focus/) | Focus view | `FocusApp`, launcher/environment views, Studio overlay shell, audio behavior, focus-tab controller, bootstrap and dependency factory | Feature root APIs, shared Workflow Studio, platform APIs, shared UI and browser APIs | Composes the stable full-page focus experience, filtered background and lazy Studio host without moving Session authority |
 | [`src/app/options/`](../../src/app/options/) | Options page fallback | Thin `OptionsApp` and bootstrap | Shared Workflow Studio and browser/document APIs | Hosts the reusable Studio in Chrome's manifest options page as the system fallback |
 | [`src/app/focus/focusDocumentTitle.ts`](../../src/app/focus/focusDocumentTitle.ts) and [`useFocusDocumentTitle.ts`](../../src/app/focus/useFocusDocumentTitle.ts) | Focus title presentation | Derive `timer · phase · Locusora` and update only changed title text | Session projection and authoritative countdown helpers | Own no Session state; idle and terminal states restore `Locusora focus` |
@@ -34,7 +34,8 @@ reusable image and audio Asset records and behavior.
 | [`src/app/closeSidePanel.ts`](../../src/app/closeSidePanel.ts) | Side Panel browser integration | Side-panel open, close and state subscription helpers | WXT/browser APIs | Keeps Chrome lifecycle calls behind one injected application boundary |
 | [`src/app/useSidePanelControl.ts`](../../src/app/useSidePanelControl.ts) | Cross-surface Side Panel presentation | Optimistic open/close state, single-flight toggle, lifecycle authority, recoverable error and cleanup | React and injected Side Panel functions | Gives Focus and Workflow Studio identical behavior without importing browser APIs into presentation |
 | [`src/app/runWorkflowCatalogMutation.ts`](../../src/app/runWorkflowCatalogMutation.ts) | Catalog mutation composition | Success-only Workflow catalog invalidation wrapper | Workflow catalog event port | Ensures Options and side-panel mutations publish the same invalidation behavior |
-| [`src/app/seeds/`](../../src/app/seeds/) | Starter catalog definitions | Typed, immutable, data-only background and ambient-loop definitions | Assets public types only | Supplies SEED-001 with an offline catalog without performing persistence or runtime seeding |
+| [`src/app/seeds/`](../../src/app/seeds/) | Starter catalog composition | Typed immutable definitions, deterministic versioned IDs and packaged-file browser adapter | Starter-content and Assets public types plus WXT/browser only in the loader | Maps the offline SEED-002 catalog into production seed version 1 without owning persistence |
+| [`src/app/databaseSchemas.ts`](../../src/app/databaseSchemas.ts) | Production database composition | One cumulative schema set and database factory | Feature-owned schema fragments and storage platform | Ensures background, Focus, Options and Side Panel all open global Dexie versions 1–5 identically |
 
 Files in `src/app/` are composition code. Lower modules must not import them.
 The shared Workflow Studio may use generic app-owned contracts but must not
@@ -56,6 +57,15 @@ only the layers it needs:
 
 Consumers outside a feature import from its root, for example
 `@/features/workflow`, not `@/features/workflow/domain/Workflow`.
+
+## Starter-content Feature
+
+[`src/features/starter-content/`](../../src/features/starter-content/) owns the
+versioned Application orchestration, narrow file/registry/unit-of-work ports,
+global Dexie version-5 marker fragment and atomic adapter spanning Assets,
+Workflows and completion markers. Its Application layer has no browser or Dexie
+dependency. Production version 1 contains only starter Assets; future example
+Workflows use an independent version instead of changing the completed marker.
 
 ## Workflow Feature
 

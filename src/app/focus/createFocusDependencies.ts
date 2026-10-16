@@ -6,17 +6,13 @@ import {
   updateSettingsUseCase,
 } from '@/features/settings';
 import {
-  assetDatabaseSchemas,
   BrowserAssetUrlService,
   DexieAssetRepository,
 } from '@/features/assets';
-import { sessionDatabaseSchemas } from '@/features/session';
 import {
   DexieWorkflowRepository,
   listWorkflowsUseCase,
-  workflowDatabaseSchemas,
 } from '@/features/workflow';
-import { LocusoraDatabase } from '@/platform/storage';
 import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 
 import {
@@ -31,17 +27,12 @@ import {
   openSidePanel,
   subscribeSidePanelState,
 } from '../closeSidePanel';
+import { createProductionDatabase } from '../databaseSchemas';
 
 export function createFocusDependencies(
   preferences: FocusDependencies['preferences'],
 ): FocusDependencies {
-  const database = new LocusoraDatabase({
-    schemas: [
-      ...workflowDatabaseSchemas,
-      ...sessionDatabaseSchemas,
-      ...assetDatabaseSchemas,
-    ],
-  });
+  const database = createProductionDatabase();
   const assets = new DexieAssetRepository(database);
   const workflows = new DexieWorkflowRepository(database);
   const settings = new ChromeSettingsRepository();

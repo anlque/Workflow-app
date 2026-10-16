@@ -140,7 +140,8 @@ the narrow Assets retirement port.
 
 ## Persistence
 
-`DexieAssetRepository` writes version-2 records in global Dexie version 4:
+`DexieAssetRepository` writes version-2 records using the Role index introduced
+in global Dexie version 4 (the complete database is currently version 5):
 `assets: 'id, createdAt, &roleKey'`. Metadata and Blob content are one record;
 the optional normalized Role key is globally unique across Asset kinds. Reads
 accept version 2 and role-less version 1 as `unknown`, validate the envelope,

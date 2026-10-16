@@ -1,12 +1,10 @@
 import { browser } from 'wxt/browser';
 
-import { assetDatabaseSchemas } from '@/features/assets';
 import {
   ChromeSettingsRepository,
   getSettingsUseCase,
   updateSettingsUseCase,
 } from '@/features/settings';
-import { sessionDatabaseSchemas } from '@/features/session';
 import {
   createWorkflow,
   createWorkflowId,
@@ -16,9 +14,7 @@ import {
   duplicateWorkflowUseCase,
   listWorkflowsUseCase,
   reorderWorkflowsUseCase,
-  workflowDatabaseSchemas,
 } from '@/features/workflow';
-import { LocusoraDatabase } from '@/platform/storage';
 import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 
 import {
@@ -29,18 +25,13 @@ import type { SidePanelDependencies } from './SidePanelApp';
 import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
 import { createChromeFocusTabController } from '../focus/createChromeFocusTabController';
 import { closeSidePanel } from '../closeSidePanel';
+import { createProductionDatabase } from '../databaseSchemas';
 
 export function createSidePanelDependencies(
   preferences: SidePanelDependencies['preferences'],
 ): SidePanelDependencies {
   const focusTabs = createChromeFocusTabController(browser);
-  const database = new LocusoraDatabase({
-    schemas: [
-      ...workflowDatabaseSchemas,
-      ...sessionDatabaseSchemas,
-      ...assetDatabaseSchemas,
-    ],
-  });
+  const database = createProductionDatabase();
   const workflows = new DexieWorkflowRepository(database);
   const settings = new ChromeSettingsRepository();
   const runtime: SessionRuntime = {

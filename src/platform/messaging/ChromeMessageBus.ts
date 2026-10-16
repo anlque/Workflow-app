@@ -10,7 +10,35 @@ import {
   RuntimeMessageValidationError,
 } from './runtimeMessageSchema';
 
+type ChromeMessageListener = (
+  message: unknown,
+  sender: Browser.runtime.MessageSender,
+  sendResponse: (response?: unknown) => void,
+) => boolean | undefined;
+
+type ChromeRuntime = Readonly<{
+  onMessage: Readonly<{
+    addListener(listener: ChromeMessageListener): void;
+    removeListener(listener: ChromeMessageListener): void;
+  }>;
+  sendMessage(message: unknown): Promise<unknown>;
+}>;
+
+function isMissingReceiver(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message ===
+      'Could not establish connection. Receiving end does not exist.'
+  );
+}
+
 export class ChromeMessageBus implements RuntimeMessageBus {
+  readonly #runtime: ChromeRuntime;
+
+  public constructor(runtime: ChromeRuntime = browser.runtime) {
+    this.#runtime = runtime;
+  }
+
   public onActiveSessionRequest(
     listener: (request: ActiveSessionRequest) => Promise<unknown>,
   ): () => void {
@@ -42,9 +70,9 @@ export class ChromeMessageBus implements RuntimeMessageBus {
       );
       return true;
     };
-    browser.runtime.onMessage.addListener(chromeListener);
+    this.#runtime.onMessage.addListener(chromeListener);
     return () => {
-      browser.runtime.onMessage.removeListener(chromeListener);
+      this.#runtime.onMessage.removeListener(chromeListener);
     };
   }
 
@@ -81,16 +109,20 @@ export class ChromeMessageBus implements RuntimeMessageBus {
       return true;
     };
 
-    browser.runtime.onMessage.addListener(chromeListener);
+    this.#runtime.onMessage.addListener(chromeListener);
     return () => {
-      browser.runtime.onMessage.removeListener(chromeListener);
+      this.#runtime.onMessage.removeListener(chromeListener);
     };
   }
 
   public async publishSessionChanged(
     message: SessionChangedMessage,
   ): Promise<void> {
-    await browser.runtime.sendMessage(message);
+    try {
+      await this.#runtime.sendMessage(message);
+    } catch (error: unknown) {
+      if (!isMissingReceiver(error)) throw error;
+    }
   }
 }
 import { browser, type Browser } from 'wxt/browser';
