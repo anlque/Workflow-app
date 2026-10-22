@@ -1,6 +1,10 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import { createWorkflow } from '@/features/workflow';
+import {
+  createWorkflow,
+  resolveWorkflowAssetReferences,
+} from '@/features/workflow';
+import { createAssetId } from '@/features/assets';
 
 import { advanceSessionUseCase } from './advanceSessionUseCase';
 import { continueRewardSessionUseCase } from './continueRewardSessionUseCase';
@@ -54,6 +58,85 @@ const restartBonusWorkflow = (final = false) =>
   });
 
 describe('Session use cases', () => {
+  test('materializes a Quick Workflow into an immutable mode-free Session snapshot', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const quick = createWorkflow({
+      mode: 'quick',
+      id: 'quick-session',
+      name: 'Quick',
+      configuration: {
+        cycleCount: 3,
+        focus: {
+          durationSeconds: 60,
+          environment: {
+            backgroundAsset: { type: 'role', role: 'Focus image' },
+            audioAsset: { type: 'role', role: 'Focus audio' },
+          },
+        },
+        shortBreak: {
+          durationSeconds: 30,
+          environment: { audioAsset: { type: 'role', role: 'Short audio' } },
+        },
+        longBreak: {
+          durationSeconds: 90,
+          environment: {
+            backgroundAsset: { type: 'role', role: 'Long image' },
+          },
+          frequency: 2,
+        },
+        rewardDice: {
+          frequency: 2,
+          sides: [
+            { icon: 'a', title: 'A' },
+            { icon: 'b', title: 'B' },
+          ],
+        },
+      },
+    });
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'quick-session-1',
+      quick,
+      {
+        resolve: (source) =>
+          resolveWorkflowAssetReferences(source, {
+            resolve: (role, kind) =>
+              Promise.resolve(
+                createAssetId(
+                  `${kind}-${role.toLowerCase().replaceAll(' ', '-')}`,
+                ),
+              ),
+          }),
+      },
+    );
+    expect(started.snapshot.workflow).not.toHaveProperty('mode');
+    expect(started.snapshot.workflow.phases.map(({ name }) => name)).toEqual([
+      'Focus',
+      'Short break',
+      'Focus',
+      'Long break',
+      'Focus',
+      'Short break',
+    ]);
+    expect(started.snapshot.workflow.phases[0].environment.audioAsset).toEqual({
+      type: 'direct',
+      assetId: 'audio-focus-audio',
+    });
+    expect(
+      started.snapshot.workflow.phases[0].environment.backgroundAsset,
+    ).toEqual({ type: 'direct', assetId: 'image-focus-image' });
+    expect(started.snapshot.workflow.phases[1]?.environment.audioAsset).toEqual(
+      { type: 'direct', assetId: 'audio-short-audio' },
+    );
+    expect(
+      started.snapshot.workflow.phases[3]?.environment.backgroundAsset,
+    ).toEqual({ type: 'direct', assetId: 'image-long-image' });
+    expect(Object.isFrozen(started.snapshot.workflow.phases)).toBe(true);
+    expect(started.snapshot.workflow).not.toHaveProperty('configuration');
+  });
+
   test('resolves Workflow Asset references before creating the snapshot', async () => {
     const repository = new InMemorySessionRepository();
     const clock = new FakeClock(1_000);
@@ -88,7 +171,12 @@ describe('Session use cases', () => {
       { resolve: () => Promise.resolve(resolved) },
     );
 
-    expect(started.snapshot.workflow).toEqual(resolved);
+    expect(started.snapshot.workflow).toEqual({
+      id: resolved.id,
+      name: resolved.name,
+      phases: resolved.phases,
+    });
+    expect(started.snapshot.workflow).not.toHaveProperty('mode');
     expect(started.snapshot.workflow).not.toBe(resolved);
   });
 

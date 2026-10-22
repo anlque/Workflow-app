@@ -51,6 +51,27 @@ const preview = {
           referenceMode: 'direct',
           optional: true,
         },
+        {
+          owner: 'quick',
+          phase: 'focus',
+          location: 'background',
+          referenceMode: 'direct',
+          optional: true,
+        },
+        {
+          owner: 'quick',
+          phase: 'short-break',
+          location: 'background',
+          referenceMode: 'direct',
+          optional: true,
+        },
+        {
+          owner: 'quick',
+          phase: 'long-break',
+          location: 'background',
+          referenceMode: 'direct',
+          optional: true,
+        },
       ],
     },
   ],
@@ -103,6 +124,19 @@ describe('AssetRetirementDialog', () => {
         { selector: 'li' },
       ),
     ).toBeVisible();
+    for (const label of [
+      'Quick Focus',
+      'Quick Short Break',
+      'Quick Long Break',
+    ]) {
+      expect(
+        screen.getByText(
+          (_, element) =>
+            element?.textContent.startsWith(`${label} ·`) === true,
+          { selector: 'li' },
+        ),
+      ).toBeVisible();
+    }
     expect(
       await screen.findByRole('button', { name: 'Continue' }),
     ).toHaveFocus();

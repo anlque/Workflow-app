@@ -739,6 +739,7 @@ describe('WorkflowEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
 
     const saved = onSave.mock.calls[0]?.[0];
+    if (saved?.mode === 'quick') throw new Error('Expected Detailed input.');
     expect(saved?.id).toBe('workflow-1');
     expect(saved?.name).toBe('Deep work');
     expect(saved?.phases[0]?.type).toBe('break');
@@ -1000,9 +1001,12 @@ describe('WorkflowEditor', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
 
-    expect(
-      onSave.mock.calls[0]?.[0].phases[0]?.environment.backgroundAsset,
-    ).toEqual({ type: 'role', role: 'Hero scene' });
+    const saved = onSave.mock.calls[0]?.[0];
+    if (saved?.mode === 'quick') throw new Error('Expected Detailed input.');
+    expect(saved?.phases[0]?.environment.backgroundAsset).toEqual({
+      type: 'role',
+      role: 'Hero scene',
+    });
   });
 
   test('preserves a Role reference when its Phase is reordered', async () => {
@@ -1039,9 +1043,12 @@ describe('WorkflowEditor', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Move Phase 2 up' }));
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
-    expect(
-      onSave.mock.calls[0]?.[0].phases[1]?.environment.backgroundAsset,
-    ).toEqual({ type: 'role', role: 'Hero scene' });
+    const saved = onSave.mock.calls[0]?.[0];
+    if (saved?.mode === 'quick') throw new Error('Expected Detailed input.');
+    expect(saved?.phases[1]?.environment.backgroundAsset).toEqual({
+      type: 'role',
+      role: 'Hero scene',
+    });
   });
 
   test('validates enabled Reward Dice frequency', async () => {

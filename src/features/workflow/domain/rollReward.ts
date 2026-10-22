@@ -4,7 +4,7 @@ import { WorkflowValidationError } from './WorkflowErrors';
 import { eligibleDiceSides } from './eligibleDiceSides';
 
 export function rollReward(
-  workflow: Workflow,
+  workflow: Pick<Workflow, 'phases' | 'rewardDice'>,
   completedPhaseIndex: number,
   random: () => number,
 ): DiceSide {

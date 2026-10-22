@@ -6,7 +6,6 @@ import {
   updateSettingsUseCase,
 } from '@/features/settings';
 import {
-  createWorkflow,
   createWorkflowId,
   createWorkflowUseCase,
   deleteWorkflowUseCase,
@@ -68,16 +67,13 @@ export function createSidePanelDependencies(
     async createWorkflow() {
       await runWorkflowCatalogMutation(
         () =>
-          createWorkflowUseCase(
-            workflows,
-            createWorkflow({
-              id: crypto.randomUUID(),
-              name: 'Untitled Workflow',
-              phases: [
-                { type: 'focus', durationSeconds: 1_500, environment: {} },
-              ],
-            }),
-          ),
+          createWorkflowUseCase(workflows, {
+            id: crypto.randomUUID(),
+            name: 'Untitled Workflow',
+            phases: [
+              { type: 'focus', durationSeconds: 1_500, environment: {} },
+            ],
+          }),
         catalogEvents,
       );
     },

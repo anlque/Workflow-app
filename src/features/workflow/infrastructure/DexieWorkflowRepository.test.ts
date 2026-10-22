@@ -54,6 +54,29 @@ function workflow(id: string, name: string): Workflow {
   });
 }
 
+function quickRecord(overrides: Record<string, unknown> = {}) {
+  return {
+    schemaVersion: 7,
+    mode: 'quick',
+    id: 'strict-quick',
+    order: 0,
+    name: 'Strict Quick',
+    configuration: {
+      cycleCount: 2,
+      focus: { durationSeconds: 1_500, environment: {} },
+      shortBreak: { durationSeconds: 300, environment: {} },
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          { icon: 'a', title: 'A', weight: 1 },
+          { icon: 'b', title: 'B', weight: 1 },
+        ],
+      },
+    },
+    ...overrides,
+  };
+}
+
 async function putWorkflowRecord(
   database: LocusoraDatabase,
   value: unknown,
@@ -66,6 +89,118 @@ afterEach(async () => {
 });
 
 describe('DexieWorkflowRepository', () => {
+  test('stores Quick source configuration only and restores its projection', async () => {
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
+    const expected = createWorkflow({
+      mode: 'quick',
+      id: 'quick-record',
+      name: 'Quick',
+      configuration: {
+        cycleCount: 4,
+        focus: {
+          durationSeconds: 1_500,
+          environment: { backgroundAsset: { type: 'role', role: 'Backdrop' } },
+        },
+        shortBreak: { durationSeconds: 300, environment: {} },
+        longBreak: { durationSeconds: 900, environment: {}, frequency: 3 },
+        rewardDice: {
+          frequency: 2,
+          sides: [
+            { icon: 'tea', title: 'Tea', weight: 2 },
+            { icon: 'walk', title: 'Walk', weight: 4 },
+          ],
+        },
+      },
+    });
+
+    await repository.save(expected);
+
+    await expect(repository.get(expected.id)).resolves.toEqual(expected);
+    const raw = await database
+      .table<Record<string, unknown>, string>('workflows')
+      .get(expected.id);
+    expect(raw).toMatchObject({
+      schemaVersion: 7,
+      mode: 'quick',
+      configuration: { cycleCount: 4 },
+    });
+    expect(raw).not.toHaveProperty('phases');
+    expect(raw).not.toHaveProperty('rewardDice');
+  });
+
+  test('rejects a version-7 Quick record containing generated Phases', async () => {
+    const database = createDatabase();
+    const repository = new DexieWorkflowRepository(database);
+    await putWorkflowRecord(database, {
+      schemaVersion: 7,
+      mode: 'quick',
+      id: 'corrupt-quick',
+      order: 0,
+      name: 'Corrupt',
+      configuration: {
+        cycleCount: 1,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+      },
+      phases: [],
+    });
+    await expect(repository.list()).rejects.toThrow(
+      'Stored Workflow record is invalid.',
+    );
+  });
+
+  test.each([
+    ['unknown top-level field', quickRecord({ extra: true })],
+    ['mixed Detailed field', quickRecord({ phases: [] })],
+    ['malformed configuration', quickRecord({ configuration: [] })],
+    [
+      'invalid Quick duration',
+      quickRecord({
+        configuration: {
+          ...(quickRecord().configuration as object),
+          focus: { durationSeconds: 31, environment: {} },
+        },
+      }),
+    ],
+    [
+      'invalid Quick frequency',
+      quickRecord({
+        configuration: {
+          ...(quickRecord().configuration as object),
+          rewardDice: {
+            frequency: 3,
+            sides: [
+              { icon: 'a', title: 'A' },
+              { icon: 'b', title: 'B' },
+            ],
+          },
+        },
+      }),
+    ],
+    [
+      'invalid Quick weights',
+      quickRecord({
+        configuration: {
+          ...(quickRecord().configuration as object),
+          rewardDice: {
+            frequency: 1,
+            sides: [
+              { icon: 'a', title: 'A', weight: 0 },
+              { icon: 'b', title: 'B', weight: 1 },
+            ],
+          },
+        },
+      }),
+    ],
+  ])('rejects a strict v7 Quick record with %s', async (_label, record) => {
+    const database = createDatabase();
+    await putWorkflowRecord(database, record);
+    await expect(
+      new DexieWorkflowRepository(database).list(),
+    ).rejects.toBeInstanceOf(WorkflowValidationError);
+  });
+
   test('uses the Locusora database name by default', () => {
     const database = new LocusoraDatabase({
       schemas: workflowDatabaseSchemas,
@@ -106,7 +241,8 @@ describe('DexieWorkflowRepository', () => {
     await expect(
       database.table<unknown, string>('workflows').get(expected.id),
     ).resolves.toMatchObject({
-      schemaVersion: 6,
+      schemaVersion: 7,
+      mode: 'detailed',
       rewardDice: {
         sides: [
           expect.objectContaining({ availability: 'any' }),
@@ -225,7 +361,7 @@ describe('DexieWorkflowRepository', () => {
     await expect(repository.get(expected.id)).resolves.toEqual(expected);
     await expect(
       database.table<unknown, string>('workflows').get(expected.id),
-    ).resolves.toMatchObject({ schemaVersion: 6 });
+    ).resolves.toMatchObject({ schemaVersion: 7, mode: 'detailed' });
   });
 
   test('restores version-4 Sides without a Bonus Reward Phase', async () => {

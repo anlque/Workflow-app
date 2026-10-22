@@ -19,6 +19,7 @@ records remain available if they are later Superseded or Archived.
 | [ADR-0012](ADR-0012-authoritative-reward-ritual-and-bonus-reward-phases.md) | Accepted | Persist Reward ritual state in the authoritative Session aggregate |
 | [ADR-0013](ADR-0013-embedded-workflow-studio-and-extension-surface-navigation.md) | Accepted | Share one Workflow Studio composition while extension surfaces retain lifecycle and navigation ownership |
 | [ADR-0014](ADR-0014-first-run-starter-content-seeding.md) | Accepted | Seed bundled starter content through an append-only version registry and atomic transactions |
+| [ADR-0015](ADR-0015-quick-and-detailed-workflow-configurations.md) | Accepted | Represent Quick and Detailed Workflows as configuration variants with one Session runtime |
 
 Create and evolve records according to
 [`docs/concepts/09_ADR_GUIDELINES.md`](../concepts/09_ADR_GUIDELINES.md).

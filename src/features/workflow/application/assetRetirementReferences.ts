@@ -4,10 +4,13 @@ import {
   type AssetRetirementOccurrence,
 } from '@/features/assets';
 
-import { createWorkflow } from '../domain/createWorkflow';
 import type { AssetReference, EnvironmentInput } from '../domain/Environment';
 import type { Workflow } from '../domain/Workflow';
 import type { WorkflowRepository } from './WorkflowRepository';
+import {
+  listWorkflowConfigurationEnvironments,
+  mapWorkflowConfigurationEnvironments,
+} from './workflowEnvironments';
 
 export type WorkflowAssetRetirementUsage = Readonly<{
   workflowId: Workflow['id'];
@@ -29,52 +32,28 @@ function referenceKind(reference: AssetReference | undefined, source: Asset) {
 
 function occurrences(workflow: Workflow, source: Asset) {
   const values: AssetRetirementOccurrence[] = [];
-  workflow.phases.forEach(({ environment }, phaseIndex) => {
-    const references = [
-      {
-        location: 'background' as const,
-        reference: environment.backgroundAsset,
-      },
-      { location: 'audio' as const, reference: environment.audioAsset },
-    ];
-    references.forEach(({ location, reference }) => {
-      const referenceMode = referenceKind(reference, source);
-      if (referenceMode !== null) {
-        values.push({
-          owner: 'phase',
-          phaseIndex,
-          location,
-          referenceMode,
-          optional: true,
-        });
-      }
-    });
-  });
-  workflow.rewardDice?.sides.forEach(({ bonusPhase }, sideIndex) => {
-    if (bonusPhase === undefined) return;
-    const references = [
-      {
-        location: 'background' as const,
-        reference: bonusPhase.environment.backgroundAsset,
-      },
-      {
-        location: 'audio' as const,
-        reference: bonusPhase.environment.audioAsset,
-      },
-    ];
-    references.forEach(({ location, reference }) => {
-      const referenceMode = referenceKind(reference, source);
-      if (referenceMode !== null) {
-        values.push({
-          owner: 'bonus',
-          sideIndex,
-          location,
-          referenceMode,
-          optional: true,
-        });
-      }
-    });
-  });
+  listWorkflowConfigurationEnvironments(workflow).forEach(
+    ({ environment, location: owner }) => {
+      const references = [
+        {
+          location: 'background' as const,
+          reference: environment.backgroundAsset,
+        },
+        { location: 'audio' as const, reference: environment.audioAsset },
+      ];
+      references.forEach(({ location, reference }) => {
+        const referenceMode = referenceKind(reference, source);
+        if (referenceMode !== null) {
+          values.push({
+            ...owner,
+            location,
+            referenceMode,
+            optional: true,
+          });
+        }
+      });
+    },
+  );
   return values;
 }
 
@@ -96,62 +75,15 @@ export async function summarizeWorkflowAssetReferences(
   });
 }
 
-function copyWorkflow(
+async function copyWorkflow(
   workflow: Workflow,
   transform: (
     reference: AssetReference | undefined,
   ) => AssetReference | undefined,
-): Workflow {
-  return createWorkflow({
-    id: workflow.id,
-    name: workflow.name,
-    phases: workflow.phases.map((phase) => {
-      const backgroundAsset = transform(phase.environment.backgroundAsset);
-      const audioAsset = transform(phase.environment.audioAsset);
-      const environment: EnvironmentInput = {
-        ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
-        ...(audioAsset === undefined ? {} : { audioAsset }),
-        ...(phase.environment.backgroundColor === undefined
-          ? {}
-          : { backgroundColor: phase.environment.backgroundColor }),
-      };
-      return {
-        ...(phase.name === undefined ? {} : { name: phase.name }),
-        type: phase.type,
-        durationSeconds: phase.durationSeconds,
-        environment,
-      };
-    }),
-    ...(workflow.rewardDice === undefined
-      ? {}
-      : {
-          rewardDice: {
-            schedule: workflow.rewardDice.schedule,
-            rerolls: workflow.rewardDice.rerolls,
-            sides: workflow.rewardDice.sides.map((side) => ({
-              icon: side.icon,
-              title: side.title,
-              ...(side.description === undefined
-                ? {}
-                : { description: side.description }),
-              availability: side.availability,
-              weight: side.probability,
-              ...(side.bonusPhase === undefined
-                ? {}
-                : {
-                    bonusPhase: {
-                      name: side.bonusPhase.name,
-                      durationSeconds: side.bonusPhase.durationSeconds,
-                      environment: copyEnvironment(
-                        side.bonusPhase.environment,
-                        transform,
-                      ),
-                    },
-                  }),
-            })),
-          },
-        }),
-  });
+): Promise<Workflow> {
+  return mapWorkflowConfigurationEnvironments(workflow, (environment) =>
+    copyEnvironment(environment, transform),
+  );
 }
 
 function copyEnvironment(
@@ -180,7 +112,7 @@ async function patch(
 ): Promise<void> {
   for (const workflow of await repository.list()) {
     if (occurrences(workflow, source).length > 0)
-      await repository.save(copyWorkflow(workflow, transform));
+      await repository.save(await copyWorkflow(workflow, transform));
   }
 }
 

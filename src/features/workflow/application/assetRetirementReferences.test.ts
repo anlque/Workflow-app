@@ -110,6 +110,78 @@ test('reports every direct and Role occurrence with its Phase location and optio
 });
 
 describe('Workflow Asset retirement patches', () => {
+  test('reports and replaces Quick source occurrences without duplicating generated Phases', async () => {
+    const quick = createWorkflow({
+      mode: 'quick',
+      id: 'quick',
+      name: 'Quick',
+      configuration: {
+        cycleCount: 4,
+        focus: {
+          durationSeconds: 1_500,
+          environment: {
+            backgroundAsset: { type: 'direct', assetId: source.id },
+          },
+        },
+        shortBreak: {
+          durationSeconds: 300,
+          environment: { backgroundAsset: { type: 'role', role: 'Hero' } },
+        },
+        longBreak: {
+          durationSeconds: 900,
+          environment: {
+            backgroundAsset: { type: 'direct', assetId: source.id },
+          },
+          frequency: 2,
+        },
+      },
+    });
+    const repository = new InMemoryWorkflowRepository([quick]);
+    const [usage] = await summarizeWorkflowAssetReferences(repository, source);
+    expect(
+      usage?.occurrences.map(({ owner, ...value }) => ({ owner, ...value })),
+    ).toEqual([
+      {
+        owner: 'quick',
+        phase: 'focus',
+        location: 'background',
+        referenceMode: 'direct',
+        optional: true,
+      },
+      {
+        owner: 'quick',
+        phase: 'short-break',
+        location: 'background',
+        referenceMode: 'role',
+        optional: true,
+      },
+      {
+        owner: 'quick',
+        phase: 'long-break',
+        location: 'background',
+        referenceMode: 'direct',
+        optional: true,
+      },
+    ]);
+    await replaceWorkflowAssetReferences(repository, source, replacement);
+    const saved = (await repository.list())[0];
+    expect(saved?.mode).toBe('quick');
+    if (saved?.mode !== 'quick') throw new Error('Expected Quick Workflow.');
+    expect(saved.configuration.focus.environment.backgroundAsset).toEqual({
+      type: 'direct',
+      assetId: replacement.id,
+    });
+    expect(
+      saved.phases
+        .filter(({ type }) => type === 'focus')
+        .every(
+          ({ environment }) =>
+            environment.backgroundAsset?.type === 'direct' &&
+            environment.backgroundAsset.assetId === replacement.id,
+        ),
+    ).toBe(true);
+  });
+
   test('replaces direct IDs while preserving Role references', async () => {
     const repository = new InMemoryWorkflowRepository([workflow()]);
     await replaceWorkflowAssetReferences(repository, source, replacement);

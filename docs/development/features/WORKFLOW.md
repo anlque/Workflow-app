@@ -9,12 +9,14 @@ before Session creation. The editor draft stores one discriminated reference
 per Environment slot, and its picker explicitly offers direct Asset and Role
 modes. Unrelated Phase edits preserve the selected reference variant.
 
-Workflow record version 6 writes optional normalized Phase names, the reference
+Workflow record version 7 writes an explicit configuration mode. Detailed
+records contain optional normalized Phase names and the reference
 union, canonical Reward schedule, Side availability and optional Side Bonus
 Reward Phase. Its mapper reads version-1
 `backgroundAssetId`/`audioAssetId` fields as direct references. Table indexes
-remain `id, order`. Package export writes version 6; import supports versions
-1–6.
+remain `id, order`. Quick records contain only validated cycle configuration,
+never generated Phases. Package export writes version 7; import supports versions
+1–7 and maps versions 1–6 to Detailed.
 
 ## Purpose
 
@@ -28,7 +30,8 @@ Source root: [`src/features/workflow/`](../../../src/features/workflow/).
 
 ## Owns
 
-- `Workflow` identity, name and ordered non-empty Phase sequence;
+- `Workflow` identity, name, Quick/Detailed configuration mode and ordered
+  non-empty executable Phase projection;
 - `Phase`, `Environment`, Reward Dice and Dice Side value semantics;
 - Reward eligibility and weighted side selection;
 - Workflow repository port and CRUD/list/order use cases;
@@ -67,9 +70,9 @@ allowlisted Workflow Studio and Side Panel presentation consumers use
 
 | Group | Exports |
 | --- | --- |
-| Domain value types | `BonusRewardPhase`, `BonusRewardPhaseInput`, `DiceSide`, `DiceSideInput`, `DiceSideAvailability`, `AssetId`, `AssetReference`, `AssetReferenceInput`, `Environment`, `EnvironmentInput`, `DurationSeconds`, `Phase`, `PhaseInput`, `PhaseType`, `RewardDice`, `RewardDiceInput`, `RewardPhaseType`, `CreateWorkflowInput`, `Workflow`, `WorkflowId` |
+| Domain value types | `BonusRewardPhase`, `DiceSide`, Asset/Environment/Phase/Reward types, `QuickWorkflowConfiguration`, `QuickWorkflow`, `DetailedWorkflow`, `CreateWorkflowInput`, `Workflow`, `WorkflowId` |
 | Domain behavior and errors | `createWorkflowId`, `createWorkflow`, `rollReward`, `eligibleDiceSides`, `rewardOpportunityPhaseIndexes`, `isRewardDueAfterPhase`, `WorkflowValidationError` |
-| Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`–`WorkflowPackageV6`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
+| Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, source-aware Environment traversal, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`–`WorkflowPackageV7`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
 | Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `resolveWorkflowAssetReferences`, Role-summary/rename and Asset-retirement summary/patch operations, `exportWorkflowUseCase`, `importWorkflowUseCase` |
 | Infrastructure composition | `DexieWorkflowRepository`, `workflowDatabaseSchemas`, `DexieWorkflowPackageUnitOfWork` |
 | Presentation components (`/studio`) | `WorkflowLibrary`, `WorkflowLibraryProps`, `WorkflowEditor`, `WorkflowEditorProps`, `RewardDiceEditor`, `RewardDiceEditorProps` |
@@ -121,10 +124,19 @@ It does not know Dexie or Chrome runtime APIs.
 - `WorkflowId` is a non-empty branded string.
 - The trimmed Workflow name is non-empty.
 - A Workflow contains at least one Phase and preserves Phase order.
+- Detailed is the legacy/default authored-Phase mode. Quick stores 1–20 cycles,
+  Focus/Short Break and optional Long Break source Environments plus optional
+  simplified Reward cadence. It deterministically derives `Focus -> Break`
+  cycles, including the final Break, and fixed names `Focus`, `Short break` and
+  `Long break`.
+- Ordinary update cannot change mode. Quick-to-Detailed conversion belongs to
+  QUICK-003.
 - A Phase type is exactly `focus` or `break`.
 - A supplied Phase name is trimmed; blank names normalize to absence. Absent
   names display as `Phase N` without persisting that fallback.
-- `durationSeconds` is a positive integer.
+- Detailed Phase `durationSeconds` is a positive integer. Quick Focus, Short
+  Break and Long Break durations are at least 30 seconds and use 30-second
+  increments.
 - Every Phase owns one Environment value, even when all fields are absent.
 - Direct background/audio identifiers are non-empty shared `AssetId` values;
   Role references contain a validated `AssetRole`.
@@ -189,7 +201,7 @@ Phases are copied by value. Session Domain owns per-opportunity reroll usage.
 | `deleteWorkflowUseCase` | Repository, ID | Requires existence, deletes; repository compacts collection order | `void` or not-found error |
 | `listWorkflowsUseCase` | Repository | Returns repository order | Readonly Workflow list |
 | `reorderWorkflowsUseCase` | Repository, complete ordered IDs | Requires an exact permutation of current IDs, delegates atomic replacement | `void` or Application error |
-| `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced Assets/Blobs, including Bonus Environments, and creates deterministic version-6 JSON | JSON or package validation error |
+| `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced source Environments/Blobs and creates deterministic version-7 JSON | JSON or package validation error |
 | `importWorkflowUseCase` | Repositories, unit of work, JSON, limits/policy/identity | Validates complete package before writes, generates collision-free IDs, rewrites Environment references, atomically writes Assets and Workflow | Imported Workflow or package validation/storage failure |
 
 Composition wraps successful catalog mutations with
@@ -199,17 +211,18 @@ use cases.
 
 ## Persistence
 
-`DexieWorkflowRepository` writes version-6 `WorkflowRecord` rows in the global
-version-1 `workflows: 'id, order'` table definition and reads versions 1–6.
+`DexieWorkflowRepository` writes version-7 `WorkflowRecord` rows in the global
+version-1 `workflows: 'id, order'` table definition and reads versions 1–7.
 
 - Reads treat rows as `unknown`, validate record metadata and reconstruct the
   Domain aggregate.
-- Version 1 accepts only legacy ID Environment fields; versions 2–6 accept only
+- Version 1 accepts only legacy ID Environment fields; versions 2–7 accept only
   exact direct-or-Role reference fields. Versions 1–2 read legacy frequency
-  fields; versions 3–6 read the canonical schedule union. Versions 1–3 default
-  missing Side availability to `any`; versions 4–6 require it. Versions 5–6
+  fields; versions 3–7 read the canonical schedule union. Versions 1–3 default
+  missing Side availability to `any`; versions 4–7 require it. Versions 5–7
   accept the optional exact Bonus Reward Phase shape; version 6 additionally
-  accepts an optional Phase name.
+  accepts an optional Phase name. Version 7 requires either a Detailed payload
+  or a Quick source configuration and never accepts both.
 - New rows append after the highest order.
 - Updates preserve the current order.
 - Delete compacts remaining order values.

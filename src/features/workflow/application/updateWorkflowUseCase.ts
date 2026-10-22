@@ -8,9 +8,15 @@ export async function updateWorkflowUseCase(
   input: CreateWorkflowInput,
 ): Promise<Workflow> {
   const workflow = createWorkflow(input);
-  if ((await repository.get(workflow.id)) === null) {
+  const existing = await repository.get(workflow.id);
+  if (existing === null) {
     throw new WorkflowApplicationError(
       `Workflow ${workflow.id} was not found.`,
+    );
+  }
+  if (existing.mode !== workflow.mode) {
+    throw new WorkflowApplicationError(
+      'Workflow configuration mode cannot be changed by update.',
     );
   }
 

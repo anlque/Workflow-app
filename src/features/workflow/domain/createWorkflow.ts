@@ -22,6 +22,15 @@ import {
 import { WorkflowValidationError } from './WorkflowErrors';
 import { eligibleDiceSides } from './eligibleDiceSides';
 import { rewardOpportunityPhaseIndexes } from './rewardOpportunityPhaseIndexes';
+import type {
+  QuickDiceSide,
+  QuickLongBreakConfiguration,
+  QuickPhaseConfiguration,
+  QuickRewardDiceConfiguration,
+  QuickWorkflow,
+  QuickWorkflowConfiguration,
+  QuickWorkflowConfigurationInput,
+} from './QuickWorkflow';
 
 function createPhaseType(value: string): PhaseType {
   if (value !== 'focus' && value !== 'break') {
@@ -258,11 +267,196 @@ function createRewardDice(
   });
 }
 
+function createQuickFrequency(
+  value: number,
+  cycleCount: number,
+  label: string,
+): number {
+  if (!Number.isInteger(value) || value < 1 || value > cycleCount) {
+    throw new WorkflowValidationError(
+      `${label} must be an integer from 1 through the cycle count.`,
+    );
+  }
+  return value;
+}
+
+function createQuickPhaseConfiguration(input: {
+  readonly durationSeconds: number;
+  readonly environment: Parameters<typeof createEnvironment>[0];
+}): QuickPhaseConfiguration {
+  if (
+    !Number.isInteger(input.durationSeconds) ||
+    input.durationSeconds < 30 ||
+    input.durationSeconds % 30 !== 0
+  ) {
+    throw new WorkflowValidationError(
+      'Quick Workflow durations must be at least 30 seconds and use 30-second increments.',
+    );
+  }
+  return Object.freeze({
+    durationSeconds: createDurationSeconds(input.durationSeconds),
+    environment: createEnvironment(input.environment),
+  });
+}
+
+function createQuickConfiguration(
+  input: QuickWorkflowConfigurationInput,
+): QuickWorkflowConfiguration {
+  const cycleCount = input.cycleCount;
+  if (!Number.isInteger(cycleCount) || cycleCount < 1 || cycleCount > 20) {
+    throw new WorkflowValidationError(
+      'Quick Workflow cycle count must be an integer from 1 through 20.',
+    );
+  }
+  const focus = createQuickPhaseConfiguration(input.focus);
+  const shortBreak = createQuickPhaseConfiguration(input.shortBreak);
+  const longBreak: QuickLongBreakConfiguration | undefined =
+    input.longBreak === undefined
+      ? undefined
+      : Object.freeze({
+          ...createQuickPhaseConfiguration(input.longBreak),
+          frequency: createQuickFrequency(
+            input.longBreak.frequency,
+            cycleCount,
+            'Quick Long Break frequency',
+          ),
+        });
+  let rewardDice: QuickRewardDiceConfiguration | undefined;
+  if (input.rewardDice !== undefined) {
+    const frequency = createQuickFrequency(
+      input.rewardDice.frequency,
+      cycleCount,
+      'Quick Reward frequency',
+    );
+    if (input.rewardDice.sides.length < 2) {
+      throw new WorkflowValidationError(
+        'Reward Dice must contain at least two sides.',
+      );
+    }
+    const customWeightCount = input.rewardDice.sides.filter(
+      ({ weight }) => weight !== undefined,
+    ).length;
+    if (
+      customWeightCount !== 0 &&
+      customWeightCount !== input.rewardDice.sides.length
+    ) {
+      throw new WorkflowValidationError(
+        'Reward Dice weights must be provided for every side or omitted for every side.',
+      );
+    }
+    const sides = input.rewardDice.sides.map((side): QuickDiceSide => {
+      validateDiceSide({ ...side, availability: 'any' });
+      if (
+        side.weight !== undefined &&
+        (!Number.isFinite(side.weight) || side.weight <= 0)
+      ) {
+        throw new WorkflowValidationError(
+          'Reward Dice weights must be finite positive numbers.',
+        );
+      }
+      return Object.freeze({
+        icon: side.icon.trim(),
+        title: side.title.trim(),
+        ...(side.weight === undefined ? {} : { weight: side.weight }),
+      });
+    });
+    const [first, second, ...rest] = sides;
+    if (first === undefined || second === undefined)
+      throw new WorkflowValidationError(
+        'Reward Dice must contain at least two sides.',
+      );
+    const immutableSides: readonly [
+      QuickDiceSide,
+      QuickDiceSide,
+      ...QuickDiceSide[],
+    ] = Object.freeze([first, second, ...rest]);
+    rewardDice = Object.freeze({ frequency, sides: immutableSides });
+  }
+  return Object.freeze({
+    cycleCount,
+    focus,
+    shortBreak,
+    ...(longBreak === undefined ? {} : { longBreak }),
+    ...(rewardDice === undefined ? {} : { rewardDice }),
+  });
+}
+
+function createQuickWorkflow(
+  input: Extract<CreateWorkflowInput, { mode: 'quick' }>,
+  name: string,
+): QuickWorkflow {
+  const configuration = createQuickConfiguration(input.configuration);
+  const phases: Phase[] = [];
+  for (
+    let cycleIndex = 0;
+    cycleIndex < configuration.cycleCount;
+    cycleIndex += 1
+  ) {
+    phases.push(
+      createPhase({ name: 'Focus', type: 'focus', ...configuration.focus }),
+    );
+    const useLong =
+      configuration.longBreak !== undefined &&
+      (cycleIndex + 1) % configuration.longBreak.frequency === 0;
+    const breakConfiguration = useLong
+      ? configuration.longBreak
+      : configuration.shortBreak;
+    phases.push(
+      createPhase({
+        name: useLong ? 'Long break' : 'Short break',
+        type: 'break',
+        ...breakConfiguration,
+      }),
+    );
+  }
+  const [firstPhase, ...remainingPhases] = phases;
+  if (firstPhase === undefined)
+    throw new WorkflowValidationError(
+      'Workflow must contain at least one Phase.',
+    );
+  const executablePhases: readonly [Phase, ...Phase[]] = Object.freeze([
+    firstPhase,
+    ...remainingPhases,
+  ]);
+  const rewardDice =
+    configuration.rewardDice === undefined
+      ? undefined
+      : createRewardDice(
+          {
+            schedule: {
+              type: 'frequency',
+              triggerPhaseType: 'break',
+              frequency: configuration.rewardDice.frequency,
+            },
+            rerolls: 0,
+            sides: configuration.rewardDice.sides.map(
+              ({ icon, title, weight }) => ({
+                icon,
+                title,
+                ...(weight === undefined ? {} : { weight }),
+                availability: 'any',
+              }),
+            ),
+          },
+          executablePhases.length,
+        );
+  return Object.freeze({
+    mode: 'quick',
+    id: createWorkflowId(input.id),
+    name,
+    configuration,
+    phases: executablePhases,
+    ...(rewardDice === undefined ? {} : { rewardDice }),
+  });
+}
+
 export function createWorkflow(input: CreateWorkflowInput): Workflow {
   const name = input.name.trim();
   if (name.length === 0) {
     throw new WorkflowValidationError('Workflow name must not be empty.');
   }
+
+  if (input.mode === 'quick') return createQuickWorkflow(input, name);
 
   const [firstPhaseInput, ...remainingPhaseInputs] = input.phases;
   if (firstPhaseInput === undefined) {
@@ -291,6 +485,7 @@ export function createWorkflow(input: CreateWorkflowInput): Workflow {
   }
 
   return Object.freeze({
+    mode: 'detailed',
     id: createWorkflowId(input.id),
     name,
     phases: Object.freeze(phases),

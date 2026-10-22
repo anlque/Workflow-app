@@ -27,10 +27,26 @@ export type {
   RewardPhaseType,
 } from './domain/RewardDice';
 export type {
+  CreateDetailedWorkflowInput,
   CreateWorkflowInput,
+  DetailedWorkflow,
   Workflow,
   WorkflowId,
 } from './domain/Workflow';
+export type {
+  CreateQuickWorkflowInput,
+  QuickDiceSide,
+  QuickDiceSideInput,
+  QuickLongBreakConfiguration,
+  QuickLongBreakConfigurationInput,
+  QuickPhaseConfiguration,
+  QuickPhaseConfigurationInput,
+  QuickRewardDiceConfiguration,
+  QuickRewardDiceConfigurationInput,
+  QuickWorkflow,
+  QuickWorkflowConfiguration,
+  QuickWorkflowConfigurationInput,
+} from './domain/QuickWorkflow';
 export { createWorkflowId } from './domain/Workflow';
 export { WorkflowValidationError } from './domain/WorkflowErrors';
 export { createWorkflow } from './domain/createWorkflow';
@@ -53,6 +69,12 @@ export { updateWorkflowUseCase } from './application/updateWorkflowUseCase';
 export type { AssetReferenceResolver } from './application/AssetReferenceResolver';
 export { resolveWorkflowAssetReferences } from './application/resolveWorkflowAssetReferences';
 export {
+  listWorkflowConfigurationEnvironments,
+  mapWorkflowConfigurationEnvironments,
+  type WorkflowEnvironmentEntry,
+  type WorkflowEnvironmentLocation,
+} from './application/workflowEnvironments';
+export {
   summarizeWorkflowAssetReferences,
   replaceWorkflowAssetReferences,
   removeOptionalWorkflowAssetReferences,
@@ -72,6 +94,7 @@ export {
   type WorkflowPackageV4,
   type WorkflowPackageV5,
   type WorkflowPackageV6,
+  type WorkflowPackageV7,
 } from './application/WorkflowPackage';
 export { exportWorkflowUseCase } from './application/exportWorkflowUseCase';
 export {

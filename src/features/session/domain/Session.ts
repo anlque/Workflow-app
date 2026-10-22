@@ -10,7 +10,11 @@ import {
   SessionTransitionError,
   SessionValidationError,
 } from './SessionErrors';
-import { createSessionSnapshot, type SessionSnapshot } from './SessionSnapshot';
+import {
+  createSessionSnapshot,
+  type ExecutableWorkflowSnapshot,
+  type SessionSnapshot,
+} from './SessionSnapshot';
 import { deriveSessionState } from './deriveSessionState';
 import { validateEpochMilliseconds } from './validateEpochMilliseconds';
 
@@ -111,7 +115,7 @@ export type Session =
 export type RestoreSessionInput =
   | Readonly<{
       id: string;
-      workflow: Workflow;
+      workflow: ExecutableWorkflowSnapshot;
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       restartCommandReceipts: readonly RestartCommandReceipt[];
@@ -123,7 +127,7 @@ export type RestoreSessionInput =
     }>
   | Readonly<{
       id: string;
-      workflow: Workflow;
+      workflow: ExecutableWorkflowSnapshot;
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       restartCommandReceipts: readonly RestartCommandReceipt[];
@@ -134,7 +138,7 @@ export type RestoreSessionInput =
     }>
   | Readonly<{
       id: string;
-      workflow: Workflow;
+      workflow: ExecutableWorkflowSnapshot;
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       restartCommandReceipts: readonly RestartCommandReceipt[];
@@ -147,7 +151,7 @@ export type RestoreSessionInput =
     }>
   | Readonly<{
       id: string;
-      workflow: Workflow;
+      workflow: ExecutableWorkflowSnapshot;
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       restartCommandReceipts: readonly RestartCommandReceipt[];
@@ -158,7 +162,7 @@ export type RestoreSessionInput =
     }>
   | Readonly<{
       id: string;
-      workflow: Workflow;
+      workflow: ExecutableWorkflowSnapshot;
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       restartCommandReceipts: readonly RestartCommandReceipt[];

@@ -62,13 +62,35 @@ export type WorkflowRecordV6 = WorkflowRecordBase &
     }>[];
   }>;
 
+export type DetailedWorkflowRecordV7 = Readonly<{
+  schemaVersion: 7;
+  mode: 'detailed';
+  id: string;
+  order: number;
+  name: string;
+  phases: WorkflowRecordV6['phases'];
+  rewardDice?: unknown;
+}>;
+
+export type QuickWorkflowRecordV7 = Readonly<{
+  schemaVersion: 7;
+  mode: 'quick';
+  id: string;
+  order: number;
+  name: string;
+  configuration: unknown;
+}>;
+
+export type WorkflowRecordV7 = DetailedWorkflowRecordV7 | QuickWorkflowRecordV7;
+
 export type WorkflowRecord =
   | WorkflowRecordV1
   | WorkflowRecordV2
   | WorkflowRecordV3
   | WorkflowRecordV4
   | WorkflowRecordV5
-  | WorkflowRecordV6;
+  | WorkflowRecordV6
+  | WorkflowRecordV7;
 
 export const workflowDatabaseSchemas: readonly DatabaseSchema[] = [
   {

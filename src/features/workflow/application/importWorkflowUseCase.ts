@@ -8,7 +8,6 @@ import {
   type AssetRepository,
 } from '@/features/assets';
 
-import { createWorkflow } from '../domain/createWorkflow';
 import type { Workflow } from '../domain/Workflow';
 import type { WorkflowRepository } from './WorkflowRepository';
 import {
@@ -16,6 +15,10 @@ import {
   type WorkflowPackageUnitOfWork,
 } from './WorkflowPackage';
 import { parseWorkflow } from './workflowPackageMapping';
+import {
+  listWorkflowConfigurationEnvironments,
+  mapWorkflowConfigurationEnvironments,
+} from './workflowEnvironments';
 
 export type WorkflowImportOptions = Readonly<{
   maxFileBytes: number;
@@ -87,12 +90,9 @@ function packageReferences(workflow: Workflow): PackageReferences {
     }
     target.set(key, kind);
   };
-  const environments = [
-    ...workflow.phases.map(({ environment }) => environment),
-    ...(workflow.rewardDice?.sides.flatMap(({ bonusPhase }) =>
-      bonusPhase === undefined ? [] : [bonusPhase.environment],
-    ) ?? []),
-  ];
+  const environments = listWorkflowConfigurationEnvironments(workflow).map(
+    ({ environment }) => environment,
+  );
   for (const environment of environments) {
     if (environment.backgroundAsset?.type === 'direct') {
       add(direct, environment.backgroundAsset.assetId, 'image');
@@ -110,7 +110,7 @@ function packageReferences(workflow: Workflow): PackageReferences {
 
 function parseAsset(
   value: unknown,
-  version: 1 | 2 | 3 | 4 | 5 | 6,
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7,
   policy: AssetImportPolicy,
   identity: WorkflowImportIdentity,
 ): DecodedAsset {
@@ -231,7 +231,8 @@ export async function importWorkflowUseCase(
       envelope['version'] !== 3 &&
       envelope['version'] !== 4 &&
       envelope['version'] !== 5 &&
-      envelope['version'] !== 6) ||
+      envelope['version'] !== 6 &&
+      envelope['version'] !== 7) ||
     !Array.isArray(envelope['assets'])
   ) {
     throw new WorkflowPackageValidationError();
@@ -347,44 +348,11 @@ export async function importWorkflowUseCase(
     const reservedWorkflowIds = new Set(
       (await workflows.list()).map((workflow) => String(workflow.id)),
     );
-    const imported = createWorkflow({
-      id: nextUniqueId(identity.createWorkflowId, reservedWorkflowIds),
-      name: sourceWorkflow.name,
-      phases: sourceWorkflow.phases.map((phase) => ({
-        ...(phase.name === undefined ? {} : { name: phase.name }),
-        type: phase.type,
-        durationSeconds: phase.durationSeconds,
-        environment: rewriteEnvironment(phase.environment),
-      })),
-      ...(sourceWorkflow.rewardDice === undefined
-        ? {}
-        : {
-            rewardDice: {
-              schedule: sourceWorkflow.rewardDice.schedule,
-              rerolls: sourceWorkflow.rewardDice.rerolls,
-              sides: sourceWorkflow.rewardDice.sides.map((side) => ({
-                icon: side.icon,
-                title: side.title,
-                ...(side.description === undefined
-                  ? {}
-                  : { description: side.description }),
-                availability: side.availability,
-                weight: side.probability,
-                ...(side.bonusPhase === undefined
-                  ? {}
-                  : {
-                      bonusPhase: {
-                        name: side.bonusPhase.name,
-                        durationSeconds: side.bonusPhase.durationSeconds,
-                        environment: rewriteEnvironment(
-                          side.bonusPhase.environment,
-                        ),
-                      },
-                    }),
-              })),
-            },
-          }),
-    });
+    const imported = await mapWorkflowConfigurationEnvironments(
+      sourceWorkflow,
+      rewriteEnvironment,
+      { id: nextUniqueId(identity.createWorkflowId, reservedWorkflowIds) },
+    );
     for (const decodedAsset of remappedAssets) {
       await assets.save(decodedAsset.asset, decodedAsset.blob);
     }

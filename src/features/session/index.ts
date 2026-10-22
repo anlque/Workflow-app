@@ -45,7 +45,10 @@ export {
   SessionTransitionError,
   SessionValidationError,
 } from './domain/SessionErrors';
-export type { SessionSnapshot } from './domain/SessionSnapshot';
+export type {
+  ExecutableWorkflowSnapshot,
+  SessionSnapshot,
+} from './domain/SessionSnapshot';
 export { deriveSessionState } from './domain/deriveSessionState';
 export { DexieSessionRepository } from './infrastructure/DexieSessionRepository';
 export { sessionDatabaseSchemas } from './infrastructure/SessionRecord';

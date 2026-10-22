@@ -340,7 +340,7 @@ async function controlledSetup(final = false) {
   const alarms = new FakeAlarmScheduler();
   const onError = vi.fn();
   const coordinator = createSessionCoordinator({
-    workflows: workflowRepository(session.snapshot.workflow),
+    workflows: workflowRepository(workflow()),
     sessions,
     clock,
     messages,
@@ -417,7 +417,7 @@ describe('createSessionCoordinator', () => {
     };
     const messages = new FakeMessageBus();
     const coordinator = createSessionCoordinator({
-      workflows: workflowRepository(persisted.snapshot.workflow),
+      workflows: workflowRepository(workflow()),
       sessions,
       clock: new FakeClock(51_000),
       messages,

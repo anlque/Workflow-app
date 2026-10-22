@@ -28,6 +28,28 @@ function workflowWithReward() {
 }
 
 describe('parseSessionProjection', () => {
+  test('rejects Workflow configuration mode in a runtime projection', () => {
+    const value = structuredClone(
+      createSession('mode-projection', workflowWithReward(), 1_000),
+    ) as unknown as { snapshot: { workflow: Record<string, unknown> } };
+    value.snapshot.workflow['mode'] = 'detailed';
+
+    expect(() => parseSessionProjection(value)).toThrow(
+      'Session projection is invalid.',
+    );
+  });
+
+  test('keeps the parsed executable Workflow projection mode-free', () => {
+    const parsed = parseSessionProjection(
+      structuredClone(
+        createSession('mode-free-projection', workflowWithReward(), 1_000),
+      ),
+    );
+
+    expect(parsed?.snapshot.workflow).not.toHaveProperty('mode');
+    expect(parsed?.snapshot.workflow).not.toHaveProperty('configuration');
+  });
+
   test('preserves an optional canonical Phase name', () => {
     const value = createSession(
       'named-projection',

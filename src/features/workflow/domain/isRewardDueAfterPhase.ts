@@ -1,7 +1,7 @@
 import type { Workflow } from './Workflow';
 
 export function isRewardDueAfterPhase(
-  workflow: Workflow,
+  workflow: Pick<Workflow, 'phases' | 'rewardDice'>,
   completedPhaseIndex: number,
 ): boolean {
   if (

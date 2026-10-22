@@ -297,3 +297,9 @@ Accepted architectural decisions are indexed in
 [`docs/adr/README.md`](../adr/README.md). This document defines the current
 architecture; ADRs preserve the reasoning and consequences behind individual
 long-lived decisions.
+
+Quick and Detailed configuration are Workflow Domain variants. Quick
+materialization and source-Environment traversal remain inside the Workflow
+feature; Session receives a Session-owned mode-free executable Workflow
+snapshot with ordinary Phases and canonical Reward Dice and has no
+Quick-specific runtime branch.

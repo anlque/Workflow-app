@@ -8,7 +8,7 @@ same kind of state even when they describe the same Session or Workflow.
 
 | State | Authoritative owner | Representation | Lifetime | Consumers | Synchronization |
 | --- | --- | --- | --- | --- | --- |
-| Workflow aggregate | Workflow Domain | Immutable `Workflow` with ordered Phases, Environments and optional Reward Dice | Until replaced or deleted | Workflow use cases, editors and Session snapshot creation | Repository reads; catalog invalidation tells open surfaces to reload |
+| Workflow aggregate | Workflow Domain | Immutable Quick/Detailed configuration plus an ordered executable Phase/Reward projection | Until replaced or deleted | Workflow use cases, editors and Session snapshot creation | Repository reads; catalog invalidation tells open surfaces to reload |
 | Session aggregate | Session Domain; execution coordinated by background Application composition | Immutable discriminated `Session` union | Start through Completed or Stopped history | Background coordinator and surface projections | Session commands, persistence and `session/changed` |
 | Workflow records | Workflow Infrastructure | Validated `WorkflowRecord` rows | Durable IndexedDB data | `DexieWorkflowRepository` | IndexedDB transactions and explicit catalog reload |
 | Session records | Session Infrastructure | Validated `SessionRecord` rows | Durable IndexedDB data | `DexieSessionRepository` and background reconciliation | Save per authoritative transition; load on worker startup/wake |

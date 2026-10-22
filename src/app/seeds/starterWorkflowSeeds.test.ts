@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
-import { createWorkflow, type CreateWorkflowInput } from '@/features/workflow';
+import {
+  createWorkflow,
+  type CreateDetailedWorkflowInput,
+} from '@/features/workflow';
 
 import { starterAssetSeeds } from './starterAssetSeeds';
 import { starterWorkflowSeeds } from './starterWorkflowSeeds';
@@ -11,7 +14,7 @@ function expectDeeplyFrozen(value: unknown): void {
   Object.values(value).forEach(expectDeeplyFrozen);
 }
 
-function roleReferences(input: CreateWorkflowInput) {
+function roleReferences(input: CreateDetailedWorkflowInput) {
   const environments = [
     ...input.phases.map(({ environment }) => environment),
     ...(input.rewardDice?.sides.flatMap(({ bonusPhase }) =>
@@ -62,6 +65,9 @@ describe('starterWorkflowSeeds', () => {
         { name: 'Finish strong', type: 'focus', durationSeconds: 1_200 },
       ],
     ]);
+    expect(
+      starterWorkflowSeeds.map((input) => createWorkflow(input).mode),
+    ).toEqual(['detailed', 'detailed', 'detailed']);
   });
 
   test('uses only existing Role references with the matching Asset kind', () => {

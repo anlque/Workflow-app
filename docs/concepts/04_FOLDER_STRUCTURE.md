@@ -133,7 +133,8 @@ Initial MVP features are:
 - assets
 - settings
 
-Workflow owns Phase, Environment and Reward Dice configuration. Workflow Library
+Workflow owns Quick/Detailed configuration, deterministic Quick materialization,
+Phase, Environment and Reward Dice configuration. Workflow Library
 is the Workflow collection exposed by the workflow feature rather than a
 separate feature. Session consumes an immutable Workflow snapshot through the
 workflow public API. Reward Dice Templates, statistics and provider integrations

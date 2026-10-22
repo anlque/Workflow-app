@@ -1,8 +1,8 @@
-import { createWorkflow } from '../domain/createWorkflow';
 import type { AssetReference } from '../domain/Environment';
 import type { Environment } from '../domain/Environment';
 import type { Workflow } from '../domain/Workflow';
 import type { AssetReferenceResolver } from './AssetReferenceResolver';
+import { mapWorkflowConfigurationEnvironments } from './workflowEnvironments';
 
 async function resolveReference(
   reference: AssetReference | undefined,
@@ -43,50 +43,7 @@ export async function resolveWorkflowAssetReferences(
   workflow: Workflow,
   resolver: AssetReferenceResolver,
 ): Promise<Workflow> {
-  const phases = await Promise.all(
-    workflow.phases.map(async (phase) => {
-      return {
-        ...(phase.name === undefined ? {} : { name: phase.name }),
-        type: phase.type,
-        durationSeconds: phase.durationSeconds,
-        environment: await resolveEnvironment(phase.environment, resolver),
-      };
-    }),
+  return mapWorkflowConfigurationEnvironments(workflow, (environment) =>
+    resolveEnvironment(environment, resolver),
   );
-  return createWorkflow({
-    id: workflow.id,
-    name: workflow.name,
-    phases,
-    ...(workflow.rewardDice === undefined
-      ? {}
-      : {
-          rewardDice: {
-            schedule: workflow.rewardDice.schedule,
-            rerolls: workflow.rewardDice.rerolls,
-            sides: await Promise.all(
-              workflow.rewardDice.sides.map(async (side) => ({
-                icon: side.icon,
-                title: side.title,
-                ...(side.description === undefined
-                  ? {}
-                  : { description: side.description }),
-                availability: side.availability,
-                weight: side.probability,
-                ...(side.bonusPhase === undefined
-                  ? {}
-                  : {
-                      bonusPhase: {
-                        name: side.bonusPhase.name,
-                        durationSeconds: side.bonusPhase.durationSeconds,
-                        environment: await resolveEnvironment(
-                          side.bonusPhase.environment,
-                          resolver,
-                        ),
-                      },
-                    }),
-              })),
-            ),
-          },
-        }),
-  });
 }

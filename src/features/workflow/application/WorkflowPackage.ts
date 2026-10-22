@@ -40,6 +40,13 @@ export type WorkflowPackageV6 = Readonly<{
   assets: readonly unknown[];
 }>;
 
+export type WorkflowPackageV7 = Readonly<{
+  kind: 'locusora/workflow';
+  version: 7;
+  workflow: unknown;
+  assets: readonly unknown[];
+}>;
+
 export type WorkflowPackageUnitOfWork = {
   run<Result>(operation: () => Promise<Result>): Promise<Result>;
 };

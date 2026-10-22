@@ -61,7 +61,7 @@ implicitly select or start a Workflow.
 
 ## Authoritative Changes
 
-- A new version-8 Session record becomes the only active record.
+- A new version-9 Session record becomes the only active record.
 - Its Workflow snapshot contains direct Asset IDs only, including optional
   Bonus Environments; later Role moves do not change it.
 - Its immutable snapshot, current Phase index 0 and wall-clock start/end anchors
@@ -128,3 +128,8 @@ pnpm vitest run src/app/background src/app/session src/features/session
 - [ADR-0004: Authoritative Session Execution](../../adr/ADR-0004-authoritative-session-execution.md)
 - [State and Data Flow](../STATE_AND_DATA_FLOW.md)
 - [Session Feature](../features/SESSION.md)
+
+Quick Workflows are resolved through their source Environments and materialized
+before snapshot creation. The immutable Session snapshot always contains a
+Session-owned mode-free executable Workflow snapshot with ordinary Phases and
+canonical Reward Dice; Session execution never branches on configuration mode.

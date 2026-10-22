@@ -82,7 +82,7 @@ function parseReference(value: unknown) {
 
 function parseEnvironment(
   value: unknown,
-  version: 1 | 2 | 3 | 4 | 5 | 6,
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7,
 ): EnvironmentInput {
   const environment = record(value);
   const environmentKeys =
@@ -117,7 +117,35 @@ function parseEnvironment(
 }
 
 export function serializeWorkflow(workflow: Workflow): unknown {
+  if (workflow.mode === 'quick') {
+    const phase = (value: typeof workflow.configuration.focus) => ({
+      durationSeconds: value.durationSeconds,
+      environment: serializeEnvironment(value.environment),
+    });
+    return {
+      mode: 'quick',
+      id: workflow.id,
+      name: workflow.name,
+      configuration: {
+        cycleCount: workflow.configuration.cycleCount,
+        focus: phase(workflow.configuration.focus),
+        shortBreak: phase(workflow.configuration.shortBreak),
+        ...(workflow.configuration.longBreak === undefined
+          ? {}
+          : {
+              longBreak: {
+                ...phase(workflow.configuration.longBreak),
+                frequency: workflow.configuration.longBreak.frequency,
+              },
+            }),
+        ...(workflow.configuration.rewardDice === undefined
+          ? {}
+          : { rewardDice: workflow.configuration.rewardDice }),
+      },
+    };
+  }
   return {
+    mode: 'detailed',
     id: workflow.id,
     name: workflow.name,
     phases: workflow.phases.map((phase) => ({
@@ -159,11 +187,30 @@ export function serializeWorkflow(workflow: Workflow): unknown {
 
 export function parseWorkflow(
   value: unknown,
-  version: 1 | 2 | 3 | 4 | 5 | 6,
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7,
 ): Workflow {
   try {
     const input = record(value);
-    if (!hasExactKeys(input, ['id', 'name', 'phases'], ['rewardDice'])) {
+    if (version === 7 && input['mode'] === 'quick') {
+      if (!hasExactKeys(input, ['mode', 'id', 'name', 'configuration']))
+        return invalid();
+      return createWorkflow({
+        mode: 'quick',
+        id: string(input['id']),
+        name: string(input['name']),
+        configuration: parseQuickConfiguration(input['configuration']),
+      });
+    }
+    if (
+      !hasExactKeys(
+        input,
+        version === 7
+          ? ['mode', 'id', 'name', 'phases']
+          : ['id', 'name', 'phases'],
+        ['rewardDice'],
+      ) ||
+      (version === 7 && input['mode'] !== 'detailed')
+    ) {
       return invalid();
     }
     const phaseValues = input['phases'];
@@ -227,13 +274,14 @@ export function parseWorkflow(
     return createWorkflow({
       id: string(input['id']),
       name: string(input['name']),
+      mode: 'detailed',
       phases: phaseValues.map((phaseValue) => {
         const phase = record(phaseValue);
         if (
           !hasExactKeys(
             phase,
             ['type', 'durationSeconds', 'environment'],
-            version === 6 ? ['name'] : [],
+            version >= 6 ? ['name'] : [],
           )
         ) {
           return invalid();
@@ -309,4 +357,75 @@ export function parseWorkflow(
     if (error instanceof WorkflowPackageValidationError) throw error;
     throw new WorkflowPackageValidationError();
   }
+}
+
+function parseQuickPhase(value: unknown, withFrequency: boolean) {
+  const input = record(value);
+  if (
+    !hasExactKeys(
+      input,
+      withFrequency
+        ? ['durationSeconds', 'environment', 'frequency']
+        : ['durationSeconds', 'environment'],
+    )
+  )
+    return invalid();
+  return {
+    durationSeconds: number(input['durationSeconds']),
+    environment: parseEnvironment(input['environment'], 7),
+    ...(withFrequency ? { frequency: number(input['frequency']) } : {}),
+  };
+}
+
+function parseQuickConfiguration(value: unknown) {
+  const input = record(value);
+  if (
+    !hasExactKeys(
+      input,
+      ['cycleCount', 'focus', 'shortBreak'],
+      ['longBreak', 'rewardDice'],
+    )
+  )
+    return invalid();
+  const reward =
+    input['rewardDice'] === undefined ? undefined : record(input['rewardDice']);
+  if (
+    reward !== undefined &&
+    (!hasExactKeys(reward, ['frequency', 'sides']) ||
+      !Array.isArray(reward['sides']))
+  )
+    return invalid();
+  return {
+    cycleCount: number(input['cycleCount']),
+    focus: parseQuickPhase(input['focus'], false),
+    shortBreak: parseQuickPhase(input['shortBreak'], false),
+    ...(input['longBreak'] === undefined
+      ? {}
+      : {
+          longBreak: parseQuickPhase(input['longBreak'], true) as {
+            durationSeconds: number;
+            environment: EnvironmentInput;
+            frequency: number;
+          },
+        }),
+    ...(reward === undefined
+      ? {}
+      : {
+          rewardDice: {
+            frequency: number(reward['frequency']),
+            sides: (reward['sides'] as unknown[]).map((value) => {
+              const side = record(value);
+              if (!hasExactKeys(side, ['icon', 'title'], ['weight']))
+                return invalid();
+              return {
+                icon: string(side['icon']),
+                title: string(side['title']),
+                ...(side['weight'] === undefined
+                  ? {}
+                  : { weight: number(side['weight']) }),
+              };
+            }),
+          },
+        }),
+  };
 }

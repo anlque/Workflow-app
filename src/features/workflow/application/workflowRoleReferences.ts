@@ -5,9 +5,12 @@ import {
 } from '@/features/assets';
 
 import type { AssetReference, EnvironmentInput } from '../domain/Environment';
-import { createWorkflow } from '../domain/createWorkflow';
 import type { Workflow } from '../domain/Workflow';
 import type { WorkflowRepository } from './WorkflowRepository';
+import {
+  listWorkflowConfigurationEnvironments,
+  mapWorkflowConfigurationEnvironments,
+} from './workflowEnvironments';
 
 export type WorkflowRoleUsageSummary = Readonly<{
   workflowCount: number;
@@ -29,15 +32,9 @@ function usageKinds(
   role: AssetRole,
 ): ReadonlySet<AssetKind> {
   const kinds = new Set<AssetKind>();
-  workflow.phases.forEach(({ environment }) => {
+  listWorkflowConfigurationEnvironments(workflow).forEach(({ environment }) => {
     if (matches(environment.backgroundAsset, role)) kinds.add('image');
     if (matches(environment.audioAsset, role)) kinds.add('audio');
-  });
-  workflow.rewardDice?.sides.forEach(({ bonusPhase }) => {
-    if (bonusPhase === undefined) return;
-    if (matches(bonusPhase.environment.backgroundAsset, role))
-      kinds.add('image');
-    if (matches(bonusPhase.environment.audioAsset, role)) kinds.add('audio');
   });
   return kinds;
 }
@@ -69,30 +66,6 @@ function renameReference(
   return matches(reference, from) ? { type: 'role', role: to } : reference;
 }
 
-function renameEnvironment(
-  workflow: Workflow,
-  phaseIndex: number,
-  from: AssetRole,
-  to: AssetRole,
-): EnvironmentInput {
-  const phase = workflow.phases[phaseIndex];
-  if (phase === undefined) throw new Error('Workflow Phase was not found.');
-  const environment = phase.environment;
-  const backgroundAsset = renameReference(
-    environment.backgroundAsset,
-    from,
-    to,
-  );
-  const audioAsset = renameReference(environment.audioAsset, from, to);
-  return {
-    ...(backgroundAsset === undefined ? {} : { backgroundAsset }),
-    ...(audioAsset === undefined ? {} : { audioAsset }),
-    ...(environment.backgroundColor === undefined
-      ? {}
-      : { backgroundColor: environment.backgroundColor }),
-  };
-}
-
 export async function renameWorkflowRoleReferences(
   repository: WorkflowRepository,
   from: AssetRole,
@@ -101,46 +74,9 @@ export async function renameWorkflowRoleReferences(
   for (const workflow of await repository.list()) {
     if (usageKinds(workflow, from).size === 0) continue;
     await repository.save(
-      createWorkflow({
-        id: workflow.id,
-        name: workflow.name,
-        phases: workflow.phases.map((phase, index) => ({
-          ...(phase.name === undefined ? {} : { name: phase.name }),
-          type: phase.type,
-          durationSeconds: phase.durationSeconds,
-          environment: renameEnvironment(workflow, index, from, to),
-        })),
-        ...(workflow.rewardDice === undefined
-          ? {}
-          : {
-              rewardDice: {
-                schedule: workflow.rewardDice.schedule,
-                rerolls: workflow.rewardDice.rerolls,
-                sides: workflow.rewardDice.sides.map((side) => ({
-                  icon: side.icon,
-                  title: side.title,
-                  ...(side.description === undefined
-                    ? {}
-                    : { description: side.description }),
-                  availability: side.availability,
-                  weight: side.probability,
-                  ...(side.bonusPhase === undefined
-                    ? {}
-                    : {
-                        bonusPhase: {
-                          name: side.bonusPhase.name,
-                          durationSeconds: side.bonusPhase.durationSeconds,
-                          environment: renameEnvironmentValue(
-                            side.bonusPhase.environment,
-                            from,
-                            to,
-                          ),
-                        },
-                      }),
-                })),
-              },
-            }),
-      }),
+      await mapWorkflowConfigurationEnvironments(workflow, (environment) =>
+        renameEnvironmentValue(environment, from, to),
+      ),
     );
   }
 }

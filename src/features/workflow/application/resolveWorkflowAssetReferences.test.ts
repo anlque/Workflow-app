@@ -7,6 +7,60 @@ import type { AssetReferenceResolver } from './AssetReferenceResolver';
 import { resolveWorkflowAssetReferences } from './resolveWorkflowAssetReferences';
 
 describe('resolveWorkflowAssetReferences', () => {
+  test('resolves each Quick source Environment once and preserves raw configuration', async () => {
+    const resolve = vi.fn<AssetReferenceResolver['resolve']>((role, kind) =>
+      Promise.resolve(createAssetId(`${kind}-${role}`)),
+    );
+    const workflow = createWorkflow({
+      mode: 'quick',
+      id: 'quick-roles',
+      name: 'Quick roles',
+      configuration: {
+        cycleCount: 4,
+        focus: {
+          durationSeconds: 1_500,
+          environment: {
+            backgroundAsset: { type: 'role', role: 'Focus image' },
+          },
+        },
+        shortBreak: {
+          durationSeconds: 300,
+          environment: { audioAsset: { type: 'role', role: 'Break audio' } },
+        },
+        longBreak: {
+          durationSeconds: 900,
+          environment: {
+            backgroundAsset: { type: 'role', role: 'Long image' },
+          },
+          frequency: 2,
+        },
+        rewardDice: {
+          frequency: 2,
+          sides: [
+            { icon: 'a', title: 'A', weight: 2 },
+            { icon: 'b', title: 'B', weight: 4 },
+          ],
+        },
+      },
+    });
+    const resolved = await resolveWorkflowAssetReferences(workflow, {
+      resolve,
+    });
+    expect(resolve).toHaveBeenCalledTimes(3);
+    expect(resolved.mode).toBe('quick');
+    if (resolved.mode !== 'quick') throw new Error('Expected Quick Workflow.');
+    expect(
+      resolved.configuration.rewardDice?.sides.map(({ weight }) => weight),
+    ).toEqual([2, 4]);
+    expect(
+      resolved.phases.every(
+        ({ environment }) =>
+          environment.backgroundAsset?.type !== 'role' &&
+          environment.audioAsset?.type !== 'role',
+      ),
+    ).toBe(true);
+  });
+
   test('resolves every Role with the Environment expected kind', async () => {
     const resolve = vi.fn<AssetReferenceResolver['resolve']>((role, kind) =>
       Promise.resolve(createAssetId(`${kind}-${role}`)),

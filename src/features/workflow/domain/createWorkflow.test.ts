@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
 import { createWorkflow } from './createWorkflow';
+import type { CreateWorkflowInput } from './Workflow';
 import { WorkflowValidationError } from './WorkflowErrors';
+import { rewardOpportunityPhaseIndexes } from './rewardOpportunityPhaseIndexes';
 
 const validPhase = {
   type: 'focus',
@@ -11,7 +13,403 @@ const validPhase = {
   },
 } as const;
 
+const detailedInputTypeProof = {
+  id: 'detailed-type-proof',
+  name: 'Detailed',
+  phases: [validPhase],
+} satisfies CreateWorkflowInput;
+const quickInputTypeProof = {
+  mode: 'quick',
+  id: 'quick-type-proof',
+  name: 'Quick',
+  configuration: {
+    cycleCount: 1,
+    focus: { durationSeconds: 30, environment: {} },
+    shortBreak: { durationSeconds: 30, environment: {} },
+  },
+} satisfies CreateWorkflowInput;
+// @ts-expect-error Quick inputs cannot carry generated Detailed Phases.
+const mixedQuickInputTypeProof: CreateWorkflowInput = {
+  ...quickInputTypeProof,
+  phases: [validPhase],
+};
+// @ts-expect-error Detailed inputs cannot carry Quick configuration.
+const mixedDetailedInputTypeProof: CreateWorkflowInput = {
+  ...detailedInputTypeProof,
+  configuration: quickInputTypeProof.configuration,
+};
+void mixedQuickInputTypeProof;
+void mixedDetailedInputTypeProof;
+
 describe('createWorkflow', () => {
+  test('keeps Quick and Detailed constructor inputs type-exclusive', () => {
+    expect(createWorkflow(detailedInputTypeProof).mode).toBe('detailed');
+    expect(createWorkflow(quickInputTypeProof).mode).toBe('quick');
+  });
+  test('defaults a legacy constructor input to Detailed mode', () => {
+    const workflow = createWorkflow({
+      id: 'workflow-1',
+      name: 'Deep work',
+      phases: [validPhase],
+    });
+
+    expect(workflow.mode).toBe('detailed');
+    expect(workflow).not.toHaveProperty('configuration');
+  });
+
+  test('creates a deeply immutable Quick configuration beside its executable projection', () => {
+    const workflow = createWorkflow({
+      mode: 'quick',
+      id: 'quick-1',
+      name: 'Quick rhythm',
+      configuration: {
+        cycleCount: 4,
+        focus: {
+          durationSeconds: 1_500,
+          environment: { backgroundColor: '#123456' },
+        },
+        shortBreak: { durationSeconds: 300, environment: {} },
+        longBreak: { durationSeconds: 900, environment: {}, frequency: 3 },
+        rewardDice: {
+          frequency: 2,
+          sides: [
+            { icon: 'tea', title: 'Tea', weight: 2 },
+            { icon: 'walk', title: 'Walk', weight: 4 },
+          ],
+        },
+      },
+    });
+
+    expect(workflow.mode).toBe('quick');
+    if (workflow.mode !== 'quick') throw new Error('Expected Quick Workflow');
+    expect(workflow.phases.map(({ name }) => name)).toEqual([
+      'Focus',
+      'Short break',
+      'Focus',
+      'Short break',
+      'Focus',
+      'Long break',
+      'Focus',
+      'Short break',
+    ]);
+    expect(workflow.rewardDice).toMatchObject({
+      schedule: { type: 'frequency', triggerPhaseType: 'break', frequency: 2 },
+      rerolls: 0,
+    });
+    expect(
+      workflow.rewardDice?.sides.map(({ probability }) => probability),
+    ).toEqual([1 / 3, 2 / 3]);
+    expect(
+      workflow.configuration.rewardDice?.sides.map(({ weight }) => weight),
+    ).toEqual([2, 4]);
+    expect(Object.isFrozen(workflow.configuration)).toBe(true);
+    expect(Object.isFrozen(workflow.configuration.focus.environment)).toBe(
+      true,
+    );
+    expect(Object.isFrozen(workflow.configuration.rewardDice?.sides)).toBe(
+      true,
+    );
+  });
+
+  test.each([0, 21, 1.5, Number.NaN])(
+    'rejects invalid Quick cycle count %s',
+    (cycleCount) => {
+      expect(() =>
+        createWorkflow({
+          mode: 'quick',
+          id: 'quick-1',
+          name: 'Quick',
+          configuration: {
+            cycleCount,
+            focus: { durationSeconds: 1_500, environment: {} },
+            shortBreak: { durationSeconds: 300, environment: {} },
+          },
+        }),
+      ).toThrow(
+        'Quick Workflow cycle count must be an integer from 1 through 20.',
+      );
+    },
+  );
+
+  test.each([
+    ['Focus', 'focus', 29],
+    ['Focus', 'focus', 31],
+    ['Short Break', 'shortBreak', 0],
+    ['Short Break', 'shortBreak', 45],
+    ['Long Break', 'longBreak', -30],
+    ['Long Break', 'longBreak', 61],
+  ] as const)(
+    'rejects invalid Quick %s duration',
+    (_label, field, durationSeconds) => {
+      const base = {
+        cycleCount: 2,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+        longBreak: { durationSeconds: 900, environment: {}, frequency: 2 },
+      };
+      const configuration = {
+        ...base,
+        ...(field === 'focus'
+          ? { focus: { ...base.focus, durationSeconds } }
+          : field === 'shortBreak'
+            ? { shortBreak: { ...base.shortBreak, durationSeconds } }
+            : { longBreak: { ...base.longBreak, durationSeconds } }),
+      };
+
+      expect(() =>
+        createWorkflow({
+          mode: 'quick',
+          id: 'quick-duration',
+          name: 'Quick',
+          configuration,
+        }),
+      ).toThrow(
+        'Quick Workflow durations must be at least 30 seconds and use 30-second increments.',
+      );
+    },
+  );
+
+  test('keeps positive whole-second durations valid for Detailed Workflows', () => {
+    expect(
+      createWorkflow({
+        id: 'detailed-seconds',
+        name: 'Detailed',
+        phases: [{ ...validPhase, durationSeconds: 1 }],
+      }).phases[0].durationSeconds,
+    ).toBe(1);
+  });
+
+  test('materializes all accepted Quick cadence combinations deterministically', () => {
+    for (let cycleCount = 1; cycleCount <= 20; cycleCount += 1) {
+      for (let frequency = 1; frequency <= cycleCount; frequency += 1) {
+        const workflow = createWorkflow({
+          mode: 'quick',
+          id: `quick-${String(cycleCount)}-${String(frequency)}`,
+          name: 'Quick',
+          configuration: {
+            cycleCount,
+            focus: { durationSeconds: 1_500, environment: {} },
+            shortBreak: { durationSeconds: 300, environment: {} },
+            longBreak: { durationSeconds: 900, environment: {}, frequency },
+            rewardDice: {
+              frequency,
+              sides: [
+                { icon: 'tea', title: 'Tea' },
+                { icon: 'walk', title: 'Walk' },
+              ],
+            },
+          },
+        });
+        expect(workflow.phases).toHaveLength(cycleCount * 2);
+        expect(workflow.phases.at(-1)?.type).toBe('break');
+        expect(
+          workflow.phases.filter(({ name }) => name === 'Long break'),
+        ).toHaveLength(Math.floor(cycleCount / frequency));
+        expect(rewardOpportunityPhaseIndexes(workflow)).toEqual(
+          Array.from(
+            { length: Math.floor(cycleCount / frequency) },
+            (_, index) => (index + 1) * frequency * 2 - 1,
+          ),
+        );
+      }
+    }
+  });
+
+  test('projects the configured duration and Environment for every Quick cadence segment', () => {
+    const workflow = createWorkflow({
+      mode: 'quick',
+      id: 'quick-projection',
+      name: 'Quick',
+      configuration: {
+        cycleCount: 3,
+        focus: {
+          durationSeconds: 60,
+          environment: { backgroundColor: '#111111' },
+        },
+        shortBreak: {
+          durationSeconds: 90,
+          environment: { backgroundColor: '#222222' },
+        },
+        longBreak: {
+          durationSeconds: 120,
+          environment: { backgroundColor: '#333333' },
+          frequency: 2,
+        },
+      },
+    });
+    expect(
+      workflow.phases.map(({ durationSeconds, environment }) => ({
+        durationSeconds,
+        backgroundColor: environment.backgroundColor,
+      })),
+    ).toEqual([
+      { durationSeconds: 60, backgroundColor: '#111111' },
+      { durationSeconds: 90, backgroundColor: '#222222' },
+      { durationSeconds: 60, backgroundColor: '#111111' },
+      { durationSeconds: 120, backgroundColor: '#333333' },
+      { durationSeconds: 60, backgroundColor: '#111111' },
+      { durationSeconds: 90, backgroundColor: '#222222' },
+    ]);
+  });
+
+  test.each([
+    [
+      'Long Break',
+      { longBreak: { durationSeconds: 300, environment: {}, frequency: 3 } },
+    ],
+    [
+      'Reward',
+      {
+        rewardDice: {
+          frequency: 3,
+          sides: [
+            { icon: 'a', title: 'A' },
+            { icon: 'b', title: 'B' },
+          ],
+        },
+      },
+    ],
+  ] as const)('rejects %s frequency above cycle count', (_label, extension) => {
+    expect(() =>
+      createWorkflow({
+        mode: 'quick',
+        id: 'quick-frequency',
+        name: 'Quick',
+        configuration: {
+          cycleCount: 2,
+          focus: { durationSeconds: 1_500, environment: {} },
+          shortBreak: { durationSeconds: 300, environment: {} },
+          ...extension,
+        },
+      }),
+    ).toThrow('must be an integer from 1 through the cycle count.');
+  });
+
+  test.each([0, 1.5, Number.NaN])(
+    'rejects invalid Quick Long Break and Reward frequency %s',
+    (frequency) => {
+      for (const extension of [
+        { longBreak: { durationSeconds: 300, environment: {}, frequency } },
+        {
+          rewardDice: {
+            frequency,
+            sides: [
+              { icon: 'a', title: 'A' },
+              { icon: 'b', title: 'B' },
+            ],
+          },
+        },
+      ]) {
+        expect(() =>
+          createWorkflow({
+            mode: 'quick',
+            id: 'quick-invalid-frequency',
+            name: 'Quick',
+            configuration: {
+              cycleCount: 2,
+              focus: { durationSeconds: 1_500, environment: {} },
+              shortBreak: { durationSeconds: 300, environment: {} },
+              ...extension,
+            },
+          }),
+        ).toThrow('must be an integer from 1 through the cycle count.');
+      }
+    },
+  );
+
+  test('rejects a Quick Reward after cycle count is reduced below its frequency', () => {
+    expect(() =>
+      createWorkflow({
+        mode: 'quick',
+        id: 'quick-reduced',
+        name: 'Quick',
+        configuration: {
+          cycleCount: 1,
+          focus: { durationSeconds: 1_500, environment: {} },
+          shortBreak: { durationSeconds: 300, environment: {} },
+          rewardDice: {
+            frequency: 2,
+            sides: [
+              { icon: 'a', title: 'A' },
+              { icon: 'b', title: 'B' },
+            ],
+          },
+        },
+      }),
+    ).toThrow(
+      'Quick Reward frequency must be an integer from 1 through the cycle count.',
+    );
+  });
+
+  test.each([
+    [
+      'fewer than two sides',
+      [{ icon: 'a', title: 'A' }],
+      'Reward Dice must contain at least two sides.',
+    ],
+    [
+      'blank icon',
+      [
+        { icon: ' ', title: 'A' },
+        { icon: 'b', title: 'B' },
+      ],
+      'Dice Side icon must not be empty.',
+    ],
+    [
+      'blank title',
+      [
+        { icon: 'a', title: ' ' },
+        { icon: 'b', title: 'B' },
+      ],
+      'Dice Side title must not be empty.',
+    ],
+    [
+      'partial weights',
+      [
+        { icon: 'a', title: 'A', weight: 1 },
+        { icon: 'b', title: 'B' },
+      ],
+      'Reward Dice weights must be provided for every side or omitted for every side.',
+    ],
+    [
+      'zero weight',
+      [
+        { icon: 'a', title: 'A', weight: 0 },
+        { icon: 'b', title: 'B', weight: 1 },
+      ],
+      'Reward Dice weights must be finite positive numbers.',
+    ],
+    [
+      'negative weight',
+      [
+        { icon: 'a', title: 'A', weight: -1 },
+        { icon: 'b', title: 'B', weight: 1 },
+      ],
+      'Reward Dice weights must be finite positive numbers.',
+    ],
+    [
+      'non-finite weight',
+      [
+        { icon: 'a', title: 'A', weight: Number.POSITIVE_INFINITY },
+        { icon: 'b', title: 'B', weight: 1 },
+      ],
+      'Reward Dice weights must be finite positive numbers.',
+    ],
+  ] as const)('rejects Quick Reward %s', (_label, sides, message) => {
+    expect(() =>
+      createWorkflow({
+        mode: 'quick',
+        id: 'quick-sides',
+        name: 'Quick',
+        configuration: {
+          cycleCount: 2,
+          focus: { durationSeconds: 1_500, environment: {} },
+          shortBreak: { durationSeconds: 300, environment: {} },
+          rewardDice: { frequency: 1, sides },
+        },
+      }),
+    ).toThrow(message);
+  });
   test('creates a normalized deeply immutable Workflow', () => {
     const workflow = createWorkflow({
       id: 'workflow-1',

@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
 import { createWorkflow } from '../domain/createWorkflow';
-import type { CreateWorkflowInput, WorkflowId } from '../domain/Workflow';
+import type {
+  CreateDetailedWorkflowInput,
+  WorkflowId,
+} from '../domain/Workflow';
 import { createWorkflowUseCase } from './createWorkflowUseCase';
 import { deleteWorkflowUseCase } from './deleteWorkflowUseCase';
 import { duplicateWorkflowUseCase } from './duplicateWorkflowUseCase';
@@ -10,7 +13,10 @@ import { reorderWorkflowsUseCase } from './reorderWorkflowsUseCase';
 import { InMemoryWorkflowRepository } from './testing/InMemoryWorkflowRepository';
 import { updateWorkflowUseCase } from './updateWorkflowUseCase';
 
-const workflowInput = (id: string, name: string): CreateWorkflowInput => ({
+const workflowInput = (
+  id: string,
+  name: string,
+): CreateDetailedWorkflowInput => ({
   id,
   name,
   phases: [
@@ -26,6 +32,67 @@ const workflowId = (value: string): WorkflowId =>
   createWorkflow(workflowInput(value, 'ID fixture')).id;
 
 describe('Workflow use cases', () => {
+  test('duplicates Quick configuration and rejects ordinary mode changes', async () => {
+    const source = createWorkflow({
+      mode: 'quick',
+      id: 'quick-source',
+      name: 'Quick',
+      configuration: {
+        cycleCount: 2,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+        rewardDice: {
+          frequency: 1,
+          sides: [
+            { icon: 'a', title: 'A', weight: 2 },
+            { icon: 'b', title: 'B', weight: 4 },
+          ],
+        },
+      },
+    });
+    const repository = new InMemoryWorkflowRepository([source]);
+    const duplicate = await duplicateWorkflowUseCase(
+      repository,
+      source.id,
+      workflowId('quick-copy'),
+    );
+    expect(duplicate.mode).toBe('quick');
+    if (duplicate.mode !== 'quick') throw new Error('Expected Quick Workflow.');
+    expect(
+      duplicate.configuration.rewardDice?.sides.map(({ weight }) => weight),
+    ).toEqual([2, 4]);
+
+    await expect(
+      updateWorkflowUseCase(repository, {
+        mode: 'detailed',
+        id: source.id,
+        name: source.name,
+        phases: source.phases,
+      }),
+    ).rejects.toThrow(
+      'Workflow configuration mode cannot be changed by update.',
+    );
+
+    const detailed = createWorkflow(
+      workflowInput('detailed-source', 'Detailed'),
+    );
+    const detailedRepository = new InMemoryWorkflowRepository([detailed]);
+    await expect(
+      updateWorkflowUseCase(detailedRepository, {
+        mode: 'quick',
+        id: detailed.id,
+        name: detailed.name,
+        configuration: {
+          cycleCount: 1,
+          focus: { durationSeconds: 1_500, environment: {} },
+          shortBreak: { durationSeconds: 300, environment: {} },
+        },
+      }),
+    ).rejects.toThrow(
+      'Workflow configuration mode cannot be changed by update.',
+    );
+  });
+
   test('creates and appends a Workflow to the library', async () => {
     const repository = new InMemoryWorkflowRepository();
 

@@ -8,9 +8,10 @@ import type { AssetId } from '@/shared';
 import type { Workflow } from '../domain/Workflow';
 import {
   WorkflowPackageValidationError,
-  type WorkflowPackageV6,
+  type WorkflowPackageV7,
 } from './WorkflowPackage';
 import { serializeWorkflow } from './workflowPackageMapping';
+import { listWorkflowConfigurationEnvironments } from './workflowEnvironments';
 
 function referencedAssets(
   workflow: Workflow,
@@ -25,12 +26,9 @@ function referencedAssets(
     ),
   );
   const selected = new Map<AssetId, Asset>();
-  const environments = [
-    ...workflow.phases.map(({ environment }) => environment),
-    ...(workflow.rewardDice?.sides.flatMap(({ bonusPhase }) =>
-      bonusPhase === undefined ? [] : [bonusPhase.environment],
-    ) ?? []),
-  ];
+  const environments = listWorkflowConfigurationEnvironments(workflow).map(
+    ({ environment }) => environment,
+  );
   for (const environment of environments) {
     for (const [reference, expectedKind] of [
       [environment.backgroundAsset, 'image'],
@@ -89,9 +87,9 @@ export async function exportWorkflowUseCase(
       };
     }),
   );
-  const envelope: WorkflowPackageV6 = {
+  const envelope: WorkflowPackageV7 = {
     kind: 'locusora/workflow',
-    version: 6,
+    version: 7,
     workflow: serializeWorkflow(workflow),
     assets: encodedAssets,
   };

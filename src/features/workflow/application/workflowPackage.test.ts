@@ -105,6 +105,32 @@ function rewardedWorkflow(): Workflow {
   });
 }
 
+function quickPackage(workflowOverrides: Record<string, unknown> = {}) {
+  return {
+    kind: 'locusora/workflow',
+    version: 7,
+    workflow: {
+      mode: 'quick',
+      id: 'quick-package-input',
+      name: 'Quick package',
+      configuration: {
+        cycleCount: 2,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+        rewardDice: {
+          frequency: 1,
+          sides: [
+            { icon: 'a', title: 'A', weight: 1 },
+            { icon: 'b', title: 'B', weight: 1 },
+          ],
+        },
+      },
+      ...workflowOverrides,
+    },
+    assets: [],
+  };
+}
+
 async function addAsset(
   repository: MemoryAssetRepository,
   id: string,
@@ -126,6 +152,139 @@ async function addAsset(
 }
 
 describe('Workflow package', () => {
+  test('round-trips a Quick source configuration through package v7', async () => {
+    const source = createWorkflow({
+      mode: 'quick',
+      id: 'quick-package',
+      name: 'Quick',
+      configuration: {
+        cycleCount: 3,
+        focus: {
+          durationSeconds: 1_500,
+          environment: {
+            backgroundAsset: { type: 'direct', assetId: 'asset-used' },
+          },
+        },
+        shortBreak: { durationSeconds: 300, environment: {} },
+        rewardDice: {
+          frequency: 2,
+          sides: [
+            { icon: 'tea', title: 'Tea', weight: 2 },
+            { icon: 'walk', title: 'Walk', weight: 4 },
+          ],
+        },
+      },
+    });
+    const sourceAssets = new MemoryAssetRepository();
+    await addAsset(sourceAssets, 'asset-used');
+
+    const data = await exportWorkflowUseCase(source, sourceAssets);
+    const encoded = JSON.parse(data) as Record<string, unknown>;
+    expect(encoded).toMatchObject({
+      version: 7,
+      workflow: { mode: 'quick', configuration: { cycleCount: 3 } },
+    });
+    expect(encoded['workflow']).not.toHaveProperty('phases');
+
+    const workflows = new MemoryWorkflowRepository();
+    const imported = await importWorkflowUseCase(
+      workflows,
+      new MemoryAssetRepository(),
+      new MemoryUnitOfWork(),
+      data,
+      { maxFileBytes: 10_000, assetPolicy: policy },
+      {
+        createWorkflowId: () => 'quick-imported',
+        createAssetId: () => 'asset-imported',
+        now: () => 2_000,
+      },
+    );
+    expect(imported.mode).toBe('quick');
+    if (imported.mode !== 'quick') throw new Error('Expected Quick Workflow.');
+    expect(
+      imported.configuration.rewardDice?.sides.map(({ weight }) => weight),
+    ).toEqual([2, 4]);
+    expect(imported.phases).toHaveLength(6);
+    expect(imported.configuration.focus.environment.backgroundAsset).toEqual({
+      type: 'direct',
+      assetId: 'asset-imported',
+    });
+  });
+
+  test('rejects generated Phases in a version-7 Quick package before writes', async () => {
+    await expectRejectedPackage({
+      kind: 'locusora/workflow',
+      version: 7,
+      workflow: {
+        mode: 'quick',
+        id: 'invalid-quick',
+        name: 'Invalid',
+        configuration: {
+          cycleCount: 1,
+          focus: { durationSeconds: 1_500, environment: {} },
+          shortBreak: { durationSeconds: 300, environment: {} },
+        },
+        phases: [],
+      },
+      assets: [],
+    });
+  });
+
+  test.each([
+    ['unknown field', quickPackage({ extra: true })],
+    ['mixed Detailed field', quickPackage({ rewardDice: {} })],
+    ['malformed configuration', quickPackage({ configuration: null })],
+    [
+      'invalid duration',
+      quickPackage({
+        configuration: {
+          cycleCount: 1,
+          focus: { durationSeconds: 29, environment: {} },
+          shortBreak: { durationSeconds: 300, environment: {} },
+        },
+      }),
+    ],
+    [
+      'invalid frequency',
+      quickPackage({
+        configuration: {
+          cycleCount: 1,
+          focus: { durationSeconds: 1_500, environment: {} },
+          shortBreak: { durationSeconds: 300, environment: {} },
+          rewardDice: {
+            frequency: 2,
+            sides: [
+              { icon: 'a', title: 'A' },
+              { icon: 'b', title: 'B' },
+            ],
+          },
+        },
+      }),
+    ],
+    [
+      'invalid weights',
+      quickPackage({
+        configuration: {
+          cycleCount: 1,
+          focus: { durationSeconds: 1_500, environment: {} },
+          shortBreak: { durationSeconds: 300, environment: {} },
+          rewardDice: {
+            frequency: 1,
+            sides: [
+              { icon: 'a', title: 'A', weight: Number.NaN },
+              { icon: 'b', title: 'B', weight: 1 },
+            ],
+          },
+        },
+      }),
+    ],
+  ])(
+    'rejects a strict v7 Quick package with %s atomically',
+    async (_label, value) => {
+      await expectRejectedPackage(value);
+    },
+  );
+
   async function expectRejectedPackage(packageValue: unknown): Promise<void> {
     const workflows = new MemoryWorkflowRepository();
     const assets = new MemoryAssetRepository();
@@ -147,7 +306,7 @@ describe('Workflow package', () => {
     expect(unitOfWork.runs).toBe(0);
   }
 
-  test('round-trips a named Phase through a version-6 package', async () => {
+  test('round-trips a named Phase through a version-7 package', async () => {
     const source = createWorkflow({
       id: 'named-source',
       name: 'Named source',
@@ -168,7 +327,7 @@ describe('Workflow package', () => {
       version: number;
       workflow: { phases: readonly { name?: string }[] };
     };
-    expect(encoded.version).toBe(6);
+    expect(encoded.version).toBe(7);
     expect(encoded.workflow.phases[0]?.name).toBe('Writing');
 
     const workflows = new MemoryWorkflowRepository();
@@ -440,7 +599,7 @@ describe('Workflow package', () => {
       packageWith({ type: 'direct', assetId: 'a' }, { ...asset, extra: true }),
     );
   });
-  test('exports version 6 and remaps a colliding imported Role to its imported Asset', async () => {
+  test('exports version 7 and remaps a colliding imported Role to its imported Asset', async () => {
     const sourceAssets = new MemoryAssetRepository();
     await addAsset(sourceAssets, 'source-image', 'Backdrop');
     const source = createWorkflow({
@@ -476,7 +635,7 @@ describe('Workflow package', () => {
       },
     );
 
-    expect(parsed.version).toBe(6);
+    expect(parsed.version).toBe(7);
     expect(parsed.assets).toEqual([
       expect.objectContaining({ role: 'Backdrop' }),
     ]);
@@ -706,7 +865,7 @@ describe('Workflow package', () => {
 
     expect(JSON.parse(data)).toMatchObject({
       kind: 'locusora/workflow',
-      version: 6,
+      version: 7,
       workflow: {
         rewardDice: {
           schedule: { type: 'frequency', triggerPhaseType: 'break' },
@@ -742,6 +901,7 @@ describe('Workflow package', () => {
       frequency?: unknown;
     };
     legacyPackage.version = 2;
+    delete (legacyPackage.workflow as Record<string, unknown>)['mode'];
     legacyReward['triggerPhaseType'] = schedule.triggerPhaseType;
     legacyReward['frequency'] = schedule.frequency;
     delete legacyReward['schedule'];
@@ -766,7 +926,7 @@ describe('Workflow package', () => {
     expect(imported.rewardDice?.rerolls).toBe(0);
   });
 
-  test('round-trips a canonical custom Reward schedule in version 6', async () => {
+  test('round-trips a canonical custom Reward schedule in version 7', async () => {
     const source = createWorkflow({
       id: 'custom-reward-workflow',
       name: 'Custom reward',
@@ -801,7 +961,7 @@ describe('Workflow package', () => {
     );
 
     expect(JSON.parse(data)).toMatchObject({
-      version: 6,
+      version: 7,
       workflow: {
         rewardDice: {
           schedule: { type: 'custom', phaseIndexes: [1] },

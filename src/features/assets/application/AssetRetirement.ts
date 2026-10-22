@@ -22,6 +22,10 @@ export type AssetRetirementOccurrence = AssetRetirementOccurrenceBase &
   (
     | Readonly<{ owner: 'phase'; phaseIndex: number }>
     | Readonly<{ owner: 'bonus'; sideIndex: number }>
+    | Readonly<{
+        owner: 'quick';
+        phase: 'focus' | 'short-break' | 'long-break';
+      }>
   );
 
 export type AssetRetirementPreview = Readonly<{

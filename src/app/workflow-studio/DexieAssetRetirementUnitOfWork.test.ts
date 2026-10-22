@@ -28,7 +28,7 @@ afterEach(async () =>
   Promise.all(names.splice(0).map((name) => Dexie.delete(name))),
 );
 
-async function setup() {
+async function setup(quick = false) {
   const name = `asset-retirement-${crypto.randomUUID()}`;
   names.push(name);
   const database = new LocusoraDatabase({
@@ -62,19 +62,35 @@ async function setup() {
   await assets.save(source, blob);
   await assets.save(replacement, blob);
   await workflows.save(
-    createWorkflow({
-      id: 'workflow',
-      name: 'Workflow',
-      phases: [
-        {
-          type: 'focus',
-          durationSeconds: 60,
-          environment: {
-            backgroundAsset: { type: 'direct', assetId: source.id },
+    quick
+      ? createWorkflow({
+          mode: 'quick',
+          id: 'workflow',
+          name: 'Workflow',
+          configuration: {
+            cycleCount: 2,
+            focus: {
+              durationSeconds: 60,
+              environment: {
+                backgroundAsset: { type: 'direct', assetId: source.id },
+              },
+            },
+            shortBreak: { durationSeconds: 30, environment: {} },
           },
-        },
-      ],
-    }),
+        })
+      : createWorkflow({
+          id: 'workflow',
+          name: 'Workflow',
+          phases: [
+            {
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {
+                backgroundAsset: { type: 'direct', assetId: source.id },
+              },
+            },
+          ],
+        }),
   );
   const active = { has: () => Promise.resolve(false) };
   const workflowReferences = {
@@ -112,6 +128,33 @@ async function setup() {
 }
 
 describe('DexieAssetRetirementUnitOfWork', () => {
+  test('commits a Quick direct-reference replacement and Role transfer', async () => {
+    const value = await setup(true);
+    await value.run({ type: 'existing', assetId: value.replacement.id });
+    const restored = (
+      await new DexieWorkflowRepository(value.database).list()
+    )[0];
+    expect(restored?.mode).toBe('quick');
+    if (restored?.mode !== 'quick') throw new Error('Expected Quick Workflow.');
+    expect(restored.configuration.focus.environment.backgroundAsset).toEqual({
+      type: 'direct',
+      assetId: value.replacement.id,
+    });
+    expect((await value.assets.get(value.replacement.id))?.role).toBe('Hero');
+    expect(await value.assets.get(value.source.id)).toBeNull();
+  });
+
+  test('rolls back Quick Workflow replacement when Role transfer fails', async () => {
+    const value = await setup(true);
+    vi.spyOn(value.database.table('assets'), 'put').mockRejectedValueOnce(
+      new Error('role failed'),
+    );
+    await expect(
+      value.run({ type: 'existing', assetId: value.replacement.id }),
+    ).rejects.toThrow('role failed');
+    await value.expectUnchanged();
+  });
+
   test('commits an uploaded replacement without leaving the source', async () => {
     const value = await setup();
     await value.run({

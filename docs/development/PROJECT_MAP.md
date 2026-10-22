@@ -75,7 +75,7 @@ aggregate and everything configured as part of it.
 
 | Location | Owner | Contains | May depend on | Why it exists |
 | --- | --- | --- | --- | --- |
-| [`domain/`](../../src/features/workflow/domain/) | Workflow Domain | `Workflow`, `Phase`, `Environment`, Reward Dice, Dice Side, creation, reward eligibility/selection and validation errors | Domain modules and Shared Kernel `AssetId` | Protects Workflow invariants independently of UI and storage |
+| [`domain/`](../../src/features/workflow/domain/) | Workflow Domain | Quick/Detailed `Workflow`, deterministic Quick materialization, `Phase`, `Environment`, Reward Dice and validation | Domain modules and Shared Kernel `AssetId` | Protects configuration and executable projection invariants independently of UI and storage |
 | [`application/`](../../src/features/workflow/application/) | Workflow use cases | Repository port; create, update, delete, duplicate, list and reorder use cases; Workflow package import/export contracts | Workflow Domain and Assets root API where package operations require Asset contracts | Coordinates changes to Workflows without choosing persistence or UI |
 | [`infrastructure/`](../../src/features/workflow/infrastructure/) | Workflow persistence | IndexedDB records/mapping, Dexie repository and atomic Workflow-package unit of work | Workflow Application/Domain contracts, Assets public contracts and storage platform | Adapts Workflow and package operations to IndexedDB |
 | [`presentation/`](../../src/features/workflow/presentation/) | Workflow UI | Library, editor, Reward Dice editor and catalog/editor hooks | Workflow public behavior, React and shared UI | Provides reusable Workflow screens and local draft/catalog state |

@@ -626,7 +626,14 @@ describe('Session', () => {
     expect(session.currentPhaseIndex).toBe(0);
     expect(session.phaseStartedAt).toBe(1_000);
     expect(session.phaseEndsAt).toBe(11_000);
-    expect(session.snapshot.workflow).toEqual(source);
+    expect(session.snapshot.workflow).toEqual({
+      id: source.id,
+      name: source.name,
+      phases: source.phases,
+      rewardDice: source.rewardDice,
+    });
+    expect(session.snapshot.workflow).not.toHaveProperty('mode');
+    expect(session.snapshot.workflow).not.toHaveProperty('configuration');
     expect(session.snapshot.workflow).not.toBe(source);
     expect(session.snapshot.workflow.phases).not.toBe(source.phases);
     expect(session.snapshot.workflow.rewardDice?.rerolls).toBe(3);

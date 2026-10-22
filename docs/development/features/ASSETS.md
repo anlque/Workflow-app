@@ -154,6 +154,9 @@ storage failures propagate. Object URLs are transient and never persisted.
 Workflow package export loads every referenced Blob and embeds it as Base64.
 Import validates the complete package, creates new identifiers and writes its
 Assets and Workflow in one Dexie transaction owned by the Workflow feature.
+Quick Workflow Asset operations traverse the three source Environments once
+(Focus, Short Break and optional Long Break), then rematerialize the executable
+projection. They never patch repeated generated Phases independently.
 See [Persistence and Compatibility](../PERSISTENCE.md) and
 [ADR-0007](../../adr/ADR-0007-versioned-import-export.md).
 

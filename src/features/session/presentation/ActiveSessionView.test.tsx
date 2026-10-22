@@ -131,9 +131,24 @@ describe('ActiveSessionView', () => {
 
   test('keeps a final Reward visible before acknowledgment', () => {
     const finalWorkflow = createWorkflow({
-      ...workflow,
+      mode: 'detailed',
       id: 'workflow-final',
+      name: workflow.name,
       phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      ...(workflow.rewardDice === undefined
+        ? {}
+        : {
+            rewardDice: {
+              schedule: workflow.rewardDice.schedule,
+              rerolls: workflow.rewardDice.rerolls,
+              sides: workflow.rewardDice.sides.map((side) => ({
+                icon: side.icon,
+                title: side.title,
+                weight: side.probability,
+                availability: side.availability,
+              })),
+            },
+          }),
     });
     const paused = deriveSessionState(
       createSession('session-final', finalWorkflow, 1_000),
@@ -235,8 +250,10 @@ describe('ActiveSessionView', () => {
 
   test('does not report a Phase boundary when restarting the Workflow from Bonus', () => {
     const bonusWorkflow = createWorkflow({
-      ...workflow,
+      mode: 'detailed',
       id: 'bonus-restart-cue',
+      name: workflow.name,
+      phases: workflow.phases,
       rewardDice: {
         frequency: 1,
         sides: [
@@ -289,8 +306,10 @@ describe('ActiveSessionView', () => {
 
   test('reports a real boundary after the immediate workflow restart update was missed', () => {
     const bonusWorkflow = createWorkflow({
-      ...workflow,
+      mode: 'detailed',
       id: 'missed-bonus-restart-cue',
+      name: workflow.name,
+      phases: workflow.phases,
       rewardDice: {
         frequency: 1,
         sides: [

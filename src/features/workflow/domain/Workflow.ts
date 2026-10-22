@@ -1,5 +1,6 @@
 import type { Phase, PhaseInput } from './Phase';
 import type { RewardDice, RewardDiceInput } from './RewardDice';
+import type { CreateQuickWorkflowInput, QuickWorkflow } from './QuickWorkflow';
 import { WorkflowValidationError } from './WorkflowErrors';
 
 declare const workflowIdBrand: unique symbol;
@@ -14,16 +15,23 @@ export function createWorkflowId(value: string): WorkflowId {
   return value as WorkflowId;
 }
 
-export type Workflow = Readonly<{
+export type DetailedWorkflow = Readonly<{
+  mode: 'detailed';
   id: WorkflowId;
   name: string;
   phases: readonly [Phase, ...Phase[]];
   rewardDice?: RewardDice;
 }>;
 
-export type CreateWorkflowInput = Readonly<{
+export type CreateDetailedWorkflowInput = Readonly<{
+  mode?: 'detailed';
   id: string;
   name: string;
   phases: readonly PhaseInput[];
   rewardDice?: RewardDiceInput;
+  configuration?: never;
 }>;
+
+export type Workflow = DetailedWorkflow | QuickWorkflow;
+export type CreateWorkflowInput =
+  CreateDetailedWorkflowInput | CreateQuickWorkflowInput;

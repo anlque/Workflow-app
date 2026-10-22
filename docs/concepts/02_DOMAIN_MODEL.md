@@ -446,6 +446,12 @@ Session.
 
 A Workflow may contain multiple Phases.
 
+A Workflow configuration is either Quick or Detailed. Detailed directly owns
+the arbitrary ordered Phase sequence. Quick owns a validated 1–20-cycle rhythm
+and deterministically materializes an executable `Focus -> Break` sequence,
+including the final Break. The materialized projection, rather than Quick
+configuration, is copied into Session.
+
 A Workflow contains at least one ordered Phase. The MVP executes the ordered
 sequence once. Each Phase has a positive duration and is either Focus or Break.
 

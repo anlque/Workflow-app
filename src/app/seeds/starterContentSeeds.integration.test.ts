@@ -89,7 +89,30 @@ describe('starter Workflow seed integration', () => {
     const quickId = createWorkflow(quickInput).id;
     const quickFocus = await workflows.get(quickId);
     if (quickFocus === null) throw new Error('Quick Focus missing.');
-    await workflows.save(createWorkflow({ ...quickFocus, name: 'My focus' }));
+    if (quickFocus.mode !== 'detailed')
+      throw new Error('Starter must be Detailed.');
+    await workflows.save(
+      createWorkflow({
+        mode: 'detailed',
+        id: quickFocus.id,
+        name: 'My focus',
+        phases: quickFocus.phases,
+        ...(quickFocus.rewardDice === undefined
+          ? {}
+          : {
+              rewardDice: {
+                schedule: quickFocus.rewardDice.schedule,
+                rerolls: quickFocus.rewardDice.rerolls,
+                sides: quickFocus.rewardDice.sides.map((side) => ({
+                  icon: side.icon,
+                  title: side.title,
+                  weight: side.probability,
+                  availability: side.availability,
+                })),
+              },
+            }),
+      }),
+    );
     const balancedId = createWorkflow(balancedInput).id;
     await workflows.delete(balancedId);
 

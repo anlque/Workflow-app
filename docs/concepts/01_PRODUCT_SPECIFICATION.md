@@ -284,7 +284,10 @@ The MVP targets Chrome on Manifest V3 and contains these extension surfaces:
 The MVP does not require a popup or content scripts. Additional browsers and
 extension surfaces remain future work.
 
-An MVP Workflow contains an ordered, non-empty sequence of Phases. A Phase is
+Every executable Workflow projection contains an ordered, non-empty sequence of
+Phases. Detailed Workflows author that sequence directly. Quick Workflows save a
+1–20-cycle Focus/Break rhythm and deterministically materialize the same Phase
+model; Quick configuration is their only saved source of truth. A Phase is
 either `focus` or `break` and may have a user-defined name; unnamed and legacy
 Phases display the deterministic fallback `Phase N`. Short-break and long-break
 presets are presentation conveniences rather than distinct domain types. A

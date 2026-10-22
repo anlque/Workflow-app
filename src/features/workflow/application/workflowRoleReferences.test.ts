@@ -12,6 +12,45 @@ import {
 const role = createAssetRole('Ambient');
 
 describe('Workflow Role references', () => {
+  test('summarizes and renames Quick source Roles without converting mode', async () => {
+    const quick = createWorkflow({
+      mode: 'quick',
+      id: 'quick',
+      name: 'Quick',
+      configuration: {
+        cycleCount: 3,
+        focus: {
+          durationSeconds: 1_500,
+          environment: { audioAsset: { type: 'role', role: 'Ambient' } },
+        },
+        shortBreak: {
+          durationSeconds: 300,
+          environment: { audioAsset: { type: 'role', role: 'AMBIENT' } },
+        },
+      },
+    });
+    const repository = new InMemoryWorkflowRepository([quick]);
+    await expect(
+      summarizeWorkflowRoleReferences(repository, role),
+    ).resolves.toEqual({ workflowCount: 1, expectedKinds: ['audio'] });
+    await renameWorkflowRoleReferences(
+      repository,
+      role,
+      createAssetRole('New ambience'),
+    );
+    const renamed = (await repository.list())[0];
+    expect(renamed?.mode).toBe('quick');
+    if (renamed?.mode !== 'quick') throw new Error('Expected Quick Workflow.');
+    expect(renamed.configuration.focus.environment.audioAsset).toEqual({
+      type: 'role',
+      role: 'New ambience',
+    });
+    expect(renamed.configuration.shortBreak.environment.audioAsset).toEqual({
+      type: 'role',
+      role: 'New ambience',
+    });
+  });
+
   test('summarizes distinct Workflows and every expected kind', async () => {
     const repository = new InMemoryWorkflowRepository([
       createWorkflow({

@@ -6,7 +6,7 @@ import type { Workflow } from '../domain/Workflow';
 import { WorkflowValidationError } from '../domain/WorkflowErrors';
 import type { WorkflowRecord } from './WorkflowRecord';
 
-type WorkflowSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6;
+type WorkflowSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 function invalidRecord(): never {
   throw new WorkflowValidationError('Stored Workflow record is invalid.');
@@ -128,7 +128,7 @@ function mapPhaseRecord(
     !hasExactKeys(
       record,
       ['type', 'durationSeconds', 'environment'],
-      schemaVersion === 6 ? ['name'] : [],
+      schemaVersion >= 6 ? ['name'] : [],
     )
   ) {
     return invalidRecord();
@@ -259,7 +259,8 @@ export function mapWorkflowRecord(value: unknown): Workflow {
     record['schemaVersion'] !== 3 &&
     record['schemaVersion'] !== 4 &&
     record['schemaVersion'] !== 5 &&
-    record['schemaVersion'] !== 6
+    record['schemaVersion'] !== 6 &&
+    record['schemaVersion'] !== 7
   ) {
     return invalidRecord();
   }
@@ -269,18 +270,49 @@ export function mapWorkflowRecord(value: unknown): Workflow {
     return invalidRecord();
   }
 
+  const schemaVersion = record['schemaVersion'];
+  if (schemaVersion === 7 && record['mode'] === 'quick') {
+    if (
+      !hasExactKeys(record, [
+        'schemaVersion',
+        'mode',
+        'id',
+        'order',
+        'name',
+        'configuration',
+      ])
+    )
+      return invalidRecord();
+    return createWorkflow({
+      mode: 'quick',
+      id: stringValue(record['id']),
+      name: stringValue(record['name']),
+      configuration: mapQuickConfigurationRecord(record['configuration']),
+    });
+  }
+  if (schemaVersion === 7 && record['mode'] !== 'detailed')
+    return invalidRecord();
+  if (
+    schemaVersion === 7 &&
+    !hasExactKeys(
+      record,
+      ['schemaVersion', 'mode', 'id', 'order', 'name', 'phases'],
+      ['rewardDice'],
+    )
+  )
+    return invalidRecord();
   const phases = record['phases'];
   if (!Array.isArray(phases)) {
     return invalidRecord();
   }
 
-  const schemaVersion = record['schemaVersion'];
   const rewardDice =
     record['rewardDice'] === undefined
       ? undefined
       : mapRewardDiceRecord(record['rewardDice'], schemaVersion);
 
   return createWorkflow({
+    mode: 'detailed',
     id: stringValue(record['id']),
     name: stringValue(record['name']),
     phases: phases.map((phase) => mapPhaseRecord(phase, schemaVersion)),
@@ -288,13 +320,132 @@ export function mapWorkflowRecord(value: unknown): Workflow {
   });
 }
 
+function mapQuickPhaseConfiguration(value: unknown, withFrequency: boolean) {
+  const record = objectRecord(value);
+  if (
+    !hasExactKeys(
+      record,
+      withFrequency
+        ? ['durationSeconds', 'environment', 'frequency']
+        : ['durationSeconds', 'environment'],
+    )
+  )
+    return invalidRecord();
+  return {
+    durationSeconds: numberValue(record['durationSeconds']),
+    environment: mapEnvironmentRecord(record['environment'], 7),
+    ...(withFrequency ? { frequency: numberValue(record['frequency']) } : {}),
+  };
+}
+
+function mapQuickConfigurationRecord(value: unknown) {
+  const record = objectRecord(value);
+  if (
+    !hasExactKeys(
+      record,
+      ['cycleCount', 'focus', 'shortBreak'],
+      ['longBreak', 'rewardDice'],
+    )
+  )
+    return invalidRecord();
+  const reward =
+    record['rewardDice'] === undefined
+      ? undefined
+      : objectRecord(record['rewardDice']);
+  if (
+    reward !== undefined &&
+    (!hasExactKeys(reward, ['frequency', 'sides']) ||
+      !Array.isArray(reward['sides']))
+  )
+    return invalidRecord();
+  return {
+    cycleCount: numberValue(record['cycleCount']),
+    focus: mapQuickPhaseConfiguration(record['focus'], false),
+    shortBreak: mapQuickPhaseConfiguration(record['shortBreak'], false),
+    ...(record['longBreak'] === undefined
+      ? {}
+      : {
+          longBreak: mapQuickPhaseConfiguration(record['longBreak'], true) as {
+            durationSeconds: number;
+            environment: EnvironmentInput;
+            frequency: number;
+          },
+        }),
+    ...(reward === undefined
+      ? {}
+      : {
+          rewardDice: {
+            frequency: numberValue(reward['frequency']),
+            sides: (reward['sides'] as unknown[]).map((value) => {
+              const side = objectRecord(value);
+              if (!hasExactKeys(side, ['icon', 'title'], ['weight']))
+                return invalidRecord();
+              return {
+                icon: stringValue(side['icon']),
+                title: stringValue(side['title']),
+                ...(side['weight'] === undefined
+                  ? {}
+                  : { weight: numberValue(side['weight']) }),
+              };
+            }),
+          },
+        }),
+  };
+}
+
+function mapEnvironmentToRecord(
+  environment: Workflow['phases'][number]['environment'],
+) {
+  return {
+    ...(environment.backgroundAsset === undefined
+      ? {}
+      : { backgroundAsset: environment.backgroundAsset }),
+    ...(environment.audioAsset === undefined
+      ? {}
+      : { audioAsset: environment.audioAsset }),
+    ...(environment.backgroundColor === undefined
+      ? {}
+      : { backgroundColor: environment.backgroundColor }),
+  };
+}
+
 export function mapWorkflowToRecord(
   workflow: Workflow,
   order: number,
 ): WorkflowRecord {
+  if (workflow.mode === 'quick') {
+    const mapPhase = (phase: typeof workflow.configuration.focus) => ({
+      durationSeconds: phase.durationSeconds,
+      environment: mapEnvironmentToRecord(phase.environment),
+    });
+    return {
+      id: workflow.id,
+      schemaVersion: 7,
+      mode: 'quick',
+      order,
+      name: workflow.name,
+      configuration: {
+        cycleCount: workflow.configuration.cycleCount,
+        focus: mapPhase(workflow.configuration.focus),
+        shortBreak: mapPhase(workflow.configuration.shortBreak),
+        ...(workflow.configuration.longBreak === undefined
+          ? {}
+          : {
+              longBreak: {
+                ...mapPhase(workflow.configuration.longBreak),
+                frequency: workflow.configuration.longBreak.frequency,
+              },
+            }),
+        ...(workflow.configuration.rewardDice === undefined
+          ? {}
+          : { rewardDice: workflow.configuration.rewardDice }),
+      },
+    };
+  }
   return {
     id: workflow.id,
-    schemaVersion: 6,
+    schemaVersion: 7,
+    mode: 'detailed',
     order,
     name: workflow.name,
     phases: workflow.phases.map((phase) => ({

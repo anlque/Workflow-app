@@ -1,12 +1,27 @@
-import { createWorkflow, type Workflow } from '@/features/workflow';
+import {
+  createWorkflow,
+  type Phase,
+  type RewardDice,
+  type Workflow,
+  type WorkflowId,
+} from '@/features/workflow';
 
 import { SessionValidationError } from './SessionErrors';
 
-export type SessionSnapshot = Readonly<{
-  workflow: Workflow;
+export type ExecutableWorkflowSnapshot = Readonly<{
+  id: WorkflowId;
+  name: string;
+  phases: readonly [Phase, ...Phase[]];
+  rewardDice?: RewardDice;
 }>;
 
-export function createSessionSnapshot(source: Workflow): SessionSnapshot {
+export type SessionSnapshot = Readonly<{
+  workflow: ExecutableWorkflowSnapshot;
+}>;
+
+export function createSessionSnapshot(
+  source: Workflow | ExecutableWorkflowSnapshot,
+): SessionSnapshot {
   if (
     source.phases.some(
       ({ environment }) =>
@@ -24,7 +39,7 @@ export function createSessionSnapshot(source: Workflow): SessionSnapshot {
       'Session snapshot requires direct Asset references.',
     );
   }
-  const workflow = createWorkflow({
+  const materialized = createWorkflow({
     id: source.id,
     name: source.name,
     phases: source.phases,
@@ -54,6 +69,15 @@ export function createSessionSnapshot(source: Workflow): SessionSnapshot {
             })),
           },
         }),
+  });
+
+  const workflow: ExecutableWorkflowSnapshot = Object.freeze({
+    id: materialized.id,
+    name: materialized.name,
+    phases: materialized.phases,
+    ...(materialized.rewardDice === undefined
+      ? {}
+      : { rewardDice: materialized.rewardDice }),
   });
 
   return Object.freeze({ workflow });

@@ -26,6 +26,79 @@ afterEach(async () =>
 );
 
 describe('DexieAssetRoleManagementUnitOfWork', () => {
+  test.each([false, true])(
+    'renames a Quick Role atomically (Asset write failure: %s)',
+    async (failAssetWrite) => {
+      const name = `quick-role-uow-${crypto.randomUUID()}`;
+      names.push(name);
+      const database = new LocusoraDatabase({
+        name,
+        schemas: [...workflowDatabaseSchemas, ...assetDatabaseSchemas],
+      });
+      const workflows = new DexieWorkflowRepository(database);
+      const assets = new DexieAssetRepository(database);
+      const blob = new Blob(['x'], { type: 'image/png' });
+      const target = createAsset({
+        id: 'quick-asset',
+        name: 'Quick Asset',
+        kind: 'image',
+        mimeType: blob.type,
+        byteSize: blob.size,
+        createdAt: 1,
+        role: 'Old',
+      });
+      await assets.save(target, blob);
+      await workflows.save(
+        createWorkflow({
+          mode: 'quick',
+          id: 'quick-workflow',
+          name: 'Quick',
+          configuration: {
+            cycleCount: 1,
+            focus: {
+              durationSeconds: 60,
+              environment: { backgroundAsset: { type: 'role', role: 'Old' } },
+            },
+            shortBreak: { durationSeconds: 30, environment: {} },
+          },
+        }),
+      );
+      if (failAssetWrite) {
+        vi.spyOn(database.table('assets'), 'put').mockRejectedValueOnce(
+          new Error('Asset write failed'),
+        );
+      }
+      const operation = new DexieAssetRoleManagementUnitOfWork(database).run(
+        async () => {
+          await renameWorkflowRoleReferences(
+            workflows,
+            createAssetRole('Old'),
+            createAssetRole('New'),
+          );
+          await assets.renameRole(
+            target.id,
+            createAssetRole('Old'),
+            createAssetRole('New'),
+          );
+        },
+      );
+      if (failAssetWrite)
+        await expect(operation).rejects.toThrow('Asset write failed');
+      else await expect(operation).resolves.toBeUndefined();
+      const restored = (await workflows.list())[0];
+      expect(restored?.mode).toBe('quick');
+      if (restored?.mode !== 'quick')
+        throw new Error('Expected Quick Workflow.');
+      expect(restored.configuration.focus.environment.backgroundAsset).toEqual({
+        type: 'role',
+        role: failAssetWrite ? 'Old' : 'New',
+      });
+      expect((await assets.get(target.id))?.role).toBe(
+        failAssetWrite ? 'Old' : 'New',
+      );
+    },
+  );
+
   test('commits Workflow and Asset Role rename together', async () => {
     const name = `role-uow-${crypto.randomUUID()}`;
     names.push(name);

@@ -20,6 +20,7 @@ import { SessionValidationError } from '../domain/SessionErrors';
 import { deriveSessionState } from '../domain/deriveSessionState';
 import { rollSessionRewardUseCase } from '../application/rollSessionRewardUseCase';
 import { DexieSessionRepository } from './DexieSessionRepository';
+import { mapSessionToRecord } from './mapSessionRecord';
 import { sessionDatabaseSchemas, type SessionRecord } from './SessionRecord';
 
 const databaseNames: string[] = [];
@@ -44,6 +45,16 @@ function workflow() {
     ],
   });
 }
+
+test('writes a mode-free executable Workflow snapshot record', () => {
+  const record = mapSessionToRecord(
+    createSession('mode-free-record', workflow(), 1_000),
+  );
+  const stored = record.session as { workflow: Record<string, unknown> };
+
+  expect(stored.workflow).not.toHaveProperty('mode');
+  expect(stored.workflow).not.toHaveProperty('configuration');
+});
 
 test('round-trips version-9 restart receipts and keeps Dexie schema unchanged', async () => {
   const store = database();

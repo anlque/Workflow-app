@@ -208,14 +208,18 @@ export function AssetRetirementDialog({
                             key={`${occurrence.owner}:${String(
                               occurrence.owner === 'phase'
                                 ? occurrence.phaseIndex
-                                : occurrence.sideIndex,
+                                : occurrence.owner === 'bonus'
+                                  ? occurrence.sideIndex
+                                  : occurrence.phase,
                             )}:${occurrence.location}:${occurrence.referenceMode}`}
                           >
                             {occurrence.owner === 'phase'
                               ? `Phase ${String(occurrence.phaseIndex + 1)}`
-                              : `Reward Side ${String(
-                                  occurrence.sideIndex + 1,
-                                )} Bonus Phase`}{' '}
+                              : occurrence.owner === 'bonus'
+                                ? `Reward Side ${String(
+                                    occurrence.sideIndex + 1,
+                                  )} Bonus Phase`
+                                : `Quick ${occurrence.phase === 'focus' ? 'Focus' : occurrence.phase === 'short-break' ? 'Short Break' : 'Long Break'}`}{' '}
                             · {occurrence.location} · {occurrence.referenceMode}{' '}
                             · {occurrence.optional ? 'optional' : 'required'}
                           </li>

@@ -1,7 +1,7 @@
-import { createWorkflow } from '../domain/createWorkflow';
 import type { Workflow, WorkflowId } from '../domain/Workflow';
 import { WorkflowApplicationError } from './WorkflowApplicationError';
 import type { WorkflowRepository } from './WorkflowRepository';
+import { mapWorkflowConfigurationEnvironments } from './workflowEnvironments';
 
 export async function duplicateWorkflowUseCase(
   repository: WorkflowRepository,
@@ -19,31 +19,11 @@ export async function duplicateWorkflowUseCase(
     );
   }
 
-  const duplicate = createWorkflow({
-    id: duplicateId,
-    name: source.name,
-    phases: source.phases,
-    ...(source.rewardDice === undefined
-      ? {}
-      : {
-          rewardDice: {
-            schedule: source.rewardDice.schedule,
-            rerolls: source.rewardDice.rerolls,
-            sides: source.rewardDice.sides.map((side) => ({
-              icon: side.icon,
-              title: side.title,
-              ...(side.description === undefined
-                ? {}
-                : { description: side.description }),
-              availability: side.availability,
-              weight: side.probability,
-              ...(side.bonusPhase === undefined
-                ? {}
-                : { bonusPhase: side.bonusPhase }),
-            })),
-          },
-        }),
-  });
+  const duplicate = await mapWorkflowConfigurationEnvironments(
+    source,
+    (environment) => environment,
+    { id: duplicateId },
+  );
 
   await repository.save(duplicate);
   return duplicate;
