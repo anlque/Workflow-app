@@ -582,13 +582,13 @@ describe('FocusApp', () => {
     vi.mocked(deps.loadAssetUrl).mockResolvedValue('blob:ambient');
     render(<FocusApp dependencies={deps} />);
     const countdown = await screen.findByLabelText('Time remaining');
+    await waitFor(() => {
+      expect(document.querySelector('audio')).toBeInstanceOf(HTMLAudioElement);
+    });
     const audio = document.querySelector('audio');
     if (!(audio instanceof HTMLAudioElement)) {
       throw new Error('Ambient audio element was not rendered.');
     }
-    await act(async () => {
-      await Promise.resolve();
-    });
     act(() => {
       audio.dispatchEvent(new Event('pause'));
     });

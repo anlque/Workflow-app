@@ -649,11 +649,14 @@ describe('WorkflowStudio', () => {
     );
 
     const workflowsTab = await screen.findByRole('tab', { name: 'Workflows' });
+    expect(
+      screen.getByRole('tablist', { name: 'Configuration' }),
+    ).toHaveAttribute('aria-orientation', 'vertical');
     expect(workflowsTab).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tabpanel', { name: 'Workflows' })).toBeVisible();
 
     workflowsTab.focus();
-    await user.keyboard('{ArrowRight}');
+    await user.keyboard('{ArrowDown}');
 
     expect(screen.getByRole('tab', { name: 'Assets' })).toHaveFocus();
     expect(screen.getByRole('tab', { name: 'Assets' })).toHaveAttribute(
@@ -666,6 +669,37 @@ describe('WorkflowStudio', () => {
       'src',
       '/brand/locusora-mark.svg',
     );
+  });
+
+  test('uses horizontal arrows for the narrow tablist', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: true,
+        media: '(max-width: 52rem)',
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    );
+    const { unmount } = render(
+      <WorkflowStudio dependencies={dependencies()} />,
+    );
+
+    const workflowsTab = await screen.findByRole('tab', { name: 'Workflows' });
+    expect(
+      screen.getByRole('tablist', { name: 'Configuration' }),
+    ).toHaveAttribute('aria-orientation', 'horizontal');
+    workflowsTab.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'Assets' })).toHaveFocus();
+
+    unmount();
+    vi.unstubAllGlobals();
   });
 
   test('activates the Settings tab by click', async () => {

@@ -27,6 +27,9 @@ import {
 } from '@/features/workflow';
 import { WorkflowEditor, WorkflowLibrary } from '@/features/workflow/studio';
 
+import { WorkflowStudioShell } from './WorkflowStudioShell';
+import type { WorkflowStudioNavigationOrientation } from './WorkflowStudioShell';
+
 export type WorkflowStudioSnapshot = Readonly<{
   workflows: readonly Workflow[];
   assets: readonly Asset[];
@@ -140,11 +143,16 @@ export function WorkflowStudio({
     queueMicrotask(() => tabRefs.current.get(tab)?.focus());
   }
 
-  function handleTabKey(event: KeyboardEvent<HTMLButtonElement>): void {
+  function handleTabKey(
+    event: KeyboardEvent<HTMLButtonElement>,
+    orientation: WorkflowStudioNavigationOrientation,
+  ): void {
     const current = tabs.indexOf(activeTab);
     let next: number | null = null;
-    if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
-    if (event.key === 'ArrowLeft')
+    const nextKey = orientation === 'vertical' ? 'ArrowDown' : 'ArrowRight';
+    const previousKey = orientation === 'vertical' ? 'ArrowUp' : 'ArrowLeft';
+    if (event.key === nextKey) next = (current + 1) % tabs.length;
+    if (event.key === previousKey)
       next = (current - 1 + tabs.length) % tabs.length;
     if (event.key === 'Home') next = 0;
     if (event.key === 'End') next = tabs.length - 1;
@@ -177,66 +185,78 @@ export function WorkflowStudio({
     : 'Open side panel';
 
   return (
-    <main className="workflow-studio">
-      <header className="app-header">
-        <div className="app-header__identity">
-          <img
-            className="brand-logo"
-            src="/brand/locusora-mark.svg"
-            alt=""
-            aria-hidden="true"
-          />
-          <div>
-            <h1>Locusora</h1>
-            <p>
-              Design the rhythms and environments that help you return to focus.
-            </p>
+    <WorkflowStudioShell
+      topBar={
+        <>
+          <div className="app-header__identity">
+            <img
+              className="brand-logo"
+              src="/brand/locusora-mark.svg"
+              alt=""
+              aria-hidden="true"
+            />
+            <div>
+              <h1>Locusora</h1>
+              <p>
+                Design the rhythms and environments that help you return to
+                focus.
+              </p>
+            </div>
           </div>
-        </div>
-        <Button
-          variant="secondary"
-          pending={sidePanel.pending}
-          pendingLabel={sidePanelLabel}
-          onClick={() => {
-            void sidePanel.toggle();
-          }}
+          <Button
+            variant="secondary"
+            pending={sidePanel.pending}
+            pendingLabel={sidePanelLabel}
+            onClick={() => {
+              void sidePanel.toggle();
+            }}
+          >
+            {sidePanelLabel}
+          </Button>
+        </>
+      }
+      navigation={(orientation) => (
+        <div
+          className="tabs workflow-studio-shell__tabs"
+          role="tablist"
+          aria-label="Configuration"
+          aria-orientation={orientation}
         >
-          {sidePanelLabel}
-        </Button>
-      </header>
+          {tabs.map((tab) => {
+            const label = tabLabel(tab);
+            return (
+              <button
+                key={tab}
+                ref={(node) => {
+                  if (node === null) tabRefs.current.delete(tab);
+                  else tabRefs.current.set(tab, node);
+                }}
+                id={`tab-${tab}`}
+                className="tab"
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab}
+                aria-controls={`panel-${tab}`}
+                tabIndex={activeTab === tab ? 0 : -1}
+                onClick={() => {
+                  setActiveTab(tab);
+                }}
+                onKeyDown={(event) => {
+                  handleTabKey(event, orientation);
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    >
       {sidePanel.error === null ? null : (
         <p className="feedback feedback--error" role="alert">
           {sidePanel.error}
         </p>
       )}
-      <div className="tabs" role="tablist" aria-label="Configuration">
-        {tabs.map((tab) => {
-          const label = tabLabel(tab);
-          return (
-            <button
-              key={tab}
-              ref={(node) => {
-                if (node === null) tabRefs.current.delete(tab);
-                else tabRefs.current.set(tab, node);
-              }}
-              id={`tab-${tab}`}
-              className="tab"
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab}
-              aria-controls={`panel-${tab}`}
-              tabIndex={activeTab === tab ? 0 : -1}
-              onClick={() => {
-                setActiveTab(tab);
-              }}
-              onKeyDown={handleTabKey}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
       <section
         className="tab-panel"
         id={`panel-${activeTab}`}
@@ -393,6 +413,6 @@ export function WorkflowStudio({
           />
         )}
       </section>
-    </main>
+    </WorkflowStudioShell>
   );
 }

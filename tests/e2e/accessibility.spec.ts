@@ -37,7 +37,10 @@ test('configuration tabs support keyboard-only navigation', async ({
   const workflows = options.getByRole('tab', { name: 'Workflows' });
   await workflows.focus();
 
-  await options.keyboard.press('ArrowRight');
+  await expect(
+    options.getByRole('tablist', { name: 'Configuration' }),
+  ).toHaveAttribute('aria-orientation', 'vertical');
+  await options.keyboard.press('ArrowDown');
   await expect(options.getByRole('tab', { name: 'Assets' })).toBeFocused();
   await expect(options.getByRole('tab', { name: 'Assets' })).toHaveAttribute(
     'aria-selected',
@@ -47,6 +50,156 @@ test('configuration tabs support keyboard-only navigation', async ({
   await expect(options.getByRole('tab', { name: 'Settings' })).toBeFocused();
   await options.keyboard.press('Home');
   await expect(workflows).toBeFocused();
+});
+
+test('Workflow Studio shell is responsive without horizontal overflow', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.setViewportSize({ width: 1280, height: 800 });
+  await options.goto(extensionUrls.options);
+  const shellBody = options.locator('.workflow-studio-shell__body');
+  const topBar = options.locator('.workflow-studio-shell__top-bar');
+  const sidebar = options.locator('.workflow-studio-shell__sidebar');
+  const tablist = options.getByRole('tablist', { name: 'Configuration' });
+  const workflowTab = options.getByRole('tab', { name: 'Workflows' });
+  const assetsTab = options.getByRole('tab', { name: 'Assets' });
+  await expect(shellBody).toBeVisible();
+
+  expect(
+    await shellBody.evaluate(
+      (element) =>
+        getComputedStyle(element).gridTemplateColumns.split(' ').length,
+    ),
+  ).toBe(2);
+  await expect(tablist).toHaveAttribute('aria-orientation', 'vertical');
+  expect(
+    await tablist.evaluate(
+      (element) => getComputedStyle(element).flexDirection,
+    ),
+  ).toBe('column');
+  expect(
+    await tablist.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  const wideBounds = await Promise.all([
+    sidebar.boundingBox(),
+    workflowTab.boundingBox(),
+    assetsTab.boundingBox(),
+  ]);
+  const [wideSidebar, wideWorkflow, wideAssets] = wideBounds;
+  expect(wideSidebar).not.toBeNull();
+  expect(wideWorkflow).not.toBeNull();
+  expect(wideAssets).not.toBeNull();
+  if (wideSidebar !== null && wideWorkflow !== null && wideAssets !== null) {
+    expect(wideWorkflow.x).toBe(wideAssets.x);
+    expect(wideAssets.y).toBeGreaterThan(wideWorkflow.y);
+    expect(wideWorkflow.x + wideWorkflow.width).toBeLessThanOrEqual(
+      wideSidebar.x + wideSidebar.width,
+    );
+  }
+  expect(
+    await topBar.evaluate((element) => ({
+      alignItems: getComputedStyle(element).alignItems,
+      marginBottom: getComputedStyle(element).marginBottom,
+    })),
+  ).toEqual({ alignItems: 'center', marginBottom: '0px' });
+  expect(
+    await options.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+
+  await options.setViewportSize({ width: 500, height: 800 });
+  const topBarIdentity = topBar.locator(':scope > .app-header__identity');
+  const topBarButton = topBar.locator(':scope > .button');
+  expect(
+    await shellBody.evaluate(
+      (element) =>
+        getComputedStyle(element).gridTemplateColumns.split(' ').length,
+    ),
+  ).toBe(1);
+  await expect(tablist).toHaveAttribute('aria-orientation', 'horizontal');
+  expect(
+    await tablist.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      columns: getComputedStyle(element).gridTemplateColumns.split(' ').length,
+      scrollWidth: element.scrollWidth,
+    })),
+  ).toMatchObject({ columns: 3 });
+  expect(
+    await tablist.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  const narrowWorkflow = await workflowTab.boundingBox();
+  const narrowAssets = await assetsTab.boundingBox();
+  expect(narrowWorkflow).not.toBeNull();
+  expect(narrowAssets).not.toBeNull();
+  if (narrowWorkflow !== null && narrowAssets !== null) {
+    expect(narrowAssets.x).toBeGreaterThan(narrowWorkflow.x);
+    expect(narrowAssets.y).toBe(narrowWorkflow.y);
+  }
+  expect(
+    await topBar.evaluate((element) => ({
+      alignItems: getComputedStyle(element).alignItems,
+      flexDirection: getComputedStyle(element).flexDirection,
+    })),
+  ).toEqual({ alignItems: 'stretch', flexDirection: 'column' });
+  const [identityBounds, buttonBounds, topBarBounds] = await Promise.all([
+    topBarIdentity.boundingBox(),
+    topBarButton.boundingBox(),
+    topBar.boundingBox(),
+  ]);
+  expect(identityBounds).not.toBeNull();
+  expect(buttonBounds).not.toBeNull();
+  expect(topBarBounds).not.toBeNull();
+  if (
+    identityBounds !== null &&
+    buttonBounds !== null &&
+    topBarBounds !== null
+  ) {
+    expect(buttonBounds.y).toBeGreaterThanOrEqual(
+      identityBounds.y + identityBounds.height,
+    );
+    expect(buttonBounds.width).toBeCloseTo(
+      topBarBounds.width - 2 * (buttonBounds.x - topBarBounds.x),
+      0,
+    );
+    expect(buttonBounds.x + buttonBounds.width).toBeLessThanOrEqual(
+      topBarBounds.x + topBarBounds.width,
+    );
+  }
+  await workflowTab.focus();
+  await options.keyboard.press('ArrowRight');
+  await expect(assetsTab).toBeFocused();
+  expect(
+    await options.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+
+  // A 640 CSS-pixel viewport represents a 1280-pixel window at 200% zoom.
+  await options.setViewportSize({ width: 640, height: 450 });
+  expect(
+    await shellBody.evaluate(
+      (element) =>
+        getComputedStyle(element).gridTemplateColumns.split(' ').length,
+    ),
+  ).toBe(1);
+  expect(
+    await options.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
 });
 
 test('Asset Role dialog has no detectable axe violations', async ({
