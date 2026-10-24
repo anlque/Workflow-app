@@ -5,6 +5,7 @@ import { expect, test } from './extensionFixture';
 
 async function createWorkflow(options: Page, name: string): Promise<void> {
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill(name);
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(

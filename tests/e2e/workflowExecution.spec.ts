@@ -105,6 +105,58 @@ test('loads every MVP extension surface in an isolated profile', async ({
   ).toBeVisible();
 });
 
+test('creates, reopens and starts a Quick Workflow', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Quick setup' }).click();
+  await options.getByLabel('Workflow name').fill('Quick writing');
+  await options.getByLabel('Cycles').fill('3');
+  await options.getByLabel('Focus duration in minutes').fill('30');
+  await options.getByLabel('Short Break duration in minutes').fill('5.5');
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(options.getByRole('status')).toHaveText('Workflow saved');
+  await expect(
+    options.getByRole('button', { name: 'Open Quick writing' }),
+  ).toBeVisible();
+
+  await options.reload();
+  await options.getByRole('button', { name: 'Open Quick writing' }).click();
+  await expect(options.getByLabel('Cycles')).toHaveValue('3');
+  await expect(options.getByLabel('Focus duration in minutes')).toHaveValue(
+    '30',
+  );
+  await expect(
+    options.getByRole('heading', { name: 'Quick setup' }),
+  ).toBeVisible();
+  await options.setViewportSize({ width: 640, height: 700 });
+  const saveButton = options.getByRole('button', { name: 'Save workflow' });
+  expect(
+    await saveButton.evaluate(
+      (element) => getComputedStyle(element).whiteSpace,
+    ),
+  ).toBe('nowrap');
+  expect(
+    await options.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(640);
+  await options.setViewportSize({ width: 500, height: 700 });
+  expect(
+    await options.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(500);
+
+  const focus = await context.newPage();
+  await focus.goto(extensionUrls.focus);
+  await focus
+    .getByRole('button', { name: 'Start workflow: Quick writing' })
+    .click();
+  await expect(
+    focus.getByRole('heading', { name: 'Quick writing' }),
+  ).toBeVisible();
+});
+
 test('names, duplicates and locally collapses Workflow Phases', async ({
   context,
   extensionUrls,
@@ -112,6 +164,7 @@ test('names, duplicates and locally collapses Workflow Phases', async ({
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Structured focus');
   await options.getByLabel('Phase 1 name').fill('Writing');
   await options.getByRole('button', { name: 'Duplicate Phase 1' }).click();
@@ -157,6 +210,7 @@ test('reorders Phases by pointer and keyboard while preserving a custom Reward m
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Reordered phases');
   await options.getByLabel('Phase 1 name').fill('One');
   await options.getByRole('button', { name: 'Add phase' }).click();
@@ -230,12 +284,14 @@ test('uploads and selects a Phase Asset without losing the Workflow draft', asyn
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Existing workflow');
   await options.getByLabel('Phase 1 name').fill('Existing phase');
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
 
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Inline atmosphere');
   await options.getByLabel('Phase 1 name').fill('Drafting');
   await options.getByLabel('Background color').fill('#123456');
@@ -314,6 +370,7 @@ test('embeds Workflow Studio over idle and active Focus without navigation', asy
   await expect(focus).toHaveURL(extensionUrls.focus);
 
   await focus.getByRole('button', { name: 'New workflow' }).click();
+  await focus.getByRole('button', { name: 'Detailed setup' }).click();
   await focus.getByLabel('Workflow name').fill('Embedded focus');
   await focus.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await focus.getByRole('button', { name: 'Save workflow' }).click();
@@ -379,6 +436,7 @@ test('synchronizes an open Workflow Library after Options changes', async ({
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Synced focus');
   await options.getByRole('button', { name: 'Save workflow' }).click();
 
@@ -404,6 +462,7 @@ test('creates and controls a Workflow across extension contexts', async ({
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('E2E focus');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Save workflow' }).click();
@@ -483,6 +542,7 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
   await options.getByRole('button', { name: 'Assign role' }).click();
   await options.getByRole('tab', { name: 'Workflows' }).click();
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Custom rewards');
   for (let index = 0; index < 5; index += 1) {
     await options.getByRole('button', { name: 'Add phase' }).click();
@@ -573,6 +633,7 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
 
   await options.getByRole('tab', { name: 'Workflows' }).click();
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Rewarded focus');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();
@@ -750,6 +811,7 @@ test('executes and restores a non-final Bonus Reward Phase authoritatively', asy
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Bonus Reward journey');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();
@@ -823,6 +885,7 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Restart journey');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();

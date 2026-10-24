@@ -108,6 +108,7 @@ export default defineConfig(
   {
     files: [
       'src/features/workflow/presentation/RewardDiceEditor.tsx',
+      'src/features/workflow/presentation/QuickWorkflowEditor.tsx',
       'src/features/workflow/presentation/WorkflowEditor.tsx',
     ],
     rules: {

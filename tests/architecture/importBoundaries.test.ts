@@ -165,6 +165,23 @@ describe('architectural import boundaries', () => {
     expect(findViolations()).toEqual([]);
   });
 
+  test('keeps Asset presentation behind its Studio entry point', () => {
+    const assetRoot = readFileSync(
+      resolve(projectRoot, 'src/features/assets/index.ts'),
+      'utf8',
+    );
+    const quickEditor = readFileSync(
+      resolve(
+        projectRoot,
+        'src/features/workflow/presentation/QuickWorkflowEditor.tsx',
+      ),
+      'utf8',
+    );
+
+    expect(assetRoot).not.toContain('presentation/AssetPicker');
+    expect(quickEditor).toContain("from '@/features/assets/studio'");
+  });
+
   test.each([
     'src/app/background/bootstrapBackground.ts',
     'src/app/focus/createFocusDependencies.ts',

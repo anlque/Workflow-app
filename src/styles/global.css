@@ -863,6 +863,28 @@ textarea {
   min-width: 0;
 }
 
+.workflow-library__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.workflow-library__group > h3 {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-body-large);
+}
+
+.workflow-mode-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.125rem 0.5rem;
+  color: var(--color-primary-foreground);
+  background: var(--color-primary);
+  border-radius: var(--radius-round);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+}
+
 .workflow-library h2,
 .workflow-library p {
   margin: 0;
@@ -942,6 +964,13 @@ textarea {
   color: var(--color-ink);
 }
 
+.workflow-list__open span.workflow-mode-badge,
+.workflow-list__item[aria-current='true']
+  .workflow-list__open
+  span.workflow-mode-badge {
+  color: var(--color-primary-foreground);
+}
+
 .workflow-list__actions {
   display: flex;
   flex-wrap: wrap;
@@ -983,6 +1012,68 @@ textarea {
   min-width: 0;
 }
 
+.quick-setup {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.quick-setup__section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.quick-setup__section > h3 {
+  margin: 0;
+}
+
+.quick-setup__section-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-4);
+}
+
+.quick-setup__reward-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.quick-reward-drawer {
+  inset: 0 0 0 auto;
+  width: min(30rem, 100vw);
+  max-height: 100vh;
+  height: 100vh;
+  margin: 0;
+  border-radius: var(--radius-surface) 0 0 var(--radius-surface);
+}
+
+.quick-reward-drawer__sides {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.quick-reward-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+}
+
+.quick-reward-side legend {
+  padding: 0 var(--space-1);
+  font-weight: 700;
+}
+
 .editor-header,
 .section-heading,
 .phase-item__header {
@@ -1007,8 +1098,13 @@ textarea {
 
 .editor-header__save {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 0.75rem;
+}
+
+.editor-header__save .button {
+  white-space: nowrap;
 }
 
 .editor-header__save-status {
@@ -1747,6 +1843,15 @@ textarea {
 
   .phase-item__actions {
     justify-content: flex-start;
+  }
+
+  .editor-header__save {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .editor-header__save .button {
+    width: 100%;
   }
 }
 

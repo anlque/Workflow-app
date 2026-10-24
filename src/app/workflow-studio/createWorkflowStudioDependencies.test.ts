@@ -109,6 +109,53 @@ describe('createWorkflowStudioDependencies inline Asset upload', () => {
   });
 });
 
+describe('createWorkflowStudioDependencies Workflow ordering', () => {
+  test('keeps a duplicated Quick Workflow beside its source', async () => {
+    const database = createDatabase();
+    const workflows = new DexieWorkflowRepository(database);
+    const source = createWorkflow({
+      id: 'quick-source',
+      name: 'Quick source',
+      mode: 'quick',
+      configuration: {
+        cycleCount: 4,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+      },
+    });
+    await workflows.save(source);
+    await workflows.save(
+      createWorkflow({
+        id: 'quick-neighbor',
+        name: 'Quick neighbor',
+        mode: 'quick',
+        configuration: {
+          cycleCount: 2,
+          focus: { durationSeconds: 1_800, environment: {} },
+          shortBreak: { durationSeconds: 300, environment: {} },
+        },
+      }),
+    );
+    const dependencies = createWorkflowStudioDependencies(
+      createTestDocumentPreferences(),
+      database,
+    );
+
+    await dependencies.duplicateWorkflow(source.id);
+    const quick = (await dependencies.load()).workflows.filter(
+      ({ mode }) => mode === 'quick',
+    );
+
+    expect(quick.map(({ name }) => name)).toEqual([
+      'Quick source',
+      'Quick source',
+      'Quick neighbor',
+    ]);
+    expect(quick[1]?.id).not.toBe('quick-source');
+    expect(quick[1]?.mode).toBe('quick');
+  });
+});
+
 describe('createWorkflowStudioDependencies Asset Role integration', () => {
   test('renames the Asset Role and every Workflow Role reference', async () => {
     const database = createDatabase();

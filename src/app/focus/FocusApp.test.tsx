@@ -339,6 +339,7 @@ describe('FocusApp', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Create workflow' }),
     );
+    await user.click(screen.getByRole('button', { name: 'Detailed setup' }));
     await user.type(screen.getByLabelText('Workflow name'), 'First workflow');
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
     await waitFor(() => {

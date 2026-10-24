@@ -174,10 +174,13 @@ Filename casing follows the primary exported symbol:
 
 - React components, Domain types and classes use PascalCase files, such as
   [`WorkflowEditor.tsx`](../../src/features/workflow/presentation/WorkflowEditor.tsx),
+  [`QuickWorkflowEditor.tsx`](../../src/features/workflow/presentation/QuickWorkflowEditor.tsx),
   [`Workflow.ts`](../../src/features/workflow/domain/Workflow.ts) and
   [`ChromeSessionClient.ts`](../../src/app/session/ChromeSessionClient.ts).
 - Function, hook and utility modules use camelCase files, such as
   [`createWorkflow.ts`](../../src/features/workflow/domain/createWorkflow.ts)
+  and
+  [`useQuickWorkflowEditor.ts`](../../src/features/workflow/presentation/useQuickWorkflowEditor.ts)
   and
   [`useWorkflowCatalog.ts`](../../src/features/workflow/presentation/useWorkflowCatalog.ts).
 - Tests match the source name with `.test.ts` or `.test.tsx`; assembled journeys

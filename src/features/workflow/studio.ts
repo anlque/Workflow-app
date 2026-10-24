@@ -7,6 +7,10 @@ export {
   type WorkflowEditorProps,
 } from './presentation/WorkflowEditor';
 export {
+  QuickWorkflowEditor,
+  type QuickWorkflowEditorProps,
+} from './presentation/QuickWorkflowEditor';
+export {
   RewardDiceEditor,
   type RewardDiceEditorProps,
 } from './presentation/RewardDiceEditor';

@@ -272,6 +272,7 @@ describe('WorkflowStudio', () => {
     await user.click(
       await screen.findByRole('button', { name: 'New workflow' }),
     );
+    await user.click(screen.getByRole('button', { name: 'Detailed setup' }));
     await user.type(screen.getByLabelText('Workflow name'), 'New draft');
     await user.type(screen.getByLabelText('Phase 1 name'), 'Writing');
     await user.type(screen.getByLabelText('Background color'), '#123456');
@@ -290,6 +291,50 @@ describe('WorkflowStudio', () => {
       'direct:uploaded-image',
     );
     expect(importAsset).toHaveBeenCalledOnce();
+  });
+
+  test('creates and saves a Quick Workflow with the permanent Quick editor', async () => {
+    const user = userEvent.setup();
+    const saveWorkflow = vi.fn((input: CreateWorkflowInput) => {
+      void input;
+      return Promise.resolve();
+    });
+    const load = vi.fn(() =>
+      Promise.resolve({ workflows: [], assets: [], settings: defaultSettings }),
+    );
+    render(
+      <WorkflowStudio dependencies={dependencies({ load, saveWorkflow })} />,
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Create workflow' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Quick setup' }));
+    expect(screen.getByRole('heading', { name: 'Quick setup' })).toBeVisible();
+    await user.type(screen.getByLabelText('Workflow name'), 'Fast flow');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+    await waitFor(() => {
+      expect(saveWorkflow).toHaveBeenCalledOnce();
+    });
+    expect(saveWorkflow.mock.calls[0]?.[0]).toMatchObject({ mode: 'quick' });
+  });
+
+  test('protects a dirty Quick draft when switching Studio sections', async () => {
+    const user = userEvent.setup();
+    render(<WorkflowStudio dependencies={dependencies()} />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Create workflow' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Quick setup' }));
+    await user.type(screen.getByLabelText('Workflow name'), 'Unsaved');
+    await user.click(screen.getByRole('tab', { name: 'Assets' }));
+    expect(
+      screen.getByRole('dialog', { name: 'Discard changes?' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Stay' }));
+    expect(screen.getByRole('heading', { name: 'Quick setup' })).toBeVisible();
+    await user.click(screen.getByRole('tab', { name: 'Assets' }));
+    await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+    expect(screen.getByRole('heading', { name: 'Local Assets' })).toBeVisible();
   });
 
   test.each(['publication', 'load'] as const)(
@@ -351,6 +396,7 @@ describe('WorkflowStudio', () => {
       await user.click(
         await screen.findByRole('button', { name: 'New workflow' }),
       );
+      await user.click(screen.getByRole('button', { name: 'Detailed setup' }));
       await user.type(screen.getByLabelText('Workflow name'), 'Uncommitted');
       await user.type(screen.getByLabelText('Phase 1 name'), 'Writing');
       await user.upload(
@@ -772,6 +818,7 @@ describe('WorkflowStudio', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Create workflow' }),
     );
+    await user.click(screen.getByRole('button', { name: 'Detailed setup' }));
     await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
     await waitFor(() => {

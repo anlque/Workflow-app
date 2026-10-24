@@ -18,7 +18,7 @@ function dependencies(
     preferences: createTestDocumentPreferences(),
     listWorkflows: () => Promise.resolve(workflows),
     subscribeWorkflowChanges: vi.fn(() => vi.fn()),
-    createWorkflow: () => Promise.resolve(),
+    createWorkflow: vi.fn(() => Promise.resolve()),
     duplicateWorkflow: () => Promise.resolve(),
     deleteWorkflow: () => Promise.resolve(),
     reorderWorkflows: () => Promise.resolve(),
@@ -53,6 +53,19 @@ describe('SidePanelApp', () => {
       'src',
       '/brand/locusora-mark.svg',
     );
+  });
+
+  test('forwards the selected creation mode', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies();
+    render(<SidePanelApp dependencies={deps} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Create workflow' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Quick setup' }));
+
+    expect(deps.createWorkflow).toHaveBeenCalledWith('quick');
   });
 
   test('opens a Workflow in the options editor', async () => {

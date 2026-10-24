@@ -139,15 +139,22 @@ export function createWorkflowStudioDependencies(
       }, catalogEvents);
     },
     async duplicateWorkflow(id) {
-      await runWorkflowCatalogMutation(
-        () =>
-          duplicateWorkflowUseCase(
-            workflows,
-            id,
-            createWorkflowId(crypto.randomUUID()),
-          ),
-        catalogEvents,
-      );
+      await runWorkflowCatalogMutation(async () => {
+        const duplicate = await duplicateWorkflowUseCase(
+          workflows,
+          id,
+          createWorkflowId(crypto.randomUUID()),
+        );
+        const ordered = await listWorkflowsUseCase(workflows);
+        const ids = ordered.map(({ id: value }) => value);
+        const duplicateIndex = ids.indexOf(duplicate.id);
+        const sourceIndex = ids.indexOf(id);
+        if (duplicateIndex >= 0 && sourceIndex >= 0) {
+          ids.splice(duplicateIndex, 1);
+          ids.splice(sourceIndex + 1, 0, duplicate.id);
+          await reorderWorkflowsUseCase(workflows, ids);
+        }
+      }, catalogEvents);
     },
     async deleteWorkflow(id) {
       await runWorkflowCatalogMutation(

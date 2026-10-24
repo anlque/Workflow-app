@@ -12,7 +12,7 @@ import {
 import { AssetLibrary } from '@/features/assets/studio';
 import type { Settings } from '@/features/settings';
 import { SettingsPage } from '@/features/settings/studio';
-import { Button } from '@/shared';
+import { Button, Dialog } from '@/shared';
 import type { DocumentPreferences } from '@/app/document-preferences/DocumentPreferences';
 import { useDocumentPreferences } from '@/app/document-preferences/useDocumentPreferences';
 import {
@@ -25,7 +25,11 @@ import {
   type Workflow,
   type WorkflowId,
 } from '@/features/workflow';
-import { WorkflowEditor, WorkflowLibrary } from '@/features/workflow/studio';
+import {
+  QuickWorkflowEditor,
+  WorkflowEditor,
+  WorkflowLibrary,
+} from '@/features/workflow/studio';
 
 import { WorkflowStudioShell } from './WorkflowStudioShell';
 import type { WorkflowStudioNavigationOrientation } from './WorkflowStudioShell';
@@ -90,11 +94,19 @@ export function WorkflowStudio({
     WorkflowId | undefined
   >();
   const [newWorkflowId, setNewWorkflowId] = useState<string | null>(null);
+  const [newWorkflowMode, setNewWorkflowMode] =
+    useState<Workflow['mode']>('detailed');
+  const [quickDirty, setQuickDirty] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<
+    (() => void) | null
+  >(null);
   const [activeTab, setActiveTab] = useState<Tab>('workflows');
   const [error, setError] = useState<string | null>(null);
   const tabRefs = useRef(new Map<Tab, HTMLButtonElement>());
 
-  async function load(preferredId?: WorkflowId): Promise<void> {
+  async function load(
+    preferredId?: WorkflowId,
+  ): Promise<WorkflowStudioSnapshot> {
     const loaded = await dependencies.load();
     setSnapshot(loaded);
     const selected =
@@ -107,6 +119,7 @@ export function WorkflowStudio({
         ? selected
         : loaded.workflows[0]?.id,
     );
+    return loaded;
   }
 
   async function reloadSnapshot(): Promise<void> {
@@ -138,9 +151,31 @@ export function WorkflowStudio({
     };
   }, [dependencies]);
 
+  useEffect(() => {
+    if (!quickDirty) return undefined;
+    const preventExit = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', preventExit);
+    return () => {
+      window.removeEventListener('beforeunload', preventExit);
+    };
+  }, [quickDirty]);
+
+  function navigate(action: () => void): void {
+    if (quickDirty) {
+      setPendingNavigation(() => action);
+      return;
+    }
+    action();
+  }
+
   function selectTab(tab: Tab): void {
-    setActiveTab(tab);
-    queueMicrotask(() => tabRefs.current.get(tab)?.focus());
+    navigate(() => {
+      setQuickDirty(false);
+      setActiveTab(tab);
+      queueMicrotask(() => tabRefs.current.get(tab)?.focus());
+    });
   }
 
   function handleTabKey(
@@ -239,7 +274,7 @@ export function WorkflowStudio({
                 aria-controls={`panel-${tab}`}
                 tabIndex={activeTab === tab ? 0 : -1}
                 onClick={() => {
-                  setActiveTab(tab);
+                  selectTab(tab);
                 }}
                 onKeyDown={(event) => {
                   handleTabKey(event, orientation);
@@ -271,14 +306,21 @@ export function WorkflowStudio({
                 {...(selectedWorkflowId === undefined
                   ? {}
                   : { selectedWorkflowId })}
-                onCreate={() => {
-                  setNewWorkflowId(dependencies.createId());
-                  setSelectedWorkflowId(undefined);
+                onCreate={(mode) => {
+                  navigate(() => {
+                    setQuickDirty(false);
+                    setNewWorkflowId(dependencies.createId());
+                    setNewWorkflowMode(mode);
+                    setSelectedWorkflowId(undefined);
+                  });
                   return Promise.resolve();
                 }}
                 onOpen={(id) => {
-                  setNewWorkflowId(null);
-                  setSelectedWorkflowId(id);
+                  navigate(() => {
+                    setQuickDirty(false);
+                    setNewWorkflowId(null);
+                    setSelectedWorkflowId(id);
+                  });
                 }}
                 onDuplicate={async (id) => {
                   await dependencies.duplicateWorkflow(id);
@@ -301,6 +343,69 @@ export function WorkflowStudio({
                   <h2>Select or create a Workflow.</h2>
                   <p>The editor will open here without leaving this page.</p>
                 </div>
+              ) : selectedWorkflow?.mode === 'quick' ||
+                (selectedWorkflow === undefined &&
+                  newWorkflowMode === 'quick') ? (
+                <QuickWorkflowEditor
+                  key={selectedWorkflow?.id ?? newWorkflowId}
+                  workflowId={
+                    selectedWorkflow?.id ??
+                    newWorkflowId ??
+                    dependencies.createId()
+                  }
+                  assets={snapshot.assets}
+                  {...(selectedWorkflow?.mode === 'quick'
+                    ? { workflow: selectedWorkflow }
+                    : {})}
+                  onDirtyChange={setQuickDirty}
+                  onUploadAsset={async (file, kind) => {
+                    const asset = await dependencies.importAsset(file, kind);
+                    setSnapshot((current) =>
+                      current === null
+                        ? current
+                        : {
+                            ...current,
+                            assets: [
+                              ...current.assets.filter(
+                                ({ id }) => id !== asset.id,
+                              ),
+                              asset,
+                            ],
+                          },
+                    );
+                    return asset;
+                  }}
+                  onSynchronizeAssetUpload={async () => {
+                    await dependencies.synchronizeAssetImport();
+                    await reloadSnapshot();
+                  }}
+                  onSave={async (input) => {
+                    await dependencies.saveWorkflow(input);
+                    const id = createWorkflowId(input.id);
+                    if (newWorkflowId !== null) {
+                      const loaded = await dependencies.load();
+                      const ids = loaded.workflows.map(
+                        ({ id: value }) => value,
+                      );
+                      const currentIndex = ids.indexOf(id);
+                      const firstModeIndex = loaded.workflows.findIndex(
+                        (workflow) =>
+                          workflow.id !== id && workflow.mode === input.mode,
+                      );
+                      if (
+                        currentIndex >= 0 &&
+                        firstModeIndex >= 0 &&
+                        currentIndex !== firstModeIndex
+                      ) {
+                        ids.splice(currentIndex, 1);
+                        ids.splice(firstModeIndex, 0, id);
+                        await dependencies.reorderWorkflows(ids);
+                      }
+                    }
+                    await load(id);
+                    setNewWorkflowId(null);
+                  }}
+                />
               ) : (
                 <WorkflowEditor
                   key={selectedWorkflow?.id ?? newWorkflowId}
@@ -337,6 +442,26 @@ export function WorkflowStudio({
                   onSave={async (input) => {
                     await dependencies.saveWorkflow(input);
                     const id = createWorkflowId(input.id);
+                    if (newWorkflowId !== null) {
+                      const loaded = await dependencies.load();
+                      const ids = loaded.workflows.map(
+                        ({ id: value }) => value,
+                      );
+                      const currentIndex = ids.indexOf(id);
+                      const firstModeIndex = loaded.workflows.findIndex(
+                        (workflow) =>
+                          workflow.id !== id && workflow.mode === 'detailed',
+                      );
+                      if (
+                        currentIndex >= 0 &&
+                        firstModeIndex >= 0 &&
+                        currentIndex !== firstModeIndex
+                      ) {
+                        ids.splice(currentIndex, 1);
+                        ids.splice(firstModeIndex, 0, id);
+                        await dependencies.reorderWorkflows(ids);
+                      }
+                    }
                     await load(id);
                     setNewWorkflowId(null);
                   }}
@@ -413,6 +538,36 @@ export function WorkflowStudio({
           />
         )}
       </section>
+      <Dialog
+        open={pendingNavigation !== null}
+        title="Discard changes?"
+        onCancel={() => {
+          setPendingNavigation(null);
+        }}
+      >
+        <p>Your unsaved Quick Workflow changes will be lost.</p>
+        <div className="dialog__actions">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setPendingNavigation(null);
+            }}
+          >
+            Stay
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              const action = pendingNavigation;
+              setPendingNavigation(null);
+              setQuickDirty(false);
+              action?.();
+            }}
+          >
+            Discard changes
+          </Button>
+        </div>
+      </Dialog>
     </WorkflowStudioShell>
   );
 }

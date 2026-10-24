@@ -40,6 +40,7 @@ test('loads before visibility and synchronizes preferences across open documents
   }
 
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Preference sync focus');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Save workflow' }).click();

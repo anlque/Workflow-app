@@ -75,8 +75,8 @@ allowlisted Workflow Studio and Side Panel presentation consumers use
 | Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, source-aware Environment traversal, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`–`WorkflowPackageV7`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
 | Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `resolveWorkflowAssetReferences`, Role-summary/rename and Asset-retirement summary/patch operations, `exportWorkflowUseCase`, `importWorkflowUseCase` |
 | Infrastructure composition | `DexieWorkflowRepository`, `workflowDatabaseSchemas`, `DexieWorkflowPackageUnitOfWork` |
-| Presentation components (`/studio`) | `WorkflowLibrary`, `WorkflowLibraryProps`, `WorkflowEditor`, `WorkflowEditorProps`, `RewardDiceEditor`, `RewardDiceEditorProps` |
-| Presentation editor API (`/studio`) | `useWorkflowEditor`, `validateWorkflowDraft`, `PhaseDraft`, `RewardDiceDraft`, `RewardSideDraft`, `WorkflowDraft`, `WorkflowDraftErrors`, `WorkflowDraftValidation` |
+| Presentation components (`/studio`) | `WorkflowLibrary`, `WorkflowLibraryProps`, `WorkflowEditor`, `WorkflowEditorProps`, `QuickWorkflowEditor`, `QuickWorkflowEditorProps`, `RewardDiceEditor`, `RewardDiceEditorProps` |
+| Presentation editor API (`/studio`) | `useWorkflowEditor`, `validateWorkflowDraft`, `useQuickWorkflowEditor`, `validateQuickWorkflowDraft`, Detailed and Quick draft types |
 | Presentation catalog API | `useWorkflowCatalog`, `WorkflowCatalogSource`, `WorkflowCatalogState` |
 
 Infrastructure exports exist so `src/app` can compose concrete adapters. Their
@@ -240,10 +240,21 @@ package differences and migrations.
 
 ### `WorkflowLibrary`
 
-Renders empty/list states and delegates create, open, duplicate, delete,
-reorder and optional start actions. It owns pending/error feedback and deletion
-confirmation, but receives all operations as props. Options and side panel
-compose different capabilities from the same component.
+Renders one catalog as non-empty Quick then Detailed groups while preserving
+repository order inside each group. Mode badges identify every card; creation
+explicitly chooses Quick or Detailed setup. It delegates open, duplicate,
+delete, within-group reorder and optional start actions, owns pending/error
+feedback and deletion confirmation, and receives all operations as props.
+Options and side panel compose different capabilities from the same component.
+
+### `QuickWorkflowEditor`
+
+Authors only canonical Quick configuration: name, cycles, three Environment
+presets, optional Long Break cadence and optional cycle-based Reward Dice. It
+reuses Asset selection and inline upload boundaries. Its right-hand Reward
+sides drawer exposes only icon, title and optional weight; generated Phases are
+never editable or persisted as a second source of truth. Dirty navigation is
+guarded by Workflow Studio until save or explicit discard.
 
 ### `WorkflowEditor`
 
@@ -280,6 +291,8 @@ validation converts them to numeric constructor input.
 
 - `useWorkflowEditor` owns editable string/selection state and immutable draft
   updates. `validateWorkflowDraft` maps that state to `CreateWorkflowInput`.
+- `useQuickWorkflowEditor` owns the string-based Quick draft and maps a valid
+  draft directly to `CreateQuickWorkflowInput` without materialized Phases.
 - `useWorkflowCatalog` subscribes before loading, coalesces invalidations,
   preserves the last valid list on refresh failure and ignores work after
   unmount.

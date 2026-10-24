@@ -162,7 +162,7 @@ function rerollCount(value: string): number | null {
   return parsed >= 0 && parsed <= 3 ? parsed : null;
 }
 
-function minutesToDurationSeconds(value: string): number | null {
+export function minutesToDurationSeconds(value: string): number | null {
   if (value.trim().length === 0) return null;
   const minutes = Number(value);
   const seconds = minutes * 60;
@@ -174,12 +174,12 @@ function minutesToDurationSeconds(value: string): number | null {
     : null;
 }
 
-function normalizedDurationMinutes(value: string): string | null {
+export function normalizedDurationMinutes(value: string): string | null {
   const seconds = minutesToDurationSeconds(value);
   return seconds === null ? null : String(seconds / 60);
 }
 
-function steppedDurationMinutes(
+export function steppedDurationMinutes(
   value: string,
   direction: -1 | 1,
 ): string | null {

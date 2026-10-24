@@ -30,6 +30,7 @@ test('protects Assets referenced by an immutable active Session snapshot', async
 
   await options.getByRole('tab', { name: 'Workflows' }).click();
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Forest focus');
   await options.getByLabel('Background image').selectOption({
     label: 'forest.png',
@@ -119,6 +120,8 @@ test('creates, follows and explicitly moves an Asset Role', async ({
   await options.keyboard.press('Enter');
   await options.getByRole('button', { name: 'New workflow' }).focus();
   await options.keyboard.press('Enter');
+  await options.getByRole('button', { name: 'Detailed setup' }).focus();
+  await options.keyboard.press('Enter');
   await options.getByLabel('Workflow name').focus();
   await options.keyboard.type('Role focus');
   await options.getByLabel('Background image').focus();
@@ -191,6 +194,7 @@ test('retires an Asset by replacing direct Workflow references', async ({
   }
   await options.getByRole('tab', { name: 'Workflows' }).click();
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Replacement focus');
   await options
     .getByLabel('Background image')
@@ -230,6 +234,7 @@ test('retires an Asset with an uploaded replacement', async ({
   });
   await options.getByRole('tab', { name: 'Workflows' }).click();
   await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Uploaded replacement');
   await options
     .getByLabel('Background image')

@@ -27,7 +27,7 @@ export type SidePanelDependencies = Readonly<{
   preferences: DocumentPreferences;
   listWorkflows(): Promise<readonly Workflow[]>;
   subscribeWorkflowChanges(listener: () => void): () => void;
-  createWorkflow(): Promise<void>;
+  createWorkflow(mode: Workflow['mode']): Promise<void>;
   duplicateWorkflow(id: WorkflowId): Promise<void>;
   deleteWorkflow(id: WorkflowId): Promise<void>;
   reorderWorkflows(ids: readonly WorkflowId[]): Promise<void>;
@@ -209,8 +209,8 @@ export function SidePanelApp({
           )}
           <WorkflowLibrary
             workflows={workflows}
-            onCreate={async () => {
-              await dependencies.createWorkflow();
+            onCreate={async (mode) => {
+              await dependencies.createWorkflow(mode);
               await reload();
             }}
             onOpen={(id) => {

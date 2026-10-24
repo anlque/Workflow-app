@@ -8,7 +8,7 @@ export type WorkflowLibraryProps = Readonly<{
   workflows: readonly Workflow[];
   selectedWorkflowId?: WorkflowId;
   busyWorkflowId?: WorkflowId;
-  onCreate(): Promise<void>;
+  onCreate(mode: Workflow['mode']): Promise<void>;
   onOpen(id: WorkflowId): void;
   onDuplicate(id: WorkflowId): Promise<void>;
   onDelete(id: WorkflowId): Promise<void>;
@@ -28,6 +28,7 @@ export function WorkflowLibrary({
   onStart,
 }: WorkflowLibraryProps) {
   const [deleting, setDeleting] = useState<Workflow | null>(null);
+  const [choosingMode, setChoosingMode] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,16 +49,78 @@ export function WorkflowLibrary({
     }
   }
 
-  function reordered(index: number, offset: -1 | 1): readonly WorkflowId[] {
+  function reordered(
+    workflow: Workflow,
+    offset: -1 | 1,
+  ): readonly WorkflowId[] {
     const ids = workflows.map(({ id }) => id);
-    const target = index + offset;
-    const current = ids[index];
-    const destination = ids[target];
-    if (current === undefined || destination === undefined) return ids;
-    ids[index] = destination;
-    ids[target] = current;
+    const group = workflows.filter(({ mode }) => mode === workflow.mode);
+    const groupIndex = group.findIndex(({ id }) => id === workflow.id);
+    const destination = group[groupIndex + offset];
+    if (destination === undefined) return ids;
+    const currentIndex = ids.indexOf(workflow.id);
+    const destinationIndex = ids.indexOf(destination.id);
+    ids[currentIndex] = destination.id;
+    ids[destinationIndex] = workflow.id;
     return ids;
   }
+
+  const groups = (['quick', 'detailed'] as const).flatMap((mode) => {
+    const values = workflows.filter((workflow) => workflow.mode === mode);
+    return values.length === 0 ? [] : [{ mode, values }];
+  });
+
+  const createButton = (label: string) => (
+    <Button
+      variant="primary"
+      pending={pendingAction === 'create'}
+      pendingLabel="Creating…"
+      onClick={() => {
+        setChoosingMode(true);
+      }}
+    >
+      {label}
+    </Button>
+  );
+
+  const createDialog = (
+    <Dialog
+      open={choosingMode}
+      title="New workflow"
+      onCancel={() => {
+        setChoosingMode(false);
+      }}
+    >
+      <p>Choose the editing experience for this Workflow.</p>
+      <div className="dialog__actions">
+        <Button
+          variant="quiet"
+          onClick={() => {
+            setChoosingMode(false);
+          }}
+        >
+          Cancel
+        </Button>
+        {(['quick', 'detailed'] as const).map((mode) => (
+          <Button
+            key={mode}
+            variant={mode === 'quick' ? 'primary' : 'secondary'}
+            pending={pendingAction === `create:${mode}`}
+            pendingLabel="Creating…"
+            onClick={() => {
+              void perform(`create:${mode}`, () => onCreate(mode)).then(
+                (succeeded) => {
+                  if (succeeded) setChoosingMode(false);
+                },
+              );
+            }}
+          >
+            {mode === 'quick' ? 'Quick setup' : 'Detailed setup'}
+          </Button>
+        ))}
+      </div>
+    </Dialog>
+  );
 
   if (workflows.length === 0) {
     return (
@@ -69,15 +132,9 @@ export function WorkflowLibrary({
             return to.
           </p>
         </div>
-        <Button
-          variant="primary"
-          pending={pendingAction === 'create'}
-          pendingLabel="Creating…"
-          onClick={() => void perform('create', onCreate)}
-        >
-          Create workflow
-        </Button>
+        {createButton('Create workflow')}
         {error === null ? null : <p role="alert">{error}</p>}
+        {createDialog}
       </section>
     );
   }
@@ -92,14 +149,7 @@ export function WorkflowLibrary({
           <h2 id="workflow-library-title">Workflows</h2>
           <p>Choose a rhythm or shape a new one.</p>
         </div>
-        <Button
-          variant="primary"
-          pending={pendingAction === 'create'}
-          pendingLabel="Creating…"
-          onClick={() => void perform('create', onCreate)}
-        >
-          New workflow
-        </Button>
+        {createButton('New workflow')}
       </div>
 
       {error === null || deleting !== null ? null : (
@@ -108,104 +158,119 @@ export function WorkflowLibrary({
         </p>
       )}
 
-      <ol className="workflow-list">
-        {workflows.map((workflow, index) => {
-          const externallyBusy = busyWorkflowId === workflow.id;
-          return (
-            <li
-              className="workflow-list__item"
-              key={workflow.id}
-              aria-current={
-                selectedWorkflowId === workflow.id ? 'true' : undefined
-              }
-            >
-              <button
-                className="workflow-list__open"
-                type="button"
-                onClick={() => {
-                  onOpen(workflow.id);
-                }}
-                aria-label={`Open ${workflow.name}`}
-              >
-                <strong>{workflow.name}</strong>
-                <span>
-                  {String(workflow.phases.length)}{' '}
-                  {workflow.phases.length === 1 ? 'phase' : 'phases'}
-                </span>
-              </button>
-              <div className="workflow-list__actions">
-                {onStart === undefined ? null : (
-                  <Button
-                    variant="primary"
-                    aria-label={`Start workflow: ${workflow.name}`}
-                    pending={pendingAction === `start:${workflow.id}`}
-                    pendingLabel="Starting…"
-                    onClick={() =>
-                      void perform(`start:${workflow.id}`, () =>
-                        onStart(workflow.id),
-                      )
-                    }
+      {groups.map(({ mode, values }) => (
+        <div
+          className="workflow-library__group"
+          role="group"
+          aria-label={mode === 'quick' ? 'Quick' : 'Detailed'}
+          key={mode}
+        >
+          <h3>{mode === 'quick' ? 'Quick' : 'Detailed'}</h3>
+          <ol className="workflow-list">
+            {values.map((workflow, index) => {
+              const externallyBusy = busyWorkflowId === workflow.id;
+              return (
+                <li
+                  className="workflow-list__item"
+                  key={workflow.id}
+                  aria-current={
+                    selectedWorkflowId === workflow.id ? 'true' : undefined
+                  }
+                >
+                  <button
+                    className="workflow-list__open"
+                    type="button"
+                    onClick={() => {
+                      onOpen(workflow.id);
+                    }}
+                    aria-label={`Open ${workflow.name}`}
                   >
-                    Start workflow
-                  </Button>
-                )}
-                <Button
-                  variant="quiet"
-                  aria-label={`Move ${workflow.name} up`}
-                  disabled={index === 0 || externallyBusy}
-                  pending={pendingAction === `up:${workflow.id}`}
-                  pendingLabel="Moving…"
-                  onClick={() =>
-                    void perform(`up:${workflow.id}`, () =>
-                      onReorder(reordered(index, -1)),
-                    )
-                  }
-                >
-                  Move up
-                </Button>
-                <Button
-                  variant="quiet"
-                  aria-label={`Move ${workflow.name} down`}
-                  disabled={index === workflows.length - 1 || externallyBusy}
-                  pending={pendingAction === `down:${workflow.id}`}
-                  pendingLabel="Moving…"
-                  onClick={() =>
-                    void perform(`down:${workflow.id}`, () =>
-                      onReorder(reordered(index, 1)),
-                    )
-                  }
-                >
-                  Move down
-                </Button>
-                <Button
-                  variant="quiet"
-                  aria-label={`Duplicate ${workflow.name}`}
-                  disabled={externallyBusy}
-                  pending={pendingAction === `duplicate:${workflow.id}`}
-                  pendingLabel="Duplicating…"
-                  onClick={() =>
-                    void perform(`duplicate:${workflow.id}`, () =>
-                      onDuplicate(workflow.id),
-                    )
-                  }
-                >
-                  Duplicate
-                </Button>
-                <Button
-                  variant="quiet"
-                  aria-label={`Delete ${workflow.name}`}
-                  disabled={externallyBusy}
-                  onClick={() => {
-                    setDeleting(workflow);
-                  }}
-                >
-                  Delete
-                </Button>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+                    <strong>{workflow.name}</strong>
+                    <span className="workflow-mode-badge">
+                      {workflow.mode === 'quick' ? 'Quick' : 'Detailed'}
+                    </span>
+                    <span>
+                      {String(workflow.phases.length)}{' '}
+                      {workflow.phases.length === 1 ? 'phase' : 'phases'}
+                    </span>
+                  </button>
+                  <div className="workflow-list__actions">
+                    {onStart === undefined ? null : (
+                      <Button
+                        variant="primary"
+                        aria-label={`Start workflow: ${workflow.name}`}
+                        pending={pendingAction === `start:${workflow.id}`}
+                        pendingLabel="Starting…"
+                        onClick={() =>
+                          void perform(`start:${workflow.id}`, () =>
+                            onStart(workflow.id),
+                          )
+                        }
+                      >
+                        Start workflow
+                      </Button>
+                    )}
+                    <Button
+                      variant="quiet"
+                      aria-label={`Move ${workflow.name} up`}
+                      disabled={index === 0 || externallyBusy}
+                      pending={pendingAction === `up:${workflow.id}`}
+                      pendingLabel="Moving…"
+                      onClick={() =>
+                        void perform(`up:${workflow.id}`, () =>
+                          onReorder(reordered(workflow, -1)),
+                        )
+                      }
+                    >
+                      Move up
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      aria-label={`Move ${workflow.name} down`}
+                      disabled={index === values.length - 1 || externallyBusy}
+                      pending={pendingAction === `down:${workflow.id}`}
+                      pendingLabel="Moving…"
+                      onClick={() =>
+                        void perform(`down:${workflow.id}`, () =>
+                          onReorder(reordered(workflow, 1)),
+                        )
+                      }
+                    >
+                      Move down
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      aria-label={`Duplicate ${workflow.name}`}
+                      disabled={externallyBusy}
+                      pending={pendingAction === `duplicate:${workflow.id}`}
+                      pendingLabel="Duplicating…"
+                      onClick={() =>
+                        void perform(`duplicate:${workflow.id}`, () =>
+                          onDuplicate(workflow.id),
+                        )
+                      }
+                    >
+                      Duplicate
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      aria-label={`Delete ${workflow.name}`}
+                      disabled={externallyBusy}
+                      onClick={() => {
+                        setDeleting(workflow);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ))}
+
+      {createDialog}
 
       <Dialog
         open={deleting !== null}
