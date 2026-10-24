@@ -123,6 +123,7 @@ describe('createWorkflowStudioDependencies Workflow ordering', () => {
         shortBreak: { durationSeconds: 300, environment: {} },
       },
     });
+    if (source.mode !== 'quick') throw new Error('Expected Quick Workflow.');
     await workflows.save(source);
     await workflows.save(
       createWorkflow({
@@ -153,6 +154,49 @@ describe('createWorkflowStudioDependencies Workflow ordering', () => {
     ]);
     expect(quick[1]?.id).not.toBe('quick-source');
     expect(quick[1]?.mode).toBe('quick');
+  });
+
+  test('converts through the real transaction and publishes only during synchronization', async () => {
+    const database = createDatabase();
+    const workflows = new DexieWorkflowRepository(database);
+    const source = createWorkflow({
+      id: 'quick-source',
+      name: 'Quick source',
+      mode: 'quick',
+      configuration: {
+        cycleCount: 2,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+      },
+    });
+    if (source.mode !== 'quick') throw new Error('Expected Quick Workflow.');
+    await workflows.save(source);
+    const dependencies = createWorkflowStudioDependencies(
+      createTestDocumentPreferences(),
+      database,
+    );
+
+    await dependencies.convertQuickWorkflow(
+      {
+        mode: 'quick',
+        id: source.id,
+        name: 'Edited source',
+        configuration: source.configuration,
+      },
+      true,
+    );
+
+    const converted = await dependencies.load();
+    expect(converted.workflows.map(({ mode }) => mode)).toEqual([
+      'quick',
+      'detailed',
+    ]);
+    expect(converted.workflows[0]?.name).toBe('Edited source (Quick copy)');
+    expect(converted.workflows[1]?.name).toBe('Edited source');
+    expect(browserMock.runtime.sendMessage).not.toHaveBeenCalled();
+
+    await dependencies.synchronizeWorkflowConversion();
+    expect(browserMock.runtime.sendMessage).toHaveBeenCalledOnce();
   });
 });
 

@@ -66,6 +66,15 @@ export { duplicateWorkflowUseCase } from './application/duplicateWorkflowUseCase
 export { listWorkflowsUseCase } from './application/listWorkflowsUseCase';
 export { reorderWorkflowsUseCase } from './application/reorderWorkflowsUseCase';
 export { updateWorkflowUseCase } from './application/updateWorkflowUseCase';
+export {
+  convertQuickWorkflowUseCase,
+  type ConvertQuickWorkflowInput,
+} from './application/convertQuickWorkflowUseCase';
+export type {
+  WorkflowConversionCommit,
+  WorkflowConversionResult,
+  WorkflowConversionUnitOfWork,
+} from './application/WorkflowConversionUnitOfWork';
 export type { AssetReferenceResolver } from './application/AssetReferenceResolver';
 export { resolveWorkflowAssetReferences } from './application/resolveWorkflowAssetReferences';
 export {
@@ -103,6 +112,7 @@ export {
   type WorkflowImportOptions,
 } from './application/importWorkflowUseCase';
 export { DexieWorkflowPackageUnitOfWork } from './infrastructure/DexieWorkflowPackageUnitOfWork';
+export { DexieWorkflowConversionUnitOfWork } from './infrastructure/DexieWorkflowConversionUnitOfWork';
 export {
   useWorkflowCatalog,
   type WorkflowCatalogSource,

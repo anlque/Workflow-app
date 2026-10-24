@@ -22,6 +22,7 @@ import {
 import {
   createWorkflowId,
   type CreateWorkflowInput,
+  type CreateQuickWorkflowInput,
   type Workflow,
   type WorkflowId,
 } from '@/features/workflow';
@@ -44,6 +45,11 @@ export type WorkflowStudioDependencies = Readonly<{
   preferences: DocumentPreferences;
   load(): Promise<WorkflowStudioSnapshot>;
   saveWorkflow(input: CreateWorkflowInput): Promise<void>;
+  convertQuickWorkflow(
+    input: CreateQuickWorkflowInput,
+    keepQuickCopy: boolean,
+  ): Promise<void>;
+  synchronizeWorkflowConversion(): Promise<void>;
   duplicateWorkflow(id: WorkflowId): Promise<void>;
   deleteWorkflow(id: WorkflowId): Promise<void>;
   reorderWorkflows(ids: readonly WorkflowId[]): Promise<void>;
@@ -358,6 +364,20 @@ export function WorkflowStudio({
                     ? { workflow: selectedWorkflow }
                     : {})}
                   onDirtyChange={setQuickDirty}
+                  {...(selectedWorkflow?.mode !== 'quick'
+                    ? {}
+                    : {
+                        onConvert: (input, keepQuickCopy) =>
+                          dependencies.convertQuickWorkflow(
+                            input,
+                            keepQuickCopy,
+                          ),
+                        onSynchronizeConversion: async () => {
+                          await dependencies.synchronizeWorkflowConversion();
+                          await load(selectedWorkflow.id);
+                          setQuickDirty(false);
+                        },
+                      })}
                   onUploadAsset={async (file, kind) => {
                     const asset = await dependencies.importAsset(file, kind);
                     setSnapshot((current) =>

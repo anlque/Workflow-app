@@ -31,6 +31,8 @@ function dependencies(): WorkflowStudioDependencies {
     load: () =>
       Promise.resolve({ workflows: [], assets: [], settings: defaultSettings }),
     saveWorkflow: () => Promise.resolve(),
+    convertQuickWorkflow: () => Promise.resolve(),
+    synchronizeWorkflowConversion: () => Promise.resolve(),
     duplicateWorkflow: () => Promise.resolve(),
     deleteWorkflow: () => Promise.resolve(),
     reorderWorkflows: () => Promise.resolve(),

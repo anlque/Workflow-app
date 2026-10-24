@@ -41,6 +41,7 @@ async function activeSessionSummary(page: Page) {
         restartCommandReceipts: unknown[];
         rewardRitual?: unknown;
         activeBonusPhase?: unknown;
+        workflow: { phases: unknown[] };
       };
     }>((resolve, reject) => {
       const request = database
@@ -66,6 +67,7 @@ async function activeSessionSummary(page: Page) {
               restartCommandReceipts: unknown[];
               rewardRitual?: unknown;
               activeBonusPhase?: unknown;
+              workflow: { phases: unknown[] };
             };
           },
         );
@@ -77,6 +79,14 @@ async function activeSessionSummary(page: Page) {
     database.close();
     return record.session;
   });
+}
+
+async function activeSessionPhases(page: Page) {
+  const session = await activeSessionSummary(page);
+  if (!Array.isArray(session.workflow.phases)) {
+    throw new Error('Active Session Workflow phases are invalid.');
+  }
+  return { sessionId: session.id, phases: session.workflow.phases };
 }
 
 test('loads every MVP extension surface in an isolated profile', async ({
@@ -155,6 +165,69 @@ test('creates, reopens and starts a Quick Workflow', async ({
   await expect(
     focus.getByRole('heading', { name: 'Quick writing' }),
   ).toBeVisible();
+});
+
+test('save-and-converts a Quick draft with an equivalent retained copy', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Quick setup' }).click();
+  await options.getByLabel('Workflow name').fill('Convertible rhythm');
+  await options.getByLabel('Cycles').fill('2');
+  await options.getByLabel('Focus duration in minutes').fill('0.5');
+  await options.getByLabel('Short Break duration in minutes').fill('0.5');
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await expect(options.getByRole('status')).toHaveText('Workflow saved');
+
+  await options.getByLabel('Cycles').fill('3');
+  await options.getByRole('button', { name: 'Convert to detailed' }).click();
+  await options.getByRole('checkbox', { name: 'Keep a Quick copy' }).check();
+  await options.getByRole('button', { name: 'Save and convert' }).click();
+
+  await expect(
+    options.getByRole('heading', { name: 'Convertible rhythm' }),
+  ).toBeVisible();
+  await expect(options.getByLabel('Phase 1 duration in minutes')).toHaveValue(
+    '0.5',
+  );
+  await expect(
+    options.getByRole('button', {
+      name: 'Open Convertible rhythm',
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('button', {
+      name: 'Open Convertible rhythm (Quick copy)',
+    }),
+  ).toBeVisible();
+
+  const focus = await context.newPage();
+  await focus.goto(extensionUrls.focus);
+  await focus
+    .getByRole('button', {
+      name: 'Start workflow: Convertible rhythm (Quick copy)',
+    })
+    .click();
+  const quickExecution = await activeSessionPhases(focus);
+  await focus.getByRole('button', { name: 'Stop' }).click();
+  await focus.getByRole('button', { name: 'Stop session' }).click();
+  await focus.getByRole('button', { name: 'Back to workflows' }).click();
+
+  await focus
+    .getByRole('button', {
+      name: 'Start workflow: Convertible rhythm',
+      exact: true,
+    })
+    .click();
+  const detailedExecution = await activeSessionPhases(focus);
+  expect(detailedExecution.sessionId).not.toBe(quickExecution.sessionId);
+  expect(quickExecution.phases).toHaveLength(6);
+  expect(detailedExecution.phases).toHaveLength(6);
+  expect(detailedExecution.phases).toEqual(quickExecution.phases);
 });
 
 test('names, duplicates and locally collapses Workflow Phases', async ({

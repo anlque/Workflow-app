@@ -21,6 +21,11 @@ export type QuickWorkflowEditorProps = Readonly<{
   workflow?: QuickWorkflow;
   assets: readonly Asset[];
   onSave(input: Extract<CreateWorkflowInput, { mode: 'quick' }>): Promise<void>;
+  onConvert?(
+    input: Extract<CreateWorkflowInput, { mode: 'quick' }>,
+    keepQuickCopy: boolean,
+  ): Promise<void>;
+  onSynchronizeConversion?(): Promise<void>;
   onUploadAsset?: AssetPickerUpload;
   onSynchronizeAssetUpload?: AssetPickerUploadSynchronization;
   onDirtyChange?(dirty: boolean): void;
@@ -33,6 +38,8 @@ export function QuickWorkflowEditor({
   workflow,
   assets,
   onSave,
+  onConvert,
+  onSynchronizeConversion,
   onUploadAsset,
   onSynchronizeAssetUpload,
   onDirtyChange,
@@ -43,6 +50,11 @@ export function QuickWorkflowEditor({
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [conversionOpen, setConversionOpen] = useState(false);
+  const [keepQuickCopy, setKeepQuickCopy] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const [conversionCommitted, setConversionCommitted] = useState(false);
+  const [conversionError, setConversionError] = useState<string | null>(null);
   const saveStatusTimer = useRef<number | undefined>(undefined);
   const rewardInputs = useRef(new Map<string, HTMLInputElement>());
   const [pendingRewardFocusKey, setPendingRewardFocusKey] = useState<
@@ -205,6 +217,36 @@ export function QuickWorkflowEditor({
     }
   }
 
+  async function convert() {
+    if (onConvert === undefined || onSynchronizeConversion === undefined)
+      return;
+    setConversionError(null);
+    setConverting(true);
+    try {
+      if (!conversionCommitted) {
+        const result = validateQuickWorkflowDraft(editor.draft);
+        if (!result.valid) {
+          setErrors(result.errors);
+          setConversionError(
+            'Review the highlighted fields before converting.',
+          );
+          return;
+        }
+        setErrors({});
+        await onConvert(result.input, keepQuickCopy);
+        setConversionCommitted(true);
+      }
+      await onSynchronizeConversion();
+      setConversionOpen(false);
+    } catch (cause) {
+      setConversionError(
+        cause instanceof Error ? cause.message : 'Conversion failed.',
+      );
+    } finally {
+      setConverting(false);
+    }
+  }
+
   return (
     <form
       className="quick-setup"
@@ -228,6 +270,19 @@ export function QuickWorkflowEditor({
               Workflow saved
             </span>
           ) : null}
+          {workflow === undefined || onConvert === undefined ? null : (
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => {
+                setConversionError(null);
+                setKeepQuickCopy(false);
+                setConversionOpen(true);
+              }}
+            >
+              Convert to detailed
+            </Button>
+          )}
           <Button
             variant="primary"
             type="submit"
@@ -537,6 +592,67 @@ export function QuickWorkflowEditor({
             }}
           >
             Done
+          </Button>
+        </div>
+      </Dialog>
+      <Dialog
+        open={conversionOpen}
+        title="Convert to Detailed setup?"
+        describedBy="quick-conversion-warning"
+        onCancel={() => {
+          if (!converting && !conversionCommitted) setConversionOpen(false);
+        }}
+      >
+        <p id="quick-conversion-warning">
+          This Workflow cannot be converted back to Quick Setup. Its current
+          Phases, Environments and Reward behavior will be preserved.
+        </p>
+        {conversionCommitted ? null : (
+          <label className="check-control">
+            <input
+              type="checkbox"
+              checked={keepQuickCopy}
+              onChange={(event) => {
+                setKeepQuickCopy(event.target.checked);
+              }}
+            />
+            Keep a Quick copy
+          </label>
+        )}
+        {conversionError === null ? null : (
+          <p className="feedback feedback--error" role="alert">
+            {conversionError}
+          </p>
+        )}
+        <div className="dialog__actions">
+          {conversionCommitted ? null : (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={converting}
+              onClick={() => {
+                setConversionOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="primary"
+            pending={converting}
+            pendingLabel={
+              conversionCommitted ? 'Synchronizing…' : 'Converting…'
+            }
+            onClick={() => {
+              void convert();
+            }}
+          >
+            {conversionCommitted
+              ? 'Retry sync'
+              : editor.dirty
+                ? 'Save and convert'
+                : 'Convert'}
           </Button>
         </div>
       </Dialog>

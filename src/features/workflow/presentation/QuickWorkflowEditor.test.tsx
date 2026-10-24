@@ -209,4 +209,171 @@ describe('QuickWorkflowEditor', () => {
       screen.getByText(/individual Phases and advanced Reward settings/iu),
     ).toBeVisible();
   });
+
+  test('confirms clean conversion with an unchecked optional Quick copy', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      mode: 'quick',
+      id: 'quick-1',
+      name: 'Existing quick',
+      configuration: {
+        cycleCount: 2,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+      },
+    });
+    if (workflow.mode !== 'quick') throw new Error('Expected Quick Workflow.');
+    const onConvert = vi.fn(
+      (
+        input: Extract<CreateWorkflowInput, { mode: 'quick' }>,
+        keep: boolean,
+      ) => {
+        void input;
+        void keep;
+        return Promise.resolve();
+      },
+    );
+    const onSynchronizeConversion = vi.fn(() => Promise.resolve());
+    render(
+      <QuickWorkflowEditor
+        workflowId={workflow.id}
+        workflow={workflow}
+        assets={[]}
+        onSave={() => Promise.resolve()}
+        onConvert={onConvert}
+        onSynchronizeConversion={onSynchronizeConversion}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Convert to detailed' }),
+    );
+    expect(
+      screen.getByText(/cannot be converted back to Quick Setup/iu),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('checkbox', { name: 'Keep a Quick copy' }),
+    ).not.toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    await waitFor(() => {
+      expect(onConvert).toHaveBeenCalledOnce();
+    });
+    expect(onConvert.mock.calls[0]?.[1]).toBe(false);
+    expect(onSynchronizeConversion).toHaveBeenCalledOnce();
+  });
+
+  test('uses the validated dirty draft for Save and convert', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      mode: 'quick',
+      id: 'quick-1',
+      name: 'Existing quick',
+      configuration: {
+        cycleCount: 2,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+      },
+    });
+    if (workflow.mode !== 'quick') throw new Error('Expected Quick Workflow.');
+    const onConvert = vi.fn(
+      (
+        input: Extract<CreateWorkflowInput, { mode: 'quick' }>,
+        keep: boolean,
+      ) => {
+        void input;
+        void keep;
+        return Promise.resolve();
+      },
+    );
+    render(
+      <QuickWorkflowEditor
+        workflowId={workflow.id}
+        workflow={workflow}
+        assets={[]}
+        onSave={() => Promise.resolve()}
+        onConvert={onConvert}
+        onSynchronizeConversion={() => Promise.resolve()}
+      />,
+    );
+    await user.clear(screen.getByLabelText('Workflow name'));
+    await user.type(screen.getByLabelText('Workflow name'), 'Current draft');
+    await user.click(
+      screen.getByRole('button', { name: 'Convert to detailed' }),
+    );
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Keep a Quick copy' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Save and convert' }));
+
+    await waitFor(() => {
+      expect(onConvert).toHaveBeenCalledOnce();
+    });
+    expect(onConvert.mock.calls[0]?.[0]).toMatchObject({
+      name: 'Current draft',
+      mode: 'quick',
+    });
+    expect(onConvert.mock.calls[0]?.[1]).toBe(true);
+  });
+
+  test('preserves the dialog and draft across storage and post-commit sync failures', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      mode: 'quick',
+      id: 'quick-1',
+      name: 'Existing quick',
+      configuration: {
+        cycleCount: 2,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+      },
+    });
+    if (workflow.mode !== 'quick') throw new Error('Expected Quick Workflow.');
+    const onConvert = vi
+      .fn(
+        (
+          input: Extract<CreateWorkflowInput, { mode: 'quick' }>,
+          keep: boolean,
+        ) => {
+          void input;
+          void keep;
+          return Promise.resolve();
+        },
+      )
+      .mockRejectedValueOnce(new Error('Storage failed.'))
+      .mockResolvedValue(undefined);
+    const onSynchronizeConversion = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Reload failed.'))
+      .mockResolvedValue(undefined);
+    render(
+      <QuickWorkflowEditor
+        workflowId={workflow.id}
+        workflow={workflow}
+        assets={[]}
+        onSave={() => Promise.resolve()}
+        onConvert={onConvert}
+        onSynchronizeConversion={onSynchronizeConversion}
+      />,
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Convert to detailed' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Storage failed.',
+    );
+    expect(screen.getByRole('dialog')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Reload failed.',
+    );
+    expect(screen.getByRole('button', { name: 'Retry sync' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Retry sync' }));
+    await waitFor(() => {
+      expect(onSynchronizeConversion).toHaveBeenCalledTimes(2);
+    });
+    expect(onConvert).toHaveBeenCalledTimes(2);
+  });
 });

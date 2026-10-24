@@ -45,6 +45,8 @@ function dependencies(
     load: () =>
       Promise.resolve({ workflows: [], assets: [], settings: defaultSettings }),
     saveWorkflow: () => Promise.resolve(),
+    convertQuickWorkflow: () => Promise.resolve(),
+    synchronizeWorkflowConversion: () => Promise.resolve(),
     duplicateWorkflow: () => Promise.resolve(),
     deleteWorkflow: () => Promise.resolve(),
     reorderWorkflows: () => Promise.resolve(),
@@ -316,6 +318,60 @@ describe('WorkflowStudio', () => {
       expect(saveWorkflow).toHaveBeenCalledOnce();
     });
     expect(saveWorkflow.mock.calls[0]?.[0]).toMatchObject({ mode: 'quick' });
+  });
+
+  test('opens the converted Workflow in the Detailed editor after synchronization', async () => {
+    const user = userEvent.setup();
+    const quick = createWorkflow({
+      mode: 'quick',
+      id: 'quick-convert',
+      name: 'Quick conversion',
+      configuration: {
+        cycleCount: 1,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+      },
+    });
+    if (quick.mode !== 'quick') throw new Error('Expected Quick Workflow.');
+    let workflows: readonly Workflow[] = [quick];
+    const load = vi.fn(() =>
+      Promise.resolve({ workflows, assets: [], settings: defaultSettings }),
+    );
+    const convertQuickWorkflow = vi.fn(
+      (input: Extract<CreateWorkflowInput, { mode: 'quick' }>) => {
+        workflows = [
+          createWorkflow({
+            mode: 'detailed',
+            id: input.id,
+            name: input.name,
+            phases: quick.phases,
+          }),
+        ];
+        return Promise.resolve();
+      },
+    );
+    const synchronizeWorkflowConversion = vi.fn(() => Promise.resolve());
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load,
+          convertQuickWorkflow,
+          synchronizeWorkflowConversion,
+        })}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Convert to detailed' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Quick conversion' }),
+    ).toBeVisible();
+    expect(screen.getByLabelText('Phase 1 name')).toBeVisible();
+    expect(convertQuickWorkflow).toHaveBeenCalledOnce();
+    expect(synchronizeWorkflowConversion).toHaveBeenCalledOnce();
   });
 
   test('protects a dirty Quick draft when switching Studio sections', async () => {

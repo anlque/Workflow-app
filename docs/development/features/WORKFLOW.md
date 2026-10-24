@@ -35,6 +35,8 @@ Source root: [`src/features/workflow/`](../../../src/features/workflow/).
 - `Phase`, `Environment`, Reward Dice and Dice Side value semantics;
 - Reward eligibility and weighted side selection;
 - Workflow repository port and CRUD/list/order use cases;
+- Quick-to-Detailed conversion contract and atomic replacement/copy/order unit
+  of work;
 - Workflow package contract, mapping, import/export and atomic unit-of-work port;
 - Workflow record mapping, table ordering and Dexie adapters;
 - Workflow Library, editor, Reward Dice editor and catalog/editor hooks;
@@ -72,9 +74,9 @@ allowlisted Workflow Studio and Side Panel presentation consumers use
 | --- | --- |
 | Domain value types | `BonusRewardPhase`, `DiceSide`, Asset/Environment/Phase/Reward types, `QuickWorkflowConfiguration`, `QuickWorkflow`, `DetailedWorkflow`, `CreateWorkflowInput`, `Workflow`, `WorkflowId` |
 | Domain behavior and errors | `createWorkflowId`, `createWorkflow`, `rollReward`, `eligibleDiceSides`, `rewardOpportunityPhaseIndexes`, `isRewardDueAfterPhase`, `WorkflowValidationError` |
-| Application contracts and errors | `WorkflowRepository`, `AssetReferenceResolver`, source-aware Environment traversal, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`–`WorkflowPackageV7`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
-| Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `resolveWorkflowAssetReferences`, Role-summary/rename and Asset-retirement summary/patch operations, `exportWorkflowUseCase`, `importWorkflowUseCase` |
-| Infrastructure composition | `DexieWorkflowRepository`, `workflowDatabaseSchemas`, `DexieWorkflowPackageUnitOfWork` |
+| Application contracts and errors | `WorkflowRepository`, `WorkflowConversionUnitOfWork`, conversion inputs/results, `AssetReferenceResolver`, source-aware Environment traversal, `WorkflowRoleUsageSummary`, `WorkflowApplicationError`, `WorkflowPackageV1`–`WorkflowPackageV7`, `WorkflowPackageUnitOfWork`, `WorkflowPackageValidationError`, `WorkflowImportIdentity`, `WorkflowImportOptions` |
+| Application use cases | `createWorkflowUseCase`, `deleteWorkflowUseCase`, `duplicateWorkflowUseCase`, `listWorkflowsUseCase`, `reorderWorkflowsUseCase`, `updateWorkflowUseCase`, `convertQuickWorkflowUseCase`, `resolveWorkflowAssetReferences`, Role-summary/rename and Asset-retirement summary/patch operations, `exportWorkflowUseCase`, `importWorkflowUseCase` |
+| Infrastructure composition | `DexieWorkflowRepository`, `workflowDatabaseSchemas`, `DexieWorkflowPackageUnitOfWork`, `DexieWorkflowConversionUnitOfWork` |
 | Presentation components (`/studio`) | `WorkflowLibrary`, `WorkflowLibraryProps`, `WorkflowEditor`, `WorkflowEditorProps`, `QuickWorkflowEditor`, `QuickWorkflowEditorProps`, `RewardDiceEditor`, `RewardDiceEditorProps` |
 | Presentation editor API (`/studio`) | `useWorkflowEditor`, `validateWorkflowDraft`, `useQuickWorkflowEditor`, `validateQuickWorkflowDraft`, Detailed and Quick draft types |
 | Presentation catalog API | `useWorkflowCatalog`, `WorkflowCatalogSource`, `WorkflowCatalogState` |
@@ -129,8 +131,10 @@ It does not know Dexie or Chrome runtime APIs.
   simplified Reward cadence. It deterministically derives `Focus -> Break`
   cycles, including the final Break, and fixed names `Focus`, `Short break` and
   `Long break`.
-- Ordinary update cannot change mode. Quick-to-Detailed conversion belongs to
-  QUICK-003.
+- Ordinary update cannot change mode. `convertQuickWorkflowUseCase` is the
+  only Quick-to-Detailed boundary: it preserves the source ID and materialized
+  executable values while atomically replacing the source, optionally adding a
+  retained Quick copy and writing the complete library order.
 - A Phase type is exactly `focus` or `break`.
 - A supplied Phase name is trimmed; blank names normalize to absence. Absent
   names display as `Phase N` without persisting that fallback.
@@ -201,6 +205,7 @@ Phases are copied by value. Session Domain owns per-opportunity reroll usage.
 | `deleteWorkflowUseCase` | Repository, ID | Requires existence, deletes; repository compacts collection order | `void` or not-found error |
 | `listWorkflowsUseCase` | Repository | Returns repository order | Readonly Workflow list |
 | `reorderWorkflowsUseCase` | Repository, complete ordered IDs | Requires an exact permutation of current IDs, delegates atomic replacement | `void` or Application error |
+| `convertQuickWorkflowUseCase` | Repository, conversion unit of work, validated current Quick input, optional copy ID | Materializes an equivalent Detailed replacement; optional copy uses `Name (Quick copy)`, then incrementing numeric suffixes; computes Quick-first/Detailed-second full order | Converted value/copy/order or Application/storage error; no partial writes |
 | `exportWorkflowUseCase` | Workflow, Asset repository | Resolves referenced source Environments/Blobs and creates deterministic version-7 JSON | JSON or package validation error |
 | `importWorkflowUseCase` | Repositories, unit of work, JSON, limits/policy/identity | Validates complete package before writes, generates collision-free IDs, rewrites Environment references, atomically writes Assets and Workflow | Imported Workflow or package validation/storage failure |
 
@@ -233,6 +238,9 @@ version-1 `workflows: 'id, order'` table definition and reads versions 1–7.
 `DexieWorkflowPackageUnitOfWork` spans `workflows` and `assets`; it is used only
 after package validation and identity rewriting.
 
+`DexieWorkflowConversionUnitOfWork` spans only `workflows`. Replacement,
+optional copy and every resulting `order` value commit in one transaction.
+
 See [Persistence and Compatibility](../PERSISTENCE.md) for schemas, records,
 package differences and migrations.
 
@@ -255,6 +263,11 @@ reuses Asset selection and inline upload boundaries. Its right-hand Reward
 sides drawer exposes only icon, title and optional weight; generated Phases are
 never editable or persisted as a second source of truth. Dirty navigation is
 guarded by Workflow Studio until save or explicit discard.
+For a persisted Quick Workflow it also owns the irreversible confirmation UI.
+Clean drafts show `Convert`; dirty drafts show `Save and convert` and pass the
+validated current draft to the Application boundary. After a durable commit,
+publication/reload recovery offers only `Retry sync`, so it cannot repeat the
+conversion.
 
 ### `WorkflowEditor`
 

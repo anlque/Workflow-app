@@ -23,7 +23,9 @@ import {
 import {
   createWorkflowId,
   createWorkflowUseCase,
+  convertQuickWorkflowUseCase,
   deleteWorkflowUseCase,
+  DexieWorkflowConversionUnitOfWork,
   DexieWorkflowPackageUnitOfWork,
   DexieWorkflowRepository,
   duplicateWorkflowUseCase,
@@ -92,6 +94,7 @@ export function createWorkflowStudioDependencies(
   const settings = new ChromeSettingsRepository();
   const urls = new BrowserAssetUrlService();
   const unitOfWork = new DexieWorkflowPackageUnitOfWork(database);
+  const conversionUnitOfWork = new DexieWorkflowConversionUnitOfWork(database);
   const roleUnitOfWork = new DexieAssetRoleManagementUnitOfWork(database);
   const retirementUnitOfWork = new DexieAssetRetirementUnitOfWork(database);
   const activeSessionReferences: ActiveSessionAssetReferences = {
@@ -138,6 +141,16 @@ export function createWorkflowStudioDependencies(
         }
       }, catalogEvents);
     },
+    async convertQuickWorkflow(input, keepQuickCopy) {
+      await convertQuickWorkflowUseCase(workflows, conversionUnitOfWork, {
+        sourceId: createWorkflowId(input.id),
+        input,
+        ...(keepQuickCopy
+          ? { copyId: createWorkflowId(crypto.randomUUID()) }
+          : {}),
+      });
+    },
+    synchronizeWorkflowConversion: () => catalogEvents.publishChanged(),
     async duplicateWorkflow(id) {
       await runWorkflowCatalogMutation(async () => {
         const duplicate = await duplicateWorkflowUseCase(

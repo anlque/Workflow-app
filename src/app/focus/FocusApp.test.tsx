@@ -40,6 +40,8 @@ function studioDependencies(
       Promise.resolve({ workflows, assets: [], settings: defaultSettings }),
     ),
     saveWorkflow: vi.fn(() => Promise.resolve()),
+    convertQuickWorkflow: vi.fn(() => Promise.resolve()),
+    synchronizeWorkflowConversion: vi.fn(() => Promise.resolve()),
     duplicateWorkflow: vi.fn(() => Promise.resolve()),
     deleteWorkflow: vi.fn(() => Promise.resolve()),
     reorderWorkflows: vi.fn(() => Promise.resolve()),
