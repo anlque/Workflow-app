@@ -13,6 +13,8 @@ import {
   restoreSession,
   resumeSession,
   rollSessionReward,
+  skipSessionPhase,
+  skipSessionReward,
   stopSession,
 } from './Session';
 import { deriveSessionState } from './deriveSessionState';
@@ -93,6 +95,252 @@ function acceptedNormalPhase(withBonus: boolean) {
 }
 
 describe('Session', () => {
+  test.each(['running', 'paused'] as const)(
+    'skips an exact %s ordinary Phase through an authoritative transition',
+    (state) => {
+      const initial = createSession('skip-ordinary', workflow(), 1_000);
+      const source =
+        state === 'paused' ? pauseSession(initial, 1_500) : initial;
+
+      const skipped = skipSessionPhase(source, 2_000, 'skip-phase-0', {
+        type: 'phase',
+        phaseIndex: 0,
+      });
+
+      expect(skipped).toMatchObject({
+        id: initial.id,
+        snapshot: initial.snapshot,
+        currentPhaseIndex: 0,
+        status: 'transitioning',
+        transitionEndsAt: 3_000,
+        transition: { type: 'ordinary-phase', cause: 'skipped' },
+        skipCommandReceipts: [
+          {
+            commandId: 'skip-phase-0',
+            type: 'skip-phase',
+            target: { type: 'phase', phaseIndex: 0 },
+          },
+        ],
+      });
+      expect(Object.isFrozen(skipped.skipCommandReceipts)).toBe(true);
+      const receipt = skipped.skipCommandReceipts[0];
+      if (receipt?.type !== 'skip-phase')
+        throw new Error('Expected phase skip receipt.');
+      if (skipped.status !== 'transitioning')
+        throw new Error('Expected skipped transition.');
+      expect(Object.isFrozen(receipt.target)).toBe(true);
+      expect(Object.isFrozen(skipped.transition)).toBe(true);
+      expect(deriveSessionState(skipped, 3_000)).toMatchObject({
+        status: 'running',
+        currentPhaseIndex: 1,
+        phaseStartedAt: 3_000,
+        phaseEndsAt: 8_000,
+      });
+    },
+  );
+
+  test('bypasses Reward eligibility and completes when an ordinary Phase is skipped', () => {
+    const rewarded = bonusWorkflow();
+    const intermediate = skipSessionPhase(
+      createSession('skip-reward-bearing', rewarded, 1_000),
+      2_000,
+      'skip-intermediate',
+      { type: 'phase', phaseIndex: 0 },
+    );
+    expect(deriveSessionState(intermediate, 3_000)).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+    });
+
+    const finalPhase = deriveSessionState(
+      createSession('skip-final', workflow(), 1_000),
+      18_000,
+    );
+    expect(finalPhase).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 2,
+    });
+    const finalSkip = skipSessionPhase(finalPhase, 20_000, 'skip-final', {
+      type: 'phase',
+      phaseIndex: 2,
+    });
+    expect(deriveSessionState(finalSkip, 21_000)).toMatchObject({
+      status: 'completed',
+      completedAt: 21_000,
+    });
+
+    expect(
+      deriveSessionState(createSession('natural', rewarded, 1_000), 12_000),
+    ).toMatchObject({
+      status: 'paused',
+      pauseReason: 'reward',
+    });
+  });
+
+  test('skips a normal Phase after an acknowledged Bonus without invalidating its history', () => {
+    const normal = acceptedNormalPhase(true);
+    expect(normal).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+      rewardRitual: { acknowledged: true },
+    });
+
+    const skipped = skipSessionPhase(normal, 51_000, 'skip-after-bonus', {
+      type: 'phase',
+      phaseIndex: 1,
+    });
+
+    expect(skipped).toMatchObject({
+      status: 'transitioning',
+      transition: { type: 'ordinary-phase', cause: 'skipped' },
+      rewardRitual: { acknowledged: true },
+    });
+    if (skipped.status !== 'transitioning')
+      throw new Error('Expected skipped transition.');
+    if (skipped.rewardRitual === undefined)
+      throw new Error('Expected acknowledged Reward history.');
+    expect(
+      restoreSession({
+        id: skipped.id,
+        workflow: skipped.snapshot.workflow,
+        currentPhaseIndex: skipped.currentPhaseIndex,
+        rewardCommandReceipts: skipped.rewardCommandReceipts,
+        restartCommandReceipts: skipped.restartCommandReceipts,
+        skipCommandReceipts: skipped.skipCommandReceipts,
+        rewardRitual: skipped.rewardRitual,
+        status: 'transitioning',
+        transitionEndsAt: skipped.transitionEndsAt,
+        transition: skipped.transition,
+      }),
+    ).toEqual(skipped);
+    expect(deriveSessionState(skipped, 52_000)).toMatchObject({
+      status: 'completed',
+    });
+  });
+
+  test.each([
+    ['non-final', false, 'running'],
+    ['final', true, 'completed'],
+  ] as const)(
+    'skips a %s Bonus through its stored continuation',
+    (_label, final, expectedStatus) => {
+      const bonus = runningBonus(final);
+      const ritualId = bonus.activeBonusPhase?.rewardRitualId;
+      if (ritualId === undefined) throw new Error('Expected Bonus target.');
+
+      const skipped = skipSessionPhase(bonus, 25_000, 'skip-bonus', {
+        type: 'bonus',
+        rewardRitualId: ritualId,
+      });
+      expect(skipped).toMatchObject({
+        status: 'transitioning',
+        transitionEndsAt: 26_000,
+        transition: {
+          type: 'bonus-phase',
+          cause: 'skipped',
+          rewardRitualId: ritualId,
+        },
+        activeBonusPhase: { rewardRitualId: ritualId },
+        rewardRitual: { acknowledged: true },
+      });
+      const continued = deriveSessionState(skipped, 26_000);
+      expect(continued.status).toBe(expectedStatus);
+      expect(continued).not.toHaveProperty('activeBonusPhase');
+    },
+  );
+
+  test('dismisses only an unrolled Reward and follows its continuation', () => {
+    const rewardPaused = deriveSessionState(
+      createSession('skip-reward', bonusWorkflow(), 1_000),
+      12_000,
+    );
+    if (rewardPaused.rewardRitual === undefined)
+      throw new Error('Expected Reward ritual.');
+    const ritualId = rewardPaused.rewardRitual.id;
+
+    const skipped = skipSessionReward(
+      rewardPaused,
+      20_000,
+      'skip-reward-command',
+      ritualId,
+    );
+    expect(skipped).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+      phaseStartedAt: 20_000,
+      phaseEndsAt: 25_000,
+      skipCommandReceipts: [
+        {
+          commandId: 'skip-reward-command',
+          type: 'skip-reward',
+          rewardRitualId: ritualId,
+        },
+      ],
+    });
+    expect(skipped).not.toHaveProperty('rewardRitual');
+    expect(
+      skipSessionReward(skipped, 21_000, 'skip-reward-command', ritualId),
+    ).toBe(skipped);
+
+    const selected = rollSessionReward(rewardPaused, () => 0, 'roll-first');
+    expect(() =>
+      skipSessionReward(selected, 20_000, 'skip-selected', ritualId),
+    ).toThrow();
+  });
+
+  test('rejects stale and conflicting skips while bounding immutable receipts', () => {
+    let current:
+      ReturnType<typeof createSession> | ReturnType<typeof restoreSession> =
+      createSession('bounded-skip', workflow(), 1_000);
+    expect(() =>
+      skipSessionPhase(current, 2_000, 'stale', {
+        type: 'phase',
+        phaseIndex: 1,
+      }),
+    ).toThrow();
+    expect(() =>
+      skipSessionPhase(current, 11_000, 'deadline', {
+        type: 'phase',
+        phaseIndex: 0,
+      }),
+    ).toThrow();
+
+    for (let index = 0; index < 17; index += 1) {
+      current = restartSessionPhase(
+        current,
+        2_000 + index,
+        `prepare-${String(index)}`,
+        { type: 'phase', phaseIndex: 0 },
+      );
+      current = skipSessionPhase(
+        current,
+        3_000 + index,
+        `skip-${String(index)}`,
+        { type: 'phase', phaseIndex: 0 },
+      );
+      current = restoreSession({
+        id: current.id,
+        workflow: current.snapshot.workflow,
+        currentPhaseIndex: current.currentPhaseIndex,
+        rewardCommandReceipts: current.rewardCommandReceipts,
+        restartCommandReceipts: current.restartCommandReceipts,
+        skipCommandReceipts: current.skipCommandReceipts,
+        status: 'running',
+        phaseStartedAt: 4_000 + index,
+        phaseEndsAt: 20_000 + index,
+      });
+    }
+    expect(current.skipCommandReceipts).toHaveLength(16);
+    expect(current.skipCommandReceipts[0]?.commandId).toBe('skip-1');
+    expect(Object.isFrozen(current.skipCommandReceipts)).toBe(true);
+    expect(() =>
+      restartSessionPhase(current, 30_000, 'skip-16', {
+        type: 'phase',
+        phaseIndex: 0,
+      }),
+    ).toThrow();
+  });
+
   test('restarts a normal Phase and the complete Workflow authoritatively', () => {
     const phaseOne = deriveSessionState(
       createSession('restart-session', workflow(), 1_000),
@@ -333,6 +581,7 @@ describe('Session', () => {
         currentPhaseIndex: paused.currentPhaseIndex,
         rewardCommandReceipts: paused.rewardCommandReceipts,
         restartCommandReceipts: paused.restartCommandReceipts,
+        skipCommandReceipts: paused.skipCommandReceipts,
         rewardRitual,
         activeBonusPhase,
         status: 'paused',
@@ -385,6 +634,7 @@ describe('Session', () => {
         currentPhaseIndex: paused.currentPhaseIndex,
         rewardCommandReceipts: paused.rewardCommandReceipts,
         restartCommandReceipts: paused.restartCommandReceipts,
+        skipCommandReceipts: paused.skipCommandReceipts,
         rewardRitual: paused.rewardRitual,
         status: 'paused',
         pauseReason: 'user',
@@ -415,6 +665,7 @@ describe('Session', () => {
       currentPhaseIndex: running.currentPhaseIndex,
       rewardCommandReceipts: running.rewardCommandReceipts,
       restartCommandReceipts: running.restartCommandReceipts,
+      skipCommandReceipts: running.skipCommandReceipts,
       rewardRitual: running.rewardRitual,
       activeBonusPhase: running.activeBonusPhase,
     };
@@ -443,6 +694,7 @@ describe('Session', () => {
         ...common,
         status: 'transitioning',
         transitionEndsAt: 50_000,
+        transition: { type: 'ordinary-phase', cause: 'elapsed' },
       }),
     ).toThrow('Session Bonus Reward Phase is invalid.');
     expect(() =>
@@ -474,6 +726,7 @@ describe('Session', () => {
         currentPhaseIndex: finalBonus.currentPhaseIndex,
         rewardCommandReceipts: finalBonus.rewardCommandReceipts,
         restartCommandReceipts: finalBonus.restartCommandReceipts,
+        skipCommandReceipts: finalBonus.skipCommandReceipts,
         rewardRitual: finalRitual,
         status: 'running',
         phaseStartedAt: finalBonus.phaseStartedAt,
@@ -980,6 +1233,7 @@ describe('Session', () => {
       currentPhaseIndex: paused.currentPhaseIndex,
       rewardCommandReceipts: paused.rewardCommandReceipts,
       restartCommandReceipts: paused.restartCommandReceipts,
+      skipCommandReceipts: paused.skipCommandReceipts,
       rewardRitual,
     };
 
@@ -997,6 +1251,7 @@ describe('Session', () => {
         ...common,
         status: 'transitioning',
         transitionEndsAt: 4_000,
+        transition: { type: 'ordinary-phase', cause: 'elapsed' },
       }),
     ).toThrow('Session Reward ritual is invalid.');
     expect(() =>
@@ -1045,6 +1300,7 @@ describe('Session', () => {
         currentPhaseIndex: paused.currentPhaseIndex,
         rewardCommandReceipts: paused.rewardCommandReceipts,
         restartCommandReceipts: paused.restartCommandReceipts,
+        skipCommandReceipts: paused.skipCommandReceipts,
         status: 'paused',
         pauseReason: 'reward',
         pausedAt: paused.pausedAt,

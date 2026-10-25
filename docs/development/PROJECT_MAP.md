@@ -96,9 +96,9 @@ the authority that executes those rules.
 | Location | Owner | Contains | May depend on | Why it exists |
 | --- | --- | --- | --- | --- |
 | [`domain/`](../../src/features/session/domain/) | Session Domain | Session state variants, immutable Workflow snapshot, restoration, timing derivation and errors | Session Domain modules and Workflow root types | Models valid Session states without knowing Chrome, React or Dexie |
-| [`application/`](../../src/features/session/application/) | Session use cases | Clock/repository ports; start, advance, pause, resume, reward continuation, stop and active lookup | Session Domain and Workflow root types | Coordinates lifecycle changes through explicit ports |
+| [`application/`](../../src/features/session/application/) | Session use cases | Clock/repository ports; start, advance, pause, resume, restart, phase/reward skip, reward continuation, stop and active lookup | Session Domain and Workflow root types | Coordinates lifecycle changes through explicit ports |
 | [`infrastructure/`](../../src/features/session/infrastructure/) | Session persistence | Session record, mapper, schema fragment and Dexie repository | Session Application/Domain and storage platform | Persists and restores Session state without leaking records inward |
-| [`presentation/`](../../src/features/session/presentation/) | Session UI projection | Zustand store, message connection, projection parser, countdown helpers, controls, active view and Reward dialog/cube | Session public behavior, Workflow root types, React/Zustand and shared UI | Mirrors authoritative background state and renders local interactions |
+| [`presentation/`](../../src/features/session/presentation/) | Session UI projection | Zustand store, message connection, projection parser, countdown/boundary helpers, shared skip/restart controls, active view and Reward dialog/cube | Session public behavior, Workflow root types, React/Zustand and shared UI | Mirrors authoritative background state and renders local interactions |
 | [`index.ts`](../../src/features/session/index.ts) | Session public API | Supported Domain/Application contracts, Dexie adapter/schema and projection exports | Session internals | Keeps composition code out of internal feature paths |
 
 ## Assets Feature

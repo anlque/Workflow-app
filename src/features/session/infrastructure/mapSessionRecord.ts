@@ -4,11 +4,12 @@ import {
   restoreSession,
   type RestoreSessionInput,
   type Session,
+  type SessionTransition,
 } from '../domain/Session';
 import { SessionValidationError } from '../domain/SessionErrors';
 import type { SessionRecord } from './SessionRecord';
 
-type SessionSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type SessionSchemaVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 function invalid(): never {
   throw new SessionValidationError('Stored Session record is invalid.');
@@ -372,6 +373,73 @@ function parseRestartCommandReceipts(value: unknown) {
   });
 }
 
+function parsePhaseTarget(value: unknown) {
+  const target = record(value);
+  return target['type'] === 'phase' &&
+    hasExactKeys(target, ['type', 'phaseIndex'])
+    ? ({
+        type: 'phase' as const,
+        phaseIndex: number(target['phaseIndex']),
+      } as const)
+    : target['type'] === 'bonus' &&
+        hasExactKeys(target, ['type', 'rewardRitualId'])
+      ? ({
+          type: 'bonus' as const,
+          rewardRitualId: string(target['rewardRitualId']),
+        } as const)
+      : invalid();
+}
+
+function parseSkipCommandReceipts(value: unknown) {
+  if (!Array.isArray(value)) return invalid();
+  return value.map((entry) => {
+    const receipt = record(entry);
+    if (receipt['type'] === 'skip-reward') {
+      if (!hasExactKeys(receipt, ['commandId', 'type', 'rewardRitualId']))
+        return invalid();
+      return {
+        commandId: string(receipt['commandId']),
+        type: 'skip-reward' as const,
+        rewardRitualId: string(receipt['rewardRitualId']),
+      };
+    }
+    if (
+      receipt['type'] !== 'skip-phase' ||
+      !hasExactKeys(receipt, ['commandId', 'type', 'target'])
+    )
+      return invalid();
+    return {
+      commandId: string(receipt['commandId']),
+      type: 'skip-phase' as const,
+      target: parsePhaseTarget(receipt['target']),
+    };
+  });
+}
+
+function parseTransition(value: unknown): SessionTransition {
+  const transition = record(value);
+  if (
+    transition['type'] === 'ordinary-phase' &&
+    hasExactKeys(transition, ['type', 'cause']) &&
+    (transition['cause'] === 'elapsed' || transition['cause'] === 'skipped')
+  )
+    return {
+      type: 'ordinary-phase' as const,
+      cause: transition['cause'],
+    };
+  if (
+    transition['type'] === 'bonus-phase' &&
+    transition['cause'] === 'skipped' &&
+    hasExactKeys(transition, ['type', 'cause', 'rewardRitualId'])
+  )
+    return {
+      type: 'bonus-phase' as const,
+      cause: 'skipped' as const,
+      rewardRitualId: string(transition['rewardRitualId']),
+    };
+  return invalid();
+}
+
 export function mapSessionRecord(value: unknown): Session {
   const outer = record(value);
   if (
@@ -383,7 +451,8 @@ export function mapSessionRecord(value: unknown): Session {
       outer['schemaVersion'] !== 6 &&
       outer['schemaVersion'] !== 7 &&
       outer['schemaVersion'] !== 8 &&
-      outer['schemaVersion'] !== 9) ||
+      outer['schemaVersion'] !== 9 &&
+      outer['schemaVersion'] !== 10) ||
     (outer['active'] !== 0 && outer['active'] !== 1)
   ) {
     return invalid();
@@ -410,12 +479,17 @@ export function mapSessionRecord(value: unknown): Session {
     outer['schemaVersion'] < 9
       ? []
       : parseRestartCommandReceipts(stored['restartCommandReceipts']);
+  const skipCommandReceipts =
+    outer['schemaVersion'] < 10
+      ? []
+      : parseSkipCommandReceipts(stored['skipCommandReceipts']);
   const common = {
     id: string(stored['id']),
     workflow: parseWorkflow(stored['workflow'], outer['schemaVersion']),
     currentPhaseIndex: number(stored['currentPhaseIndex']),
     rewardCommandReceipts,
     restartCommandReceipts,
+    skipCommandReceipts,
     ...(rewardRitual === undefined ? {} : { rewardRitual }),
     ...(activeBonusPhase === undefined ? {} : { activeBonusPhase }),
   };
@@ -433,6 +507,10 @@ export function mapSessionRecord(value: unknown): Session {
       ...common,
       status,
       transitionEndsAt: number(stored['transitionEndsAt']),
+      transition:
+        outer['schemaVersion'] < 10
+          ? { type: 'ordinary-phase', cause: 'elapsed' }
+          : parseTransition(stored['transition']),
     };
   } else if (status === 'paused') {
     const pauseReason = storedPauseReason(stored['pauseReason']);
@@ -507,7 +585,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
             : session.stoppedAt;
   return {
     id: session.id,
-    schemaVersion: 9,
+    schemaVersion: 10,
     active,
     updatedAt,
     session: {
@@ -516,6 +594,7 @@ export function mapSessionToRecord(session: Session): SessionRecord {
       currentPhaseIndex: session.currentPhaseIndex,
       rewardCommandReceipts: session.rewardCommandReceipts,
       restartCommandReceipts: session.restartCommandReceipts,
+      skipCommandReceipts: session.skipCommandReceipts,
       status: session.status,
       ...(session.rewardRitual === undefined
         ? {}
@@ -529,7 +608,10 @@ export function mapSessionToRecord(session: Session): SessionRecord {
             phaseEndsAt: session.phaseEndsAt,
           }
         : session.status === 'transitioning'
-          ? { transitionEndsAt: session.transitionEndsAt }
+          ? {
+              transitionEndsAt: session.transitionEndsAt,
+              transition: session.transition,
+            }
           : session.status === 'paused'
             ? {
                 pauseReason: session.pauseReason,

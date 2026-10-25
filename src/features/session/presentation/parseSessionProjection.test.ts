@@ -8,6 +8,7 @@ import {
   pauseSession,
   restartSessionPhase,
   rollSessionReward,
+  skipSessionPhase,
 } from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
 import { parseSessionProjection } from './parseSessionProjection';
@@ -408,6 +409,37 @@ describe('parseSessionProjection', () => {
     const receipt = parsed?.restartCommandReceipts[0];
     if (receipt?.type !== 'restart-phase') throw new Error('Expected receipt.');
     expect(Object.isFrozen(receipt.target)).toBe(true);
+  });
+
+  test('requires deeply immutable canonical skip receipts and transition metadata', () => {
+    const skipped = skipSessionPhase(
+      createSession('projection-skip', workflowWithReward(), 1_000),
+      2_000,
+      'skip-projection',
+      { type: 'phase', phaseIndex: 0 },
+    );
+    const parsed = parseSessionProjection(structuredClone(skipped));
+
+    expect(parsed).toEqual(skipped);
+    expect(Object.isFrozen(parsed?.skipCommandReceipts)).toBe(true);
+    expect(Object.isFrozen(parsed?.skipCommandReceipts[0])).toBe(true);
+    if (parsed?.status !== 'transitioning')
+      throw new Error('Expected transitioning projection.');
+    expect(Object.isFrozen(parsed.transition)).toBe(true);
+
+    const missingReceipts = structuredClone(skipped) as Record<string, unknown>;
+    delete missingReceipts['skipCommandReceipts'];
+    expect(() => parseSessionProjection(missingReceipts)).toThrow(
+      'Session projection is invalid.',
+    );
+    const missingTransition = structuredClone(skipped) as Record<
+      string,
+      unknown
+    >;
+    delete missingTransition['transition'];
+    expect(() => parseSessionProjection(missingTransition)).toThrow(
+      'Session projection is invalid.',
+    );
   });
 
   test('rejects a final Reward projection without its ritual', () => {

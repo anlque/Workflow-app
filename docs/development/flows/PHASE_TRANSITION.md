@@ -27,7 +27,11 @@ deadline, not callback frequency, determines progress.
    the injected Clock.
 4. [`deriveSessionState`](../../../src/features/session/domain/deriveSessionState.ts)
    moves an elapsed Running Phase to Transitioning with
-   `transitionEndsAt = phaseEndsAt + 1000`.
+   `transitionEndsAt = phaseEndsAt + 1000` and an
+   `ordinary-phase / elapsed` descriptor. `Skip phase` instead persists an
+   ordinary- or Bonus-phase `skipped` descriptor from command time. Skipped
+   ordinary phases bypass Reward eligibility; skipped Bonus phases use the
+   ritual continuation and never create a nested Reward.
 5. If `now` is still before that anchor, derivation returns Transitioning. The
    use case saves it, then the coordinator publishes it and schedules the same
    alarm name for `transitionEndsAt`.

@@ -4,6 +4,7 @@ import {
   restoreSession,
   type RestoreSessionInput,
   type Session,
+  type SessionTransition,
 } from '../domain/Session';
 import { SessionValidationError } from '../domain/SessionErrors';
 
@@ -156,6 +157,73 @@ function restartCommandReceipts(value: unknown) {
       target,
     };
   });
+}
+
+function sessionPhaseTarget(value: unknown) {
+  const target = record(value);
+  return target['type'] === 'phase' &&
+    hasExactKeys(target, ['type', 'phaseIndex'])
+    ? ({
+        type: 'phase' as const,
+        phaseIndex: number(target['phaseIndex']),
+      } as const)
+    : target['type'] === 'bonus' &&
+        hasExactKeys(target, ['type', 'rewardRitualId'])
+      ? ({
+          type: 'bonus' as const,
+          rewardRitualId: string(target['rewardRitualId']),
+        } as const)
+      : invalid();
+}
+
+function skipCommandReceipts(value: unknown) {
+  if (!Array.isArray(value)) return invalid();
+  return value.map((entry) => {
+    const receipt = record(entry);
+    if (receipt['type'] === 'skip-reward') {
+      if (!hasExactKeys(receipt, ['commandId', 'type', 'rewardRitualId']))
+        return invalid();
+      return {
+        commandId: string(receipt['commandId']),
+        type: 'skip-reward' as const,
+        rewardRitualId: string(receipt['rewardRitualId']),
+      };
+    }
+    if (
+      receipt['type'] !== 'skip-phase' ||
+      !hasExactKeys(receipt, ['commandId', 'type', 'target'])
+    )
+      return invalid();
+    return {
+      commandId: string(receipt['commandId']),
+      type: 'skip-phase' as const,
+      target: sessionPhaseTarget(receipt['target']),
+    };
+  });
+}
+
+function sessionTransition(value: unknown): SessionTransition {
+  const transition = record(value);
+  if (
+    transition['type'] === 'ordinary-phase' &&
+    hasExactKeys(transition, ['type', 'cause']) &&
+    (transition['cause'] === 'elapsed' || transition['cause'] === 'skipped')
+  )
+    return {
+      type: 'ordinary-phase' as const,
+      cause: transition['cause'],
+    };
+  if (
+    transition['type'] === 'bonus-phase' &&
+    transition['cause'] === 'skipped' &&
+    hasExactKeys(transition, ['type', 'cause', 'rewardRitualId'])
+  )
+    return {
+      type: 'bonus-phase' as const,
+      cause: 'skipped' as const,
+      rewardRitualId: string(transition['rewardRitualId']),
+    };
+  return invalid();
 }
 
 function hasExactKeys(
@@ -330,7 +398,7 @@ export function parseSessionProjection(value: unknown): Session | null {
     status === 'running'
       ? ['phaseStartedAt', 'phaseEndsAt']
       : status === 'transitioning'
-        ? ['transitionEndsAt']
+        ? ['transitionEndsAt', 'transition']
         : status === 'paused'
           ? ['pauseReason', 'pausedAt', 'remainingMilliseconds']
           : status === 'completed'
@@ -348,6 +416,7 @@ export function parseSessionProjection(value: unknown): Session | null {
         'currentPhaseIndex',
         'rewardCommandReceipts',
         'restartCommandReceipts',
+        'skipCommandReceipts',
         'status',
         ...statusKeys,
       ],
@@ -372,6 +441,7 @@ export function parseSessionProjection(value: unknown): Session | null {
     restartCommandReceipts: restartCommandReceipts(
       input['restartCommandReceipts'],
     ),
+    skipCommandReceipts: skipCommandReceipts(input['skipCommandReceipts']),
     ...(ritual === undefined ? {} : { rewardRitual: ritual }),
     ...(activeBonus === undefined ? {} : { activeBonusPhase: activeBonus }),
   };
@@ -388,6 +458,7 @@ export function parseSessionProjection(value: unknown): Session | null {
       ...common,
       status,
       transitionEndsAt: number(input['transitionEndsAt']),
+      transition: sessionTransition(input['transition']),
     };
   } else if (status === 'paused') {
     restored = {

@@ -45,6 +45,11 @@ and fallback never overlap. Dice retains the RW-006 repeat/crossfade and
 terminal envelope so it covers the complete roll and restarts cleanly on
 reroll.
 
+An authoritative `Skip phase` suppresses the phase-boundary bell for both the
+immediate skipped transition and a later projection that missed it. Terminal
+completion still plays the existing Session-complete cue exactly once,
+including completion reached by `Skip phase` or pre-roll `Skip reward`.
+
 Cue volume/mute are independent from ambient music by default. The global
 `Mute cues with music` preference is the only setting that couples ambient mute
 to cues. Audio lock or playback failure never changes Session timing.

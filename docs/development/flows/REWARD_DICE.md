@@ -41,6 +41,11 @@ Phase index; it is not a timer or random event.
 
 ### Final Reward
 
+Before the first roll, either Session surface may send `session/skip-reward`.
+The authoritative Session applies the stored continuation immediately, without
+a nested confirmation or Bonus Phase. Once rolling begins or a Side is
+selected, `Skip reward` is unavailable and rejected by Domain validation.
+
 1. After the last Phase transition, an eligible Reward creates the same
    authoritative Reward pause with a `complete` continuation target.
 2. Any newly opened Session surface reconstructs the dialog from that state.

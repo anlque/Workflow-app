@@ -1,6 +1,6 @@
 import {
   restartSessionPhase,
-  type RestartPhaseTarget,
+  type SessionPhaseTarget,
   type Session,
 } from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
@@ -14,7 +14,7 @@ export async function restartSessionPhaseUseCase(
   clock: Clock,
   sessionId: string,
   commandId: string,
-  target: RestartPhaseTarget,
+  target: SessionPhaseTarget,
 ): Promise<Session> {
   const current = await loadSession(repository, sessionId);
   const now = clock.now();

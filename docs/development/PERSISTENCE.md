@@ -6,7 +6,7 @@ Global Dexie version 4 defines `assets: 'id, createdAt, &roleKey'`; global
 version 5 adds the append-only `starterContentSeeds` registry. The optional
 normalized key is globally unique; role-less rows are not indexed. Asset writers
 remain at record version 2; Workflow writers emit record version 7 and Session
-writers emit version 9. Their readers retain the compatible older versions. Workflow
+writers emit version 10. Their readers retain the compatible older versions. Workflow
 and Session indexes are unchanged.
 
 Workflow package export emits version 7 with an explicit Quick/Detailed mode,
@@ -91,7 +91,7 @@ These version numbers solve different compatibility problems:
 | --- | --- | --- | --- |
 | Dexie database version | Whole `locusora` database structure and upgrade order | 1–5 history; current 5 | A table/index changes or existing stored data needs a database migration |
 | `WorkflowRecord.schemaVersion` | One Workflow record serialization shape | Current writes 7; reads 1–7; versions 1–6 map to Detailed | The Workflow record reader/writer needs a new incompatible serialization |
-| `SessionRecord.schemaVersion` | One Session record envelope | Current writes 9; reads 1–9 | The Session record reader/writer needs a new incompatible serialization |
+| `SessionRecord.schemaVersion` | One Session record envelope | Current writes 10; reads 1–10 | The Session record reader/writer needs a new incompatible serialization |
 | `AssetRecord.schemaVersion` | One Asset record shape | Current writes 2; reads role-less 1 and 2 | The Asset record reader/writer needs a new incompatible serialization |
 | Workflow package `version` | Public `locusora/workflow` import/export envelope | Current export 7; import 1–7; versions 1–6 map to Detailed | The external Workflow package contract changes |
 | Settings package `version` | Public `locusora/settings` import/export envelope | Current export 3; import 1–3 | The external Settings package contract changes |
@@ -162,7 +162,7 @@ The outer record contains:
 ```ts
 {
   id: string;
-  schemaVersion: 9;
+  schemaVersion: 10;
   active: 0 | 1;
   updatedAt: number;
   session: unknown;
@@ -170,15 +170,15 @@ The outer record contains:
 ```
 
 Version 1 snapshots accept only legacy direct ID Environment fields. Versions
-2–9 accept only exact direct-reference objects; Role references, mixed
+2–10 accept only exact direct-reference objects; Role references, mixed
 versions and unknown Environment fields are rejected. Versions 1–2 read legacy
 top-level Reward `triggerPhaseType + frequency` fields and default a missing
-trigger type to `focus`; versions 3–9 require the canonical `frequency | custom`
-schedule union, including `triggerPhaseType` for frequency. Versions 4–9 require
-canonical Side availability; versions 1–3 default it to `any`. Versions 6–9
-accept optional exact Bonus configuration; versions 1–5 do not. Versions 7–9 add
+trigger type to `focus`; versions 3–10 require the canonical `frequency | custom`
+schedule union, including `triggerPhaseType` for frequency. Versions 4–10 require
+canonical Side availability; versions 1–3 default it to `any`. Versions 6–10
+accept optional exact Bonus configuration; versions 1–5 do not. Versions 7–10 add
 the optional exact active Bonus marker and permit `restart` Reward-command
-receipts; versions 1–6 restore without an active Bonus marker. Versions 8–9
+receipts; versions 1–6 restore without an active Bonus marker. Versions 8–10
 accept optional Phase names. Version 9 requires exact bounded restart-command
 receipts; versions 1–8 restore an empty restart history. The nested `session`
 stores the immutable Workflow snapshot, current Phase index,
@@ -198,6 +198,9 @@ Compatibility defaults apply inside stored snapshots:
 - missing legacy Reward Dice trigger Phase type defaults to `focus`;
 - missing Reward Dice rerolls defaults to `0`;
 - missing Paused Session `pauseReason` defaults to `user`.
+- versions 1–9 restore empty skip receipts; legacy Transitioning records restore
+  an `ordinary-phase / elapsed` descriptor. Version 10 requires exact skip
+  receipts and transition metadata.
 
 The repository rejects more than one stored active Session and prevents saving a
 new active identifier while another active row exists.

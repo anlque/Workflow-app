@@ -14,6 +14,8 @@ import { resumeSessionUseCase } from './resumeSessionUseCase';
 import { restartSessionPhaseUseCase } from './restartSessionPhaseUseCase';
 import { restartSessionWorkflowUseCase } from './restartSessionWorkflowUseCase';
 import { rollSessionRewardUseCase } from './rollSessionRewardUseCase';
+import { skipSessionPhaseUseCase } from './skipSessionPhaseUseCase';
+import { skipSessionRewardUseCase } from './skipSessionRewardUseCase';
 import { startSessionUseCase } from './startSessionUseCase';
 import type { SessionWorkflowResolver } from './SessionWorkflowResolver';
 import { stopSessionUseCase } from './stopSessionUseCase';
@@ -888,5 +890,184 @@ describe('Session use cases', () => {
     ).rejects.toThrow('Reward command identifier conflicts');
     expect(save).not.toHaveBeenCalled();
     await expect(repository.get(started.id)).resolves.toEqual(selected);
+  });
+
+  test('skips an exact Phase with one clock sample and one write while duplicates and stale targets write nothing', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(2_000);
+    const started = await startSessionUseCase(
+      repository,
+      new FakeClock(1_000),
+      'skip-phase-use-case',
+      workflow(),
+    );
+    const now = vi.spyOn(clock, 'now');
+    const save = vi.spyOn(repository, 'save');
+
+    const skipped = await skipSessionPhaseUseCase(
+      repository,
+      clock,
+      started.id,
+      'skip-phase-command',
+      { type: 'phase', phaseIndex: 0 },
+    );
+
+    expect(skipped).toMatchObject({
+      status: 'transitioning',
+      transitionEndsAt: 3_000,
+    });
+    expect(now).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledTimes(1);
+
+    save.mockClear();
+    now.mockClear();
+    await expect(
+      skipSessionPhaseUseCase(
+        repository,
+        clock,
+        started.id,
+        'skip-phase-command',
+        { type: 'phase', phaseIndex: 0 },
+      ),
+    ).resolves.toBe(skipped);
+    expect(now).toHaveBeenCalledTimes(1);
+    expect(save).not.toHaveBeenCalled();
+
+    const staleRepository = new InMemorySessionRepository();
+    const staleStarted = await startSessionUseCase(
+      staleRepository,
+      new FakeClock(1_000),
+      'skip-stale-use-case',
+      workflow(),
+    );
+    const staleSave = vi.spyOn(staleRepository, 'save');
+    await expect(
+      skipSessionPhaseUseCase(
+        staleRepository,
+        new FakeClock(11_000),
+        staleStarted.id,
+        'skip-at-deadline',
+        { type: 'phase', phaseIndex: 0 },
+      ),
+    ).rejects.toThrow();
+    expect(staleSave).not.toHaveBeenCalled();
+  });
+
+  test('skips only an unrolled Reward with one write and preserves storage on rejection', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'skip-reward-use-case',
+      restartBonusWorkflow(),
+    );
+    clock.set(3_000);
+    const paused = await advanceSessionUseCase(repository, clock, started.id);
+    if (paused.rewardRitual === undefined)
+      throw new Error('Expected Reward pause.');
+    const save = vi.spyOn(repository, 'save');
+
+    const skipped = await skipSessionRewardUseCase(
+      repository,
+      clock,
+      started.id,
+      'skip-reward-command',
+      paused.rewardRitual.id,
+    );
+    expect(skipped).toMatchObject({ status: 'running', currentPhaseIndex: 1 });
+    expect(save).toHaveBeenCalledTimes(1);
+
+    save.mockClear();
+    await expect(
+      skipSessionRewardUseCase(
+        repository,
+        clock,
+        started.id,
+        'skip-reward-command',
+        paused.rewardRitual.id,
+      ),
+    ).resolves.toBe(skipped);
+    expect(save).not.toHaveBeenCalled();
+
+    const selectedRepository = new InMemorySessionRepository();
+    const selectedStarted = await startSessionUseCase(
+      selectedRepository,
+      new FakeClock(1_000),
+      'skip-selected-use-case',
+      restartBonusWorkflow(),
+    );
+    const selectedClock = new FakeClock(3_000);
+    const rewardPaused = await advanceSessionUseCase(
+      selectedRepository,
+      selectedClock,
+      selectedStarted.id,
+    );
+    if (rewardPaused.rewardRitual === undefined)
+      throw new Error('Expected Reward pause.');
+    await rollSessionRewardUseCase(
+      selectedRepository,
+      selectedStarted.id,
+      () => 0,
+      false,
+      'roll-before-skip',
+      rewardPaused.rewardRitual.id,
+    );
+    const before = await selectedRepository.get(selectedStarted.id);
+    const selectedSave = vi.spyOn(selectedRepository, 'save');
+    await expect(
+      skipSessionRewardUseCase(
+        selectedRepository,
+        selectedClock,
+        selectedStarted.id,
+        'skip-selected-command',
+        rewardPaused.rewardRitual.id,
+      ),
+    ).rejects.toThrow();
+    expect(selectedSave).not.toHaveBeenCalled();
+    await expect(selectedRepository.get(selectedStarted.id)).resolves.toEqual(
+      before,
+    );
+  });
+
+  test('completes a final skipped Reward and leaves its stored pause intact when saving fails', async () => {
+    const repository = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const started = await startSessionUseCase(
+      repository,
+      clock,
+      'skip-final-reward-use-case',
+      restartBonusWorkflow(true),
+    );
+    clock.set(3_000);
+    const paused = await advanceSessionUseCase(repository, clock, started.id);
+    if (paused.rewardRitual === undefined)
+      throw new Error('Expected final Reward pause.');
+    const save = vi
+      .spyOn(repository, 'save')
+      .mockRejectedValueOnce(new Error('save failed'));
+
+    await expect(
+      skipSessionRewardUseCase(
+        repository,
+        clock,
+        started.id,
+        'skip-final-reward',
+        paused.rewardRitual.id,
+      ),
+    ).rejects.toThrow('save failed');
+    expect(save).toHaveBeenCalledTimes(1);
+    await expect(repository.get(started.id)).resolves.toEqual(paused);
+
+    save.mockRestore();
+    await expect(
+      skipSessionRewardUseCase(
+        repository,
+        clock,
+        started.id,
+        'skip-final-reward-retry',
+        paused.rewardRitual.id,
+      ),
+    ).resolves.toMatchObject({ status: 'completed', completedAt: 3_000 });
   });
 });

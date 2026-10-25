@@ -1043,3 +1043,103 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
     30_000,
   );
 });
+
+test('skips ordinary, Reward and Bonus progress authoritatively across surfaces', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
+  await options.getByLabel('Workflow name').fill('Skip journey');
+  await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
+  await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByLabel('Phase 2 type').selectOption('break');
+  await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
+  await options.getByLabel('Enable Reward Dice').check();
+  for (const side of [1, 2]) {
+    await options
+      .getByLabel(`Reward side ${String(side)} icon`)
+      .fill(side === 1 ? '☕' : '🌿');
+    await options
+      .getByLabel(`Reward side ${String(side)} title`)
+      .fill(`Skip reward ${String(side)}`);
+    await options
+      .getByLabel(`Enable Bonus Phase for side ${String(side)}`)
+      .check();
+    await options
+      .getByLabel(`Side ${String(side)} Bonus Phase name`)
+      .fill('Skippable bonus');
+    await options
+      .getByLabel(`Side ${String(side)} Bonus Phase duration in minutes`)
+      .fill('0.5');
+  }
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+
+  const focus = await context.newPage();
+  await focus.goto(extensionUrls.focus);
+  await focus
+    .getByRole('button', { name: 'Start workflow: Skip journey' })
+    .click();
+  const sidePanel = await context.newPage();
+  await sidePanel.goto(extensionUrls.sidePanel);
+
+  await focus.getByRole('button', { name: 'Pause' }).click();
+  await focus.getByRole('button', { name: 'Skip phase' }).click();
+  const phaseConfirmation = focus.getByRole('dialog', {
+    name: 'Skip this phase?',
+  });
+  await expect(phaseConfirmation).toContainText(
+    'Skipped phases do not unlock rewards.',
+  );
+  await phaseConfirmation.getByRole('button', { name: 'Skip phase' }).click();
+  await expect(
+    focus.getByText('Transitioning to the next phase…'),
+  ).toBeVisible();
+  await expireActiveSessionDeadline(focus);
+  await expect(focus.getByText('Break · Phase 2 of 2')).toBeVisible();
+  await expect(sidePanel.getByText('Break · Phase 2 of 2')).toBeVisible();
+  await expect(
+    focus.getByRole('dialog', { name: 'Reward unlocked' }),
+  ).toHaveCount(0);
+
+  await focus.getByRole('button', { name: 'Restart workflow' }).click();
+  await focus
+    .getByRole('dialog', { name: 'Restart this workflow?' })
+    .getByRole('button', { name: 'Restart workflow' })
+    .click();
+  await expireActiveSessionDeadline(focus);
+  await expireActiveSessionDeadline(focus);
+  const reward = focus.getByRole('dialog', { name: 'Reward unlocked' });
+  await expect(reward).toBeVisible();
+  await reward.getByRole('button', { name: 'Skip reward' }).click();
+  await expect(focus.getByText('Break · Phase 2 of 2')).toBeVisible();
+  await expect(reward).toHaveCount(0);
+
+  await focus.getByRole('button', { name: 'Restart workflow' }).click();
+  await focus
+    .getByRole('dialog', { name: 'Restart this workflow?' })
+    .getByRole('button', { name: 'Restart workflow' })
+    .click();
+  await expireActiveSessionDeadline(focus);
+  await expireActiveSessionDeadline(focus);
+  await focus.getByRole('button', { name: 'Roll dice' }).click();
+  await expect(focus.getByRole('button', { name: 'Continue' })).toBeVisible({
+    timeout: 10_000,
+  });
+  await focus.getByRole('button', { name: 'Continue' }).click();
+  await expect(focus.getByText('Bonus · Skippable bonus')).toBeVisible();
+  await focus.getByRole('button', { name: 'Skip phase' }).click();
+  await expect(focus.getByRole('dialog', { name: /Skip/u })).toHaveCount(0);
+  await expireActiveSessionDeadline(focus);
+  await expect(focus.getByText('Break · Phase 2 of 2')).toBeVisible();
+
+  await focus.getByRole('button', { name: 'Skip phase' }).click();
+  await focus
+    .getByRole('dialog', { name: 'Skip final phase?' })
+    .getByRole('button', { name: 'Skip phase' })
+    .click();
+  await expireActiveSessionDeadline(focus);
+  await expect(focus.getByText('Session complete')).toBeVisible();
+});

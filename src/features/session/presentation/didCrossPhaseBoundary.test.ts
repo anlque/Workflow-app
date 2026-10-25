@@ -9,6 +9,8 @@ import {
   rollSessionReward,
   restartSessionPhase,
   restartSessionWorkflow,
+  skipSessionPhase,
+  skipSessionReward,
   stopSession,
 } from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
@@ -65,6 +67,48 @@ function activeBonus() {
 }
 
 describe('didCrossPhaseBoundary', () => {
+  test('suppresses immediate, following and missed projections of a skipped phase', () => {
+    const initial = createSession('skip-boundary', workflow, 1_000);
+    const skipped = skipSessionPhase(initial, 1_500, 'skip-1', {
+      type: 'phase',
+      phaseIndex: 0,
+    });
+    const next = deriveSessionState(skipped, 2_500);
+
+    expect(didCrossPhaseBoundary(initial, skipped)).toBe(false);
+    expect(didCrossPhaseBoundary(skipped, next)).toBe(false);
+    expect(didCrossPhaseBoundary(initial, next)).toBe(false);
+  });
+
+  test('suppresses a final pre-roll Reward skip while completion stays observable', () => {
+    const reward = deriveSessionState(
+      createSession(
+        'skip-reward-boundary',
+        createWorkflow({
+          id: 'skip-final-reward',
+          name: 'Skip final reward',
+          phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+          rewardDice: {
+            frequency: 1,
+            sides: [
+              { icon: 'a', title: 'A' },
+              { icon: 'b', title: 'B' },
+            ],
+          },
+        }),
+        1_000,
+      ),
+      3_000,
+    );
+    const completed = skipSessionReward(
+      reward,
+      3_000,
+      'skip-reward',
+      'skip-reward-boundary:0',
+    );
+
+    expect(didCrossPhaseBoundary(reward, completed)).toBe(false);
+  });
   test('detects one observed Phase transition', () => {
     const initial = createSession('session-1', workflow, 1_000);
 

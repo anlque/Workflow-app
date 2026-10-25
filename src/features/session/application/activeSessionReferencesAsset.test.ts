@@ -71,6 +71,7 @@ function session(
     currentPhaseIndex: pauseReason === 'reward' ? 1 : 0,
     rewardCommandReceipts: [],
     restartCommandReceipts: [],
+    skipCommandReceipts: [],
     ...(pauseReason === 'reward'
       ? {
           rewardRitual: {
@@ -92,7 +93,12 @@ function session(
         phaseEndsAt: 11_000,
       });
     case 'transitioning':
-      return restoreSession({ ...base, status, transitionEndsAt: 12_000 });
+      return restoreSession({
+        ...base,
+        status,
+        transitionEndsAt: 12_000,
+        transition: { type: 'ordinary-phase', cause: 'elapsed' },
+      });
     case 'paused':
       return restoreSession({
         ...base,

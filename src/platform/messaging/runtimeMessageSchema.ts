@@ -67,7 +67,7 @@ export function parseSessionCommand(value: unknown): SessionCommand {
     });
   }
 
-  if (type === 'session/restart-phase') {
+  if (type === 'session/restart-phase' || type === 'session/skip-phase') {
     if (
       hasExactKeys(record, ['type', 'commandId', 'sessionId', 'phaseIndex'])
     ) {
@@ -75,23 +75,52 @@ export function parseSessionCommand(value: unknown): SessionCommand {
       if (!Number.isInteger(phaseIndex) || (phaseIndex as number) < 0) {
         throw new RuntimeMessageValidationError();
       }
-      return Object.freeze({
-        type,
-        commandId,
-        sessionId: nonEmptyString(record['sessionId']),
-        phaseIndex: phaseIndex as number,
-      });
+      const sessionId = nonEmptyString(record['sessionId']);
+      return type === 'session/restart-phase'
+        ? Object.freeze({
+            type: 'session/restart-phase',
+            commandId,
+            sessionId,
+            phaseIndex: phaseIndex as number,
+          })
+        : Object.freeze({
+            type: 'session/skip-phase',
+            commandId,
+            sessionId,
+            phaseIndex: phaseIndex as number,
+          });
     }
     if (
       hasExactKeys(record, ['type', 'commandId', 'sessionId', 'rewardRitualId'])
     ) {
-      return Object.freeze({
-        type,
-        commandId,
-        sessionId: nonEmptyString(record['sessionId']),
-        rewardRitualId: nonEmptyString(record['rewardRitualId']),
-      });
+      const sessionId = nonEmptyString(record['sessionId']);
+      const rewardRitualId = nonEmptyString(record['rewardRitualId']);
+      return type === 'session/restart-phase'
+        ? Object.freeze({
+            type: 'session/restart-phase',
+            commandId,
+            sessionId,
+            rewardRitualId,
+          })
+        : Object.freeze({
+            type: 'session/skip-phase',
+            commandId,
+            sessionId,
+            rewardRitualId,
+          });
     }
+  }
+
+  if (
+    type === 'session/skip-reward' &&
+    hasExactKeys(record, ['type', 'commandId', 'sessionId', 'rewardRitualId'])
+  ) {
+    return Object.freeze({
+      type,
+      commandId,
+      sessionId: nonEmptyString(record['sessionId']),
+      rewardRitualId: nonEmptyString(record['rewardRitualId']),
+    });
   }
 
   if (

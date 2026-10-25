@@ -29,6 +29,7 @@ type SessionBase = Readonly<{
   currentPhaseIndex: number;
   rewardCommandReceipts: readonly RewardCommandReceipt[];
   restartCommandReceipts: readonly RestartCommandReceipt[];
+  skipCommandReceipts: readonly SkipCommandReceipt[];
   rewardRitual?: RewardRitual;
   activeBonusPhase?: ActiveBonusRewardPhase;
 }>;
@@ -50,8 +51,9 @@ export type RewardCommandReceipt = Readonly<{
 
 export const MAX_REWARD_COMMAND_RECEIPTS = 16;
 export const MAX_RESTART_COMMAND_RECEIPTS = 16;
+export const MAX_SKIP_COMMAND_RECEIPTS = 16;
 
-export type RestartPhaseTarget =
+export type SessionPhaseTarget =
   | Readonly<{ type: 'phase'; phaseIndex: number }>
   | Readonly<{ type: 'bonus'; rewardRitualId: string }>;
 
@@ -59,9 +61,29 @@ export type RestartCommandReceipt =
   | Readonly<{
       commandId: string;
       type: 'restart-phase';
-      target: RestartPhaseTarget;
+      target: SessionPhaseTarget;
     }>
   | Readonly<{ commandId: string; type: 'restart-workflow' }>;
+
+export type SkipCommandReceipt =
+  | Readonly<{
+      commandId: string;
+      type: 'skip-phase';
+      target: SessionPhaseTarget;
+    }>
+  | Readonly<{
+      commandId: string;
+      type: 'skip-reward';
+      rewardRitualId: string;
+    }>;
+
+export type SessionTransition =
+  | Readonly<{ type: 'ordinary-phase'; cause: 'elapsed' | 'skipped' }>
+  | Readonly<{
+      type: 'bonus-phase';
+      cause: 'skipped';
+      rewardRitualId: string;
+    }>;
 
 export type RewardRitual = Readonly<{
   id: string;
@@ -83,6 +105,7 @@ export type TransitioningSession = SessionBase &
   Readonly<{
     status: 'transitioning';
     transitionEndsAt: number;
+    transition: SessionTransition;
   }>;
 
 export type PausedSession = SessionBase &
@@ -119,6 +142,7 @@ export type RestoreSessionInput =
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       restartCommandReceipts: readonly RestartCommandReceipt[];
+      skipCommandReceipts: readonly SkipCommandReceipt[];
       rewardRitual?: RewardRitual;
       activeBonusPhase?: ActiveBonusRewardPhase;
       status: 'running';
@@ -131,10 +155,12 @@ export type RestoreSessionInput =
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       restartCommandReceipts: readonly RestartCommandReceipt[];
+      skipCommandReceipts: readonly SkipCommandReceipt[];
       rewardRitual?: RewardRitual;
       activeBonusPhase?: ActiveBonusRewardPhase;
       status: 'transitioning';
       transitionEndsAt: number;
+      transition: SessionTransition;
     }>
   | Readonly<{
       id: string;
@@ -142,6 +168,7 @@ export type RestoreSessionInput =
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       restartCommandReceipts: readonly RestartCommandReceipt[];
+      skipCommandReceipts: readonly SkipCommandReceipt[];
       rewardRitual?: RewardRitual;
       activeBonusPhase?: ActiveBonusRewardPhase;
       status: 'paused';
@@ -155,6 +182,7 @@ export type RestoreSessionInput =
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       restartCommandReceipts: readonly RestartCommandReceipt[];
+      skipCommandReceipts: readonly SkipCommandReceipt[];
       rewardRitual?: RewardRitual;
       activeBonusPhase?: ActiveBonusRewardPhase;
       status: 'completed';
@@ -166,6 +194,7 @@ export type RestoreSessionInput =
       currentPhaseIndex: number;
       rewardCommandReceipts: readonly RewardCommandReceipt[];
       restartCommandReceipts: readonly RestartCommandReceipt[];
+      skipCommandReceipts: readonly SkipCommandReceipt[];
       rewardRitual?: RewardRitual;
       activeBonusPhase?: ActiveBonusRewardPhase;
       status: 'stopped';
@@ -196,6 +225,7 @@ export function createSession(
     currentPhaseIndex: 0,
     rewardCommandReceipts: Object.freeze([]),
     restartCommandReceipts: Object.freeze([]),
+    skipCommandReceipts: Object.freeze([]),
     status: 'running',
     phaseStartedAt: now,
     phaseEndsAt: now + firstPhase.durationSeconds * 1_000,
@@ -214,6 +244,7 @@ export function restoreSession(input: RestoreSessionInput): Session {
   const rewardCommandReceipts = input.rewardCommandReceipts;
   validateRewardCommandReceipts(rewardCommandReceipts);
   validateRestartCommandReceipts(input.restartCommandReceipts);
+  validateSkipCommandReceipts(input.skipCommandReceipts);
   if (
     input.restartCommandReceipts.some((restartReceipt) =>
       rewardCommandReceipts.some(
@@ -222,6 +253,11 @@ export function restoreSession(input: RestoreSessionInput): Session {
     )
   )
     throw new SessionValidationError('Session command receipts are invalid.');
+  validateCommandReceiptNamespace(
+    rewardCommandReceipts,
+    input.restartCommandReceipts,
+    input.skipCommandReceipts,
+  );
   validateActiveBonusPhase(input);
   if (input.rewardRitual !== undefined) {
     validateRewardRitual(input, input.rewardRitual, rewardCommandReceipts);
@@ -236,6 +272,7 @@ export function restoreSession(input: RestoreSessionInput): Session {
     restartCommandReceipts: freezeRestartCommandReceipts(
       input.restartCommandReceipts,
     ),
+    skipCommandReceipts: freezeSkipCommandReceipts(input.skipCommandReceipts),
     ...(input.rewardRitual === undefined
       ? {}
       : { rewardRitual: freezeRewardRitual(input.rewardRitual) }),
@@ -287,10 +324,12 @@ export function restoreSession(input: RestoreSessionInput): Session {
   }
   if (input.status === 'transitioning') {
     validateEpochMilliseconds(input.transitionEndsAt);
+    validateSessionTransition(input);
     return Object.freeze({
       ...base,
       status: input.status,
       transitionEndsAt: input.transitionEndsAt,
+      transition: freezeSessionTransition(input.transition),
     });
   }
   if (input.status === 'completed') {
@@ -322,6 +361,7 @@ export function pauseSession(session: Session, now: number): PausedSession {
     currentPhaseIndex: reconciled.currentPhaseIndex,
     rewardCommandReceipts: reconciled.rewardCommandReceipts,
     restartCommandReceipts: reconciled.restartCommandReceipts,
+    skipCommandReceipts: reconciled.skipCommandReceipts,
     ...(reconciled.rewardRitual === undefined
       ? {}
       : { rewardRitual: reconciled.rewardRitual }),
@@ -348,6 +388,7 @@ export function resumeSession(session: Session, now: number): RunningSession {
     currentPhaseIndex: session.currentPhaseIndex,
     rewardCommandReceipts: session.rewardCommandReceipts,
     restartCommandReceipts: session.restartCommandReceipts,
+    skipCommandReceipts: session.skipCommandReceipts,
     ...(session.rewardRitual === undefined
       ? {}
       : { rewardRitual: session.rewardRitual }),
@@ -392,6 +433,7 @@ export function continueRewardSession(
         session.rewardRitual.id,
       ),
       restartCommandReceipts: session.restartCommandReceipts,
+      skipCommandReceipts: session.skipCommandReceipts,
       status: 'running',
       phaseStartedAt: now,
       phaseEndsAt: now + bonusPhase.durationSeconds * 1_000,
@@ -418,6 +460,7 @@ export function continueRewardSession(
         session.rewardRitual.id,
       ),
       restartCommandReceipts: session.restartCommandReceipts,
+      skipCommandReceipts: session.skipCommandReceipts,
       status: 'completed',
       completedAt: now,
       rewardRitual: freezeRewardRitual({
@@ -438,6 +481,7 @@ export function continueRewardSession(
       session.rewardRitual.id,
     ),
     restartCommandReceipts: session.restartCommandReceipts,
+    skipCommandReceipts: session.skipCommandReceipts,
     status: 'running',
     phaseStartedAt: now,
     phaseEndsAt: now + session.remainingMilliseconds,
@@ -452,12 +496,15 @@ export function restartSessionPhase(
   session: Session,
   now: number,
   commandId: string,
-  target: RestartPhaseTarget,
+  target: SessionPhaseTarget,
 ): Session {
   validateEpochMilliseconds(now);
   if (
     commandId.trim() === '' ||
     session.rewardCommandReceipts.some(
+      (receipt) => receipt.commandId === commandId,
+    ) ||
+    session.skipCommandReceipts.some(
       (receipt) => receipt.commandId === commandId,
     )
   )
@@ -511,6 +558,7 @@ export function restartSessionPhase(
       session.restartCommandReceipts,
       { commandId, type: 'restart-phase', target },
     ),
+    skipCommandReceipts: session.skipCommandReceipts,
     ...(session.rewardRitual === undefined
       ? {}
       : { rewardRitual: session.rewardRitual }),
@@ -532,6 +580,9 @@ export function restartSessionWorkflow(
   if (
     commandId.trim() === '' ||
     session.rewardCommandReceipts.some(
+      (receipt) => receipt.commandId === commandId,
+    ) ||
+    session.skipCommandReceipts.some(
       (receipt) => receipt.commandId === commandId,
     )
   )
@@ -559,9 +610,143 @@ export function restartSessionWorkflow(
       session.restartCommandReceipts,
       { commandId, type: 'restart-workflow' },
     ),
+    skipCommandReceipts: session.skipCommandReceipts,
     status: 'running',
     phaseStartedAt: now,
     phaseEndsAt: now + firstPhase.durationSeconds * 1_000,
+  });
+}
+
+export function skipSessionPhase(
+  session: Session,
+  now: number,
+  commandId: string,
+  target: SessionPhaseTarget,
+): Session {
+  validateEpochMilliseconds(now);
+  const duplicate = findSkipCommandReceipt(session, commandId);
+  if (duplicate !== undefined) {
+    if (
+      duplicate.type === 'skip-phase' &&
+      phaseTargetsEqual(duplicate.target, target)
+    )
+      return session;
+    throw new SessionTransitionError();
+  }
+  validateFreshSkipCommandId(session, commandId);
+  const current = deriveSessionState(session, now);
+  if (
+    current.status !== 'running' &&
+    !(current.status === 'paused' && current.pauseReason === 'user')
+  )
+    throw new SessionTransitionError();
+
+  const transition: SessionTransition = (() => {
+    if (target.type === 'phase') {
+      if (
+        current.activeBonusPhase !== undefined ||
+        target.phaseIndex !== current.currentPhaseIndex
+      )
+        throw new SessionTransitionError();
+      return Object.freeze({
+        type: 'ordinary-phase' as const,
+        cause: 'skipped' as const,
+      });
+    }
+    if (
+      current.activeBonusPhase?.rewardRitualId !== target.rewardRitualId ||
+      current.rewardRitual === undefined
+    )
+      throw new SessionTransitionError();
+    return Object.freeze({
+      type: 'bonus-phase' as const,
+      cause: 'skipped' as const,
+      rewardRitualId: target.rewardRitualId,
+    });
+  })();
+
+  return Object.freeze({
+    id: current.id,
+    sourceWorkflowId: current.sourceWorkflowId,
+    snapshot: current.snapshot,
+    currentPhaseIndex: current.currentPhaseIndex,
+    rewardCommandReceipts: current.rewardCommandReceipts,
+    restartCommandReceipts: current.restartCommandReceipts,
+    skipCommandReceipts: appendSkipCommandReceipt(current.skipCommandReceipts, {
+      commandId,
+      type: 'skip-phase',
+      target,
+    }),
+    ...(current.rewardRitual === undefined
+      ? {}
+      : { rewardRitual: current.rewardRitual }),
+    ...(current.activeBonusPhase === undefined
+      ? {}
+      : { activeBonusPhase: current.activeBonusPhase }),
+    status: 'transitioning',
+    transitionEndsAt: now + 1_000,
+    transition,
+  });
+}
+
+export function skipSessionReward(
+  session: Session,
+  now: number,
+  commandId: string,
+  rewardRitualId: string,
+): Session {
+  validateEpochMilliseconds(now);
+  const duplicate = findSkipCommandReceipt(session, commandId);
+  if (duplicate !== undefined) {
+    if (
+      duplicate.type === 'skip-reward' &&
+      duplicate.rewardRitualId === rewardRitualId
+    )
+      return session;
+    throw new SessionTransitionError();
+  }
+  validateFreshSkipCommandId(session, commandId);
+  const current = deriveSessionState(session, now);
+  const ritual = current.rewardRitual;
+  if (
+    current.status !== 'paused' ||
+    current.pauseReason !== 'reward' ||
+    ritual?.id !== rewardRitualId ||
+    ritual.selectedSideIndex !== undefined
+  )
+    throw new SessionTransitionError();
+  const receipts = appendSkipCommandReceipt(current.skipCommandReceipts, {
+    commandId,
+    type: 'skip-reward',
+    rewardRitualId,
+  });
+  if (ritual.continuation.type === 'complete') {
+    return Object.freeze({
+      id: current.id,
+      sourceWorkflowId: current.sourceWorkflowId,
+      snapshot: current.snapshot,
+      currentPhaseIndex: current.currentPhaseIndex,
+      rewardCommandReceipts: current.rewardCommandReceipts,
+      restartCommandReceipts: current.restartCommandReceipts,
+      skipCommandReceipts: receipts,
+      status: 'completed',
+      completedAt: now,
+    });
+  }
+  const phase =
+    current.snapshot.workflow.phases[ritual.continuation.phaseIndex];
+  if (phase === undefined) throw new SessionTransitionError();
+  return Object.freeze({
+    id: current.id,
+    sourceWorkflowId: current.sourceWorkflowId,
+    snapshot: current.snapshot,
+    currentPhaseIndex: ritual.continuation.phaseIndex,
+    rewardCommandReceipts: current.rewardCommandReceipts,
+    restartCommandReceipts: current.restartCommandReceipts,
+    skipCommandReceipts: receipts,
+    status: 'running',
+    phaseStartedAt: now,
+    phaseEndsAt: now + phase.durationSeconds * 1_000,
   });
 }
 
@@ -607,6 +792,7 @@ function selectReward(
       current.id,
     ),
     restartCommandReceipts: session.restartCommandReceipts,
+    skipCommandReceipts: session.skipCommandReceipts,
     rewardRitual: freezeRewardRitual({
       ...current,
       selectedSideIndex,
@@ -623,6 +809,9 @@ function validateRewardCommandId(
   if (
     commandId.trim() === '' ||
     session.restartCommandReceipts.some(
+      (receipt) => receipt.commandId === commandId,
+    ) ||
+    session.skipCommandReceipts.some(
       (receipt) => receipt.commandId === commandId,
     )
   ) {
@@ -700,9 +889,16 @@ function validateRewardRitual(
       : input.status === 'running'
         ? ritual.acknowledged &&
           (activeBonus !== undefined || ritual.continuation.type === 'phase')
-        : input.status === 'completed'
-          ? ritual.acknowledged && ritual.continuation.type === 'complete'
-          : false;
+        : input.status === 'transitioning'
+          ? ritual.acknowledged &&
+            ((activeBonus !== undefined &&
+              input.transition.type === 'bonus-phase') ||
+              (activeBonus === undefined &&
+                input.transition.type === 'ordinary-phase' &&
+                ritual.continuation.type === 'phase'))
+          : input.status === 'completed'
+            ? ritual.acknowledged && ritual.continuation.type === 'complete'
+            : false;
   if (
     !validCompleted ||
     ritual.id !== `${input.id}:${String(ritual.completedPhaseIndex)}` ||
@@ -727,9 +923,14 @@ function validateActiveBonusPhase(input: RestoreSessionInput): void {
   if (active === undefined) return;
   const ritual = input.rewardRitual;
   const side = input.workflow.rewardDice?.sides[active.selectedSideIndex];
+  const activeTimedState =
+    input.status === 'running' ||
+    (input.status === 'paused' && input.pauseReason === 'user') ||
+    (input.status === 'transitioning' &&
+      input.transition.type === 'bonus-phase' &&
+      input.transition.rewardRitualId === active.rewardRitualId);
   if (
-    (input.status !== 'running' &&
-      !(input.status === 'paused' && input.pauseReason === 'user')) ||
+    !activeTimedState ||
     ritual === undefined ||
     !ritual.acknowledged ||
     ritual.id !== active.rewardRitualId ||
@@ -782,6 +983,57 @@ function validateRestartCommandReceipts(
     throw new SessionValidationError('Session restart receipts are invalid.');
 }
 
+function validateSkipCommandReceipts(
+  receipts: readonly SkipCommandReceipt[],
+): void {
+  if (
+    receipts.length > MAX_SKIP_COMMAND_RECEIPTS ||
+    new Set(receipts.map(({ commandId }) => commandId)).size !==
+      receipts.length ||
+    receipts.some((receipt) => {
+      if (receipt.commandId.trim() === '') return true;
+      if (receipt.type === 'skip-reward')
+        return receipt.rewardRitualId.trim() === '';
+      return receipt.target.type === 'phase'
+        ? !Number.isInteger(receipt.target.phaseIndex) ||
+            receipt.target.phaseIndex < 0
+        : receipt.target.rewardRitualId.trim() === '';
+    })
+  )
+    throw new SessionValidationError('Session skip receipts are invalid.');
+}
+
+function validateCommandReceiptNamespace(
+  reward: readonly RewardCommandReceipt[],
+  restart: readonly RestartCommandReceipt[],
+  skip: readonly SkipCommandReceipt[],
+): void {
+  const commandIds = [
+    ...reward.map(({ commandId }) => commandId),
+    ...restart.map(({ commandId }) => commandId),
+    ...skip.map(({ commandId }) => commandId),
+  ];
+  if (new Set(commandIds).size !== commandIds.length)
+    throw new SessionValidationError('Session command receipts are invalid.');
+}
+
+function validateSessionTransition(
+  input: Extract<RestoreSessionInput, { status: 'transitioning' }>,
+): void {
+  const transition = input.transition;
+  if (transition.type === 'ordinary-phase') {
+    if (input.activeBonusPhase !== undefined)
+      throw new SessionValidationError('Session transition is invalid.');
+    return;
+  }
+  if (
+    transition.rewardRitualId.trim() === '' ||
+    input.activeBonusPhase?.rewardRitualId !== transition.rewardRitualId ||
+    input.rewardRitual?.id !== transition.rewardRitualId
+  )
+    throw new SessionValidationError('Session transition is invalid.');
+}
+
 function findRestartCommandReceipt(
   session: Session,
   commandId: string,
@@ -791,9 +1043,31 @@ function findRestartCommandReceipt(
   );
 }
 
+function findSkipCommandReceipt(
+  session: Session,
+  commandId: string,
+): SkipCommandReceipt | undefined {
+  return session.skipCommandReceipts.find(
+    (receipt) => receipt.commandId === commandId,
+  );
+}
+
+function validateFreshSkipCommandId(session: Session, commandId: string): void {
+  if (
+    commandId.trim() === '' ||
+    session.rewardCommandReceipts.some(
+      (receipt) => receipt.commandId === commandId,
+    ) ||
+    session.restartCommandReceipts.some(
+      (receipt) => receipt.commandId === commandId,
+    )
+  )
+    throw new SessionTransitionError();
+}
+
 function restartTargetsEqual(
-  left: RestartPhaseTarget,
-  right: RestartPhaseTarget,
+  left: SessionPhaseTarget,
+  right: SessionPhaseTarget,
 ): boolean {
   return left.type === 'phase' && right.type === 'phase'
     ? left.phaseIndex === right.phaseIndex
@@ -802,12 +1076,23 @@ function restartTargetsEqual(
       : false;
 }
 
+const phaseTargetsEqual = restartTargetsEqual;
+
 function appendRestartCommandReceipt(
   receipts: readonly RestartCommandReceipt[],
   receipt: RestartCommandReceipt,
 ): readonly RestartCommandReceipt[] {
   return freezeRestartCommandReceipts(
     [...receipts, receipt].slice(-MAX_RESTART_COMMAND_RECEIPTS),
+  );
+}
+
+function appendSkipCommandReceipt(
+  receipts: readonly SkipCommandReceipt[],
+  receipt: SkipCommandReceipt,
+): readonly SkipCommandReceipt[] {
+  return freezeSkipCommandReceipts(
+    [...receipts, receipt].slice(-MAX_SKIP_COMMAND_RECEIPTS),
   );
 }
 
@@ -860,6 +1145,26 @@ function freezeRestartCommandReceipts(
   );
 }
 
+function freezeSkipCommandReceipts(
+  receipts: readonly SkipCommandReceipt[],
+): readonly SkipCommandReceipt[] {
+  return Object.freeze(
+    receipts.map((receipt) =>
+      Object.freeze(
+        receipt.type === 'skip-phase'
+          ? { ...receipt, target: Object.freeze({ ...receipt.target }) }
+          : { ...receipt },
+      ),
+    ),
+  );
+}
+
+function freezeSessionTransition(
+  transition: SessionTransition,
+): SessionTransition {
+  return Object.freeze({ ...transition });
+}
+
 export function stopSession(session: Session, now: number): StoppedSession {
   const reconciled = deriveSessionState(session, now);
   if (reconciled.status !== 'running' && reconciled.status !== 'paused') {
@@ -873,6 +1178,7 @@ export function stopSession(session: Session, now: number): StoppedSession {
     currentPhaseIndex: reconciled.currentPhaseIndex,
     rewardCommandReceipts: reconciled.rewardCommandReceipts,
     restartCommandReceipts: reconciled.restartCommandReceipts,
+    skipCommandReceipts: reconciled.skipCommandReceipts,
     status: 'stopped',
     stoppedAt: now,
   });

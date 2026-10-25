@@ -82,8 +82,11 @@ createSessionCoordinator
 ```
 
 The background coordinator is authoritative because it serializes the command
-path and owns alarm reconciliation. IndexedDB is durable storage for the
-aggregate, but records do not execute behavior. React and Zustand display
+path, including phase/reward skips, and persists bounded skip receipts before
+publishing a projection or rescheduling the alarm. Presentation derives only
+confirmation copy and sends the exact active target; it never advances timing
+locally. The background coordinator also owns alarm reconciliation. IndexedDB is
+durable storage for the aggregate, but records do not execute behavior. React and Zustand display
 projections, but they do not decide or persist authoritative transitions.
 
 ## Startup and Projection Race Handling

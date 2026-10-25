@@ -2,7 +2,12 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
-import { createSession, deriveSessionState } from '@/features/session';
+import {
+  continueRewardSession,
+  createSession,
+  deriveSessionState,
+  rollSessionReward,
+} from '@/features/session';
 import { createWorkflow } from '@/features/workflow';
 import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
 
@@ -32,6 +37,8 @@ function dependencies(
     resumeSession: vi.fn(() => Promise.resolve()),
     restartPhase: vi.fn(() => Promise.resolve()),
     restartWorkflow: vi.fn(() => Promise.resolve()),
+    skipPhase: vi.fn(() => Promise.resolve()),
+    skipReward: vi.fn(() => Promise.resolve()),
     rollReward: vi.fn(() => Promise.resolve()),
     rerollReward: vi.fn(() => Promise.resolve()),
     continueReward: vi.fn(() => Promise.resolve()),
@@ -42,6 +49,85 @@ function dependencies(
 }
 
 describe('SidePanelApp', () => {
+  test('routes ordinary, Bonus, and Reward skips once with exact targets', async () => {
+    const user = userEvent.setup();
+    const rewarded = createWorkflow({
+      id: 'panel-skip-routing',
+      name: 'Panel skip routing',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const ordinary = createSession(
+      'panel-ordinary-skip',
+      createWorkflow({
+        id: 'panel-ordinary-skip-workflow',
+        name: 'Ordinary skip',
+        phases: [
+          { type: 'focus', durationSeconds: 10, environment: {} },
+          { type: 'break', durationSeconds: 10, environment: {} },
+        ],
+      }),
+      1_000,
+    );
+    const reward = deriveSessionState(
+      createSession('panel-reward-skip', rewarded, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(reward, () => 0),
+      4_000,
+      'panel-continue-to-bonus',
+    );
+
+    const ordinaryDeps = dependencies([], ordinary);
+    const ordinaryView = render(<SidePanelApp dependencies={ordinaryDeps} />);
+    await user.click(await screen.findByRole('button', { name: 'Skip phase' }));
+    expect(ordinaryDeps.skipPhase).toHaveBeenCalledOnce();
+    expect(ordinaryDeps.skipPhase).toHaveBeenCalledWith(ordinary.id, {
+      type: 'phase',
+      phaseIndex: 0,
+    });
+    ordinaryView.unmount();
+
+    const bonusDeps = dependencies([], bonus);
+    const bonusView = render(<SidePanelApp dependencies={bonusDeps} />);
+    await user.click(await screen.findByRole('button', { name: 'Skip phase' }));
+    expect(bonusDeps.skipPhase).toHaveBeenCalledOnce();
+    expect(bonusDeps.skipPhase).toHaveBeenCalledWith(bonus.id, {
+      type: 'bonus',
+      rewardRitualId: 'panel-reward-skip:0',
+    });
+    bonusView.unmount();
+
+    const rewardDeps = dependencies([], reward);
+    render(<SidePanelApp dependencies={rewardDeps} />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Skip reward' }),
+    );
+    expect(rewardDeps.skipReward).toHaveBeenCalledOnce();
+    expect(rewardDeps.skipReward).toHaveBeenCalledWith(
+      reward.id,
+      'panel-reward-skip:0',
+    );
+  });
+
   test('shows the compact Workflow empty state', async () => {
     const { container } = render(
       <SidePanelApp dependencies={dependencies()} />,

@@ -6,7 +6,7 @@ import {
   connectSessionMessages,
   createActiveSessionStore,
   type SessionId,
-  type RestartPhaseTarget,
+  type SessionPhaseTarget,
   type SessionProjectionClient,
 } from '@/features/session';
 import { Button } from '@/shared';
@@ -36,8 +36,10 @@ export type SidePanelDependencies = Readonly<{
   startSession(id: WorkflowId): Promise<void>;
   pauseSession(id: SessionId): Promise<void>;
   resumeSession(id: SessionId): Promise<void>;
-  restartPhase(id: SessionId, target: RestartPhaseTarget): Promise<void>;
+  restartPhase(id: SessionId, target: SessionPhaseTarget): Promise<void>;
   restartWorkflow(id: SessionId): Promise<void>;
+  skipPhase(id: SessionId, target: SessionPhaseTarget): Promise<void>;
+  skipReward(id: SessionId, rewardRitualId: string): Promise<void>;
   rollReward(id: SessionId, rewardRitualId: string): Promise<void>;
   rerollReward(id: SessionId, rewardRitualId: string): Promise<void>;
   continueReward(id: SessionId, rewardRitualId: string): Promise<void>;
@@ -178,11 +180,13 @@ export function SidePanelApp({
               rollReward: dependencies.rollReward,
               rerollReward: dependencies.rerollReward,
               continueReward: dependencies.continueReward,
+              skipReward: dependencies.skipReward,
             }}
             onPause={dependencies.pauseSession}
             onResume={dependencies.resumeSession}
             onRestartPhase={dependencies.restartPhase}
             onRestartWorkflow={dependencies.restartWorkflow}
+            onSkipPhase={dependencies.skipPhase}
             onStop={dependencies.stopSession}
           />
           <Button

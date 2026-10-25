@@ -13,7 +13,7 @@ import {
   connectSessionMessages,
   createActiveSessionStore,
   type SessionId,
-  type RestartPhaseTarget,
+  type SessionPhaseTarget,
   type SessionProjectionClient,
   getActiveSessionSegment,
 } from '@/features/session';
@@ -51,8 +51,10 @@ export type FocusDependencies = Readonly<{
   sessions: SessionProjectionClient;
   pause(id: SessionId): Promise<void>;
   resume(id: SessionId): Promise<void>;
-  restartPhase(id: SessionId, target: RestartPhaseTarget): Promise<void>;
+  restartPhase(id: SessionId, target: SessionPhaseTarget): Promise<void>;
   restartWorkflow(id: SessionId): Promise<void>;
+  skipPhase(id: SessionId, target: SessionPhaseTarget): Promise<void>;
+  skipReward(id: SessionId, rewardRitualId: string): Promise<void>;
   continueReward(id: SessionId, rewardRitualId: string): Promise<void>;
   rollReward(id: SessionId, rewardRitualId: string): Promise<void>;
   rerollReward(id: SessionId, rewardRitualId: string): Promise<void>;
@@ -367,6 +369,7 @@ export function FocusApp({
               rollReward: dependencies.rollReward,
               rerollReward: dependencies.rerollReward,
               continueReward: dependencies.continueReward,
+              skipReward: dependencies.skipReward,
             }}
             onPause={async (id) => {
               void activateSounds();
@@ -378,6 +381,7 @@ export function FocusApp({
             }}
             onRestartPhase={dependencies.restartPhase}
             onRestartWorkflow={dependencies.restartWorkflow}
+            onSkipPhase={dependencies.skipPhase}
             onStop={async (id) => {
               void activateSounds();
               await dependencies.stop(id);

@@ -9,6 +9,19 @@ export function didCrossPhaseBoundary(
   if (previous.status === 'completed' || previous.status === 'stopped') {
     return false;
   }
+  const hasNewSkipReceipt = current.skipCommandReceipts.some(
+    (receipt) =>
+      !previous.skipCommandReceipts.some(
+        (previousReceipt) => previousReceipt.commandId === receipt.commandId,
+      ),
+  );
+  if (
+    hasNewSkipReceipt ||
+    (current.status === 'transitioning' &&
+      current.transition.cause === 'skipped')
+  ) {
+    return false;
+  }
   const hasNewWorkflowRestartReceipt = current.restartCommandReceipts.some(
     (receipt) =>
       receipt.type === 'restart-workflow' &&

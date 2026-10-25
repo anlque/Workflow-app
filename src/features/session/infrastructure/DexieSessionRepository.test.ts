@@ -13,6 +13,7 @@ import {
   restartSessionPhase,
   restartSessionWorkflow,
   rollSessionReward,
+  skipSessionPhase,
   stopSession,
   type Session,
 } from '../domain/Session';
@@ -56,7 +57,7 @@ test('writes a mode-free executable Workflow snapshot record', () => {
   expect(stored.workflow).not.toHaveProperty('configuration');
 });
 
-test('round-trips version-9 restart receipts and keeps Dexie schema unchanged', async () => {
+test('round-trips version-10 restart and skip state while keeping Dexie schema unchanged', async () => {
   const store = database();
   const repository = new DexieSessionRepository(store);
   const phaseRestarted = restartSessionPhase(
@@ -71,13 +72,18 @@ test('round-trips version-9 restart receipts and keeps Dexie schema unchanged', 
     'restart-workflow-command',
   );
 
-  await repository.save(restarted);
+  const skipped = skipSessionPhase(restarted, 4_000, 'skip-command', {
+    type: 'phase',
+    phaseIndex: 0,
+  });
 
-  await expect(repository.get(restarted.id)).resolves.toEqual(restarted);
+  await repository.save(skipped);
+
+  await expect(repository.get(skipped.id)).resolves.toEqual(skipped);
   await expect(
-    store.table<SessionRecord, string>('sessions').get(restarted.id),
+    store.table<SessionRecord, string>('sessions').get(skipped.id),
   ).resolves.toMatchObject({
-    schemaVersion: 9,
+    schemaVersion: 10,
     session: {
       restartCommandReceipts: [
         {
@@ -90,13 +96,75 @@ test('round-trips version-9 restart receipts and keeps Dexie schema unchanged', 
           type: 'restart-workflow',
         },
       ],
+      skipCommandReceipts: [
+        {
+          commandId: 'skip-command',
+          type: 'skip-phase',
+          target: { type: 'phase', phaseIndex: 0 },
+        },
+      ],
+      transition: { type: 'ordinary-phase', cause: 'skipped' },
     },
   });
   expect(sessionDatabaseSchemas).toHaveLength(1);
 });
 
-test.each([1, 2, 3, 4, 5, 6, 7, 8] as const)(
-  'restores version-%s with empty restart history',
+test('restores version-9 skip defaults and elapsed transition metadata', async () => {
+  const store = database();
+  const repository = new DexieSessionRepository(store);
+  const transitioning = deriveSessionState(
+    createSession('legacy-v9-transition', workflow(), 1_000),
+    11_000,
+  );
+  await repository.save(transitioning);
+  const table = store.table<SessionRecord, string>('sessions');
+  const stored = structuredClone(
+    await table.get(transitioning.id),
+  ) as unknown as {
+    schemaVersion: number;
+    session: Record<string, unknown>;
+  };
+  stored.schemaVersion = 9;
+  delete stored.session['skipCommandReceipts'];
+  delete stored.session['transition'];
+  await table.put(stored as SessionRecord);
+
+  await expect(repository.get(transitioning.id)).resolves.toMatchObject({
+    skipCommandReceipts: [],
+    transition: { type: 'ordinary-phase', cause: 'elapsed' },
+  });
+});
+
+test('rejects malformed canonical version-10 skip state', async () => {
+  const store = database();
+  const repository = new DexieSessionRepository(store);
+  const skipped = skipSessionPhase(
+    createSession('invalid-v10-skip', workflow(), 1_000),
+    2_000,
+    'skip-invalid',
+    { type: 'phase', phaseIndex: 0 },
+  );
+  await repository.save(skipped);
+  const table = store.table<SessionRecord, string>('sessions');
+  const stored = structuredClone(await table.get(skipped.id)) as unknown as {
+    session: Record<string, unknown>;
+  };
+  stored.session['skipCommandReceipts'] = [
+    {
+      commandId: 'skip-invalid',
+      type: 'skip-phase',
+      target: { type: 'phase', phaseIndex: 0, extra: true },
+    },
+  ];
+  await table.put(stored as SessionRecord);
+
+  await expect(repository.get(skipped.id)).rejects.toBeInstanceOf(
+    SessionValidationError,
+  );
+});
+
+test.each([1, 2, 3, 4, 5, 6, 7, 8, 9] as const)(
+  'restores version-%s with compatible empty command histories',
   async (schemaVersion) => {
     const store = database();
     const repository = new DexieSessionRepository(store);
@@ -112,7 +180,8 @@ test.each([1, 2, 3, 4, 5, 6, 7, 8] as const)(
       session: Record<string, unknown>;
     };
     stored.schemaVersion = schemaVersion;
-    delete stored.session['restartCommandReceipts'];
+    if (schemaVersion < 9) delete stored.session['restartCommandReceipts'];
+    delete stored.session['skipCommandReceipts'];
     if (schemaVersion === 1) {
       const phases = (
         stored.session['workflow'] as {
@@ -128,6 +197,7 @@ test.each([1, 2, 3, 4, 5, 6, 7, 8] as const)(
 
     await expect(repository.get(value.id)).resolves.toMatchObject({
       restartCommandReceipts: [],
+      skipCommandReceipts: [],
     });
   },
 );
@@ -162,7 +232,7 @@ afterEach(async () => {
 });
 
 describe('DexieSessionRepository', () => {
-  test('round-trips a named Phase in a version-9 Session snapshot', async () => {
+  test('round-trips a named Phase in a version-10 Session snapshot', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
     const session = createSession(
@@ -188,7 +258,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(session.id),
     ).resolves.toMatchObject({
-      schemaVersion: 9,
+      schemaVersion: 10,
       session: {
         workflow: { phases: [{ name: 'Writing' }] },
       },
@@ -268,7 +338,7 @@ describe('DexieSessionRepository', () => {
     );
   });
 
-  test('round-trips a v9 user pause in the normal Phase after a non-final Bonus', async () => {
+  test('round-trips a v10 user pause in the normal Phase after a non-final Bonus', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
     const rewarded = createWorkflow({
@@ -313,7 +383,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(paused.id),
     ).resolves.toMatchObject({
-      schemaVersion: 9,
+      schemaVersion: 10,
       session: {
         status: 'paused',
         pauseReason: 'user',
@@ -325,7 +395,7 @@ describe('DexieSessionRepository', () => {
     });
   });
 
-  test('round-trips canonical version-9 active Bonus state and rejects corrupt markers', async () => {
+  test('round-trips canonical version-10 active Bonus state and rejects corrupt markers', async () => {
     const store = database();
     const repository = new DexieSessionRepository(store);
     const rewarded = createWorkflow({
@@ -369,7 +439,7 @@ describe('DexieSessionRepository', () => {
     await expect(repository.get(restarted.id)).resolves.toEqual(restarted);
     const table = store.table<SessionRecord, string>('sessions');
     await expect(table.get(restarted.id)).resolves.toMatchObject({
-      schemaVersion: 9,
+      schemaVersion: 10,
       session: {
         activeBonusPhase: {
           rewardRitualId: 'v7-bonus-session:0',
@@ -685,7 +755,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(rolled.id),
     ).resolves.toMatchObject({
-      schemaVersion: 9,
+      schemaVersion: 10,
       session: {
         rewardRitual: {
           id: 'reward-session:0',
@@ -870,7 +940,7 @@ describe('DexieSessionRepository', () => {
     await expect(
       store.table<SessionRecord, string>('sessions').get(expected.id),
     ).resolves.toMatchObject({
-      schemaVersion: 9,
+      schemaVersion: 10,
       session: {
         workflow: {
           rewardDice: {

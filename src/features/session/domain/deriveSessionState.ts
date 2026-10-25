@@ -26,6 +26,7 @@ export function deriveSessionState(session: Session, now: number): Session {
             currentPhaseIndex: current.currentPhaseIndex,
             rewardCommandReceipts: current.rewardCommandReceipts,
             restartCommandReceipts: current.restartCommandReceipts,
+            skipCommandReceipts: current.skipCommandReceipts,
             rewardRitual: ritual,
             status: 'completed',
             completedAt: current.phaseEndsAt,
@@ -47,6 +48,7 @@ export function deriveSessionState(session: Session, now: number): Session {
             currentPhaseIndex: current.currentPhaseIndex,
             rewardCommandReceipts: current.rewardCommandReceipts,
             restartCommandReceipts: current.restartCommandReceipts,
+            skipCommandReceipts: current.skipCommandReceipts,
             rewardRitual: ritual,
             status: 'running',
             phaseStartedAt: current.phaseEndsAt,
@@ -63,17 +65,63 @@ export function deriveSessionState(session: Session, now: number): Session {
         currentPhaseIndex: current.currentPhaseIndex,
         rewardCommandReceipts: current.rewardCommandReceipts,
         restartCommandReceipts: current.restartCommandReceipts,
+        skipCommandReceipts: current.skipCommandReceipts,
         status: 'transitioning',
         transitionEndsAt: current.phaseEndsAt + 1_000,
+        transition: Object.freeze({
+          type: 'ordinary-phase',
+          cause: 'elapsed',
+        }),
       });
       current = transitioning;
       continue;
     }
 
     if (now < current.transitionEndsAt) return current;
+    if (current.transition.type === 'bonus-phase') {
+      const ritual = current.rewardRitual;
+      if (ritual?.id !== current.transition.rewardRitualId)
+        throw new SessionValidationError('Session transition is invalid.');
+      if (ritual.continuation.type === 'complete') {
+        return Object.freeze({
+          id: current.id,
+          sourceWorkflowId: current.sourceWorkflowId,
+          snapshot: current.snapshot,
+          currentPhaseIndex: current.currentPhaseIndex,
+          rewardCommandReceipts: current.rewardCommandReceipts,
+          restartCommandReceipts: current.restartCommandReceipts,
+          skipCommandReceipts: current.skipCommandReceipts,
+          rewardRitual: ritual,
+          status: 'completed',
+          completedAt: current.transitionEndsAt,
+        });
+      }
+      const continuedPhase =
+        current.snapshot.workflow.phases[ritual.continuation.phaseIndex];
+      if (continuedPhase === undefined)
+        throw new SessionValidationError(
+          'Session current Phase index is invalid.',
+        );
+      current = Object.freeze({
+        id: current.id,
+        sourceWorkflowId: current.sourceWorkflowId,
+        snapshot: current.snapshot,
+        currentPhaseIndex: ritual.continuation.phaseIndex,
+        rewardCommandReceipts: current.rewardCommandReceipts,
+        restartCommandReceipts: current.restartCommandReceipts,
+        skipCommandReceipts: current.skipCommandReceipts,
+        rewardRitual: ritual,
+        status: 'running',
+        phaseStartedAt: current.transitionEndsAt,
+        phaseEndsAt:
+          current.transitionEndsAt + continuedPhase.durationSeconds * 1_000,
+      });
+      continue;
+    }
     const nextPhaseIndex = current.currentPhaseIndex + 1;
     const nextPhase = current.snapshot.workflow.phases[nextPhaseIndex];
     if (
+      current.transition.cause === 'elapsed' &&
       isRewardDueAfterPhase(
         current.snapshot.workflow,
         current.currentPhaseIndex,
@@ -87,6 +135,7 @@ export function deriveSessionState(session: Session, now: number): Session {
           nextPhase === undefined ? current.currentPhaseIndex : nextPhaseIndex,
         rewardCommandReceipts: current.rewardCommandReceipts,
         restartCommandReceipts: current.restartCommandReceipts,
+        skipCommandReceipts: current.skipCommandReceipts,
         status: 'paused',
         pauseReason: 'reward',
         pausedAt: current.transitionEndsAt,
@@ -116,6 +165,7 @@ export function deriveSessionState(session: Session, now: number): Session {
         currentPhaseIndex: current.currentPhaseIndex,
         rewardCommandReceipts: current.rewardCommandReceipts,
         restartCommandReceipts: current.restartCommandReceipts,
+        skipCommandReceipts: current.skipCommandReceipts,
         status: 'completed',
         completedAt: current.transitionEndsAt,
       });
@@ -129,6 +179,7 @@ export function deriveSessionState(session: Session, now: number): Session {
       currentPhaseIndex: nextPhaseIndex,
       rewardCommandReceipts: current.rewardCommandReceipts,
       restartCommandReceipts: current.restartCommandReceipts,
+      skipCommandReceipts: current.skipCommandReceipts,
       status: 'running',
       phaseStartedAt: current.transitionEndsAt,
       phaseEndsAt: current.transitionEndsAt + nextPhase.durationSeconds * 1_000,

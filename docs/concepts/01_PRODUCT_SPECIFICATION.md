@@ -292,8 +292,10 @@ either `focus` or `break` and may have a user-defined name; unnamed and legacy
 Phases display the deterministic fallback `Phase N`. Short-break and long-break
 presets are presentation conveniences rather than distinct domain types. A
 Workflow runs its sequence once and then completes. Repeating a Workflow starts
-a new Session. Skipping Phases and editing a running Workflow are outside the
-MVP.
+a new Session. An active ordinary or Bonus Phase can be skipped authoritatively
+through a persisted one-second transition. A pre-roll Reward can also be
+skipped. Skipping an ordinary Phase never unlocks its scheduled Reward. Editing
+a running Workflow remains outside the MVP.
 
 Starting a Workflow creates a Session from an immutable snapshot of its
 configuration. Later Workflow edits do not affect that Session. One active

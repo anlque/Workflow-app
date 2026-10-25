@@ -102,6 +102,8 @@ function dependencies(
     resume: vi.fn(() => Promise.resolve()),
     restartPhase: vi.fn(() => Promise.resolve()),
     restartWorkflow: vi.fn(() => Promise.resolve()),
+    skipPhase: vi.fn(() => Promise.resolve()),
+    skipReward: vi.fn(() => Promise.resolve()),
     continueReward: vi.fn(() => Promise.resolve()),
     rollReward: vi.fn(() => Promise.resolve()),
     rerollReward: vi.fn(() => Promise.resolve()),
@@ -120,6 +122,85 @@ function dependencies(
 }
 
 describe('FocusApp', () => {
+  test('routes ordinary, Bonus, and Reward skips once with exact targets', async () => {
+    const user = userEvent.setup();
+    const rewarded = createWorkflow({
+      id: 'focus-skip-routing',
+      name: 'Focus skip routing',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const ordinary = createSession(
+      'focus-ordinary-skip',
+      createWorkflow({
+        id: 'focus-ordinary-skip-workflow',
+        name: 'Ordinary skip',
+        phases: [
+          { type: 'focus', durationSeconds: 10, environment: {} },
+          { type: 'break', durationSeconds: 10, environment: {} },
+        ],
+      }),
+      1_000,
+    );
+    const reward = deriveSessionState(
+      createSession('focus-reward-skip', rewarded, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(reward, () => 0),
+      4_000,
+      'focus-continue-to-bonus',
+    );
+
+    const ordinaryDeps = dependencies(ordinary);
+    const ordinaryView = render(<FocusApp dependencies={ordinaryDeps} />);
+    await user.click(await screen.findByRole('button', { name: 'Skip phase' }));
+    expect(ordinaryDeps.skipPhase).toHaveBeenCalledOnce();
+    expect(ordinaryDeps.skipPhase).toHaveBeenCalledWith(ordinary.id, {
+      type: 'phase',
+      phaseIndex: 0,
+    });
+    ordinaryView.unmount();
+
+    const bonusDeps = dependencies(bonus);
+    const bonusView = render(<FocusApp dependencies={bonusDeps} />);
+    await user.click(await screen.findByRole('button', { name: 'Skip phase' }));
+    expect(bonusDeps.skipPhase).toHaveBeenCalledOnce();
+    expect(bonusDeps.skipPhase).toHaveBeenCalledWith(bonus.id, {
+      type: 'bonus',
+      rewardRitualId: 'focus-reward-skip:0',
+    });
+    bonusView.unmount();
+
+    const rewardDeps = dependencies(reward);
+    render(<FocusApp dependencies={rewardDeps} />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Skip reward' }),
+    );
+    expect(rewardDeps.skipReward).toHaveBeenCalledOnce();
+    expect(rewardDeps.skipReward).toHaveBeenCalledWith(
+      reward.id,
+      'focus-reward-skip:0',
+    );
+  });
+
   test.each(['completed', 'stopped'] as const)(
     'returns a %s Session to Workflow selection until a new Session starts',
     async (status) => {

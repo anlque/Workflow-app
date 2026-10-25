@@ -31,6 +31,24 @@ export type SessionCommand =
       commandId: string;
       sessionId: string;
     }>
+  | Readonly<{
+      type: 'session/skip-phase';
+      commandId: string;
+      sessionId: string;
+      phaseIndex: number;
+    }>
+  | Readonly<{
+      type: 'session/skip-phase';
+      commandId: string;
+      sessionId: string;
+      rewardRitualId: string;
+    }>
+  | Readonly<{
+      type: 'session/skip-reward';
+      commandId: string;
+      sessionId: string;
+      rewardRitualId: string;
+    }>
   | Readonly<{ type: 'session/stop'; commandId: string; sessionId: string }>;
 
 export type SessionChangedMessage = Readonly<{

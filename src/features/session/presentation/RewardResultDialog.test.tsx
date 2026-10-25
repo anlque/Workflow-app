@@ -33,6 +33,62 @@ const otherSide = createWorkflow({
 afterEach(() => vi.useRealTimers());
 
 describe('RewardResultDialog', () => {
+  test('offers a retryable pre-roll Reward skip without nested confirmation', async () => {
+    const onSkip = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('Skip failed.'))
+      .mockResolvedValueOnce();
+    render(
+      <RewardResultDialog
+        reward={null}
+        usedRerolls={0}
+        rerolls={1}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+        onSkip={onSkip}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip reward' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Skip failed.');
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Skip reward' }));
+    expect(onSkip).toHaveBeenCalledTimes(2);
+  });
+
+  test('keeps roll single-flight with a pending Reward skip', async () => {
+    let resolveSkip: (() => void) | undefined;
+    const requestRoll = vi.fn(() => Promise.resolve());
+    render(
+      <RewardResultDialog
+        reward={null}
+        usedRerolls={0}
+        rerolls={1}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        requestRoll={requestRoll}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+        onSkip={() =>
+          new Promise<void>((resolve) => {
+            resolveSkip = resolve;
+          })
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip reward' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll dice' }));
+
+    expect(requestRoll).not.toHaveBeenCalled();
+    await act(() => {
+      resolveSkip?.();
+      return Promise.resolve();
+    });
+  });
   test('requests an authoritative roll without selecting locally', () => {
     const requestRoll = vi.fn(() => Promise.resolve());
     render(

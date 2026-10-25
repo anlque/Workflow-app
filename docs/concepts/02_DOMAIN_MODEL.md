@@ -137,6 +137,12 @@ creates
 Session (Entity)
 ```
 
+Session owns durable command receipts for Reward, restart and skip operations.
+A Phase skip records whether its one-second transition was elapsed or skipped;
+a Reward skip is valid only before a Side is selected. These facts preserve
+authoritative timing, idempotency and cue classification across surfaces and
+service-worker restarts.
+
 # Workflow (Entity)
 
 Workflow is the central business entity.

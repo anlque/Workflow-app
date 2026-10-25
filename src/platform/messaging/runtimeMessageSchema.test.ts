@@ -129,6 +129,33 @@ describe('parseSessionCommand', () => {
       },
       'session/restart-workflow',
     ],
+    [
+      {
+        type: 'session/skip-phase',
+        commandId: 'command-8',
+        sessionId: 'session-1',
+        phaseIndex: 2,
+      },
+      'session/skip-phase',
+    ],
+    [
+      {
+        type: 'session/skip-phase',
+        commandId: 'command-8b',
+        sessionId: 'session-1',
+        rewardRitualId: 'session-1:0',
+      },
+      'session/skip-phase',
+    ],
+    [
+      {
+        type: 'session/skip-reward',
+        commandId: 'command-9',
+        sessionId: 'session-1',
+        rewardRitualId: 'session-1:0',
+      },
+      'session/skip-reward',
+    ],
   ] as const)('accepts a valid %s command', (value, expectedType) => {
     expect(parseSessionCommand(value).type).toBe(expectedType);
   });
@@ -151,6 +178,25 @@ describe('parseSessionCommand', () => {
       sessionId: 'session-1',
       phaseIndex: 0,
       rewardRitualId: 'session-1:0',
+    },
+    {
+      type: 'session/skip-phase',
+      commandId: 'command-1',
+      sessionId: 'session-1',
+    },
+    {
+      type: 'session/skip-phase',
+      commandId: 'command-1',
+      sessionId: 'session-1',
+      phaseIndex: 0,
+      rewardRitualId: 'session-1:0',
+    },
+    {
+      type: 'session/skip-reward',
+      commandId: 'command-1',
+      sessionId: 'session-1',
+      rewardRitualId: 'session-1:0',
+      extra: true,
     },
     {
       type: 'session/stop',

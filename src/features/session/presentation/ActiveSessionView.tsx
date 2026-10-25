@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { RestartPhaseTarget, Session, SessionId } from '../domain/Session';
+import type { Session, SessionId, SessionPhaseTarget } from '../domain/Session';
 import { SessionControls } from './SessionControls';
 import {
   RewardResultDialog,
@@ -22,11 +22,13 @@ export type ActiveSessionViewProps = Readonly<{
     rollReward?(id: SessionId, rewardRitualId: string): Promise<void>;
     rerollReward?(id: SessionId, rewardRitualId: string): Promise<void>;
     continueReward(id: SessionId, rewardRitualId: string): Promise<void>;
+    skipReward?(id: SessionId, rewardRitualId: string): Promise<void>;
   }>;
   onPause(id: SessionId): Promise<void>;
   onResume(id: SessionId): Promise<void>;
-  onRestartPhase?(id: SessionId, target: RestartPhaseTarget): Promise<void>;
+  onRestartPhase?(id: SessionId, target: SessionPhaseTarget): Promise<void>;
   onRestartWorkflow?(id: SessionId): Promise<void>;
+  onSkipPhase?(id: SessionId, target: SessionPhaseTarget): Promise<void>;
   onStop(id: SessionId): Promise<void>;
   onBackToWorkflows?(): void;
 }>;
@@ -43,6 +45,7 @@ export function ActiveSessionView({
   onResume,
   onRestartPhase,
   onRestartWorkflow,
+  onSkipPhase,
   onStop,
   onBackToWorkflows,
 }: ActiveSessionViewProps) {
@@ -101,6 +104,13 @@ export function ActiveSessionView({
         onContinue={() =>
           rewardInteraction.continueReward(session.id, ritual.id)
         }
+        {...(rewardInteraction.skipReward === undefined
+          ? {}
+          : {
+              onSkip: () =>
+                rewardInteraction.skipReward?.(session.id, ritual.id) ??
+                Promise.resolve(),
+            })}
       />
     );
 
@@ -149,6 +159,7 @@ export function ActiveSessionView({
         onResume={onResume}
         {...(onRestartPhase === undefined ? {} : { onRestartPhase })}
         {...(onRestartWorkflow === undefined ? {} : { onRestartWorkflow })}
+        {...(onSkipPhase === undefined ? {} : { onSkipPhase })}
         onStop={onStop}
       />
       {rewardResult}

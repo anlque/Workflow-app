@@ -9,6 +9,8 @@ import {
   restartSessionPhaseUseCase,
   restartSessionWorkflowUseCase,
   rollSessionRewardUseCase,
+  skipSessionPhaseUseCase,
+  skipSessionRewardUseCase,
   startSessionUseCase,
   stopSessionUseCase,
   type Clock,
@@ -124,6 +126,24 @@ export function createSessionCoordinator({
         clock,
         command.sessionId,
         command.commandId,
+      );
+    } else if (command.type === 'session/skip-phase') {
+      session = await skipSessionPhaseUseCase(
+        sessions,
+        clock,
+        command.sessionId,
+        command.commandId,
+        'phaseIndex' in command
+          ? { type: 'phase', phaseIndex: command.phaseIndex }
+          : { type: 'bonus', rewardRitualId: command.rewardRitualId },
+      );
+    } else if (command.type === 'session/skip-reward') {
+      session = await skipSessionRewardUseCase(
+        sessions,
+        clock,
+        command.sessionId,
+        command.commandId,
+        command.rewardRitualId,
       );
     } else if (
       command.type === 'session/roll-reward' ||

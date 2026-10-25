@@ -143,6 +143,31 @@ export class ChromeSessionClient implements SessionProjectionClient {
     });
   }
 
+  public skipPhase(
+    id: SessionId,
+    target:
+      | Readonly<{ type: 'phase'; phaseIndex: number }>
+      | Readonly<{ type: 'bonus'; rewardRitualId: string }>,
+  ): Promise<void> {
+    return this.#command({
+      type: 'session/skip-phase',
+      commandId: this.#createId(),
+      sessionId: id,
+      ...(target.type === 'phase'
+        ? { phaseIndex: target.phaseIndex }
+        : { rewardRitualId: target.rewardRitualId }),
+    });
+  }
+
+  public skipReward(id: SessionId, rewardRitualId: string): Promise<void> {
+    return this.#command({
+      type: 'session/skip-reward',
+      commandId: this.#createId(),
+      sessionId: id,
+      rewardRitualId,
+    });
+  }
+
   public stop(id: SessionId): Promise<void> {
     return this.#command({
       type: 'session/stop',

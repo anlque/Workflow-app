@@ -32,6 +32,7 @@ export type RewardResultDialogProps = Readonly<{
   requestRoll(): Promise<void>;
   requestReroll(): Promise<void>;
   onContinue(): Promise<void>;
+  onSkip?(): Promise<void>;
 }>;
 
 export function RewardResultDialog({
@@ -43,6 +44,7 @@ export function RewardResultDialog({
   requestRoll,
   requestReroll,
   onContinue,
+  onSkip,
 }: RewardResultDialogProps) {
   const [stage, setStage] = useState<RewardStage>(
     reward === null ? 'ready' : 'result',
@@ -52,10 +54,31 @@ export function RewardResultDialog({
     useState<RewardCubeResultMedia>('poster');
   const [animateResult, setAnimateResult] = useState(false);
   const [continuePending, setContinuePending] = useState(false);
+  const [skipPending, setSkipPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
   const attemptRef = useRef<RollAttempt | null>(null);
   const nextAttemptIdRef = useRef(0);
+  const skipPendingRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  async function skipReward(): Promise<void> {
+    if (onSkip === undefined || skipPendingRef.current) return;
+    skipPendingRef.current = true;
+    setSkipPending(true);
+    setError(null);
+    try {
+      await onSkip();
+    } catch (cause) {
+      if (!mountedRef.current) return;
+      setError(
+        cause instanceof Error ? cause.message : 'Skipping Reward failed.',
+      );
+    } finally {
+      skipPendingRef.current = false;
+      if (mountedRef.current) setSkipPending(false);
+    }
+  }
 
   function publishAttempt(next: RollAttempt | null): void {
     attemptRef.current = next;
@@ -88,14 +111,15 @@ export function RewardResultDialog({
     setStage('result');
   }, [attempt, reward, usedRerolls]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
       const current = attemptRef.current;
       attemptRef.current = null;
       if (current !== null) stopPlayback(current);
-    },
-    [],
-  );
+    };
+  }, []);
 
   useEffect(() => {
     if (stage === 'result' && usedRerolls > 0 && usedRerolls >= rerolls) {
@@ -119,7 +143,7 @@ export function RewardResultDialog({
   }
 
   async function roll(reroll: boolean): Promise<void> {
-    if (attemptRef.current !== null) return;
+    if (attemptRef.current !== null || skipPendingRef.current) return;
     setError(null);
     const id = nextAttemptIdRef.current + 1;
     nextAttemptIdRef.current = id;
@@ -235,14 +259,29 @@ export function RewardResultDialog({
             Rolling…
           </Button>
         ) : (
-          <Button
-            variant="primary"
-            onClick={() => {
-              void roll(false);
-            }}
-          >
-            Roll dice
-          </Button>
+          <>
+            <Button
+              variant="primary"
+              disabled={skipPending}
+              onClick={() => {
+                void roll(false);
+              }}
+            >
+              Roll dice
+            </Button>
+            {onSkip === undefined ? null : (
+              <Button
+                variant="secondary"
+                pending={skipPending}
+                pendingLabel="Skipping…"
+                onClick={() => {
+                  void skipReward();
+                }}
+              >
+                Skip reward
+              </Button>
+            )}
+          </>
         )}
       </div>
     </Dialog>

@@ -12,6 +12,8 @@ export { resumeSessionUseCase } from './application/resumeSessionUseCase';
 export { restartSessionPhaseUseCase } from './application/restartSessionPhaseUseCase';
 export { restartSessionWorkflowUseCase } from './application/restartSessionWorkflowUseCase';
 export { rollSessionRewardUseCase } from './application/rollSessionRewardUseCase';
+export { skipSessionPhaseUseCase } from './application/skipSessionPhaseUseCase';
+export { skipSessionRewardUseCase } from './application/skipSessionRewardUseCase';
 export { startSessionUseCase } from './application/startSessionUseCase';
 export { stopSessionUseCase } from './application/stopSessionUseCase';
 export {
@@ -26,6 +28,8 @@ export {
   resumeSession,
   rollSessionReward,
   restoreSession,
+  skipSessionPhase,
+  skipSessionReward,
   stopSession,
   type ActiveBonusRewardPhase,
   type CompletedSession,
@@ -33,7 +37,9 @@ export {
   type RewardContinuationTarget,
   type RewardRitual,
   type RestartCommandReceipt,
-  type RestartPhaseTarget,
+  type SessionTransition,
+  type SkipCommandReceipt,
+  type SessionPhaseTarget,
   type RunningSession,
   type RestoreSessionInput,
   type Session,

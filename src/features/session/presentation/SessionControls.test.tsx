@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -9,6 +9,7 @@ import {
   createSession,
   pauseSession,
   rollSessionReward,
+  skipSessionPhase,
 } from '../domain/Session';
 import { deriveSessionState } from '../domain/deriveSessionState';
 import { SessionControls } from './SessionControls';
@@ -28,6 +29,264 @@ function callbacks() {
 }
 
 describe('SessionControls', () => {
+  test('skips an intermediate phase immediately with its exact target', async () => {
+    const user = userEvent.setup();
+    const onSkipPhase = vi.fn(() => Promise.resolve());
+    const session = createSession(
+      'session-1',
+      createWorkflow({
+        id: 'skip-workflow',
+        name: 'Skip',
+        phases: [
+          { type: 'focus', durationSeconds: 10, environment: {} },
+          { type: 'break', durationSeconds: 5, environment: {} },
+        ],
+      }),
+      1_000,
+    );
+    render(
+      <SessionControls
+        session={session}
+        {...callbacks()}
+        onSkipPhase={onSkipPhase}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Skip phase' }));
+
+    expect(onSkipPhase).toHaveBeenCalledWith(session.id, {
+      type: 'phase',
+      phaseIndex: 0,
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  test('skips an ordinary phase while user-paused with its exact target', async () => {
+    const user = userEvent.setup();
+    const onSkipPhase = vi.fn(() => Promise.resolve());
+    const session = pauseSession(
+      createSession(
+        'paused-skip',
+        createWorkflow({
+          id: 'paused-skip-workflow',
+          name: 'Paused skip',
+          phases: [
+            { type: 'focus', durationSeconds: 10, environment: {} },
+            { type: 'break', durationSeconds: 5, environment: {} },
+          ],
+        }),
+        1_000,
+      ),
+      2_000,
+    );
+    render(
+      <SessionControls
+        session={session}
+        {...callbacks()}
+        onSkipPhase={onSkipPhase}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Skip phase' }));
+
+    expect(onSkipPhase).toHaveBeenCalledWith(session.id, {
+      type: 'phase',
+      phaseIndex: 0,
+    });
+  });
+
+  test('skips a non-final Bonus with its ritual target', async () => {
+    const user = userEvent.setup();
+    const onSkipPhase = vi.fn(() => Promise.resolve());
+    const rewarded = createWorkflow({
+      id: 'bonus-skip',
+      name: 'Bonus skip',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const rewardPaused = deriveSessionState(
+      createSession('bonus-skip-session', rewarded, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(rewardPaused, () => 0),
+      4_000,
+      'continue-bonus-skip',
+    );
+    render(
+      <SessionControls
+        session={bonus}
+        {...callbacks()}
+        onSkipPhase={onSkipPhase}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Skip phase' }));
+
+    expect(onSkipPhase).toHaveBeenCalledWith(bonus.id, {
+      type: 'bonus',
+      rewardRitualId: 'bonus-skip-session:0',
+    });
+  });
+
+  test('keeps skip single-flight across rapid clicks', () => {
+    const onSkipPhase = vi.fn(() => new Promise<void>(() => undefined));
+    const session = createSession(
+      'single-flight-skip',
+      createWorkflow({
+        id: 'single-flight-skip-workflow',
+        name: 'Single flight skip',
+        phases: [
+          { type: 'focus', durationSeconds: 10, environment: {} },
+          { type: 'break', durationSeconds: 5, environment: {} },
+        ],
+      }),
+      1_000,
+    );
+    render(
+      <SessionControls
+        session={session}
+        {...callbacks()}
+        onSkipPhase={onSkipPhase}
+      />,
+    );
+    const trigger = screen.getByRole('button', { name: 'Skip phase' });
+
+    fireEvent.click(trigger);
+    fireEvent.click(trigger);
+
+    expect(onSkipPhase).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Skipping…' })).toBeDisabled();
+  });
+
+  test('keeps a failed skip confirmation open and allows retry', async () => {
+    const user = userEvent.setup();
+    const onSkipPhase = vi
+      .fn(() => Promise.resolve())
+      .mockRejectedValueOnce(new Error('Skip unavailable.'));
+    const session = createSession('skip-retry', workflow, 1_000);
+    render(
+      <SessionControls
+        session={session}
+        {...callbacks()}
+        onSkipPhase={onSkipPhase}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Skip phase' }));
+    const confirm = screen
+      .getAllByRole('button', { name: 'Skip phase' })
+      .at(-1);
+    if (confirm === undefined) throw new Error('Expected skip confirmation.');
+    await user.click(confirm);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Skip unavailable.',
+    );
+    expect(screen.getByRole('dialog')).toBeVisible();
+
+    await user.click(confirm);
+    expect(onSkipPhase).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  test('confirms a final phase skip and restores focus on Cancel', async () => {
+    const user = userEvent.setup();
+    const session = createSession('session-1', workflow, 1_000);
+    render(
+      <SessionControls
+        session={session}
+        {...callbacks()}
+        onSkipPhase={() => Promise.resolve()}
+      />,
+    );
+    const trigger = screen.getByRole('button', { name: 'Skip phase' });
+
+    await user.click(trigger);
+    expect(
+      screen.getByRole('dialog', { name: 'Skip final phase?' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(trigger).toHaveFocus();
+  });
+
+  test('discards a confirmation when the authoritative segment changes', async () => {
+    const user = userEvent.setup();
+    const onSkipPhase = vi.fn(() => Promise.resolve());
+    const session = createSession(
+      'stale-skip-confirmation',
+      createWorkflow({
+        id: 'stale-skip-workflow',
+        name: 'Stale skip',
+        phases: [
+          { type: 'focus', durationSeconds: 10, environment: {} },
+          { type: 'break', durationSeconds: 10, environment: {} },
+        ],
+        rewardDice: {
+          frequency: 1,
+          sides: [
+            { icon: 'a', title: 'A' },
+            { icon: 'b', title: 'B' },
+          ],
+        },
+      }),
+      1_000,
+    );
+    const { rerender } = render(
+      <SessionControls
+        session={session}
+        {...callbacks()}
+        onSkipPhase={onSkipPhase}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Skip phase' }));
+    expect(screen.getByRole('dialog')).toBeVisible();
+
+    const nextPhase = deriveSessionState(
+      skipSessionPhase(session, 2_000, 'advance-before-confirmation', {
+        type: 'phase',
+        phaseIndex: 0,
+      }),
+      4_000,
+    );
+    rerender(
+      <SessionControls
+        session={nextPhase}
+        {...callbacks()}
+        onSkipPhase={onSkipPhase}
+      />,
+    );
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Skip phase' }));
+    const confirm = screen
+      .getAllByRole('button', { name: 'Skip phase' })
+      .at(-1);
+    if (confirm === undefined) throw new Error('Expected skip confirmation.');
+    await user.click(confirm);
+    expect(onSkipPhase).not.toHaveBeenCalledWith(session.id, {
+      type: 'phase',
+      phaseIndex: 0,
+    });
+  });
   test('pauses a running Session and confirms stop', async () => {
     const user = userEvent.setup();
     const session = createSession('session-1', workflow, 1_000);
@@ -70,7 +329,13 @@ describe('SessionControls', () => {
       61_000,
     );
 
-    render(<SessionControls session={transitioning} {...callbacks()} />);
+    render(
+      <SessionControls
+        session={transitioning}
+        {...callbacks()}
+        onSkipPhase={() => Promise.resolve()}
+      />,
+    );
 
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
@@ -96,11 +361,20 @@ describe('SessionControls', () => {
       12_000,
     );
 
-    render(<SessionControls session={rewardPaused} {...callbacks()} />);
+    render(
+      <SessionControls
+        session={rewardPaused}
+        {...callbacks()}
+        onSkipPhase={() => Promise.resolve()}
+      />,
+    );
 
     expect(screen.getByText('Reward pending')).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Resume' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Skip phase' }),
     ).not.toBeInTheDocument();
   });
 

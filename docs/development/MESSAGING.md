@@ -16,6 +16,8 @@ The catalog lists every current application runtime message exactly once.
 | `session/continue-reward` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId`, `rewardRitualId` | `{ type, commandId, sessionId, rewardRitualId }` | `parseSessionCommand` → command bus → `continueRewardSessionUseCase` | Same normalized command response | Successful change also emits `session/changed` | Yes; exact fingerprints are persisted in Session-level history |
 | `session/restart-phase` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId`; exact normal `phaseIndex` or Bonus `rewardRitualId` target | `{ type, commandId, sessionId, phaseIndex }` or `{ type, commandId, sessionId, rewardRitualId }` | Exact parser → serialized coordinator → `restartSessionPhaseUseCase` | Same normalized command response | Successful change also emits `session/changed` and reschedules the deadline | Yes; exact targets are persisted in restart history |
 | `session/restart-workflow` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId` | `{ type, commandId, sessionId }` | Exact parser → serialized coordinator → `restartSessionWorkflowUseCase` | Same normalized command response | Successful change emits `session/changed` and schedules Phase 0 | Yes; exact fingerprints are persisted in restart history |
+| `session/skip-phase` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId`; exact ordinary `phaseIndex` or Bonus `rewardRitualId` target | `{ type, commandId, sessionId, phaseIndex }` or `{ type, commandId, sessionId, rewardRitualId }` | Exact parser → serialized coordinator → `skipSessionPhaseUseCase` | Same normalized command response | Successful change emits `session/changed` and schedules the skipped transition | Yes; exact targets are persisted in skip history |
+| `session/skip-reward` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId`, `rewardRitualId` | `{ type, commandId, sessionId, rewardRitualId }` | Exact parser → serialized coordinator → `skipSessionRewardUseCase` | Same normalized command response | Successful change emits `session/changed` and schedules or clears the deadline | Yes; exact ritual targets are persisted in skip history |
 | `session/roll-reward` / `session/reroll-reward` | Focus or Side Panel → background | Non-empty `commandId`, `sessionId`, `rewardRitualId` | `{ type, commandId, sessionId, rewardRitualId }` | Exact parser → serialized coordinator → authoritative Reward use case with injected randomness | Updated Session projection | Successful change emits `session/changed` | Yes; exact fingerprints survive worker restart and distinct commands are serialized |
 | `session/stop` | Focus or side panel → background | Non-empty `commandId`; non-empty `sessionId` | `{ type, commandId, sessionId }` | `parseSessionCommand` → command bus → `stopSessionUseCase` | Same normalized command response | Successful change also emits `session/changed` | Yes, within the current worker instance |
 | `session/get-active` | Focus or side panel → background | Non-empty `requestId` | `{ type, requestId }` | `parseActiveSessionRequest` → `ChromeMessageBus.onActiveSessionRequest` → `getActiveSessionUseCase` | `{ ok: true, result: Session \| null }` or `{ ok: false, error: string }`; client validates result | No | No; `requestId` identifies the request but is not stored in the command map |
@@ -45,7 +47,8 @@ the background listener.
 - exactly `type`, `commandId`, `sessionId` and `rewardRitualId` for Reward
   commands;
 - exactly one normal `phaseIndex` or Bonus `rewardRitualId` target for
-  `session/restart-phase`; restart workflow has no target field;
+  `session/restart-phase` and `session/skip-phase`; restart workflow has no
+  target field;
 - a non-empty target identifier.
 
 Extra properties are rejected. This prevents silently accepting a producer and
@@ -69,17 +72,18 @@ or has a non-string failure message. It then passes the successful `result` to
 The background coordinator keeps every pending Promise plus at most 64 settled
 recent commands. It fingerprints the full command, so reusing an ID with another
 type, Session or Reward opportunity is rejected. In addition, Session persists
-a bounded Reward receipt history and a separate bounded restart receipt history.
+a bounded Reward receipt history plus separate bounded restart and skip receipt
+histories.
 The latter fingerprints restart type plus normal Phase index or Bonus ritual ID.
-Workflow restart retains both bounded receipt histories while clearing only
-user-facing Reward state. Both histories share one command-ID namespace, so a
+Workflow restart retains all bounded receipt histories while clearing only
+user-facing Reward state. All histories share one command-ID namespace, so a
 retained exact fingerprint does not repeat persistence or reset timing after a
 worker restart, while cross-history collisions reject.
 
 Current scope matters:
 
 - the in-memory map exists only for one worker instance;
-- persisted idempotency applies to Reward and restart commands whose receipts
+- persisted idempotency applies to Reward, restart and skip commands whose receipts
   remain in their bounded Session histories;
 - the identifier represents one complete Session command;
 - callers generate a new identifier for a new user intent.

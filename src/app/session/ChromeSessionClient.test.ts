@@ -116,4 +116,54 @@ describe('ChromeSessionClient', () => {
       sessionId: 'session-1',
     });
   });
+
+  test('sends exact skip-phase and skip-reward commands', async () => {
+    const session = createSession(
+      'session-1',
+      createWorkflow({
+        id: 'workflow-1',
+        name: 'Deep work',
+        phases: [{ type: 'focus', durationSeconds: 10, environment: {} }],
+      }),
+      1_000,
+    );
+    const runtime: SessionRuntime = {
+      sendMessage: vi.fn(() =>
+        Promise.resolve({ ok: true, result: structuredClone(session) }),
+      ),
+      addMessageListener: vi.fn(),
+      removeMessageListener: vi.fn(),
+    };
+    const client = new ChromeSessionClient(runtime, () => 'command-skip');
+
+    await client.skipPhase(createSessionId('session-1'), {
+      type: 'phase',
+      phaseIndex: 0,
+    });
+    expect(runtime.sendMessage).toHaveBeenLastCalledWith({
+      type: 'session/skip-phase',
+      commandId: 'command-skip',
+      sessionId: 'session-1',
+      phaseIndex: 0,
+    });
+
+    await client.skipPhase(createSessionId('session-1'), {
+      type: 'bonus',
+      rewardRitualId: 'session-1:0',
+    });
+    expect(runtime.sendMessage).toHaveBeenLastCalledWith({
+      type: 'session/skip-phase',
+      commandId: 'command-skip',
+      sessionId: 'session-1',
+      rewardRitualId: 'session-1:0',
+    });
+
+    await client.skipReward(createSessionId('session-1'), 'session-1:0');
+    expect(runtime.sendMessage).toHaveBeenLastCalledWith({
+      type: 'session/skip-reward',
+      commandId: 'command-skip',
+      sessionId: 'session-1',
+      rewardRitualId: 'session-1:0',
+    });
+  });
 });

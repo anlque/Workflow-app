@@ -404,6 +404,7 @@ describe('createSessionCoordinator', () => {
         currentPhaseIndex: persisted.currentPhaseIndex,
         rewardCommandReceipts: persisted.rewardCommandReceipts,
         restartCommandReceipts: persisted.restartCommandReceipts,
+        skipCommandReceipts: persisted.skipCommandReceipts,
         rewardRitual,
         status: 'paused',
         pauseReason: 'user',
@@ -520,6 +521,96 @@ describe('createSessionCoordinator', () => {
     expect(second).toEqual(first);
     await expect(sessions.getActive()).resolves.toEqual(first);
     expect(messages.events).toHaveLength(2);
+  });
+
+  test('routes phase skips through the serialized authority and reschedules the alarm', async () => {
+    const { value, sessions, clock, messages, alarms, coordinator } = setup();
+    await coordinator.initialize();
+    const started = (await messages.dispatch({
+      type: 'session/start',
+      commandId: 'start-before-skip',
+      workflowId: value.id,
+    })) as Session;
+    clock.set(4_000);
+    const command = {
+      type: 'session/skip-phase',
+      commandId: 'skip-phase',
+      sessionId: started.id,
+      phaseIndex: 0,
+    } as const;
+
+    const skipped = await messages.dispatch(command);
+
+    expect(skipped).toMatchObject({
+      status: 'transitioning',
+      transitionEndsAt: 5_000,
+      transition: { type: 'ordinary-phase', cause: 'skipped' },
+    });
+    expect(alarms.scheduled).toEqual({
+      name: 'locusora.session-phase',
+      when: 5_000,
+    });
+    expect(messages.events.at(-1)?.session).toEqual(skipped);
+
+    const save = vi.spyOn(sessions, 'save');
+    const secondMessages = new FakeMessageBus();
+    const secondCoordinator = createSessionCoordinator({
+      workflows: workflowRepository(value),
+      sessions,
+      clock,
+      messages: secondMessages,
+      alarms,
+      createSessionId: () => 'unused',
+      workflowResolver: { resolve: (workflow) => Promise.resolve(workflow) },
+    });
+    await secondCoordinator.initialize();
+    save.mockClear();
+    await expect(secondMessages.dispatch(command)).resolves.toEqual(skipped);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  test('routes pre-roll Reward skips and starts the continuation phase', async () => {
+    const value = repeatRewardWorkflow();
+    const sessions = new InMemorySessionRepository();
+    const clock = new FakeClock(1_000);
+    const messages = new FakeMessageBus();
+    const alarms = new FakeAlarmScheduler();
+    const coordinator = createSessionCoordinator({
+      workflows: workflowRepository(value),
+      sessions,
+      clock,
+      messages,
+      alarms,
+      createSessionId: () => 'skip-reward-session',
+      workflowResolver: { resolve: (workflow) => Promise.resolve(workflow) },
+    });
+    await coordinator.initialize();
+    await messages.dispatch({
+      type: 'session/start',
+      commandId: 'start-before-reward-skip',
+      workflowId: value.id,
+    });
+    clock.set(12_000);
+    await alarms.fire('locusora.session-phase');
+
+    const skipped = await messages.dispatch({
+      type: 'session/skip-reward',
+      commandId: 'skip-reward',
+      sessionId: 'skip-reward-session',
+      rewardRitualId: 'skip-reward-session:0',
+    });
+
+    expect(skipped).toMatchObject({
+      status: 'running',
+      currentPhaseIndex: 1,
+      phaseStartedAt: 12_000,
+      phaseEndsAt: 17_000,
+    });
+    expect(skipped).not.toHaveProperty('rewardRitual');
+    expect(alarms.scheduled).toEqual({
+      name: 'locusora.session-phase',
+      when: 17_000,
+    });
   });
 
   test('routes normal phase and workflow restarts with durable duplicate safety', async () => {
