@@ -13,7 +13,7 @@ Source root: [`src/features/settings/`](../../../src/features/settings/).
 
 - the validated immutable Settings value and defaults;
 - Settings repository and use-case contracts;
-- the `locusora/settings` version-3 writer and version-1–3 parser;
+- the `locusora/settings` version-4 writer and version-1–4 parser;
 - the `chrome.storage.local` adapter under the `settings` key;
 - the Options Settings presentation and operation feedback;
 - the root behavior/data API in
@@ -41,7 +41,7 @@ presentation API.
 | Group                      | Exports                                                                                                                 |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Domain                     | `Settings`, `Theme`, `ReducedMotion`, `createSettings`, effective audio-volume helpers, defaults and validation errors                  |
-| Application contracts      | `SettingsRepository`, `DocumentPreferenceSource`, Settings package v1/v2/v3 types, import limits and validation errors  |
+| Application contracts      | `SettingsRepository`, `DocumentPreferenceSource`, Settings package v1/v2/v3/v4 types, import limits and validation errors  |
 | Application behavior       | `getSettingsUseCase`, `updateSettingsUseCase`, `exportSettingsUseCase`, `importSettingsUseCase`, `parseSettingsPackage` |
 | Infrastructure composition | `ChromeSettingsRepository`, `ChromeDocumentPreferenceSource`, storage adapter types                                      |
 | Presentation (`/studio`)   | `SettingsPage`, `SettingsPageProps`                                                                                     |
@@ -84,6 +84,8 @@ All I/O is injected by Options.
   mute flags are independent booleans. `muteCuesWithMusic` is opt-in.
 - `backgroundBlurPx` is an integer from 0 through 24 and
   `backgroundBrightnessPercent` is a step-5 integer from 50 through 150.
+- `pauseWithSpace` is a required boolean, defaults to `true`, and controls only
+  the Focus document shortcut.
 - Legacy values without audio fields receive defaults. Legacy `volumePercent`
   is copied to both channel volumes while mute flags remain false.
 - Values without appearance fields receive appearance defaults. A present
@@ -105,9 +107,9 @@ Options checks whether it still exists and falls back to the first Workflow.
 | ----------------------- | --------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `getSettingsUseCase`    | Repository                        | Loads `unknown`; returns defaults only when absent, otherwise validates                     | Trusted Settings or validation/storage failure     |
 | `updateSettingsUseCase` | Repository and `unknown` input    | Validates first, then saves                                                                 | Updated Settings; no write on invalid input        |
-| `exportSettingsUseCase` | Repository                        | Loads validated/default settings and serializes a canonical version-3 envelope              | Deterministic compact JSON                         |
+| `exportSettingsUseCase` | Repository                        | Loads validated/default settings and serializes a canonical version-4 envelope              | Deterministic compact JSON                         |
 | `importSettingsUseCase` | Repository, JSON text, byte limit | Checks UTF-8 size, parses `unknown`, validates exact envelope and Settings, then saves      | Imported Settings; no write on validation failure  |
-| `parseSettingsPackage`  | `unknown` value                   | Strictly reads legacy v1, audio-canonical v2 or fully canonical v3 with exact keys            | Frozen package or `SettingsPackageValidationError` |
+| `parseSettingsPackage`  | `unknown` value                   | Strictly reads v1–v3 compatibility shapes or canonical v4 with exact keys            | Frozen package or `SettingsPackageValidationError` |
 
 The Options composition currently limits a Settings package to 1 MiB and owns
 file reading/download. Side panel writes `lastSelectedWorkflowId` before opening
@@ -118,7 +120,7 @@ Options for a chosen Workflow.
 `ChromeSettingsRepository` reads and writes one `settings` key in
 `chrome.storage.local`. There is no Dexie table, database migration or record
 `schemaVersion` for Settings. The public package version belongs only to the
-import/export envelope; current export is 3 and import supports 1–3.
+import/export envelope; current export is 4 and import supports 1–4.
 
 Chrome Storage cannot share a transaction with IndexedDB. The current Settings
 package is deliberately independent, so its single `set` is the only import

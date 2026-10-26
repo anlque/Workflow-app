@@ -35,6 +35,15 @@ class MemorySettingsRepository implements SettingsRepository {
 }
 
 describe('Settings use cases', () => {
+  test('defaults the Focus Space shortcut on and validates the canonical boolean', () => {
+    expect(defaultSettings.pauseWithSpace).toBe(true);
+    expect(
+      createSettings({ ...defaultSettings, pauseWithSpace: false }),
+    ).toMatchObject({ pauseWithSpace: false });
+    expect(() =>
+      createSettings({ ...defaultSettings, pauseWithSpace: 'yes' }),
+    ).toThrow('Settings are invalid.');
+  });
   test('keeps ambient and cue mute semantics independent unless coupled', () => {
     const musicMuted = { ...defaultSettings, ambientMuted: true };
     expect(effectiveAmbientVolume(musicMuted)).toBe(0);
@@ -58,6 +67,7 @@ describe('Settings use cases', () => {
       muteCuesWithMusic: false,
       backgroundBlurPx: 0,
       backgroundBrightnessPercent: 100,
+      pauseWithSpace: true,
     });
   });
 
@@ -80,6 +90,7 @@ describe('Settings use cases', () => {
       muteCuesWithMusic: false,
       backgroundBlurPx: 0,
       backgroundBrightnessPercent: 100,
+      pauseWithSpace: true,
     });
   });
 
@@ -118,6 +129,7 @@ describe('Settings use cases', () => {
       muteCuesWithMusic: false,
       backgroundBlurPx: 12,
       backgroundBrightnessPercent: 85,
+      pauseWithSpace: true,
     });
     const target = new MemorySettingsRepository();
 
@@ -125,7 +137,7 @@ describe('Settings use cases', () => {
     await importSettingsUseCase(target, exported, { maxFileBytes: 1_024 });
 
     expect(exported).toBe(
-      '{"kind":"locusora/settings","version":3,"settings":{"theme":"light","reducedMotion":"no-preference","ambientVolumePercent":40,"ambientMuted":false,"cueVolumePercent":70,"cuesMuted":true,"muteCuesWithMusic":false,"backgroundBlurPx":12,"backgroundBrightnessPercent":85}}',
+      '{"kind":"locusora/settings","version":4,"settings":{"theme":"light","reducedMotion":"no-preference","ambientVolumePercent":40,"ambientMuted":false,"cueVolumePercent":70,"cuesMuted":true,"muteCuesWithMusic":false,"backgroundBlurPx":12,"backgroundBrightnessPercent":85,"pauseWithSpace":true}}',
     );
     expect(target.value).toEqual({
       theme: 'light',
@@ -137,6 +149,7 @@ describe('Settings use cases', () => {
       muteCuesWithMusic: false,
       backgroundBlurPx: 12,
       backgroundBrightnessPercent: 85,
+      pauseWithSpace: true,
     });
   });
 
@@ -246,7 +259,7 @@ describe('Settings use cases', () => {
   test.each([
     [
       'unsupported version',
-      '{"kind":"locusora/settings","version":4,"settings":{}}',
+      '{"kind":"locusora/settings","version":5,"settings":{}}',
     ],
     [
       'corrupt data',
@@ -272,6 +285,14 @@ describe('Settings use cases', () => {
     [
       'partial v3 appearance',
       '{"kind":"locusora/settings","version":3,"settings":{"theme":"light","reducedMotion":"reduce","ambientVolumePercent":50,"ambientMuted":false,"cueVolumePercent":50,"cuesMuted":false,"muteCuesWithMusic":false,"backgroundBlurPx":0}}',
+    ],
+    [
+      'v3 controls field',
+      '{"kind":"locusora/settings","version":3,"settings":{"theme":"light","reducedMotion":"reduce","ambientVolumePercent":50,"ambientMuted":false,"cueVolumePercent":50,"cuesMuted":false,"muteCuesWithMusic":false,"backgroundBlurPx":0,"backgroundBrightnessPercent":100,"pauseWithSpace":true}}',
+    ],
+    [
+      'v4 missing controls field',
+      '{"kind":"locusora/settings","version":4,"settings":{"theme":"light","reducedMotion":"reduce","ambientVolumePercent":50,"ambientMuted":false,"cueVolumePercent":50,"cuesMuted":false,"muteCuesWithMusic":false,"backgroundBlurPx":0,"backgroundBrightnessPercent":100}}',
     ],
   ])('rejects %s without writes', async (_case, data) => {
     const repository = new MemorySettingsRepository();

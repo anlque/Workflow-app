@@ -94,7 +94,7 @@ These version numbers solve different compatibility problems:
 | `SessionRecord.schemaVersion` | One Session record envelope | Current writes 10; reads 1–10 | The Session record reader/writer needs a new incompatible serialization |
 | `AssetRecord.schemaVersion` | One Asset record shape | Current writes 2; reads role-less 1 and 2 | The Asset record reader/writer needs a new incompatible serialization |
 | Workflow package `version` | Public `locusora/workflow` import/export envelope | Current export 7; import 1–7; versions 1–6 map to Detailed | The external Workflow package contract changes |
-| Settings package `version` | Public `locusora/settings` import/export envelope | Current export 3; import 1–3 | The external Settings package contract changes |
+| Settings package `version` | Public `locusora/settings` import/export envelope | Current export 4; import 1–4 | The external Settings package contract changes |
 
 A database version must not be copied into a record, and a record
 `schemaVersion` must not be used to order Dexie migrations. Public package
@@ -341,7 +341,8 @@ a storage dump.
 Settings import has a separate `locusora/settings` envelope. Version 1 carries
 legacy theme/motion/shared-volume data; version 2 requires canonical independent
 ambient/cue channels; version 3 additionally requires canonical blur and
-brightness. It validates file size, exact version-specific
+brightness; version 4 adds the required `pauseWithSpace` control. Versions 1–3
+default that preference to `true`. It validates file size, exact version-specific
 keys and Domain Settings, then performs one `chrome.storage.local.set`.
 
 Chrome Storage cannot participate in a Dexie transaction. This is safe for the

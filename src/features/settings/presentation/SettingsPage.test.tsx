@@ -15,6 +15,7 @@ const settings: Settings = {
   muteCuesWithMusic: false,
   backgroundBlurPx: 0,
   backgroundBrightnessPercent: 100,
+  pauseWithSpace: true,
 };
 
 function setup(
@@ -48,6 +49,27 @@ function setup(
 }
 
 describe('SettingsPage', () => {
+  test('updates the global Focus Space control with accessible feedback', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = setup();
+
+    const control = screen.getByRole('checkbox', {
+      name: 'Pause or resume with Space',
+    });
+    expect(control).toBeChecked();
+    expect(screen.getByRole('group', { name: 'Controls' })).toContainElement(
+      control,
+    );
+    await user.click(control);
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      ...settings,
+      pauseWithSpace: false,
+    });
+    expect(
+      await screen.findByText('Control preferences updated.'),
+    ).toHaveAttribute('role', 'status');
+  });
   test('updates independent audio channels and optional mute coupling', async () => {
     const user = userEvent.setup();
     const { onUpdate } = setup();

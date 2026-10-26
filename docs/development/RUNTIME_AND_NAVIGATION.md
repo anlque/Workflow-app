@@ -1,5 +1,10 @@
 # Runtime and Navigation
 
+The Focus document alone owns the guarded `Space` key listener. It reads the
+live document preference and authoritative Session projection, then calls the
+existing Pause or Resume client command. It does not run in Side Panel or
+Workflow Studio and introduces no browser command or permission.
+
 This reference maps Chrome extension locations to source entrypoints and
 explains how navigation occurs. Locusora does not use React Router.
 

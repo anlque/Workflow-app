@@ -6,6 +6,7 @@ export {
   type SettingsPackageV1,
   type SettingsPackageV2,
   type SettingsPackageV3,
+  type SettingsPackageV4,
 } from './application/SettingsPackage';
 export { exportSettingsUseCase } from './application/exportSettingsUseCase';
 export { getSettingsUseCase } from './application/getSettingsUseCase';

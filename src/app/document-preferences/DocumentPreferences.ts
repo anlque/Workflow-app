@@ -19,6 +19,7 @@ export type DocumentPreferencesSnapshot = Readonly<{
   muteCuesWithMusic: boolean;
   backgroundBlurPx: number;
   backgroundBrightnessPercent: number;
+  pauseWithSpace: boolean;
 }>;
 
 export type DocumentPreferences = Readonly<{
@@ -97,7 +98,9 @@ export function createDocumentPreferences({
       next.cuesMuted !== snapshot.cuesMuted ||
       next.muteCuesWithMusic !== snapshot.muteCuesWithMusic ||
       next.backgroundBlurPx !== snapshot.backgroundBlurPx ||
-      next.backgroundBrightnessPercent !== snapshot.backgroundBrightnessPercent;
+      next.backgroundBrightnessPercent !==
+        snapshot.backgroundBrightnessPercent ||
+      next.pauseWithSpace !== snapshot.pauseWithSpace;
     snapshot = changed ? next : snapshot;
     root.dataset['theme'] = snapshot.theme;
     root.dataset['reducedMotion'] = snapshot.effectiveReducedMotion
@@ -161,5 +164,6 @@ function resolveSnapshot(
     muteCuesWithMusic: settings.muteCuesWithMusic,
     backgroundBlurPx: settings.backgroundBlurPx,
     backgroundBrightnessPercent: settings.backgroundBrightnessPercent,
+    pauseWithSpace: settings.pauseWithSpace,
   });
 }

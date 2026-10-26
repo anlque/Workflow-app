@@ -65,6 +65,7 @@ describe('createDocumentPreferences', () => {
       muteCuesWithMusic: false,
       backgroundBlurPx: 0,
       backgroundBrightnessPercent: 100,
+      pauseWithSpace: true,
     });
   });
 
@@ -82,6 +83,7 @@ describe('createDocumentPreferences', () => {
       muteCuesWithMusic: true,
       backgroundBlurPx: 18,
       backgroundBrightnessPercent: 75,
+      pauseWithSpace: false,
     });
 
     expect(state.preferences.getSnapshot()).toMatchObject({
@@ -92,6 +94,7 @@ describe('createDocumentPreferences', () => {
       muteCuesWithMusic: true,
       backgroundBlurPx: 18,
       backgroundBrightnessPercent: 75,
+      pauseWithSpace: false,
     });
   });
 

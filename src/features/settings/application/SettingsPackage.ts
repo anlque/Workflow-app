@@ -1,4 +1,5 @@
 import {
+  createAppearanceSettings,
   createAudioSettings,
   createCanonicalSettings,
   createLegacySettings,
@@ -30,6 +31,24 @@ export type SettingsPackageV2 = Readonly<{
 export type SettingsPackageV3 = Readonly<{
   kind: 'locusora/settings';
   version: 3;
+  settings: Pick<
+    Settings,
+    | 'theme'
+    | 'reducedMotion'
+    | 'ambientVolumePercent'
+    | 'ambientMuted'
+    | 'cueVolumePercent'
+    | 'cuesMuted'
+    | 'muteCuesWithMusic'
+    | 'backgroundBlurPx'
+    | 'backgroundBrightnessPercent'
+    | 'lastSelectedWorkflowId'
+  >;
+}>;
+
+export type SettingsPackageV4 = Readonly<{
+  kind: 'locusora/settings';
+  version: 4;
   settings: Settings;
 }>;
 
@@ -42,7 +61,7 @@ export class SettingsPackageValidationError extends Error {
 
 export function parseSettingsPackage(value: unknown): Readonly<{
   kind: 'locusora/settings';
-  version: 1 | 2 | 3;
+  version: 1 | 2 | 3 | 4;
   settings: Settings;
 }> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -54,7 +73,8 @@ export function parseSettingsPackage(value: unknown): Readonly<{
     record['kind'] !== 'locusora/settings' ||
     (record['version'] !== 1 &&
       record['version'] !== 2 &&
-      record['version'] !== 3)
+      record['version'] !== 3 &&
+      record['version'] !== 4)
   ) {
     throw new SettingsPackageValidationError();
   }
@@ -67,7 +87,9 @@ export function parseSettingsPackage(value: unknown): Readonly<{
           ? createLegacySettings(record['settings'])
           : record['version'] === 2
             ? createAudioSettings(record['settings'])
-            : createCanonicalSettings(record['settings']),
+            : record['version'] === 3
+              ? createAppearanceSettings(record['settings'])
+              : createCanonicalSettings(record['settings']),
     });
   } catch {
     throw new SettingsPackageValidationError();

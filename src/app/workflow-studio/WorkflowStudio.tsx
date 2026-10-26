@@ -538,6 +538,7 @@ export function WorkflowStudio({
               backgroundBlurPx: documentPreferences.backgroundBlurPx,
               backgroundBrightnessPercent:
                 documentPreferences.backgroundBrightnessPercent,
+              pauseWithSpace: documentPreferences.pauseWithSpace,
             }}
             onUpdate={async (settings) => {
               await dependencies.updateSettings(settings);

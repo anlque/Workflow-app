@@ -88,6 +88,8 @@ confirmation copy and sends the exact active target; it never advances timing
 locally. The background coordinator also owns alarm reconciliation. IndexedDB is
 durable storage for the aggregate, but records do not execute behavior. React and Zustand display
 projections, but they do not decide or persist authoritative transitions.
+The Focus `Space` listener is only an input adapter: after its UI guards pass it
+sends the existing Pause or Resume command through this same path.
 
 ## Startup and Projection Race Handling
 

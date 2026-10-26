@@ -13,6 +13,7 @@ import {
   createSession,
   continueRewardSession,
   deriveSessionState,
+  pauseSession,
   rollSessionReward,
   stopSession,
   type Session,
@@ -122,6 +123,142 @@ function dependencies(
 }
 
 describe('FocusApp', () => {
+  test('toggles authoritative Pause and Resume with Space from live preferences', async () => {
+    const workflow = createWorkflow({
+      id: 'focus-space-workflow',
+      name: 'Focus Space',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    const running = createSession('focus-space-session', workflow, 1_000);
+    const runningDeps = dependencies(running);
+    const runningView = render(<FocusApp dependencies={runningDeps} />);
+    await screen.findByRole('button', { name: 'Pause' });
+
+    fireEvent.keyDown(document.body, { code: 'Space' });
+    expect(runningDeps.pause).toHaveBeenCalledOnce();
+    expect(runningDeps.pause).toHaveBeenCalledWith(running.id);
+    runningView.unmount();
+
+    const paused = pauseSession(running, 2_000);
+    const disabledPreferences = createTestDocumentPreferences({
+      ...createTestDocumentPreferences().getSnapshot(),
+      pauseWithSpace: false,
+    });
+    const pausedDeps = dependencies(
+      paused,
+      studioDependencies(),
+      disabledPreferences,
+    );
+    const pausedView = render(<FocusApp dependencies={pausedDeps} />);
+    await screen.findByRole('button', { name: 'Resume' });
+    fireEvent.keyDown(document.body, { code: 'Space' });
+    expect(pausedDeps.resume).not.toHaveBeenCalled();
+    pausedView.unmount();
+
+    const enabledPausedDeps = dependencies(paused);
+    render(<FocusApp dependencies={enabledPausedDeps} />);
+    await screen.findByRole('button', { name: 'Resume' });
+    fireEvent.keyDown(document.body, { code: 'Space' });
+    expect(enabledPausedDeps.resume).toHaveBeenCalledWith(paused.id);
+
+    expect(disabledPreferences.getSnapshot().pauseWithSpace).toBe(false);
+  });
+
+  test('pauses an active Bonus with Space', async () => {
+    const workflow = createWorkflow({
+      id: 'focus-space-bonus-workflow',
+      name: 'Focus Space Bonus',
+      phases: [
+        { type: 'focus', durationSeconds: 1, environment: {} },
+        { type: 'break', durationSeconds: 1, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'a',
+            title: 'A',
+            bonusPhase: {
+              name: 'Bonus',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: 'b', title: 'B' },
+        ],
+      },
+    });
+    const reward = deriveSessionState(
+      createSession('focus-space-bonus-session', workflow, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(reward, () => 0),
+      4_000,
+      'focus-space-bonus-continue',
+    );
+    const deps = dependencies(bonus);
+    render(<FocusApp dependencies={deps} />);
+    await screen.findByRole('button', { name: 'Pause' });
+
+    fireEvent.keyDown(document.body, { code: 'Space' });
+
+    expect(deps.pause).toHaveBeenCalledWith(bonus.id);
+  });
+
+  test('does not intercept Space from a native control or while Studio is open', async () => {
+    const user = userEvent.setup();
+    const running = createSession(
+      'focus-space-guards-session',
+      createWorkflow({
+        id: 'focus-space-guards-workflow',
+        name: 'Focus Space Guards',
+        phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+      }),
+      1_000,
+    );
+    const deps = dependencies(running);
+    render(<FocusApp dependencies={deps} />);
+    const pauseButton = await screen.findByRole('button', { name: 'Pause' });
+
+    fireEvent.keyDown(pauseButton, { code: 'Space' });
+    expect(deps.pause).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open Workflow Studio' }),
+    );
+    await screen.findByRole('button', { name: 'Close Workflow Studio' });
+    fireEvent.keyDown(document.body, { code: 'Space' });
+    expect(deps.pause).not.toHaveBeenCalled();
+  });
+
+  test('shows a Space command failure and permits retry', async () => {
+    const running = createSession(
+      'focus-space-retry-session',
+      createWorkflow({
+        id: 'focus-space-retry-workflow',
+        name: 'Focus Space Retry',
+        phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+      }),
+      1_000,
+    );
+    const deps = dependencies(running);
+    vi.mocked(deps.pause)
+      .mockRejectedValueOnce(new Error('Pause unavailable.'))
+      .mockResolvedValueOnce();
+    render(<FocusApp dependencies={deps} />);
+    await screen.findByRole('button', { name: 'Pause' });
+
+    fireEvent.keyDown(document.body, { code: 'Space' });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Pause unavailable.',
+    );
+    fireEvent.keyDown(document.body, { code: 'Space' });
+
+    await waitFor(() => {
+      expect(deps.pause).toHaveBeenCalledTimes(2);
+    });
+  });
   test('routes ordinary, Bonus, and Reward skips once with exact targets', async () => {
     const user = userEvent.setup();
     const rewarded = createWorkflow({
@@ -602,6 +739,7 @@ describe('FocusApp', () => {
       muteCuesWithMusic: false,
       backgroundBlurPx: 0,
       backgroundBrightnessPercent: 100,
+      pauseWithSpace: true,
     });
     const deps = dependencies(session, studioDependencies(), preferences);
     render(<FocusApp dependencies={deps} />);

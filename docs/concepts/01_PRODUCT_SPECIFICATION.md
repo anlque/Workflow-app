@@ -304,6 +304,13 @@ paused, can be stopped by the user and is durably restorable after extension
 surfaces or the service worker restart. Completed and stopped Sessions are
 retained as minimal history records.
 
+On the Focus document, `Space` pauses a running ordinary or Bonus Phase and
+resumes a user-paused one through the existing authoritative commands. The
+shortcut is enabled by default, can be disabled globally, and never intercepts
+interactive/editable controls, dialogs, Workflow Studio, Reward pauses,
+transitions or terminal states. Side Panel and browser-global shortcuts are not
+provided.
+
 While a non-terminal Session is active, the side panel can switch between its
 mirrored Session controls and the Workflow Library without changing execution.
 The Library view keeps a compact sticky summary with the Workflow name, current

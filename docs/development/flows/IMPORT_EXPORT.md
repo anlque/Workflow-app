@@ -92,15 +92,16 @@ configured MIME allowlists.
 
 1. [`exportSettingsUseCase()`](../../../src/features/settings/application/exportSettingsUseCase.ts)
    loads validated settings or defaults and serializes
-   `{ kind: 'locusora/settings', version: 3, settings }` with canonical audio
-   channel and Focus appearance fields.
+   `{ kind: 'locusora/settings', version: 4, settings }` with canonical audio
+   channel, Focus appearance and Space-shortcut fields.
 2. Export uses the same temporary browser download mechanism but a distinct file
    name.
 3. [`importSettingsUseCase()`](../../../src/features/settings/application/importSettingsUseCase.ts)
    checks UTF-8 size, parses `unknown`, requires exactly the three envelope keys
-   and reads versions 1–3 using strict version-specific Settings shapes. Legacy
+   and reads versions 1–4 using strict version-specific Settings shapes. Legacy
    shared volume and absent appearance fields are normalized before the single
-   write; malformed canonical v3 values are rejected.
+   write; v1–v3 default `pauseWithSpace` to `true`, while malformed canonical v4
+   values are rejected.
 4. Only then does it perform one `chrome.storage.local.set`; Options reloads and
    reapplies live document theme, motion, audio and Focus appearance values.
 

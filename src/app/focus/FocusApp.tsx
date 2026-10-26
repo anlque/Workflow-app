@@ -42,6 +42,7 @@ import type { UiSoundPlayer } from './createUiSoundPlayer';
 import { useCompletionCue } from './useCompletionCue';
 import { WorkflowStudioOverlay } from './WorkflowStudioOverlay';
 import { useFocusDocumentTitle } from './useFocusDocumentTitle';
+import { useFocusSpaceShortcut } from './useFocusSpaceShortcut';
 
 const LazyWorkflowStudio = lazy(() => import('./LazyWorkflowStudio'));
 
@@ -148,6 +149,7 @@ export function FocusApp({
       muteCuesWithMusic: preferences.muteCuesWithMusic,
       backgroundBlurPx: preferences.backgroundBlurPx,
       backgroundBrightnessPercent: preferences.backgroundBrightnessPercent,
+      pauseWithSpace: preferences.pauseWithSpace,
     };
   }
 
@@ -192,6 +194,14 @@ export function FocusApp({
   useFocusDocumentTitle(
     projection.connection === 'connected' ? projection.session : null,
   );
+  const spaceShortcutError = useFocusSpaceShortcut({
+    session: projection.connection === 'connected' ? projection.session : null,
+    enabled: preferences.pauseWithSpace,
+    studioOpen,
+    activateSounds,
+    pause: dependencies.pause,
+    resume: dependencies.resume,
+  });
 
   useEffect(() => {
     dependencies.sounds.setVolume(effectiveCueVolume(audioSettings()));
@@ -390,6 +400,11 @@ export function FocusApp({
               setDismissedTerminalSessionId(session.id);
             }}
           />
+          {spaceShortcutError === null ? null : (
+            <p className="feedback feedback--error" role="alert">
+              {spaceShortcutError}
+            </p>
+          )}
         </div>
       </main>
     );

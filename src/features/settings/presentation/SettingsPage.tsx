@@ -384,6 +384,29 @@ export function SettingsPage({
       </fieldset>
 
       <fieldset className="settings-group">
+        <legend>Controls</legend>
+        <label>
+          <input
+            type="checkbox"
+            checked={settings.pauseWithSpace}
+            disabled={pending === 'preferences'}
+            onChange={(event) => {
+              void perform(
+                'preferences',
+                () =>
+                  onUpdate({
+                    ...settings,
+                    pauseWithSpace: event.currentTarget.checked,
+                  }),
+                'Control preferences updated.',
+              );
+            }}
+          />
+          Pause or resume with Space
+        </label>
+      </fieldset>
+
+      <fieldset className="settings-group">
         <legend>Workflow data</legend>
         <p>Move the selected Workflow and its referenced local Assets.</p>
         <div className="settings-actions">

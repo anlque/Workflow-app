@@ -13,6 +13,7 @@ export type Settings = Readonly<{
   muteCuesWithMusic: boolean;
   backgroundBlurPx: number;
   backgroundBrightnessPercent: number;
+  pauseWithSpace: boolean;
   lastSelectedWorkflowId?: WorkflowId;
 }>;
 
@@ -33,6 +34,7 @@ export const defaultSettings: Settings = Object.freeze({
   muteCuesWithMusic: false,
   backgroundBlurPx: 0,
   backgroundBrightnessPercent: 100,
+  pauseWithSpace: true,
 });
 
 const baseKeys = ['theme', 'reducedMotion', 'lastSelectedWorkflowId'] as const;
@@ -47,6 +49,7 @@ const appearanceKeys = [
   'backgroundBlurPx',
   'backgroundBrightnessPercent',
 ] as const;
+const controlsKeys = ['pauseWithSpace'] as const;
 
 function isVolumePercent(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 100;
@@ -65,7 +68,7 @@ export function effectiveCueVolume(settings: Settings): number {
 
 function parseSettings(
   value: unknown,
-  mode: 'auto' | 'legacy' | 'audio' | 'canonical',
+  mode: 'auto' | 'legacy' | 'audio' | 'appearance' | 'canonical',
 ): Settings {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new SettingsValidationError();
@@ -76,19 +79,34 @@ function parseSettings(
   const hasCanonicalAppearance = appearanceKeys.some((key) =>
     Object.hasOwn(input, key),
   );
+  const hasCanonicalControls = controlsKeys.some((key) =>
+    Object.hasOwn(input, key),
+  );
   if (
-    (mode === 'canonical' && (!hasCanonicalAudio || !hasCanonicalAppearance)) ||
-    (mode === 'audio' && (!hasCanonicalAudio || hasCanonicalAppearance)) ||
-    (mode === 'legacy' && (hasCanonicalAudio || hasCanonicalAppearance)) ||
-    (hasCanonicalAppearance && !hasCanonicalAudio)
+    (mode === 'canonical' &&
+      (!hasCanonicalAudio ||
+        !hasCanonicalAppearance ||
+        !hasCanonicalControls)) ||
+    (mode === 'appearance' &&
+      (!hasCanonicalAudio ||
+        !hasCanonicalAppearance ||
+        hasCanonicalControls)) ||
+    (mode === 'audio' &&
+      (!hasCanonicalAudio || hasCanonicalAppearance || hasCanonicalControls)) ||
+    (mode === 'legacy' &&
+      (hasCanonicalAudio || hasCanonicalAppearance || hasCanonicalControls)) ||
+    (hasCanonicalAppearance && !hasCanonicalAudio) ||
+    (hasCanonicalControls && !hasCanonicalAppearance)
   ) {
     throw new SettingsValidationError();
   }
-  const allowedKeys: readonly string[] = hasCanonicalAppearance
-    ? [...baseKeys, ...audioKeys, ...appearanceKeys]
-    : hasCanonicalAudio
-      ? [...baseKeys, ...audioKeys]
-      : [...baseKeys, 'volumePercent'];
+  const allowedKeys: readonly string[] = hasCanonicalControls
+    ? [...baseKeys, ...audioKeys, ...appearanceKeys, ...controlsKeys]
+    : hasCanonicalAppearance
+      ? [...baseKeys, ...audioKeys, ...appearanceKeys]
+      : hasCanonicalAudio
+        ? [...baseKeys, ...audioKeys]
+        : [...baseKeys, 'volumePercent'];
   if (keys.some((key) => !allowedKeys.includes(key))) {
     throw new SettingsValidationError();
   }
@@ -160,6 +178,10 @@ function parseSettings(
     backgroundBlurPx = Number(blur);
     backgroundBrightnessPercent = Number(brightness);
   }
+  const pauseWithSpace = hasCanonicalControls ? input['pauseWithSpace'] : true;
+  if (typeof pauseWithSpace !== 'boolean') {
+    throw new SettingsValidationError();
+  }
   try {
     const lastSelectedWorkflowId =
       workflowIdValue === undefined
@@ -175,6 +197,7 @@ function parseSettings(
       muteCuesWithMusic,
       backgroundBlurPx,
       backgroundBrightnessPercent,
+      pauseWithSpace,
       ...(lastSelectedWorkflowId === undefined
         ? {}
         : { lastSelectedWorkflowId }),
@@ -194,6 +217,10 @@ export function createLegacySettings(value: unknown): Settings {
 
 export function createAudioSettings(value: unknown): Settings {
   return parseSettings(value, 'audio');
+}
+
+export function createAppearanceSettings(value: unknown): Settings {
+  return parseSettings(value, 'appearance');
 }
 
 export function createCanonicalSettings(value: unknown): Settings {

@@ -19,6 +19,7 @@ test('renders live snapshots and unsubscribes on unmount', () => {
     muteCuesWithMusic: false,
     backgroundBlurPx: 0,
     backgroundBrightnessPercent: 100,
+    pauseWithSpace: true,
   };
   let listener: (() => void) | undefined;
   const unsubscribe = vi.fn();
@@ -34,12 +35,12 @@ test('renders live snapshots and unsubscribes on unmount', () => {
   function Probe() {
     const current = useDocumentPreferences(preferences);
     return (
-      <output>{`${current.theme}:${String(current.effectiveReducedMotion)}`}</output>
+      <output>{`${current.theme}:${String(current.effectiveReducedMotion)}:${String(current.pauseWithSpace)}`}</output>
     );
   }
 
   const view = render(<Probe />);
-  expect(screen.getByText('light:false')).toBeInTheDocument();
+  expect(screen.getByText('light:false:true')).toBeInTheDocument();
   act(() => {
     snapshot = {
       theme: 'dark',
@@ -52,10 +53,11 @@ test('renders live snapshots and unsubscribes on unmount', () => {
       muteCuesWithMusic: true,
       backgroundBlurPx: 12,
       backgroundBrightnessPercent: 80,
+      pauseWithSpace: false,
     };
     listener?.();
   });
-  expect(screen.getByText('dark:true')).toBeInTheDocument();
+  expect(screen.getByText('dark:true:false')).toBeInTheDocument();
   view.unmount();
   expect(unsubscribe).toHaveBeenCalledOnce();
 });

@@ -50,7 +50,48 @@ test('loads before visibility and synchronizes preferences across open documents
     .click();
   await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
 
+  await focus.locator('.focus-app__content').click();
+  await focus.keyboard.press('Space');
+  await expect(focus.getByRole('button', { name: 'Resume' })).toBeVisible();
+  await focus.keyboard.press('Space');
+  await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
+
+  const nativePause = focus.getByRole('button', { name: 'Pause' });
+  await nativePause.focus();
+  await focus.keyboard.press('Space');
+  const nativeResume = focus.getByRole('button', { name: 'Resume' });
+  await expect(nativeResume).toBeVisible();
+  await nativeResume.focus();
+  await focus.keyboard.press('Space');
+  await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
+
+  await focus.getByRole('button', { name: 'Open Workflow Studio' }).click();
+  const studioOverlay = focus.locator('.workflow-studio-overlay');
+  await expect(studioOverlay).toBeVisible();
+  await studioOverlay.dispatchEvent('keydown', { code: 'Space', key: ' ' });
+  await focus.getByRole('button', { name: 'Close Workflow Studio' }).click();
+  await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await focus.getByRole('button', { name: 'Stop' }).click();
+  const stopDialog = focus.getByRole('dialog');
+  await expect(stopDialog).toBeVisible();
+  await stopDialog.dispatchEvent('keydown', { code: 'Space', key: ' ' });
+  await expect(stopDialog).toBeVisible();
+  await stopDialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
+
   await options.getByRole('tab', { name: 'Settings' }).click();
+  const pauseWithSpace = options.getByRole('checkbox', {
+    name: 'Pause or resume with Space',
+  });
+  await pauseWithSpace.uncheck();
+  await focus.locator('.focus-app__content').click();
+  await focus.keyboard.press('Space');
+  await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await pauseWithSpace.check();
+  await focus.keyboard.press('Space');
+  await expect(focus.getByRole('button', { name: 'Resume' })).toBeVisible();
+  await focus.keyboard.press('Space');
+  await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
   await options.getByRole('combobox', { name: 'Theme' }).selectOption('light');
   await options
     .getByRole('combobox', { name: 'Reduced motion' })
