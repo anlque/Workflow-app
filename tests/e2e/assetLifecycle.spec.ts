@@ -1,9 +1,19 @@
+import type { Page } from '@playwright/test';
+
 import { expect, test } from './extensionFixture';
 
 const onePixelPng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII=',
   'base64',
 );
+
+async function openNewWorkflow(page: Page): Promise<void> {
+  const back = page.getByRole('button', { name: 'Back to workflows' });
+  const create = page.getByRole('button', { name: 'New workflow' });
+  await back.or(create).waitFor();
+  if (await back.isVisible()) await back.click();
+  await create.click();
+}
 
 test('protects Assets referenced by an immutable active Session snapshot', async ({
   context,
@@ -29,7 +39,7 @@ test('protects Assets referenced by an immutable active Session snapshot', async
   await expect(options.getByAltText('Preview of forest.png')).toBeVisible();
 
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Forest focus');
   await options.getByLabel('Background image').selectOption({
@@ -118,6 +128,8 @@ test('creates, follows and explicitly moves an Asset Role', async ({
 
   await options.getByRole('tab', { name: 'Workflows' }).focus();
   await options.keyboard.press('Enter');
+  await options.getByRole('button', { name: 'Back to workflows' }).focus();
+  await options.keyboard.press('Enter');
   await options.getByRole('button', { name: 'New workflow' }).focus();
   await options.keyboard.press('Enter');
   await options.getByRole('button', { name: 'Detailed setup' }).focus();
@@ -131,20 +143,22 @@ test('creates, follows and explicitly moves an Asset Role', async ({
   );
   await options.getByRole('button', { name: 'Add phase' }).focus();
   await options.keyboard.press('Enter');
-  await options.getByLabel('Background image').nth(1).focus();
+  await options.getByRole('button', { name: 'Select Phase 2' }).focus();
+  await options.keyboard.press('Enter');
+  await options.getByLabel('Background image').focus();
   await options.keyboard.type('forest.png');
   await options.getByRole('button', { name: 'Save workflow' }).focus();
   await options.keyboard.press('Enter');
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
 
   await options.reload();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options.getByRole('button', { name: 'Open Role focus' }).click();
-  await expect(options.getByLabel('Background image').nth(0)).toHaveValue(
+  await expect(options.getByLabel('Background image')).toHaveValue(
     'role:hero scene',
   );
-  await expect(options.getByLabel('Background image').nth(1)).toHaveValue(
-    /^direct:/u,
-  );
+  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await expect(options.getByLabel('Background image')).toHaveValue(/^direct:/u);
 
   await options.getByRole('tab', { name: 'Assets' }).click();
   await options
@@ -162,20 +176,20 @@ test('creates, follows and explicitly moves an Asset Role', async ({
   ).toContainText('Role: Hero scene');
 
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await expect(options.getByLabel('Background image').nth(0)).toHaveValue(
+  await options.getByRole('button', { name: 'Select Phase 1' }).click();
+  await expect(options.getByLabel('Background image')).toHaveValue(
     'role:hero scene',
   );
-  await expect(options.getByLabel('Background image').nth(1)).toHaveValue(
-    /^direct:/u,
-  );
-  await options.getByLabel('Background color').nth(0).fill('#112233');
+  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await expect(options.getByLabel('Background image')).toHaveValue(/^direct:/u);
+  await options.getByRole('button', { name: 'Select Phase 1' }).click();
+  await options.getByLabel('Background color').fill('#112233');
   await options.getByRole('button', { name: 'Save workflow' }).click();
-  await expect(options.getByLabel('Background image').nth(0)).toHaveValue(
+  await expect(options.getByLabel('Background image')).toHaveValue(
     'role:hero scene',
   );
-  await expect(options.getByLabel('Background image').nth(1)).toHaveValue(
-    /^direct:/u,
-  );
+  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await expect(options.getByLabel('Background image')).toHaveValue(/^direct:/u);
 });
 
 test('retires an Asset by replacing direct Workflow references', async ({
@@ -193,7 +207,7 @@ test('retires an Asset by replacing direct Workflow references', async ({
     });
   }
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Replacement focus');
   await options
@@ -233,7 +247,7 @@ test('retires an Asset with an uploaded replacement', async ({
     buffer: onePixelPng,
   });
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Uploaded replacement');
   await options

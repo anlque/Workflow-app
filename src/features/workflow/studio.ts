@@ -20,6 +20,7 @@ export {
   type PhaseDraft,
   type RewardDiceDraft,
   type RewardSideDraft,
+  type AssetReferenceTransform,
   type WorkflowDraft,
   type WorkflowDraftErrors,
   type WorkflowDraftValidation,

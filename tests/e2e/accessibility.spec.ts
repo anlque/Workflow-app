@@ -202,6 +202,95 @@ test('Workflow Studio shell is responsive without horizontal overflow', async ({
   ).toBe(true);
 });
 
+test('Detailed Studio preview and phase sequence stay usable across supported widths', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.setViewportSize({ width: 1280, height: 800 });
+  await options.goto(extensionUrls.options);
+
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
+  await options.getByRole('button', { name: 'Open Balanced Flow' }).click();
+
+  const sequence = options.getByRole('list', { name: 'Phase sequence' });
+  const firstPreview = options.getByRole('region', {
+    name: 'Settle in preview',
+  });
+  const firstPhase = options.getByRole('button', {
+    name: 'Select Phase 1: Settle in',
+  });
+  const secondPhase = options.getByRole('button', {
+    name: 'Select Phase 2: Short break',
+  });
+
+  await expect(sequence).toBeVisible();
+  await expect(firstPreview).toContainText('Settle in');
+  await firstPhase.focus();
+  await options.keyboard.press('ArrowRight');
+  await expect(secondPhase).toBeFocused();
+  await expect(secondPhase).toHaveAttribute('aria-pressed', 'true');
+  const preview = options.getByRole('region', {
+    name: 'Short break preview',
+  });
+  await expect(preview).toContainText('Short break');
+
+  for (const width of [500, 640]) {
+    await options.setViewportSize({ width, height: 800 });
+    await expect(preview).toBeVisible();
+    expect(
+      await options.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+    expect(
+      await sequence.evaluate(
+        (element) => element.scrollWidth >= element.clientWidth,
+      ),
+    ).toBe(true);
+  }
+
+  await options.setViewportSize({ width: 1280, height: 800 });
+  await options.getByRole('tab', { name: 'Reward Dice' }).click();
+  const rewardEnabled = options.getByLabel('Enable Reward Dice');
+  if (!(await rewardEnabled.isChecked())) await rewardEnabled.check();
+  const rewardLayout = options.locator('.reward-editor__side-layout');
+  const firstSide = options.getByRole('button', {
+    name: /Select reward side 1/,
+  });
+  const secondSide = options.getByRole('button', {
+    name: /Select reward side 2/,
+  });
+  await expect(rewardLayout).toBeVisible();
+  expect(
+    await rewardLayout.evaluate(
+      (element) =>
+        getComputedStyle(element).gridTemplateColumns.split(' ').length,
+    ),
+  ).toBe(2);
+  await firstSide.focus();
+  await options.keyboard.press('ArrowDown');
+  await expect(secondSide).toBeFocused();
+  await expect(secondSide).toHaveAttribute('aria-pressed', 'true');
+
+  await options.setViewportSize({ width: 500, height: 800 });
+  expect(
+    await rewardLayout.evaluate(
+      (element) =>
+        getComputedStyle(element).gridTemplateColumns.split(' ').length,
+    ),
+  ).toBe(1);
+  expect(
+    await options.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+});
+
 test('Asset Role dialog has no detectable axe violations', async ({
   context,
   extensionUrls,
@@ -230,6 +319,7 @@ test('Asset Role dialog has no detectable axe violations', async ({
     options.getByRole('listitem', { name: 'Image: role-image.png' }),
   ).toContainText('Role: Backdrop');
   await options.getByRole('tab', { name: 'Workflows' }).click();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await expect(

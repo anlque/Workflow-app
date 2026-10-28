@@ -12,13 +12,18 @@ async function createWorkflow(
   name: string,
   durationMinutes: number,
 ): Promise<void> {
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  const back = options.getByRole('button', { name: 'Back to workflows' });
+  const create = options.getByRole('button', { name: 'New workflow' });
+  await back.or(create).waitFor();
+  if (await back.isVisible()) await back.click();
+  await create.click();
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill(name);
   await options
     .getByLabel('Phase 1 duration in minutes')
     .fill(String(durationMinutes));
   await options.getByRole('button', { name: 'Save workflow' }).click();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await expect(
     options.getByRole('button', { name: `Open ${name}` }),
   ).toBeVisible();
@@ -117,16 +122,24 @@ test('restores a final Bonus Reward Phase and completes only after its deadline'
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Final reward restore');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
+  await options.getByRole('tab', { name: 'Reward Dice' }).click();
   await options.getByLabel('Enable Reward Dice').check();
   await options.getByLabel('Reward side 1 icon').fill('☕');
   await options.getByLabel('Reward side 1 title').fill('Tea');
+  await options.getByRole('button', { name: /Select reward side 2/ }).click();
   await options.getByLabel('Reward side 2 icon').fill('🧘');
   await options.getByLabel('Reward side 2 title').fill('Stretch');
   for (const side of [1, 2]) {
+    await options
+      .getByRole('button', {
+        name: new RegExp(`Select reward side ${String(side)}`),
+      })
+      .click();
     await options
       .getByLabel(`Enable Bonus Phase for side ${String(side)}`)
       .check();
@@ -138,6 +151,7 @@ test('restores a final Bonus Reward Phase and completes only after its deadline'
       .fill('0.5');
   }
   await options.getByRole('button', { name: 'Save workflow' }).click();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await expect(
     options.getByRole('button', { name: 'Open Final reward restore' }),
   ).toBeVisible();

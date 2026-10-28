@@ -8,11 +8,18 @@ const keys = ['one', 'two', 'three'] as const;
 
 function Harness({
   onMove = vi.fn(),
+  orientation,
 }: {
   onMove?: (key: string, index: number) => void;
+  orientation?: 'horizontal' | 'vertical';
 }) {
   const listRef = useRef<HTMLOListElement>(null);
-  const drag = usePhaseDrag({ phaseKeys: keys, listRef, onMove });
+  const drag = usePhaseDrag({
+    phaseKeys: keys,
+    listRef,
+    onMove,
+    ...(orientation === undefined ? {} : { orientation }),
+  });
   return (
     <ol ref={listRef} data-testid="list">
       {keys.map((key) => (
@@ -54,9 +61,105 @@ function setGeometry(): void {
   });
 }
 
+function setHorizontalGeometry(): void {
+  keys.forEach((key, index) => {
+    vi.spyOn(
+      screen.getByTestId(`phase-${key}`),
+      'getBoundingClientRect',
+    ).mockReturnValue({
+      top: 0,
+      bottom: 80,
+      height: 80,
+      left: index * 120,
+      right: index * 120 + 100,
+      width: 100,
+      x: index * 120,
+      y: 0,
+      toJSON: () => undefined,
+    });
+  });
+}
+
 afterEach(() => vi.restoreAllMocks());
 
 describe('usePhaseDrag', () => {
+  test('uses horizontal geometry for a horizontal Phase sequence', () => {
+    const onMove = vi.fn();
+    render(<Harness onMove={onMove} orientation="horizontal" />);
+    setHorizontalGeometry();
+    const handle = screen.getByTestId('handle-one');
+    Object.assign(handle, {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+    });
+
+    fireEvent.pointerDown(handle, {
+      pointerId: 3,
+      button: 0,
+      isPrimary: true,
+      clientX: 20,
+      clientY: 20,
+    });
+    fireEvent.pointerMove(handle, {
+      pointerId: 3,
+      clientX: 350,
+      clientY: 20,
+    });
+    fireEvent.pointerUp(handle, {
+      pointerId: 3,
+      clientX: 350,
+      clientY: 20,
+    });
+
+    expect(onMove).toHaveBeenCalledWith('one', 2);
+  });
+
+  test('autoscrolls an overflowing horizontal Phase sequence', () => {
+    let frame: FrameRequestCallback | undefined;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frame = callback;
+      return 1;
+    });
+    render(<Harness orientation="horizontal" />);
+    setHorizontalGeometry();
+    const list = screen.getByTestId('list');
+    Object.defineProperties(list, {
+      scrollWidth: { value: 600 },
+      clientWidth: { value: 200 },
+    });
+    vi.spyOn(list, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      right: 200,
+    } as DOMRect);
+    Object.assign(list.style, { overflowX: 'auto' });
+    const scrollBy = vi.fn();
+    Object.assign(list, { scrollBy });
+    const handle = screen.getByTestId('handle-one');
+    Object.assign(handle, {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+    });
+
+    fireEvent.pointerDown(handle, {
+      pointerId: 13,
+      button: 0,
+      isPrimary: true,
+      clientX: 20,
+      clientY: 20,
+    });
+    fireEvent.pointerMove(handle, {
+      pointerId: 13,
+      clientX: 195,
+      clientY: 20,
+    });
+    frame?.(1);
+
+    expect(scrollBy).toHaveBeenCalledWith({ left: 10 });
+    fireEvent.pointerCancel(handle, { pointerId: 13 });
+  });
+
   test.each(['mouse', 'touch', 'pen'] as const)(
     'commits one %s move after threshold',
     (pointerType) => {

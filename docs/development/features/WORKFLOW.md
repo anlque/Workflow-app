@@ -274,6 +274,13 @@ conversion.
 Owns draft validation feedback, pending state and transient accessible
 `Workflow saved` confirmation. It delegates accepted input through `onSave` and
 does not choose create versus update. It prevents removing the last Phase.
+The approved Detailed composition keeps Phases and Reward Dice in accessible
+local tabs without unmounting either draft subtree. The Phase tab presents an
+ordered, keyboard-selectable sequence before a large preview of the selected
+Phase Environment. Unsaved color and direct/Role image changes update that
+preview immediately; ambient audio is described only and is never played.
+Preview blob loading and object-URL ownership use injected Asset boundaries, so
+the editor does not read persistence or browser APIs directly.
 Phase disclosure state is local to the mounted editor and never persisted;
 save validation expands any collapsed Phase containing an invalid field.
 Phase order is also local draft state until **Save workflow**. Pointer drag and

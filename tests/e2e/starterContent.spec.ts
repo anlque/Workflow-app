@@ -190,6 +190,7 @@ test('seeds three ordinary offline Workflows once and does not restore a deleted
 
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   for (const workflow of starterWorkflows) {
     await expect(
       options.getByRole('button', { name: `Open ${workflow.name}` }),
@@ -205,6 +206,7 @@ test('seeds three ordinary offline Workflows once and does not restore a deleted
   await options.getByRole('button', { name: 'Export workflow' }).click();
   await downloadPromise;
   await options.getByRole('tab', { name: 'Workflows' }).click();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options
     .getByRole('button', { name: 'Delete Personal Quick Focus' })
     .click();
@@ -216,6 +218,7 @@ test('seeds three ordinary offline Workflows once and does not restore a deleted
   await restartExtension(context, options);
   const reopened = await context.newPage();
   await reopened.goto(extensionUrls.options);
+  await reopened.getByRole('button', { name: 'Back to workflows' }).click();
   await expect(
     reopened.getByRole('button', { name: 'Open Personal Quick Focus' }),
   ).toHaveCount(0);

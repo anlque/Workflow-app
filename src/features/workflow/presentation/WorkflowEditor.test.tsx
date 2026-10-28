@@ -62,6 +62,269 @@ afterEach(() => {
 });
 
 describe('WorkflowEditor', () => {
+  test('shows only the selected Phase Basic and Environment settings', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-selected-settings',
+          name: 'Selected settings',
+          phases: [
+            {
+              name: 'One',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Two',
+              type: 'break',
+              durationSeconds: 60,
+              environment: {},
+            },
+          ],
+        })}
+        workflowId="workflow-selected-settings"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Select Phase 2: Two' }),
+    );
+    expect(screen.getByRole('heading', { name: 'Basic' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Environment' })).toBeVisible();
+    expect(screen.getByLabelText('Phase 2 name')).toHaveValue('Two');
+    expect(screen.queryByLabelText('Phase 1 name')).toBeNull();
+    expect(screen.getByLabelText('Phase 2 type')).toBeVisible();
+    expect(screen.getByLabelText('Phase 2 duration in minutes')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Move Phase 2 up' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Duplicate Phase 2' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Remove Phase 2' }),
+    ).toBeVisible();
+    expect(screen.getByLabelText('Background image')).toBeVisible();
+    expect(screen.getByLabelText('Ambient audio')).toBeVisible();
+    expect(screen.getByLabelText('Background color')).toBeVisible();
+  });
+
+  test('returns from Reward Dice to the invalid Phase field on save', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-phase-error',
+          name: 'Phase error',
+          phases: [
+            {
+              name: 'One',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Two',
+              type: 'break',
+              durationSeconds: 60,
+              environment: {},
+            },
+          ],
+        })}
+        workflowId="workflow-phase-error"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Select Phase 2: Two' }),
+    );
+    await user.clear(screen.getByLabelText('Phase 2 duration in minutes'));
+    await user.click(screen.getByRole('tab', { name: 'Reward Dice' }));
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+
+    expect(screen.getByRole('tab', { name: 'Phases' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByLabelText('Phase 2 duration in minutes')).toBeVisible();
+    expect(screen.getByLabelText('Phase 2 duration in minutes')).toHaveFocus();
+  });
+
+  test('selects a Phase by stable draft identity and previews unsaved environment changes', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-preview',
+          name: 'Preview',
+          phases: [
+            {
+              name: 'Writing',
+              type: 'focus',
+              durationSeconds: 1_500,
+              environment: { backgroundColor: '#112233' },
+            },
+            {
+              name: 'Tea',
+              type: 'break',
+              durationSeconds: 300,
+              environment: { backgroundColor: '#445566' },
+            },
+          ],
+        })}
+        workflowId="workflow-preview"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: 'Writing preview' })).toHaveStyle(
+      'background-color: rgb(17, 34, 51)',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Select Phase 2: Tea' }),
+    );
+    expect(screen.getByRole('region', { name: 'Tea preview' })).toHaveStyle(
+      'background-color: rgb(68, 85, 102)',
+    );
+
+    const color = screen.getByLabelText('Background color');
+    await user.clear(color);
+    await user.type(color, '#abcdef');
+    expect(screen.getByRole('region', { name: 'Tea preview' })).toHaveStyle(
+      'background-color: rgb(171, 205, 239)',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Select Phase 2: Tea' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('keeps the selected Phase through reorder and selects a neighbor after removal', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-selection',
+          name: 'Selection',
+          phases: [
+            {
+              name: 'One',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Two',
+              type: 'break',
+              durationSeconds: 60,
+              environment: {},
+            },
+          ],
+        })}
+        workflowId="workflow-selection"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Select Phase 2: Two' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Move Phase 2 up' }));
+    expect(screen.getByRole('region', { name: 'Two preview' })).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Select Phase 1: Two' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Phase 1' }));
+    expect(screen.getByRole('region', { name: 'One preview' })).toBeVisible();
+  });
+
+  test('moves through the phase sequence with arrow, Home and End keys', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-keyboard-sequence',
+          name: 'Keyboard',
+          phases: [
+            {
+              name: 'One',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Two',
+              type: 'break',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Three',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+          ],
+        })}
+        workflowId="workflow-keyboard-sequence"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    const first = screen.getByRole('button', { name: 'Select Phase 1: One' });
+    first.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(
+      screen.getByRole('button', { name: 'Select Phase 2: Two' }),
+    ).toHaveFocus();
+    expect(screen.getByRole('region', { name: 'Two preview' })).toBeVisible();
+    await user.keyboard('{End}');
+    expect(
+      screen.getByRole('button', { name: 'Select Phase 3: Three' }),
+    ).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(first).toHaveFocus();
+  });
+
+  test('switches accessible editor tabs without discarding the mounted draft', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflow={workflowWithBonus()}
+        workflowId="workflow-1"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    const name = screen.getByLabelText('Workflow name');
+    await user.clear(name);
+    await user.type(name, 'Unsaved ritual');
+    const phases = screen.getByRole('tab', { name: 'Phases' });
+    const reward = screen.getByRole('tab', { name: 'Reward Dice' });
+    expect(phases).toHaveAttribute('aria-selected', 'true');
+
+    phases.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(reward).toHaveFocus();
+    expect(reward).toHaveAttribute('aria-selected', 'true');
+    expect(document.getElementById('editor-panel-phases')).not.toBeVisible();
+    expect(screen.getByRole('tabpanel', { name: 'Reward Dice' })).toBeVisible();
+
+    await user.keyboard('{ArrowLeft}');
+    expect(phases).toHaveFocus();
+    expect(name).toHaveValue('Unsaved ritual');
+  });
+
   test('hydrates, edits and saves an optional Phase name', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn<(input: CreateWorkflowInput) => Promise<void>>(() =>
@@ -125,8 +388,14 @@ describe('WorkflowEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Duplicate Phase 1' }));
 
     expect(
-      screen.getByRole('button', { name: 'Collapse Phase 1: Writing' }),
+      screen.getByRole('button', { name: 'Select Phase 1: Writing' }),
     ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Select Phase 2: Writing' }),
+    ).toBeVisible();
+    await user.click(
+      screen.getByRole('button', { name: 'Select Phase 2: Writing' }),
+    );
     expect(
       screen.getByRole('button', { name: 'Collapse Phase 2: Writing' }),
     ).toBeVisible();
@@ -614,6 +883,7 @@ describe('WorkflowEditor', () => {
         onSave={() => Promise.resolve()}
       />,
     );
+    await user.click(screen.getByRole('tab', { name: 'Reward Dice' }));
     const duration = screen.getByLabelText(
       'Side 1 Bonus Phase duration in minutes',
     );
@@ -734,6 +1004,7 @@ describe('WorkflowEditor', () => {
       `direct:${image.id}`,
     );
     await user.click(screen.getByRole('button', { name: 'Add phase' }));
+    await user.click(screen.getByRole('button', { name: 'Select Phase 2' }));
     await user.selectOptions(screen.getByLabelText('Phase 2 type'), 'break');
     await user.click(screen.getByRole('button', { name: 'Move Phase 2 up' }));
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
@@ -792,6 +1063,9 @@ describe('WorkflowEditor', () => {
     expect(
       screen.getByRole('button', { name: 'Expand Phase 2: Writing' }),
     ).toBeVisible();
+    await user.click(
+      screen.getByRole('button', { name: 'Select Phase 1: Review' }),
+    );
     expect(
       screen.getByRole('button', { name: 'Move Phase 1 up' }),
     ).toBeDisabled();
@@ -832,9 +1106,12 @@ describe('WorkflowEditor', () => {
     const items = screen.getAllByRole('listitem');
     items.forEach((item, index) => {
       vi.spyOn(item, 'getBoundingClientRect').mockReturnValue({
-        top: index * 100,
-        bottom: index * 100 + 80,
+        top: 0,
+        bottom: 80,
         height: 80,
+        left: index * 120,
+        right: index * 120 + 100,
+        width: 100,
       } as DOMRect);
     });
     const handle = screen.getByLabelText('Drag Phase 1: One');
@@ -847,16 +1124,29 @@ describe('WorkflowEditor', () => {
       pointerId: 7,
       button: 0,
       isPrimary: true,
+      clientX: 20,
       clientY: 20,
     });
-    fireEvent.pointerMove(handle, { pointerId: 7, clientY: 260 });
+    fireEvent.pointerMove(handle, {
+      pointerId: 7,
+      clientX: 350,
+      clientY: 20,
+    });
     expect(screen.getByTestId('phase-drop-indicator')).toBeVisible();
-    fireEvent.pointerUp(handle, { pointerId: 7, clientY: 260 });
+    fireEvent.pointerUp(handle, {
+      pointerId: 7,
+      clientX: 350,
+      clientY: 20,
+    });
     expect(
       screen
-        .getAllByRole('heading', { level: 4 })
-        .map((heading) => heading.textContent),
-    ).toEqual(['Two', 'Three', 'One']);
+        .getAllByRole('button', { name: /^Select Phase/ })
+        .map((button) => button.getAttribute('aria-label')),
+    ).toEqual([
+      'Select Phase 1: Two',
+      'Select Phase 2: Three',
+      'Select Phase 3: One',
+    ]);
     expect(
       screen.getByText('Moved One to position 3 of 3.'),
     ).toBeInTheDocument();
@@ -1041,6 +1331,7 @@ describe('WorkflowEditor', () => {
         onSave={onSave}
       />,
     );
+    await user.click(screen.getByRole('button', { name: 'Select Phase 2' }));
     await user.click(screen.getByRole('button', { name: 'Move Phase 2 up' }));
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
     const saved = onSave.mock.calls[0]?.[0];
@@ -1061,6 +1352,7 @@ describe('WorkflowEditor', () => {
     );
 
     await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
+    await user.click(screen.getByRole('tab', { name: 'Reward Dice' }));
     await user.click(screen.getByLabelText('Enable Reward Dice'));
     await user.clear(screen.getByLabelText('Reward frequency'));
     await user.type(screen.getByLabelText('Reward frequency'), '0');
@@ -1082,10 +1374,17 @@ describe('WorkflowEditor', () => {
     );
 
     await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
+    await user.click(screen.getByRole('tab', { name: 'Reward Dice' }));
     await user.click(screen.getByLabelText('Enable Reward Dice'));
     await user.selectOptions(screen.getByLabelText('Reward after'), 'break');
     await user.type(screen.getByLabelText('Reward side 1 icon'), '☕');
     await user.type(screen.getByLabelText('Reward side 1 title'), 'Tea');
+    await user.click(
+      screen.getByRole('button', {
+        name: /Select reward side 2/,
+        hidden: true,
+      }),
+    );
     await user.type(screen.getByLabelText('Reward side 2 icon'), '🚶');
     await user.type(screen.getByLabelText('Reward side 2 title'), 'Walk');
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
@@ -1308,6 +1607,174 @@ describe('WorkflowEditor', () => {
     ]);
   });
 
+  test('applies an explicit Role rename across reordered, duplicated and newly added draft environments', () => {
+    const oldRole = createAssetRole('Scene');
+    const nextRole = createAssetRole('Backdrop');
+    const otherRole = createAssetRole('Ambient');
+    const workflow = createWorkflow({
+      id: 'workflow-reference-transform',
+      name: 'Reference transform',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 60,
+          environment: {
+            backgroundAsset: { type: 'role', role: oldRole },
+            audioAsset: { type: 'role', role: otherRole },
+          },
+        },
+        { type: 'break', durationSeconds: 60, environment: {} },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'tea',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 300,
+              environment: {
+                backgroundAsset: { type: 'role', role: oldRole },
+              },
+            },
+          },
+          { icon: 'walk', title: 'Walk' },
+        ],
+      },
+    });
+    const { result } = renderHook(() =>
+      useWorkflowEditor('workflow-reference-transform', workflow),
+    );
+    const sourceKey = result.current.draft.phases[0]?.key ?? 'missing-source';
+
+    act(() => {
+      result.current.movePhaseTo(sourceKey, 1);
+      result.current.duplicatePhase(1);
+      result.current.addPhase();
+    });
+    const addedKey = result.current.draft.phases.at(-1)?.key ?? 'missing-added';
+    act(() => {
+      result.current.updatePhase(addedKey, {
+        backgroundAsset: { type: 'role', role: oldRole },
+      });
+      result.current.addRewardSide();
+    });
+    const addedSideKey =
+      result.current.draft.rewardDice.sides.at(-1)?.key ?? 'missing-side';
+    act(() => {
+      result.current.updateRewardSide(addedSideKey, {
+        bonusPhase: {
+          enabled: true,
+          name: 'Added Bonus',
+          durationMinutes: '5',
+          backgroundAsset: { type: 'role', role: oldRole },
+          audioAsset: { type: 'role', role: otherRole },
+          backgroundColor: '',
+        },
+      });
+      result.current.applyAssetReferenceTransform({
+        type: 'rename-role',
+        from: oldRole,
+        to: nextRole,
+      });
+    });
+
+    expect(
+      result.current.draft.phases
+        .filter(({ backgroundAsset }) => backgroundAsset !== undefined)
+        .map(({ backgroundAsset }) => backgroundAsset),
+    ).toEqual([
+      { type: 'role', role: nextRole },
+      { type: 'role', role: nextRole },
+      { type: 'role', role: nextRole },
+    ]);
+    expect(
+      result.current.draft.phases.find(({ key }) => key === sourceKey)
+        ?.audioAsset,
+    ).toEqual({ type: 'role', role: otherRole });
+    expect(
+      result.current.draft.rewardDice.sides[0]?.bonusPhase?.backgroundAsset,
+    ).toEqual({ type: 'role', role: nextRole });
+    expect(
+      result.current.draft.rewardDice.sides.at(-1)?.bonusPhase,
+    ).toMatchObject({
+      backgroundAsset: { type: 'role', role: nextRole },
+      audioAsset: { type: 'role', role: otherRole },
+    });
+  });
+
+  test('removes matching direct and canonical Role references from every current draft environment', () => {
+    const retiredRole = createAssetRole('Scene');
+    const matchingRole = createAssetRole('SCENE');
+    const unrelatedRole = createAssetRole('Ambient');
+    const workflow = createWorkflow({
+      id: 'workflow-reference-removal',
+      name: 'Reference removal',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 60,
+          environment: {
+            backgroundAsset: { type: 'direct', assetId: image.id },
+            audioAsset: { type: 'role', role: matchingRole },
+          },
+        },
+      ],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: 'tea',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 300,
+              environment: {
+                backgroundAsset: { type: 'direct', assetId: image.id },
+                audioAsset: { type: 'role', role: matchingRole },
+              },
+            },
+          },
+          {
+            icon: 'walk',
+            title: 'Walk',
+            bonusPhase: {
+              name: 'Walk break',
+              durationSeconds: 300,
+              environment: {
+                audioAsset: { type: 'role', role: unrelatedRole },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const { result } = renderHook(() =>
+      useWorkflowEditor('workflow-reference-removal', workflow),
+    );
+
+    act(() => {
+      result.current.applyAssetReferenceTransform({
+        type: 'retire-direct',
+        from: image.id,
+        role: retiredRole,
+      });
+    });
+
+    expect(result.current.draft.phases[0]?.backgroundAsset).toBeUndefined();
+    expect(result.current.draft.phases[0]?.audioAsset).toBeUndefined();
+    expect(
+      result.current.draft.rewardDice.sides[0]?.bonusPhase?.backgroundAsset,
+    ).toBeUndefined();
+    expect(
+      result.current.draft.rewardDice.sides[0]?.bonusPhase?.audioAsset,
+    ).toBeUndefined();
+    expect(
+      result.current.draft.rewardDice.sides[1]?.bonusPhase?.audioAsset,
+    ).toEqual({ type: 'role', role: unrelatedRole });
+  });
+
   test.each([
     ['unknown key', 'missing', 0],
     ['negative index', 'existing', -1],
@@ -1335,10 +1802,17 @@ describe('WorkflowEditor', () => {
     );
 
     await user.type(screen.getByLabelText('Workflow name'), 'Deep work');
+    await user.click(screen.getByRole('tab', { name: 'Reward Dice' }));
     await user.click(screen.getByLabelText('Enable Reward Dice'));
     await user.selectOptions(screen.getByLabelText('Available rerolls'), '3');
     await user.type(screen.getByLabelText('Reward side 1 icon'), '☕');
     await user.type(screen.getByLabelText('Reward side 1 title'), 'Tea');
+    await user.click(
+      screen.getByRole('button', {
+        name: /Select reward side 2/,
+        hidden: true,
+      }),
+    );
     await user.type(screen.getByLabelText('Reward side 2 icon'), '🚶');
     await user.type(screen.getByLabelText('Reward side 2 title'), 'Walk');
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));

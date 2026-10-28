@@ -14,6 +14,7 @@ const AUTOSCROLL_STEP = 10;
 type DragState = {
   pointerId: number;
   phaseKey: string;
+  originX: number;
   originY: number;
   handle: HTMLElement;
   dragging: boolean;
@@ -21,25 +22,37 @@ type DragState = {
   scrollTarget: HTMLElement | 'viewport';
   scrollDirection: -1 | 0 | 1;
   clientY: number;
+  clientX: number;
+  axis: 'horizontal' | 'vertical';
 };
 
 type UsePhaseDragInput = Readonly<{
   phaseKeys: readonly string[];
   listRef: RefObject<HTMLElement | null>;
+  orientation?: 'horizontal' | 'vertical';
   onMove(phaseKey: string, targetIndex: number): void;
   onCancel?(): void;
 }>;
 
-function nearestScrollElement(element: HTMLElement | null): HTMLElement | null {
+function nearestScrollElement(
+  element: HTMLElement | null,
+  orientation: 'horizontal' | 'vertical',
+): HTMLElement | null {
   for (
     let current = element;
     current !== null;
     current = current.parentElement
   ) {
-    const overflow = getComputedStyle(current).overflowY;
+    const style = getComputedStyle(current);
+    const overflow =
+      orientation === 'horizontal' ? style.overflowX : style.overflowY;
+    const scrollSize =
+      orientation === 'horizontal' ? current.scrollWidth : current.scrollHeight;
+    const clientSize =
+      orientation === 'horizontal' ? current.clientWidth : current.clientHeight;
     if (
       (overflow === 'auto' || overflow === 'scroll') &&
-      current.scrollHeight > current.clientHeight
+      scrollSize > clientSize
     ) {
       return current;
     }
@@ -50,6 +63,7 @@ function nearestScrollElement(element: HTMLElement | null): HTMLElement | null {
 export function usePhaseDrag({
   phaseKeys,
   listRef,
+  orientation = 'vertical',
   onMove,
   onCancel,
 }: UsePhaseDragInput) {
@@ -71,13 +85,24 @@ export function usePhaseDrag({
   }, []);
 
   const calculateTarget = useCallback(
-    (phaseKey: string, clientY: number): number | null => {
+    (
+      phaseKey: string,
+      clientX: number,
+      clientY: number,
+      axis: 'horizontal' | 'vertical',
+    ): number | null => {
       const remaining = phaseKeys.filter((key) => key !== phaseKey);
       if (remaining.length === phaseKeys.length) return null;
       let index = 0;
       for (const key of remaining) {
         const bounds = phaseElements.current.get(key)?.getBoundingClientRect();
-        if (bounds !== undefined && clientY >= bounds.top + bounds.height / 2) {
+        if (bounds === undefined) continue;
+        const pointer = axis === 'horizontal' ? clientX : clientY;
+        const midpoint =
+          axis === 'horizontal'
+            ? bounds.left + bounds.width / 2
+            : bounds.top + bounds.height / 2;
+        if (pointer >= midpoint) {
           index += 1;
         }
       }
@@ -91,27 +116,42 @@ export function usePhaseDrag({
     const drag = dragRef.current;
     if (drag === null || drag.scrollDirection === 0) return;
     const amount = drag.scrollDirection * AUTOSCROLL_STEP;
-    if (drag.scrollTarget === 'viewport') window.scrollBy({ top: amount });
-    else drag.scrollTarget.scrollBy({ top: amount });
-    const nextTarget = calculateTarget(drag.phaseKey, drag.clientY);
+    const scrollOptions =
+      drag.axis === 'horizontal' ? { left: amount } : { top: amount };
+    if (drag.scrollTarget === 'viewport') window.scrollBy(scrollOptions);
+    else drag.scrollTarget.scrollBy(scrollOptions);
+    const nextTarget = calculateTarget(
+      drag.phaseKey,
+      drag.clientX,
+      drag.clientY,
+      drag.axis,
+    );
     drag.targetIndex = nextTarget;
     setTargetIndex(nextTarget);
     frameRef.current = requestAnimationFrame(runAutoscroll);
   }, [calculateTarget]);
 
   const updateAutoscroll = useCallback(
-    (clientY: number) => {
+    (clientX: number, clientY: number) => {
       const drag = dragRef.current;
       if (drag === null) return;
       drag.clientY = clientY;
       const bounds =
         drag.scrollTarget === 'viewport'
-          ? { top: 0, bottom: window.innerHeight }
+          ? {
+              top: 0,
+              bottom: window.innerHeight,
+              left: 0,
+              right: window.innerWidth,
+            }
           : drag.scrollTarget.getBoundingClientRect();
+      const pointer = drag.axis === 'horizontal' ? clientX : clientY;
+      const start = drag.axis === 'horizontal' ? bounds.left : bounds.top;
+      const end = drag.axis === 'horizontal' ? bounds.right : bounds.bottom;
       drag.scrollDirection =
-        clientY <= bounds.top + AUTOSCROLL_EDGE
+        pointer <= start + AUTOSCROLL_EDGE
           ? -1
-          : clientY >= bounds.bottom - AUTOSCROLL_EDGE
+          : pointer >= end - AUTOSCROLL_EDGE
             ? 1
             : 0;
       if (drag.scrollDirection === 0) {
@@ -178,13 +218,17 @@ export function usePhaseDrag({
           dragRef.current = {
             pointerId: event.pointerId,
             phaseKey,
+            originX: event.clientX,
             originY: event.clientY,
             handle,
             dragging: false,
             targetIndex: null,
-            scrollTarget: nearestScrollElement(listRef.current) ?? 'viewport',
+            scrollTarget:
+              nearestScrollElement(listRef.current, orientation) ?? 'viewport',
             scrollDirection: 0,
             clientY: event.clientY,
+            clientX: event.clientX,
+            axis: orientation,
           };
         },
         onPointerMove(event: ReactPointerEvent<HTMLElement>) {
@@ -192,16 +236,25 @@ export function usePhaseDrag({
           if (drag?.pointerId !== event.pointerId) return;
           if (
             !drag.dragging &&
-            Math.abs(event.clientY - drag.originY) < DRAG_THRESHOLD
+            Math.hypot(
+              event.clientX - drag.originX,
+              event.clientY - drag.originY,
+            ) < DRAG_THRESHOLD
           ) {
             return;
           }
           drag.dragging = true;
-          const nextTarget = calculateTarget(drag.phaseKey, event.clientY);
+          drag.clientX = event.clientX;
+          const nextTarget = calculateTarget(
+            drag.phaseKey,
+            event.clientX,
+            event.clientY,
+            drag.axis,
+          );
           drag.targetIndex = nextTarget;
           setActivePhaseKey(drag.phaseKey);
           setTargetIndex(nextTarget);
-          updateAutoscroll(event.clientY);
+          updateAutoscroll(event.clientX, event.clientY);
         },
         onPointerUp(event: ReactPointerEvent<HTMLElement>) {
           if (dragRef.current?.pointerId !== event.pointerId) return;

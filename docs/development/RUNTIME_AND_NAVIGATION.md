@@ -164,6 +164,9 @@ different JavaScript bundle. The state belongs to the already loaded document:
 - `WorkflowStudio` renders one active `tabpanel` and keeps Workflow selection in
   local component state. Focus lazy-loads it inside a Focus-owned overlay;
   `OptionsApp` hosts the same composition in the manifest options document.
+- Inside Workflows, the grouped library and active editor are local mounted
+  views. Returning to the library does not navigate the document or destroy an
+  unsaved editor draft; the existing dirty-navigation guard remains decisive.
 - The side panel moves to the Session view when a new active Session appears,
   permits returning to the Workflow list, and displays a compact active-Session
   bar there. Focus/options navigation failures remain inline and retryable, so

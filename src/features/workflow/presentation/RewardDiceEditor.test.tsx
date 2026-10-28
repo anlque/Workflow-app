@@ -8,6 +8,69 @@ import { RewardDiceEditor } from './RewardDiceEditor';
 import type { RewardSideDraft } from './useWorkflowEditor';
 
 describe('RewardDiceEditor', () => {
+  test('separates the Side list from the selected Side editor and supports keyboard selection', async () => {
+    const user = userEvent.setup();
+    const props = {
+      assets: [],
+      draft: {
+        enabled: true,
+        scheduleMode: 'frequency' as const,
+        triggerPhaseType: 'focus' as const,
+        frequency: '1',
+        customPhaseKeys: [],
+        rerolls: '0',
+        sides: [
+          {
+            key: 'tea',
+            icon: '☕',
+            title: 'Tea',
+            description: '',
+            weight: '',
+            availability: 'any' as const,
+          },
+          {
+            key: 'walk',
+            icon: '🚶',
+            title: 'Walk',
+            description: '',
+            weight: '',
+            availability: 'late' as const,
+          },
+        ],
+      },
+      errors: {},
+      onEnabledChange: () => undefined,
+      onScheduleModeChange: () => undefined,
+      onTriggerPhaseTypeChange: () => undefined,
+      onFrequencyChange: () => undefined,
+      onRerollsChange: () => undefined,
+      onSideChange: () => undefined,
+      onBonusDurationChange: () => undefined,
+      onBonusDurationCommit: () => undefined,
+      onBonusDurationStep: () => undefined,
+      onAddSide: () => undefined,
+      onRemoveSide: () => undefined,
+    };
+    render(<RewardDiceEditor {...props} />);
+
+    const tea = screen.getByRole('button', {
+      name: 'Select reward side 1: Tea',
+    });
+    const walk = screen.getByRole('button', {
+      name: 'Select reward side 2: Walk',
+    });
+    expect(tea).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('Reward side 1 title')).toBeVisible();
+    expect(screen.queryByLabelText('Reward side 2 title')).toBeNull();
+
+    tea.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(walk).toHaveFocus();
+    expect(walk).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('Reward side 2 title')).toHaveValue('Walk');
+    expect(screen.queryByLabelText('Reward side 1 title')).toBeNull();
+  });
+
   test('keeps optional reward controls hidden until enabled', async () => {
     const user = userEvent.setup();
     const onEnabledChange = vi.fn();
@@ -38,6 +101,7 @@ describe('RewardDiceEditor', () => {
       />,
     );
 
+    expect(screen.getByRole('region', { name: 'Reward Dice' })).toBeVisible();
     expect(screen.queryByLabelText('Reward frequency')).toBeNull();
     await user.click(screen.getByLabelText('Enable Reward Dice'));
     expect(onEnabledChange).toHaveBeenCalledWith(true);
@@ -91,7 +155,7 @@ describe('RewardDiceEditor', () => {
     const removeButtons = screen.getAllByRole('button', {
       name: /Remove reward side/,
     });
-    expect(removeButtons).toHaveLength(2);
+    expect(removeButtons).toHaveLength(1);
     for (const button of removeButtons) expect(button).toBeDisabled();
     expect(
       screen.getByText('A Reward Dice needs at least two sides.'),

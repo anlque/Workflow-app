@@ -39,6 +39,7 @@ test('loads before visibility and synchronizes preferences across open documents
     await expect(page.locator('body')).toBeVisible();
   }
 
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options.getByRole('button', { name: 'New workflow' }).click();
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Preference sync focus');
@@ -122,7 +123,7 @@ test('loads before visibility and synchronizes preferences across open documents
   await expect(options.getByRole('slider', { name: 'Cue volume' })).toHaveValue(
     '42',
   );
-  await focus.getByText('Appearance').click();
+  await focus.locator('summary').filter({ hasText: 'Appearance' }).click();
   await expect(focus.getByRole('slider', { name: /Focus blur/ })).toHaveValue(
     '10',
   );

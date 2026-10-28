@@ -106,6 +106,493 @@ function dependencies(
 }
 
 describe('WorkflowStudio', () => {
+  test.each(['Assets', 'Settings'])(
+    'preserves a new Detailed draft and selected Phase across Workflows → %s → Workflows',
+    async (destination) => {
+      const user = userEvent.setup();
+      const saveWorkflow = vi.fn(() => Promise.resolve());
+      render(
+        <WorkflowStudio
+          dependencies={dependencies({
+            load: () =>
+              Promise.resolve({
+                workflows: [],
+                assets: [],
+                settings: defaultSettings,
+              }),
+            saveWorkflow,
+          })}
+        />,
+      );
+
+      await user.click(
+        await screen.findByRole('button', { name: 'Create workflow' }),
+      );
+      await user.click(screen.getByRole('button', { name: 'Detailed setup' }));
+      await user.type(screen.getByLabelText('Workflow name'), 'Draft ritual');
+      await user.click(screen.getByRole('button', { name: 'Add phase' }));
+      await user.click(screen.getByRole('button', { name: /Select Phase 2/ }));
+
+      await user.click(screen.getByRole('tab', { name: destination }));
+      expect(screen.getByLabelText('Workflow name')).not.toBeVisible();
+      await user.click(screen.getByRole('tab', { name: 'Workflows' }));
+
+      expect(screen.getByLabelText('Workflow name')).toHaveValue(
+        'Draft ritual',
+      );
+      expect(
+        screen.getByRole('button', { name: /Select Phase 2/ }),
+      ).toHaveAttribute('aria-pressed', 'true');
+      await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+      expect(saveWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'new-id', name: 'Draft ritual' }),
+      );
+    },
+  );
+
+  test.each([
+    'asset import',
+    'settings update',
+    'settings import',
+    'workflow import',
+  ] as const)(
+    'keeps a new Detailed editor identity across an authoritative %s refresh',
+    async (operation) => {
+      const user = userEvent.setup();
+      const existing = createWorkflow({
+        id: 'existing-workflow',
+        name: 'Existing Workflow',
+        phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+      });
+      const uploaded = createAsset({
+        id: 'uploaded-image',
+        name: 'Uploaded image',
+        kind: 'image',
+        mimeType: 'image/png',
+        byteSize: 5,
+        createdAt: 2,
+      });
+      const load = vi
+        .fn()
+        .mockResolvedValueOnce({
+          workflows: [existing],
+          assets: [],
+          settings: defaultSettings,
+        })
+        .mockResolvedValue({
+          workflows: [existing],
+          assets: operation === 'asset import' ? [uploaded] : [],
+          settings: defaultSettings,
+        });
+      const saveWorkflow = vi.fn(() => Promise.resolve());
+      render(
+        <WorkflowStudio
+          dependencies={dependencies({
+            load,
+            saveWorkflow,
+            importAsset: () => Promise.resolve(uploaded),
+          })}
+        />,
+      );
+
+      await user.click(
+        await screen.findByRole('button', { name: 'Back to workflows' }),
+      );
+      await user.click(screen.getByRole('button', { name: 'New workflow' }));
+      await user.click(screen.getByRole('button', { name: 'Detailed setup' }));
+      await user.type(screen.getByLabelText('Workflow name'), 'Unsaved draft');
+      await user.type(screen.getByLabelText('Phase 1 name'), 'First draft');
+      await user.click(screen.getByRole('button', { name: 'Add phase' }));
+      await user.click(screen.getByRole('button', { name: /Select Phase 2/ }));
+      await user.type(screen.getByLabelText('Phase 2 name'), 'Selected draft');
+
+      if (operation === 'asset import') {
+        await user.click(screen.getByRole('tab', { name: 'Assets' }));
+        await user.upload(
+          screen.getByLabelText('Add local image or audio'),
+          new File(['image'], 'background.png', { type: 'image/png' }),
+        );
+      } else {
+        await user.click(screen.getByRole('tab', { name: 'Settings' }));
+        if (operation === 'settings update') {
+          await user.selectOptions(screen.getByLabelText('Theme'), 'dark');
+        } else {
+          await user.upload(
+            screen.getByLabelText(
+              operation === 'settings import'
+                ? 'Import settings file'
+                : 'Import workflow file',
+            ),
+            new File(['{}'], 'package.json', { type: 'application/json' }),
+          );
+        }
+      }
+
+      await waitFor(() => {
+        expect(load).toHaveBeenCalledTimes(2);
+      });
+      await user.click(screen.getByRole('tab', { name: 'Workflows' }));
+      expect(screen.getByLabelText('Workflow name')).toHaveValue(
+        'Unsaved draft',
+      );
+      expect(screen.getByLabelText('Phase 2 name')).toHaveValue(
+        'Selected draft',
+      );
+      expect(
+        screen.getByRole('button', { name: /Select Phase 2/ }),
+      ).toHaveAttribute('aria-pressed', 'true');
+
+      await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+      expect(saveWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'new-id', name: 'Unsaved draft' }),
+      );
+    },
+  );
+
+  test('preserves unsaved Detailed fields while synchronizing renamed Role references', async () => {
+    const user = userEvent.setup();
+    const saveWorkflow = vi.fn(() => Promise.resolve());
+    const asset = createAsset({
+      id: 'hero-image',
+      name: 'Hero image',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 1,
+      createdAt: 1,
+      role: 'Hero',
+    });
+    const initial = createWorkflow({
+      id: 'workflow-role-sync',
+      name: 'Persisted name',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 1_500,
+          environment: {
+            backgroundAsset: { type: 'role', role: 'Hero' },
+          },
+        },
+      ],
+    });
+    const renamed = createWorkflow({
+      id: initial.id,
+      name: initial.name,
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 1_500,
+          environment: {
+            backgroundAsset: { type: 'role', role: 'Scene' },
+          },
+        },
+      ],
+    });
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce({
+        workflows: [initial],
+        assets: [asset],
+        settings: defaultSettings,
+      })
+      .mockResolvedValueOnce({
+        workflows: [renamed],
+        assets: [createAsset({ ...asset, role: 'Scene' })],
+        settings: defaultSettings,
+      });
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load,
+          saveWorkflow,
+          inspectAssetRoleChange: () =>
+            Promise.resolve({
+              target: asset,
+              role: createAssetRole('Scene'),
+              action: 'rename',
+              currentOwner: asset,
+              affectedWorkflowCount: 1,
+              expectedKinds: ['image'],
+            }),
+        })}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Back to workflows' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'New workflow' }));
+    await user.click(screen.getByRole('button', { name: 'Detailed setup' }));
+    const name = screen.getByLabelText('Workflow name');
+    await user.clear(name);
+    await user.type(name, 'Unsaved Workflow');
+    await user.type(screen.getByLabelText('Phase 1 name'), 'Unsaved Phase');
+    await user.selectOptions(
+      screen.getByLabelText('Background image'),
+      'role:hero',
+    );
+    await user.click(screen.getByRole('tab', { name: 'Assets' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Manage role for Hero image' }),
+    );
+    await user.clear(screen.getByRole('textbox', { name: 'Role' }));
+    await user.type(screen.getByRole('textbox', { name: 'Role' }), 'Scene');
+    await user.click(screen.getByRole('button', { name: 'Review role' }));
+    await user.click(screen.getByRole('button', { name: 'Rename role' }));
+    await user.click(screen.getByRole('tab', { name: 'Workflows' }));
+
+    expect(screen.getByLabelText('Workflow name')).toHaveValue(
+      'Unsaved Workflow',
+    );
+    expect(screen.getByLabelText('Phase 1 name')).toHaveValue('Unsaved Phase');
+    expect(screen.getByLabelText('Background image')).toHaveValue('role:scene');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+    expect(saveWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'new-id', name: 'Unsaved Workflow' }),
+    );
+  });
+
+  test('preserves unsaved Detailed fields while synchronizing retired direct references', async () => {
+    const user = userEvent.setup();
+    const saveWorkflow = vi.fn(() => Promise.resolve());
+    const source = createAsset({
+      id: 'source-image',
+      name: 'Source image',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 1,
+      createdAt: 1,
+      role: 'Scene',
+    });
+    const replacement = createAsset({
+      id: 'replacement-image',
+      name: 'Replacement image',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 1,
+      createdAt: 2,
+    });
+    const workflow = (assetId: string) =>
+      createWorkflow({
+        id: 'workflow-retirement-sync',
+        name: 'Persisted name',
+        phases: [
+          {
+            type: 'focus',
+            durationSeconds: 1_500,
+            environment: {
+              backgroundAsset: { type: 'direct', assetId },
+            },
+          },
+        ],
+      });
+    const initial = workflow(source.id);
+    const replacementWithRole = createAsset({ ...replacement, role: 'Scene' });
+    const retired = workflow(replacement.id);
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce({
+        workflows: [initial],
+        assets: [source, replacement],
+        settings: defaultSettings,
+      })
+      .mockResolvedValueOnce({
+        workflows: [retired],
+        assets: [replacementWithRole],
+        settings: defaultSettings,
+      });
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load,
+          saveWorkflow,
+          inspectAssetRetirement: () =>
+            Promise.resolve({
+              asset: source,
+              usages: [
+                {
+                  workflowId: initial.id,
+                  workflowName: initial.name,
+                  occurrences: [
+                    {
+                      owner: 'phase',
+                      phaseIndex: 0,
+                      location: 'background',
+                      referenceMode: 'direct',
+                      optional: true,
+                    },
+                  ],
+                },
+              ],
+            }),
+        })}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Back to workflows' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'New workflow' }));
+    await user.click(screen.getByRole('button', { name: 'Detailed setup' }));
+    const name = screen.getByLabelText('Workflow name');
+    await user.clear(name);
+    await user.type(name, 'Unsaved Workflow');
+    await user.type(screen.getByLabelText('Phase 1 name'), 'Unsaved Phase');
+    await user.selectOptions(
+      screen.getByLabelText('Background image'),
+      `direct:${source.id}`,
+    );
+    await user.click(screen.getByRole('button', { name: 'Add phase' }));
+    await user.click(screen.getByRole('button', { name: /Select Phase 2/ }));
+    await user.selectOptions(
+      screen.getByLabelText('Background image'),
+      'role:scene',
+    );
+    await user.click(screen.getByRole('tab', { name: 'Assets' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Retire Source image' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Review usage' }));
+    await user.click(await screen.findByRole('button', { name: 'Continue' }));
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Replacement Asset' }),
+      replacement.id,
+    );
+    await user.click(screen.getByRole('button', { name: 'Retire asset' }));
+    await user.click(screen.getByRole('tab', { name: 'Workflows' }));
+
+    expect(screen.getByLabelText('Workflow name')).toHaveValue(
+      'Unsaved Workflow',
+    );
+    await user.click(screen.getByRole('button', { name: /Select Phase 1/ }));
+    expect(screen.getByLabelText('Phase 1 name')).toHaveValue('Unsaved Phase');
+    expect(screen.getByLabelText('Background image')).toHaveValue(
+      `direct:${replacement.id}`,
+    );
+    await user.click(screen.getByRole('button', { name: /Select Phase 2/ }));
+    expect(screen.getByLabelText('Background image')).toHaveValue('role:scene');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+    expect(saveWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'new-id', name: 'Unsaved Workflow' }),
+    );
+  });
+
+  test('removes direct and Role references from a new Detailed draft when the owning Asset is removed', async () => {
+    const user = userEvent.setup();
+    const saveWorkflow = vi.fn(() => Promise.resolve());
+    const source = createAsset({
+      id: 'retired-role-owner',
+      name: 'Retired role owner',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteSize: 1,
+      createdAt: 1,
+      role: 'Scene',
+    });
+    const existing = createWorkflow({
+      id: 'existing-workflow',
+      name: 'Existing Workflow',
+      phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+    });
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce({
+        workflows: [existing],
+        assets: [source],
+        settings: defaultSettings,
+      })
+      .mockResolvedValueOnce({
+        workflows: [existing],
+        assets: [],
+        settings: defaultSettings,
+      });
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load,
+          saveWorkflow,
+          inspectAssetRetirement: () =>
+            Promise.resolve({ asset: source, usages: [] }),
+        })}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Back to workflows' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'New workflow' }));
+    await user.click(screen.getByRole('button', { name: 'Detailed setup' }));
+    await user.type(screen.getByLabelText('Workflow name'), 'Unsaved removal');
+    await user.selectOptions(
+      screen.getByLabelText('Background image'),
+      `direct:${source.id}`,
+    );
+    await user.click(screen.getByRole('button', { name: 'Add phase' }));
+    await user.click(screen.getByRole('button', { name: /Select Phase 2/ }));
+    await user.selectOptions(
+      screen.getByLabelText('Background image'),
+      'role:scene',
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Assets' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Retire Retired role owner' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Review usage' }));
+    await user.click(await screen.findByRole('button', { name: 'Continue' }));
+    await user.click(
+      screen.getByRole('radio', { name: 'Remove optional references' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Retire asset' }));
+    await user.click(screen.getByRole('tab', { name: 'Workflows' }));
+
+    expect(screen.getByLabelText('Workflow name')).toHaveValue(
+      'Unsaved removal',
+    );
+    expect(screen.getByLabelText('Background image')).toHaveValue('');
+    await user.click(screen.getByRole('button', { name: /Select Phase 1/ }));
+    expect(screen.getByLabelText('Background image')).toHaveValue('');
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+    expect(saveWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'new-id', name: 'Unsaved removal' }),
+    );
+  });
+
+  test('moves between the approved library and editor views without discarding a Detailed draft', async () => {
+    const user = userEvent.setup();
+    const saved = createWorkflow({
+      id: 'saved-workflow',
+      name: 'Saved workflow',
+      phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+    });
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load: () =>
+            Promise.resolve({
+              workflows: [saved],
+              assets: [],
+              settings: {
+                ...defaultSettings,
+                lastSelectedWorkflowId: saved.id,
+              },
+            }),
+        })}
+      />,
+    );
+
+    const workflowName = await screen.findByLabelText('Workflow name');
+    await user.clear(workflowName);
+    await user.type(workflowName, 'Unsaved name');
+    await user.click(screen.getByRole('button', { name: 'Back to workflows' }));
+    expect(screen.getByRole('heading', { name: 'Workflows' })).toBeVisible();
+    expect(screen.getByLabelText('Workflow name')).not.toBeVisible();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open Saved workflow' }),
+    );
+    expect(screen.getByLabelText('Workflow name')).toHaveValue('Unsaved name');
+  });
+
   test('keeps every live audio and appearance preference while theme and motion change', async () => {
     const user = userEvent.setup();
     const preferences = createTestDocumentPreferences();
@@ -271,6 +758,9 @@ describe('WorkflowStudio', () => {
       <WorkflowStudio dependencies={dependencies({ load, importAsset })} />,
     );
 
+    await user.click(
+      await screen.findByRole('button', { name: 'Back to workflows' }),
+    );
     await user.click(
       await screen.findByRole('button', { name: 'New workflow' }),
     );
@@ -449,6 +939,9 @@ describe('WorkflowStudio', () => {
         />,
       );
 
+      await user.click(
+        await screen.findByRole('button', { name: 'Back to workflows' }),
+      );
       await user.click(
         await screen.findByRole('button', { name: 'New workflow' }),
       );
@@ -813,6 +1306,7 @@ describe('WorkflowStudio', () => {
   });
 
   test('falls back to the first Workflow when the saved selection is unavailable', async () => {
+    const user = userEvent.setup();
     const first = createWorkflow({
       id: 'first-workflow',
       name: 'First',
@@ -837,10 +1331,11 @@ describe('WorkflowStudio', () => {
 
     render(<WorkflowStudio dependencies={deps} />);
 
+    expect(await screen.findByLabelText('Workflow name')).toHaveValue('First');
+    await user.click(screen.getByRole('button', { name: 'Back to workflows' }));
     expect(
-      (await screen.findByRole('button', { name: 'Open First' })).closest('li'),
+      screen.getByRole('button', { name: 'Open First' }).closest('li'),
     ).toHaveAttribute('aria-current', 'true');
-    expect(screen.getByLabelText('Workflow name')).toHaveValue('First');
   });
 
   test('keeps the editor mounted long enough to announce a successful save', async () => {

@@ -248,4 +248,31 @@ describe('visual foundation', () => {
     );
     expect(stylesheet).toMatch(/@media \(prefers-reduced-motion: reduce\)/u);
   });
+
+  test('provides the approved phase sequence and atmospheric preview contracts', () => {
+    const sequence = declarationsFor('.phase-sequence');
+    const entry = declarationsFor('.phase-sequence__entry');
+    const indicator = declarationsFor('.phase-drop-indicator');
+    const dragging = declarationsFor(
+      ".phase-sequence__entry[data-dragging='true']",
+    );
+    const preview = declarationsFor('.phase-environment-preview');
+    const image = declarationsFor('.phase-environment-preview__image');
+
+    expect(sequence).toContain('display: flex;');
+    expect(sequence).toContain('overflow-x: auto;');
+    expect(sequence).toContain('scroll-snap-type: inline proximity;');
+    expect(entry).toContain('flex: 1 0 10rem;');
+    expect(indicator).toContain('flex: 0 0 0.25rem;');
+    expect(indicator).toContain('width: 0.25rem;');
+    expect(indicator).toContain('align-self: stretch;');
+    expect(dragging).toContain('background: var(--color-accent-soft);');
+    expect(dragging).toContain('border-color: var(--color-accent);');
+    expect(preview).toContain('overflow: hidden;');
+    expect(preview).toContain('min-height: clamp(16rem, 38vw, 28rem);');
+    expect(image).toContain('object-fit: cover;');
+    expect(stylesheet).toMatch(
+      /\.phase-sequence__item\[aria-pressed='true'\][\s\S]*?border: 2px solid var\(--color-selected-indicator\);/u,
+    );
+  });
 });

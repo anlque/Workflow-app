@@ -19,6 +19,14 @@ async function expectViewportCentered(dialog: Locator): Promise<void> {
   expect(offset.vertical).toBeLessThan(2);
 }
 
+async function openNewWorkflow(page: Page): Promise<void> {
+  const back = page.getByRole('button', { name: 'Back to workflows' });
+  const create = page.getByRole('button', { name: 'New workflow' });
+  await back.or(create).waitFor();
+  if (await back.isVisible()) await back.click();
+  await create.click();
+}
+
 async function activeSessionSummary(page: Page) {
   return page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -121,7 +129,7 @@ test('creates, reopens and starts a Quick Workflow', async ({
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Quick setup' }).click();
   await options.getByLabel('Workflow name').fill('Quick writing');
   await options.getByLabel('Cycles').fill('3');
@@ -129,11 +137,13 @@ test('creates, reopens and starts a Quick Workflow', async ({
   await options.getByLabel('Short Break duration in minutes').fill('5.5');
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await expect(
     options.getByRole('button', { name: 'Open Quick writing' }),
   ).toBeVisible();
 
   await options.reload();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options.getByRole('button', { name: 'Open Quick writing' }).click();
   await expect(options.getByLabel('Cycles')).toHaveValue('3');
   await expect(options.getByLabel('Focus duration in minutes')).toHaveValue(
@@ -173,7 +183,7 @@ test('save-and-converts a Quick draft with an equivalent retained copy', async (
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Quick setup' }).click();
   await options.getByLabel('Workflow name').fill('Convertible rhythm');
   await options.getByLabel('Cycles').fill('2');
@@ -193,6 +203,7 @@ test('save-and-converts a Quick draft with an equivalent retained copy', async (
   await expect(options.getByLabel('Phase 1 duration in minutes')).toHaveValue(
     '0.5',
   );
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await expect(
     options.getByRole('button', {
       name: 'Open Convertible rhythm',
@@ -236,13 +247,18 @@ test('names, duplicates and locally collapses Workflow Phases', async ({
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Structured focus');
   await options.getByLabel('Phase 1 name').fill('Writing');
   await options.getByRole('button', { name: 'Duplicate Phase 1' }).click();
+  await options
+    .getByRole('button', { name: 'Select Phase 2: Writing' })
+    .click();
   await options.getByLabel('Phase 2 name').fill('Review');
-  await expect(options.getByLabel('Phase 1 name')).toHaveValue('Writing');
+  await expect(
+    options.getByRole('button', { name: 'Select Phase 1: Writing' }),
+  ).toBeVisible();
 
   await options.getByLabel('Phase 2 duration in minutes').fill('1.2');
   await options.getByLabel('Phase 2 duration in minutes').blur();
@@ -263,16 +279,10 @@ test('names, duplicates and locally collapses Workflow Phases', async ({
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
   await options.reload();
-  if (
-    (await options
-      .getByRole('button', { name: 'Open Structured focus' })
-      .count()) > 0
-  ) {
-    await options
-      .getByRole('button', { name: 'Open Structured focus' })
-      .click();
-  }
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
+  await options.getByRole('button', { name: 'Open Structured focus' }).click();
   await expect(options.getByLabel('Phase 1 name')).toHaveValue('Writing');
+  await options.getByRole('button', { name: 'Select Phase 2: Review' }).click();
   await expect(options.getByLabel('Phase 2 name')).toHaveValue('Review');
 });
 
@@ -282,71 +292,114 @@ test('reorders Phases by pointer and keyboard while preserving a custom Reward m
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Reordered phases');
   await options.getByLabel('Phase 1 name').fill('One');
   await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByRole('button', { name: 'Select Phase 2' }).click();
   await options.getByLabel('Phase 2 name').fill('Two');
   await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByRole('button', { name: 'Select Phase 3' }).click();
   await options.getByLabel('Phase 3 name').fill('Three');
+  await options.getByRole('tab', { name: 'Reward Dice' }).click();
   await options.getByLabel('Enable Reward Dice').check();
   await options.getByLabel('Reward schedule').selectOption('custom');
+  await options.getByRole('tab', { name: 'Phases' }).click();
+  await options.getByRole('button', { name: 'Select Phase 1: One' }).click();
   await options.getByLabel('Reward after Phase 1').uncheck();
+  await options.getByRole('button', { name: 'Select Phase 3: Three' }).click();
   await options.getByLabel('Reward after Phase 3').uncheck();
+  await options.getByRole('tab', { name: 'Reward Dice' }).click();
   await options.getByLabel('Reward side 1 icon').fill('☕');
   await options.getByLabel('Reward side 1 title').fill('Tea');
+  await options.getByRole('button', { name: /Select reward side 2/ }).click();
   await options.getByLabel('Reward side 2 icon').fill('🌿');
   await options.getByLabel('Reward side 2 title').fill('Walk');
+  await options.getByRole('tab', { name: 'Phases' }).click();
+  await options.getByRole('button', { name: 'Select Phase 1: One' }).click();
   await options.getByRole('button', { name: 'Collapse Phase 1: One' }).click();
+  await options.getByRole('button', { name: 'Select Phase 2: Two' }).click();
   await options.getByRole('button', { name: 'Collapse Phase 2: Two' }).click();
+  await options.getByRole('button', { name: 'Select Phase 3: Three' }).click();
   await options
     .getByRole('button', { name: 'Collapse Phase 3: Three' })
     .click();
 
   const handle = options.getByLabel('Drag Phase 1: One');
+  await handle.scrollIntoViewIfNeeded();
   const handleBounds = await handle.boundingBox();
   const thirdBounds = await options
-    .getByRole('heading', { name: 'Three', level: 4 })
-    .locator('..')
-    .locator('..')
+    .locator('.phase-sequence__entry')
+    .nth(2)
     .boundingBox();
   if (handleBounds === null || thirdBounds === null) {
     throw new Error('Phase drag geometry is unavailable.');
   }
-  await options.mouse.move(
-    handleBounds.x + handleBounds.width / 2,
-    handleBounds.y + handleBounds.height / 2,
-  );
-  await options.mouse.down();
-  await options.mouse.move(
-    thirdBounds.x + thirdBounds.width / 2,
-    thirdBounds.y + thirdBounds.height - 2,
-    { steps: 4 },
-  );
-  await options.mouse.up();
+  await handle.evaluate((element) => {
+    element.setPointerCapture = () => undefined;
+    element.hasPointerCapture = () => false;
+  });
+  await handle.dispatchEvent('pointerdown', {
+    pointerId: 1,
+    pointerType: 'mouse',
+    button: 0,
+    isPrimary: true,
+    clientX: handleBounds.x + handleBounds.width / 2,
+    clientY: handleBounds.y + handleBounds.height / 2,
+  });
+  await handle.dispatchEvent('pointermove', {
+    pointerId: 1,
+    pointerType: 'mouse',
+    button: 0,
+    isPrimary: true,
+    clientX: thirdBounds.x + thirdBounds.width - 2,
+    clientY: thirdBounds.y + thirdBounds.height / 2,
+  });
+  await expect(
+    options.locator('.phase-sequence__entry').first(),
+  ).toHaveAttribute('data-dragging', 'true');
+  await handle.dispatchEvent('pointerup', {
+    pointerId: 1,
+    pointerType: 'mouse',
+    button: 0,
+    isPrimary: true,
+    clientX: thirdBounds.x + thirdBounds.width - 2,
+    clientY: thirdBounds.y + thirdBounds.height / 2,
+  });
   await expect(
     options.getByText('Moved One to position 3 of 3.'),
   ).toBeAttached();
 
+  await options.getByRole('button', { name: 'Select Phase 1: Two' }).click();
   await options.getByRole('button', { name: 'Move Phase 1 down' }).focus();
   await options.keyboard.press('Enter');
   await expect(
     options.getByText('Moved Two to position 2 of 3.'),
   ).toBeAttached();
-  await expect(options.getByLabel('Phase 1 name')).toHaveValue('Three');
-  await expect(options.getByLabel('Phase 2 name')).toHaveValue('Two');
-  await expect(options.getByLabel('Phase 3 name')).toHaveValue('One');
+  await expect(
+    options.getByRole('button', { name: 'Select Phase 1: Three' }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('button', { name: 'Select Phase 2: Two' }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('button', { name: 'Select Phase 3: One' }),
+  ).toBeVisible();
 
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByText('Workflow saved')).toBeVisible();
   await options.reload();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options.getByRole('button', { name: 'Open Reordered phases' }).click();
-  await expect(options.getByLabel('Phase 1 name')).toHaveValue('Three');
-  await expect(options.getByLabel('Phase 2 name')).toHaveValue('Two');
-  await expect(options.getByLabel('Phase 3 name')).toHaveValue('One');
+  await expect(
+    options.getByRole('button', { name: 'Select Phase 1: Three' }),
+  ).toBeVisible();
+  await options.getByRole('button', { name: 'Select Phase 1: Three' }).click();
   await expect(options.getByLabel('Reward after Phase 1')).not.toBeChecked();
+  await options.getByRole('button', { name: 'Select Phase 2: Two' }).click();
   await expect(options.getByLabel('Reward after Phase 2')).toBeChecked();
+  await options.getByRole('button', { name: 'Select Phase 3: One' }).click();
   await expect(options.getByLabel('Reward after Phase 3')).not.toBeChecked();
 });
 
@@ -356,14 +409,14 @@ test('uploads and selects a Phase Asset without losing the Workflow draft', asyn
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Existing workflow');
   await options.getByLabel('Phase 1 name').fill('Existing phase');
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
 
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Inline atmosphere');
   await options.getByLabel('Phase 1 name').fill('Drafting');
@@ -389,6 +442,7 @@ test('uploads and selects a Phase Asset without losing the Workflow draft', asyn
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
   await options.reload();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await expect(
     options.getByRole('button', { name: 'Open Existing workflow' }),
   ).toBeVisible();
@@ -442,12 +496,13 @@ test('embeds Workflow Studio over idle and active Focus without navigation', asy
   expect(context.pages()).toHaveLength(initialPages);
   await expect(focus).toHaveURL(extensionUrls.focus);
 
-  await focus.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(focus);
   await focus.getByRole('button', { name: 'Detailed setup' }).click();
   await focus.getByLabel('Workflow name').fill('Embedded focus');
   await focus.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await focus.getByRole('button', { name: 'Save workflow' }).click();
   await expect(focus.getByRole('status')).toHaveText('Workflow saved');
+  await focus.getByRole('button', { name: 'Back to workflows' }).click();
   await focus.getByRole('button', { name: 'Delete Embedded focus' }).click();
   await expect(
     focus.getByRole('dialog', { name: 'Delete Embedded focus?' }),
@@ -508,7 +563,7 @@ test('synchronizes an open Workflow Library after Options changes', async ({
 
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Synced focus');
   await options.getByRole('button', { name: 'Save workflow' }).click();
@@ -534,12 +589,13 @@ test('creates and controls a Workflow across extension contexts', async ({
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('E2E focus');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await expect(
     options.getByRole('button', { name: 'Open E2E focus' }),
   ).toBeVisible();
@@ -614,19 +670,22 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
   await options.getByRole('button', { name: 'Review role' }).click();
   await options.getByRole('button', { name: 'Assign role' }).click();
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Custom rewards');
   for (let index = 0; index < 5; index += 1) {
     await options.getByRole('button', { name: 'Add phase' }).click();
   }
+  await options.getByRole('tab', { name: 'Reward Dice' }).click();
   await options.getByLabel('Enable Reward Dice').check();
   await options.getByLabel('Reward side 1 icon').fill('☕');
   await options.getByLabel('Reward side 1 title').fill('Tea');
   await options.getByLabel('Reward side 1 availability').selectOption('early');
+  await options.getByRole('button', { name: /Select reward side 2/ }).click();
   await options.getByLabel('Reward side 2 icon').fill('🌿');
   await options.getByLabel('Reward side 2 title').fill('Fresh air');
   await options.getByLabel('Reward side 2 availability').selectOption('late');
+  await options.getByRole('button', { name: /Select reward side 1/ }).click();
   await options.getByLabel('Enable Bonus Phase for side 1').check();
   await options.getByLabel('Side 1 Bonus Phase name').fill('Tea break');
   await options
@@ -642,20 +701,27 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
     .getByLabel('Side 1 Bonus Phase ambient audio')
     .selectOption('role:bonus ambience');
 
+  await options.getByRole('tab', { name: 'Phases' }).click();
+  await options.getByRole('button', { name: 'Select Phase 1' }).click();
   await options.getByLabel('Reward after Phase 1').uncheck();
+  await options.getByRole('button', { name: 'Select Phase 5' }).click();
   await options.getByLabel('Reward after Phase 5').uncheck();
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
 
   await options.reload();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options.getByRole('button', { name: 'Open Custom rewards' }).click();
+  await options.getByRole('tab', { name: 'Reward Dice' }).click();
   await expect(options.getByLabel('Reward schedule')).toHaveValue('custom');
   await expect(options.getByLabel('Reward side 1 availability')).toHaveValue(
     'early',
   );
+  await options.getByRole('button', { name: /Select reward side 2/ }).click();
   await expect(options.getByLabel('Reward side 2 availability')).toHaveValue(
     'late',
   );
+  await options.getByRole('button', { name: /Select reward side 1/ }).click();
   await expect(
     options.getByLabel('Enable Bonus Phase for side 1'),
   ).toBeChecked();
@@ -674,12 +740,23 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
   await expect(
     options.getByLabel('Side 1 Bonus Phase ambient audio'),
   ).toHaveValue('role:bonus ambience');
+  await options.getByRole('tab', { name: 'Phases' }).click();
   for (const index of [1, 2, 3, 5]) {
+    await options
+      .getByRole('button', {
+        name: new RegExp(`Select Phase ${String(index + 1)}`),
+      })
+      .click();
     await expect(
       options.getByLabel(`Reward after Phase ${String(index + 1)}`),
     ).toBeChecked();
   }
   for (const index of [0, 4]) {
+    await options
+      .getByRole('button', {
+        name: new RegExp(`Select Phase ${String(index + 1)}`),
+      })
+      .click();
     await expect(
       options.getByLabel(`Reward after Phase ${String(index + 1)}`),
     ).not.toBeChecked();
@@ -705,23 +782,27 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
   ).toBeVisible();
 
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Rewarded focus');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
-  await options.getByRole('button', { name: 'Add phase' }).click();
-  await options.getByLabel('Phase 2 type').selectOption('break');
-  await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
-  await options.getByLabel('Background image').first().selectOption({
+  await options.getByLabel('Background image').selectOption({
     label: 'reward-background.png',
   });
+  await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await options.getByLabel('Phase 2 type').selectOption('break');
+  await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
+  await options.getByRole('tab', { name: 'Reward Dice' }).click();
   await options.getByLabel('Enable Reward Dice').check();
   await options.getByLabel('Available rerolls').selectOption('1');
   await options.getByLabel('Reward side 1 icon').fill('☕');
   await options.getByLabel('Reward side 1 title').fill('Tea');
+  await options.getByRole('button', { name: /Select reward side 2/ }).click();
   await options.getByLabel('Reward side 2 icon').fill('🧘');
   await options.getByLabel('Reward side 2 title').fill('Stretch');
   await options.getByRole('button', { name: 'Save workflow' }).click();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await expect(
     options.getByRole('button', { name: 'Open Rewarded focus' }),
   ).toBeVisible();
@@ -883,15 +964,22 @@ test('executes and restores a non-final Bonus Reward Phase authoritatively', asy
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Bonus Reward journey');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByRole('button', { name: 'Select Phase 2' }).click();
   await options.getByLabel('Phase 2 type').selectOption('break');
   await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
+  await options.getByRole('tab', { name: 'Reward Dice' }).click();
   await options.getByLabel('Enable Reward Dice').check();
   for (const side of [1, 2]) {
+    await options
+      .getByRole('button', {
+        name: new RegExp(`Select reward side ${String(side)}`),
+      })
+      .click();
     await options.getByLabel(`Reward side ${String(side)} icon`).fill('✨');
     await options
       .getByLabel(`Reward side ${String(side)} title`)
@@ -957,15 +1045,22 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Restart journey');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByRole('button', { name: 'Select Phase 2' }).click();
   await options.getByLabel('Phase 2 type').selectOption('break');
   await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
+  await options.getByRole('tab', { name: 'Reward Dice' }).click();
   await options.getByLabel('Enable Reward Dice').check();
   for (const side of [1, 2]) {
+    await options
+      .getByRole('button', {
+        name: new RegExp(`Select reward side ${String(side)}`),
+      })
+      .click();
     await options
       .getByLabel(`Reward side ${String(side)} icon`)
       .fill(side === 1 ? '☕' : '🌿');
@@ -1050,15 +1145,22 @@ test('skips ordinary, Reward and Bonus progress authoritatively across surfaces'
 }) => {
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  await openNewWorkflow(options);
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill('Skip journey');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();
+  await options.getByRole('button', { name: 'Select Phase 2' }).click();
   await options.getByLabel('Phase 2 type').selectOption('break');
   await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
+  await options.getByRole('tab', { name: 'Reward Dice' }).click();
   await options.getByLabel('Enable Reward Dice').check();
   for (const side of [1, 2]) {
+    await options
+      .getByRole('button', {
+        name: new RegExp(`Select reward side ${String(side)}`),
+      })
+      .click();
     await options
       .getByLabel(`Reward side ${String(side)} icon`)
       .fill(side === 1 ? '☕' : '🌿');

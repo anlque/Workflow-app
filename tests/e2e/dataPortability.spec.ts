@@ -4,10 +4,15 @@ import { readFile } from 'node:fs/promises';
 import { expect, test } from './extensionFixture';
 
 async function createWorkflow(options: Page, name: string): Promise<void> {
-  await options.getByRole('button', { name: 'New workflow' }).click();
+  const back = options.getByRole('button', { name: 'Back to workflows' });
+  const create = options.getByRole('button', { name: 'New workflow' });
+  await back.or(create).waitFor();
+  if (await back.isVisible()) await back.click();
+  await create.click();
   await options.getByRole('button', { name: 'Detailed setup' }).click();
   await options.getByLabel('Workflow name').fill(name);
   await options.getByRole('button', { name: 'Save workflow' }).click();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await expect(
     options.getByRole('button', { name: `Open ${name}` }),
   ).toBeVisible();
@@ -91,6 +96,7 @@ test('renames imported Role collisions and keeps references inside the package',
   await expect(options.getByText('Workflow imported.')).toBeVisible();
 
   await options.getByRole('tab', { name: 'Workflows' }).click();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options
     .getByRole('button', { name: 'Open Role package' })
     .last()
@@ -152,6 +158,7 @@ test('rejects a corrupt Workflow package without changing existing data', async 
   );
 
   await options.reload();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
   await expect(
     options.getByRole('button', { name: 'Open Keep me' }),
   ).toBeVisible();

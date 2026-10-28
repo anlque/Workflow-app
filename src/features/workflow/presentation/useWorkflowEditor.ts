@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { assetRoleKey, type AssetId, type AssetRole } from '@/features/assets';
+
 import type { DiceSideAvailability } from '../domain/DiceSide';
 import type { RewardPhaseType } from '../domain/RewardDice';
 import type { AssetReference } from '../domain/Environment';
@@ -56,6 +58,19 @@ export type WorkflowDraftErrors = Readonly<Record<string, string>>;
 export type WorkflowDraftValidation =
   | Readonly<{ valid: true; input: CreateWorkflowInput }>
   | Readonly<{ valid: false; errors: WorkflowDraftErrors }>;
+
+export type AssetReferenceTransform =
+  | Readonly<{
+      type: 'rename-role';
+      from: AssetRole;
+      to: AssetRole;
+    }>
+  | Readonly<{
+      type: 'retire-direct';
+      from: AssetId;
+      to?: AssetId;
+      role?: AssetRole;
+    }>;
 
 function key(): string {
   return crypto.randomUUID();
@@ -196,6 +211,38 @@ function frequencyPhaseKeys(draft: WorkflowDraft): readonly string[] {
     matching += 1;
     return matching % frequency === 0 ? [phase.key] : [];
   });
+}
+
+function transformAssetReference(
+  reference: AssetReference | undefined,
+  transform: AssetReferenceTransform,
+): AssetReference | undefined {
+  if (
+    transform.type === 'rename-role' &&
+    reference?.type === 'role' &&
+    assetRoleKey(reference.role) === assetRoleKey(transform.from)
+  ) {
+    return { type: 'role', role: transform.to };
+  }
+  if (
+    transform.type === 'retire-direct' &&
+    reference?.type === 'direct' &&
+    reference.assetId === transform.from
+  ) {
+    return transform.to === undefined
+      ? undefined
+      : { type: 'direct', assetId: transform.to };
+  }
+  if (
+    transform.type === 'retire-direct' &&
+    transform.to === undefined &&
+    transform.role !== undefined &&
+    reference?.type === 'role' &&
+    assetRoleKey(reference.role) === assetRoleKey(transform.role)
+  ) {
+    return undefined;
+  }
+  return reference;
 }
 
 export function validateWorkflowDraft(
@@ -413,6 +460,40 @@ export function useWorkflowEditor(workflowId: string, workflow?: Workflow) {
   return {
     draft,
     rewardAfterPhaseKeys,
+    applyAssetReferenceTransform(transform: AssetReferenceTransform): void {
+      setDraft((current) => ({
+        ...current,
+        phases: current.phases.map((phase) => ({
+          ...phase,
+          backgroundAsset: transformAssetReference(
+            phase.backgroundAsset,
+            transform,
+          ),
+          audioAsset: transformAssetReference(phase.audioAsset, transform),
+        })),
+        rewardDice: {
+          ...current.rewardDice,
+          sides: current.rewardDice.sides.map((side) => {
+            const bonusPhase = side.bonusPhase;
+            if (bonusPhase === undefined) return side;
+            return {
+              ...side,
+              bonusPhase: {
+                ...bonusPhase,
+                backgroundAsset: transformAssetReference(
+                  bonusPhase.backgroundAsset,
+                  transform,
+                ),
+                audioAsset: transformAssetReference(
+                  bonusPhase.audioAsset,
+                  transform,
+                ),
+              },
+            };
+          }),
+        },
+      }));
+    },
     setName(name: string): void {
       setDraft((current) => ({ ...current, name }));
     },
