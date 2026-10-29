@@ -1,5 +1,144 @@
 import { expect, test } from './extensionFixture';
 
+test('keeps all Focus semantic states invariant across document themes', async ({
+  page,
+  extensionUrls,
+}) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto(extensionUrls.focus);
+  await page.getByRole('main').waitFor();
+  const setTheme = async (theme: 'light' | 'dark' | 'system') => {
+    await page.evaluate(async (nextTheme) => {
+      const extension = globalThis as typeof globalThis & {
+        chrome: {
+          storage: {
+            local: {
+              set(value: Record<string, unknown>): Promise<void>;
+            };
+          };
+        };
+      };
+      await extension.chrome.storage.local.set({
+        settings: {
+          theme: nextTheme,
+          reducedMotion: 'system',
+        },
+      });
+    }, theme);
+    await expect
+      .poll(() =>
+        page.locator('html').evaluate((root) => root.dataset['theme']),
+      )
+      .toBe(theme);
+  };
+
+  const readFocusState = async () => {
+    await page.locator('.focus-app-surface').evaluate((surface) => {
+      surface.querySelector('[data-testid="focus-theme-fixtures"]')?.remove();
+      surface.insertAdjacentHTML(
+        'beforeend',
+        `<div data-testid="focus-theme-fixtures" style="position:fixed;left:-10000px;top:0;pointer-events:none">
+          <div class="active-session" data-session-segment="bonus">
+            <p class="session-phase" data-testid="focus-bonus">Bonus</p>
+          </div>
+          <div class="dialog dialog--reward" data-testid="focus-reward">Reward</div>
+          <p class="feedback feedback--error" data-testid="focus-danger">Danger</p>
+        </div>`,
+      );
+    });
+    const primary = page.locator('.focus-app-surface .button--primary').first();
+    await primary.waitFor();
+    await page.mouse.move(500, 500);
+    await primary.evaluate((element: HTMLButtonElement) => {
+      element.blur();
+    });
+    await expect
+      .poll(() =>
+        primary.evaluate(
+          (element) => getComputedStyle(element).backgroundColor,
+        ),
+      )
+      .toBe('rgb(47, 123, 92)');
+    const defaultButton = await primary.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { background: style.backgroundColor, color: style.color };
+    });
+    await primary.hover();
+    await expect
+      .poll(() =>
+        primary.evaluate(
+          (element) => getComputedStyle(element).backgroundColor,
+        ),
+      )
+      .toBe('rgb(59, 137, 104)');
+    const hoverBackground = await primary.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    await primary.focus();
+    const focusOutline = await primary.evaluate(
+      (element) => getComputedStyle(element).outlineColor,
+    );
+    const stateStyles = await page
+      .locator('.focus-app-surface')
+      .evaluate((surface) => {
+        const style = getComputedStyle(surface);
+        const read = (selector: string) => {
+          const element = surface.querySelector(selector);
+          if (element === null) throw new Error(`Missing ${selector}`);
+          const computed = getComputedStyle(element);
+          return {
+            background: computed.backgroundColor,
+            border: computed.borderColor,
+            color: computed.color,
+          };
+        };
+        return {
+          colorScheme: style.colorScheme,
+          tokens: [
+            '--color-primary',
+            '--color-primary-hover',
+            '--color-primary-active',
+            '--color-primary-soft',
+            '--color-accent-soft',
+            '--color-focus-ring',
+            '--color-reward-surface',
+            '--color-reward-foreground',
+            '--color-danger-surface',
+            '--color-danger-foreground',
+            '--color-border',
+            '--color-control-border',
+          ].map((token) => style.getPropertyValue(token).trim()),
+          bonus: read('[data-testid="focus-bonus"]'),
+          reward: read('[data-testid="focus-reward"]'),
+          danger: read('[data-testid="focus-danger"]'),
+        };
+      });
+    return { defaultButton, focusOutline, hoverBackground, stateStyles };
+  };
+
+  await setTheme('dark');
+  const dark = await readFocusState();
+  await setTheme('light');
+  const light = await readFocusState();
+  await setTheme('system');
+  const system = await readFocusState();
+
+  expect(light).toEqual(dark);
+  expect(system).toEqual(dark);
+  expect(dark.defaultButton).toEqual({
+    background: 'rgb(47, 123, 92)',
+    color: 'rgb(255, 255, 255)',
+  });
+  expect(dark.hoverBackground).toBe('rgb(59, 137, 104)');
+  expect(dark.focusOutline).toBe('rgb(74, 122, 255)');
+  expect(dark.stateStyles.bonus.color).toBe('rgb(129, 77, 15)');
+  expect(dark.stateStyles.reward.background).toBe('rgb(245, 250, 247)');
+  expect(dark.stateStyles.danger).toMatchObject({
+    background: 'rgb(255, 244, 241)',
+    color: 'rgb(132, 60, 48)',
+  });
+});
+
 test('loads before visibility and synchronizes preferences across open documents', async ({
   context,
   extensionUrls,
@@ -50,6 +189,17 @@ test('loads before visibility and synchronizes preferences across open documents
     .getByRole('button', { name: 'Start workflow: Preference sync focus' })
     .click();
   await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(focus.getByLabel('Focus theme')).toHaveCount(0);
+  const neutralFocusChrome = await focus
+    .locator('.focus-app-surface')
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        background: style.backgroundColor,
+        surface: style.getPropertyValue('--color-surface').trim(),
+        ink: style.getPropertyValue('--color-ink').trim(),
+      };
+    });
 
   await focus.locator('.focus-app__content').click();
   await focus.keyboard.press('Space');
@@ -162,6 +312,16 @@ test('loads before visibility and synchronizes preferences across open documents
       'no-preference',
     );
   }
+  expect(
+    await focus.locator('.focus-app-surface').evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        background: style.backgroundColor,
+        surface: style.getPropertyValue('--color-surface').trim(),
+        ink: style.getPropertyValue('--color-ink').trim(),
+      };
+    }),
+  ).toEqual(neutralFocusChrome);
 
   await expect
     .poll(() =>

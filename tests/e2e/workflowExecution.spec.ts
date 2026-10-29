@@ -1,6 +1,11 @@
 import type { Locator, Page } from '@playwright/test';
 
-import { expect, expireActiveSessionDeadline, test } from './extensionFixture';
+import {
+  expect,
+  expireActiveSessionDeadline,
+  openNewWorkflow,
+  test,
+} from './extensionFixture';
 
 const onePixelPng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII=',
@@ -17,14 +22,6 @@ async function expectViewportCentered(dialog: Locator): Promise<void> {
   });
   expect(offset.horizontal).toBeLessThan(2);
   expect(offset.vertical).toBeLessThan(2);
-}
-
-async function openNewWorkflow(page: Page): Promise<void> {
-  const back = page.getByRole('button', { name: 'Back to workflows' });
-  const create = page.getByRole('button', { name: 'New workflow' });
-  await back.or(create).waitFor();
-  if (await back.isVisible()) await back.click();
-  await create.click();
 }
 
 async function activeSessionSummary(page: Page) {

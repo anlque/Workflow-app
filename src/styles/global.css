@@ -173,9 +173,55 @@ body {
   background: var(--color-canvas);
 }
 
-.focus-document,
+.focus-document {
+  min-height: 100vh;
+}
+
 .focus-app-surface {
   min-height: 100vh;
+  --color-canvas: #10211b;
+  --color-chrome: #183128;
+  --color-surface: #f5faf7;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #e8f1ec;
+  --color-text: #f5faf7;
+  --color-text-muted: #c0d0c8;
+  --color-ink: #f5faf7;
+  --color-ink-muted: #c0d0c8;
+  --color-border: #9bb0a7;
+  --color-border-strong: #718b80;
+  --color-control-border: #718b80;
+  --color-primary: #2f7b5c;
+  --color-primary-hover: #3b8968;
+  --color-primary-active: #245f47;
+  --color-primary-foreground: #ffffff;
+  --color-primary-soft: #c2e9d3;
+  --color-growth: #78c29b;
+  --color-reward: #d88a2c;
+  --color-danger: #b85c4b;
+  --color-dark: #29483a;
+  --color-light-text: #edf7f1;
+  --color-reward-surface: #fff0dc;
+  --color-reward-soft: #ffd296;
+  --color-reward-border: #e2dcd5;
+  --color-reward-muted: #767066;
+  --color-reward-foreground: #814d0f;
+  --color-primary-mint: #e4f2ea;
+  --color-focus-ring: #4a7aff;
+  --color-focus-subtle: #c7d5fa;
+  --color-reward-subtle: #fff7ee;
+  --color-danger-surface: #fff4f1;
+  --color-danger-soft: #fff4f1;
+  --color-danger-foreground: #843c30;
+  --color-selected-indicator: #2f7b5c;
+  --color-navigation: #183128;
+  --color-accent: #2f7b5c;
+  --color-accent-hover: #3b8968;
+  --color-accent-soft: #c2e9d3;
+  --color-focus: #4a7aff;
+  color-scheme: light;
+  color: var(--color-ink);
+  background: var(--color-canvas);
 }
 
 .workflow-studio-overlay {
@@ -240,10 +286,56 @@ body {
   isolation: isolate;
 }
 
+.focus-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 1.25rem 2rem;
+  pointer-events: none;
+}
+
+.focus-header__brand,
+.focus-app__utility-actions {
+  pointer-events: auto;
+}
+
+.focus-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: #f5faf7;
+  font-family: var(--font-family-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 35%);
+}
+
 .focus-app--empty {
   align-content: center;
   padding: 2rem;
   text-align: center;
+}
+
+.focus-app__status {
+  --color-text: #10271f;
+  --color-text-muted: #4c655b;
+  --color-ink: #10271f;
+  --color-ink-muted: #4c655b;
+  width: min(100% - 2rem, 32rem);
+  padding: var(--space-5);
+  color: var(--color-ink);
+  background: color-mix(in oklch, var(--color-surface) 92%, transparent);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--elevation-raised);
+  text-align: center;
+  backdrop-filter: blur(18px);
 }
 
 .focus-launcher {
@@ -282,6 +374,10 @@ body {
 }
 
 .focus-launcher__list li {
+  --color-text: #10271f;
+  --color-text-muted: #4c655b;
+  --color-ink: #10271f;
+  --color-ink-muted: #4c655b;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -305,16 +401,16 @@ body {
 }
 
 .focus-app__utility-actions {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 1;
   display: flex;
   gap: 0.625rem;
   align-items: flex-start;
 }
 
 .focus-app__volume-control {
+  --color-text: #10271f;
+  --color-text-muted: #4c655b;
+  --color-ink: #10271f;
+  --color-ink-muted: #4c655b;
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -346,6 +442,10 @@ body {
 }
 
 .focus-appearance {
+  --color-text: #10271f;
+  --color-text-muted: #4c655b;
+  --color-ink: #10271f;
+  --color-ink-muted: #4c655b;
   position: relative;
   color: var(--color-ink);
   background: var(--color-surface-raised);
@@ -451,6 +551,10 @@ body {
 }
 
 .focus-environment__status {
+  --color-text: #10271f;
+  --color-text-muted: #4c655b;
+  --color-ink: #10271f;
+  --color-ink-muted: #4c655b;
   position: absolute;
   right: 1rem;
   bottom: 5rem;
@@ -461,13 +565,24 @@ body {
 }
 
 .focus-app__content {
-  width: min(34rem, calc(100% - 2rem));
+  --color-text: #10271f;
+  --color-text-muted: #4c655b;
+  --color-ink: #10271f;
+  --color-ink-muted: #4c655b;
+  display: grid;
+  width: min(45.375rem, calc(100vw - 2rem), calc(100dvh - 2rem));
+  aspect-ratio: 1;
+  place-items: center;
   padding: clamp(1.5rem, 5vw, 3.5rem);
   text-align: center;
   background: color-mix(in oklch, var(--color-surface) 88%, transparent);
   border: 1px solid color-mix(in oklch, var(--color-border) 75%, transparent);
-  border-radius: 1.25rem;
+  border-radius: 50%;
   backdrop-filter: blur(18px);
+}
+
+.focus-app__content > * {
+  width: min(100%, 32rem);
 }
 
 .active-session h1 {
@@ -475,6 +590,14 @@ body {
   font-size: clamp(1.75rem, 5vw, 3rem);
   line-height: 1.1;
   text-wrap: balance;
+}
+
+.active-session[data-session-state='paused'] .session-countdown {
+  color: var(--color-primary);
+}
+
+.active-session[data-session-segment='bonus'] .session-phase {
+  color: var(--color-reward-foreground);
 }
 
 .session-phase {
@@ -738,7 +861,7 @@ textarea {
 .button.focus-app__close-panel,
 .button.focus-app__enable-sounds,
 .button.focus-app__sound-toggle {
-  color: var(--color-ink);
+  color: #10271f;
   background: var(--color-surface-raised);
   border-color: var(--color-ink-muted);
   box-shadow: 0 2px 6px oklch(0.2 0.02 160 / 28%);
@@ -816,13 +939,26 @@ textarea {
   box-shadow: var(--elevation-dialog);
 }
 
+.focus-app-surface .dialog {
+  --color-text: #10271f;
+  --color-text-muted: #4c655b;
+  --color-ink: #10271f;
+  --color-ink-muted: #4c655b;
+}
+
+.focus-app-surface .feedback--error {
+  color: var(--color-danger-foreground);
+  background: var(--color-danger-surface);
+}
+
 .dialog::backdrop {
   background: oklch(0.2 0.02 160 / 45%);
 }
 
 .dialog--reward {
-  width: min(34rem, calc(100vw - 2rem));
-  min-height: min(28rem, calc(100vh - 2rem));
+  width: min(45.375rem, calc(100vw - 2rem), calc(100dvh - 2rem));
+  min-height: min(45.375rem, calc(100vw - 2rem), calc(100dvh - 2rem));
+  max-height: min(45.375rem, calc(100vw - 2rem), calc(100dvh - 2rem));
   padding: clamp(1.5rem, 5vw, 3.5rem);
   background: var(--color-surface);
 }
@@ -1907,6 +2043,57 @@ textarea {
   min-width: 0;
   min-height: 100vh;
   padding: 1rem;
+  overflow-x: hidden;
+}
+
+@media (max-width: 40rem) {
+  .focus-app-surface {
+    display: grid;
+    height: 100dvh;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .focus-header {
+    position: relative;
+    align-items: stretch;
+    flex-direction: column;
+    padding: 1rem;
+  }
+
+  .focus-header__brand {
+    align-self: flex-start;
+  }
+
+  .focus-app__utility-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .focus-app__utility-actions > * {
+    flex: 1 1 auto;
+  }
+
+  .focus-app--empty {
+    padding: 1rem;
+  }
+
+  .focus-app {
+    min-height: 0;
+    height: 100%;
+    overflow: auto;
+  }
+
+  .focus-app__content {
+    width: min(calc(100% - 1rem), 34rem);
+    aspect-ratio: auto;
+    padding: clamp(1rem, 5vw, 2rem);
+    border-radius: var(--radius-surface);
+  }
+
+  .session-countdown {
+    font-size: clamp(3rem, 22vw, 5rem);
+  }
 }
 
 .side-panel-header {
@@ -1993,7 +2180,7 @@ textarea {
 }
 
 .compact-session-summary__identity span {
-  color: var(--color-ink-muted);
+  color: var(--color-ink);
 }
 
 .compact-session-summary output {
@@ -2123,6 +2310,10 @@ textarea {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .focus-app__content:has(.active-session[data-transitioning='true']) {
+    transition: none;
+  }
+
   *,
   *::before,
   *::after {

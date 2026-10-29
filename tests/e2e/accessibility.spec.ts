@@ -4,7 +4,29 @@ import { resolve } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 
-import { expect, test } from './extensionFixture';
+import {
+  expect,
+  expireActiveSessionDeadline,
+  openNewWorkflow,
+  test,
+} from './extensionFixture';
+
+function overlapArea(
+  first: { x: number; y: number; width: number; height: number },
+  second: { x: number; y: number; width: number; height: number },
+): number {
+  const width = Math.max(
+    0,
+    Math.min(first.x + first.width, second.x + second.width) -
+      Math.max(first.x, second.x),
+  );
+  const height = Math.max(
+    0,
+    Math.min(first.y + first.height, second.y + second.height) -
+      Math.max(first.y, second.y),
+  );
+  return width * height;
+}
 
 async function expectNoAccessibilityViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page }).analyze();
@@ -26,6 +48,195 @@ test('user-facing extension surfaces have no detectable axe violations', async (
     await expectNoAccessibilityViolations(page);
     await page.close();
   }
+});
+
+test('Focus and Side Panel stay operable without horizontal overflow', async ({
+  context,
+  extensionUrls,
+}) => {
+  const focus = await context.newPage();
+  await focus.setViewportSize({ width: 640, height: 720 });
+  await focus.goto(extensionUrls.focus);
+  await focus.getByRole('main').waitFor();
+  await expect(focus.getByRole('banner')).toBeVisible();
+  await expect(
+    focus.getByRole('navigation', { name: 'Focus controls' }),
+  ).toBeVisible();
+  expect(
+    await focus.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+
+  const sidePanel = await context.newPage();
+  await sidePanel.setViewportSize({ width: 360, height: 720 });
+  await sidePanel.goto(extensionUrls.sidePanel);
+  await sidePanel.getByRole('main').waitFor();
+  expect(
+    await sidePanel.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await expectNoAccessibilityViolations(focus);
+  await expectNoAccessibilityViolations(sidePanel);
+});
+
+test('active Focus keeps header utilities clear of timer content at effective 200% width', async ({
+  context,
+  extensionUrls,
+}) => {
+  const focus = await context.newPage();
+  await focus.setViewportSize({ width: 640, height: 720 });
+  await focus.goto(extensionUrls.focus);
+  await focus
+    .getByRole('button', { name: /Start workflow:/u })
+    .first()
+    .click();
+  await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
+
+  const header = await focus.locator('.focus-header').boundingBox();
+  const utilities = await focus
+    .getByRole('navigation', { name: 'Focus controls' })
+    .boundingBox();
+  const timer = await focus.locator('.focus-app__content').boundingBox();
+  const timerContent = await focus.locator('.active-session').boundingBox();
+  expect(header).not.toBeNull();
+  expect(utilities).not.toBeNull();
+  expect(timer).not.toBeNull();
+  expect(timerContent).not.toBeNull();
+  if (
+    header !== null &&
+    utilities !== null &&
+    timer !== null &&
+    timerContent !== null
+  ) {
+    expect(overlapArea(header, timer)).toBe(0);
+    expect(overlapArea(utilities, timerContent)).toBe(0);
+    expect(timerContent.y).toBeGreaterThanOrEqual(timer.y);
+    expect(timerContent.y + timerContent.height).toBeLessThanOrEqual(
+      timer.y + timer.height,
+    );
+  }
+  for (const name of [
+    'Pause',
+    'Restart phase',
+    'Restart workflow',
+    'Skip phase',
+    'Stop',
+  ]) {
+    const control = focus.getByRole('button', { name });
+    await expect(control).toBeVisible();
+    const bounds = await control.boundingBox();
+    expect(bounds).not.toBeNull();
+    if (bounds !== null) {
+      expect(bounds.y).toBeGreaterThanOrEqual(0);
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(720);
+    }
+  }
+});
+
+test('real Focus and Side Panel Session states have no detectable axe violations', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await openNewWorkflow(options);
+  await options.getByRole('button', { name: 'Detailed setup' }).click();
+  await options.getByLabel('Workflow name').fill('Accessible reward journey');
+  await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
+  await options.getByRole('tab', { name: 'Reward Dice' }).click();
+  await options.getByLabel('Enable Reward Dice').check();
+  for (const side of [1, 2]) {
+    await options
+      .getByRole('button', {
+        name: new RegExp(`Select reward side ${String(side)}`, 'u'),
+      })
+      .click();
+    await options.getByLabel(`Reward side ${String(side)} icon`).fill('★');
+    await options
+      .getByLabel(`Reward side ${String(side)} title`)
+      .fill(`Reward ${String(side)}`);
+    await options
+      .getByLabel(`Enable Bonus Phase for side ${String(side)}`)
+      .check();
+    await options
+      .getByLabel(`Side ${String(side)} Bonus Phase name`)
+      .fill('Accessible Bonus');
+    await options
+      .getByLabel(`Side ${String(side)} Bonus Phase duration in minutes`)
+      .fill('0.5');
+  }
+  await options.getByRole('button', { name: 'Save workflow' }).click();
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
+
+  const focus = await context.newPage();
+  const sidePanel = await context.newPage();
+  await focus.goto(extensionUrls.focus);
+  await sidePanel.goto(extensionUrls.sidePanel);
+  await expectNoAccessibilityViolations(focus);
+  await expectNoAccessibilityViolations(sidePanel);
+
+  await focus
+    .getByRole('button', { name: 'Start workflow: Accessible reward journey' })
+    .click();
+  await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await focus.getByRole('button', { name: 'Pause' }).click();
+  const pausedSession = focus.locator('.active-session');
+  await expect(pausedSession).toHaveAttribute('data-session-state', 'paused');
+  await expect(pausedSession.locator('.session-countdown')).toHaveCSS(
+    'color',
+    'rgb(47, 123, 92)',
+  );
+  await focus.getByRole('button', { name: 'Resume' }).click();
+  await expect(pausedSession).toHaveAttribute('data-session-state', 'running');
+  await sidePanel.reload();
+  await expect(sidePanel.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expectNoAccessibilityViolations(focus);
+  await expectNoAccessibilityViolations(sidePanel);
+  await sidePanel.getByRole('button', { name: 'Back to workflows' }).click();
+  await expect(
+    sidePanel.getByRole('region', { name: 'Active session summary' }),
+  ).toBeVisible();
+  await expectNoAccessibilityViolations(sidePanel);
+  await sidePanel.getByRole('button', { name: 'Return to session' }).click();
+  await expect(sidePanel.getByRole('button', { name: 'Pause' })).toBeVisible();
+
+  await expireActiveSessionDeadline(focus);
+  await expect(focus.getByText('Transitioning to the next phase…')).toBeVisible(
+    {
+      timeout: 15_000,
+    },
+  );
+  await expireActiveSessionDeadline(focus);
+  const reward = focus.getByRole('dialog', { name: 'Reward unlocked' });
+  await expect(reward).toBeVisible({ timeout: 15_000 });
+  await expectNoAccessibilityViolations(focus);
+
+  await reward.getByRole('button', { name: 'Roll dice' }).click();
+  await focus.getByTestId('reward-dice-video').dispatchEvent('error');
+  await reward.getByRole('button', { name: 'Continue' }).click();
+  await expect(focus.getByText('Bonus · Accessible Bonus')).toBeVisible();
+  const bonusSession = focus.locator('.active-session');
+  await expect(bonusSession).toHaveAttribute('data-session-segment', 'bonus');
+  await expect(bonusSession.locator('.session-phase')).toHaveCSS(
+    'color',
+    'rgb(129, 77, 15)',
+  );
+  await expect(sidePanel.getByText('Bonus · Accessible Bonus')).toBeVisible();
+  await expectNoAccessibilityViolations(focus);
+  await expectNoAccessibilityViolations(sidePanel);
+
+  await expireActiveSessionDeadline(focus);
+  await expect(focus.getByText('Session complete')).toBeVisible({
+    timeout: 15_000,
+  });
+  await expectNoAccessibilityViolations(focus);
+  await expectNoAccessibilityViolations(sidePanel);
 });
 
 test('configuration tabs support keyboard-only navigation', async ({

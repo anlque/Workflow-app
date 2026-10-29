@@ -90,6 +90,18 @@ Settings application.
 
 ## Focus-local Navigation and Document Title
 
+Focus uses one theme-neutral chrome contract for idle, connecting/error, active,
+paused, transitioning, Reward, Bonus and terminal presentation. Persisted
+Light/Dark/System changes continue to update Workflow Studio and Side Panel but
+do not recolor Focus chrome. Focus still consumes the durable blur, brightness
+and reduced-motion preferences; its appearance utility intentionally exposes
+only the Focus-specific blur and brightness controls.
+
+The Focus header and utility navigation remain mounted across connection and
+Session states. The active timer uses the existing authoritative projection and
+countdown helpers inside a responsive glass surface; narrow and effective-200%
+layouts stack controls without creating another timer or Session state owner.
+
 Workflow launch controls use the visible label **Start workflow** on every
 surface. Their accessible names append the Workflow name so multiple launch
 actions remain distinguishable.

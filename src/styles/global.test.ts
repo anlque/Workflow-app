@@ -132,6 +132,7 @@ describe('visual foundation', () => {
   test('keeps semantic text and indicators above required contrast', () => {
     const light = variablesFor(':root');
     const dark = variablesFor(":root[data-theme='dark']");
+    const focus = variablesFor('.focus-app-surface');
 
     for (const palette of [light, dark]) {
       expect(
@@ -159,6 +160,18 @@ describe('visual foundation', () => {
         ),
       ).toBeGreaterThanOrEqual(3);
     }
+    expect(
+      contrast(
+        focus['--color-focus-ring'] ?? '',
+        focus['--color-surface'] ?? '',
+      ),
+    ).toBeGreaterThanOrEqual(3);
+    expect(
+      contrast(
+        focus['--color-focus-ring'] ?? '',
+        focus['--color-canvas'] ?? '',
+      ),
+    ).toBeGreaterThanOrEqual(3);
   });
 
   test('defines the approved typography and geometry scales', () => {
@@ -247,6 +260,75 @@ describe('visual foundation', () => {
       /@media \(max-width: 34rem\)[\s\S]*?\.workflow-studio-shell__top-bar > \.button\s*\{[^}]*width: 100%;/u,
     );
     expect(stylesheet).toMatch(/@media \(prefers-reduced-motion: reduce\)/u);
+  });
+
+  test('provides theme-neutral Focus and single-column Side Panel contracts', () => {
+    const focus = declarationsFor('.focus-app-surface');
+    const header = declarationsFor('.focus-header');
+    const panel = declarationsFor('.side-panel-app');
+
+    expect(focus).toContain('--color-surface: #f5faf7;');
+    expect(focus).toContain('--color-ink: #f5faf7;');
+    expect(focus).toContain('--color-ink-muted: #c0d0c8;');
+    expect(focus).toContain('--color-primary-hover: #3b8968;');
+    expect(focus).toContain('--color-primary-active: #245f47;');
+    expect(focus).toContain('--color-primary-soft: #c2e9d3;');
+    expect(focus).toContain('--color-accent-soft: #c2e9d3;');
+    expect(focus).toContain('--color-focus-ring: #4a7aff;');
+    expect(focus).toContain('--color-focus: #4a7aff;');
+    expect(focus).toContain('--color-reward-surface: #fff0dc;');
+    expect(focus).toContain('--color-reward-foreground: #814d0f;');
+    expect(focus).toContain('--color-danger-surface: #fff4f1;');
+    expect(focus).toContain('--color-danger-soft: #fff4f1;');
+    expect(focus).toContain('--color-danger-foreground: #843c30;');
+    expect(focus).toContain('--color-control-border: #718b80;');
+    expect(focus).toContain('--color-selected-indicator: #2f7b5c;');
+    expect(focus).toContain('color-scheme: light;');
+    expect(focus).toContain('background: var(--color-canvas);');
+    expect(declarationsFor('.focus-app__content')).toContain(
+      '--color-ink: #10271f;',
+    );
+    expect(header).toContain('justify-content: space-between;');
+    expect(panel).toContain('overflow-x: hidden;');
+    expect(stylesheet).toMatch(
+      /\.compact-session-summary__identity span\s*\{[^}]*color: var\(--color-ink\);/u,
+    );
+    expect(stylesheet).toMatch(
+      /@media \(max-width: 40rem\)[\s\S]*?\.focus-header\s*\{[^}]*align-items: stretch;[^}]*flex-direction: column;/u,
+    );
+    expect(stylesheet).toMatch(
+      /@media \(max-width: 40rem\)[\s\S]*?\.focus-header\s*\{[^}]*position: relative;/u,
+    );
+    expect(stylesheet).toMatch(
+      /@media \(max-width: 40rem\)[\s\S]*?\.focus-app-surface\s*\{[^}]*grid-template-rows: auto minmax\(0, 1fr\);/u,
+    );
+    expect(stylesheet).toMatch(
+      /@media \(max-width: 40rem\)[\s\S]*?\.focus-app__utility-actions\s*\{[^}]*width: 100%;[^}]*flex-wrap: wrap;/u,
+    );
+    expect(stylesheet).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.focus-app__content:has\(\.active-session\[data-transitioning='true'\]\)/u,
+    );
+  });
+
+  test('uses the approved circular Focus timer panel with a narrow fallback', () => {
+    const timer = declarationsFor('.focus-app__content');
+    const reward = declarationsFor('.dialog--reward');
+
+    expect(timer).toContain('aspect-ratio: 1;');
+    expect(timer).toContain(
+      'width: min(45.375rem, calc(100vw - 2rem), calc(100dvh - 2rem));',
+    );
+    expect(timer).toContain('border-radius: 50%;');
+    expect(timer).toContain('place-items: center;');
+    expect(reward).toContain(
+      'width: min(45.375rem, calc(100vw - 2rem), calc(100dvh - 2rem));',
+    );
+    expect(reward).toContain(
+      'min-height: min(45.375rem, calc(100vw - 2rem), calc(100dvh - 2rem));',
+    );
+    expect(stylesheet).toMatch(
+      /@media \(max-width: 40rem\)[\s\S]*?\.focus-app__content\s*\{[^}]*aspect-ratio: auto;[^}]*border-radius: var\(--radius-surface\);/u,
+    );
   });
 
   test('provides the approved phase sequence and atmospheric preview contracts', () => {

@@ -46,6 +46,25 @@ import { useFocusSpaceShortcut } from './useFocusSpaceShortcut';
 
 const LazyWorkflowStudio = lazy(() => import('./LazyWorkflowStudio'));
 
+function FocusHeader({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <header className="focus-header">
+      <div className="focus-header__brand" aria-label="Locusora focus">
+        <img
+          className="brand-logo"
+          src="/brand/locusora-mark.svg"
+          alt=""
+          aria-hidden="true"
+        />
+        <span>Locusora</span>
+      </div>
+      <nav className="focus-app__utility-actions" aria-label="Focus controls">
+        {children}
+      </nav>
+    </header>
+  );
+}
+
 export type FocusDependencies = Readonly<{
   preferences: DocumentPreferences;
   sounds: UiSoundPlayer;
@@ -213,20 +232,41 @@ export function FocusApp({
     preferences.muteCuesWithMusic,
   ]);
 
-  let focusSurface: ReactNode;
+  let focusSurface: Readonly<{ header: ReactNode; main: ReactNode }>;
   if (projection.connection === 'connecting') {
-    focusSurface = <p role="status">Connecting to your session…</p>;
+    focusSurface = {
+      header: <FocusHeader>{null}</FocusHeader>,
+      main: (
+        <main className="focus-app focus-app--status">
+          <p className="focus-app__status" role="status">
+            Connecting to your session…
+          </p>
+        </main>
+      ),
+    };
   } else if (projection.connection === 'error') {
-    focusSurface = <p role="alert">{projection.error}</p>;
+    focusSurface = {
+      header: <FocusHeader>{null}</FocusHeader>,
+      main: (
+        <main className="focus-app focus-app--status">
+          <p
+            className="feedback feedback--error focus-app__status"
+            role="alert"
+          >
+            {projection.error}
+          </p>
+        </main>
+      ),
+    };
   } else if (
     projection.session === null ||
     ((projection.session.status === 'completed' ||
       projection.session.status === 'stopped') &&
       dismissedTerminalSessionId === projection.session.id)
   ) {
-    focusSurface = (
-      <main className="focus-app focus-app--empty">
-        <div className="focus-app__utility-actions">
+    focusSurface = {
+      header: (
+        <FocusHeader>
           <Button
             buttonRef={studioFallbackRef}
             variant="quiet"
@@ -251,20 +291,24 @@ export function FocusApp({
           >
             {sidePanel.isOpen ? 'Close side panel' : 'Open side panel'}
           </Button>
-        </div>
-        <IdleFocusLauncher
-          dependencies={dependencies}
-          activateSounds={activateSounds}
-          openStudio={openStudio}
-        />
-      </main>
-    );
+        </FocusHeader>
+      ),
+      main: (
+        <main className="focus-app focus-app--empty">
+          <IdleFocusLauncher
+            dependencies={dependencies}
+            activateSounds={activateSounds}
+            openStudio={openStudio}
+          />
+        </main>
+      ),
+    };
   } else {
     const session = projection.session;
     const segment = getActiveSessionSegment(session);
-    focusSurface = (
-      <main className="focus-app">
-        <div className="focus-app__utility-actions">
+    focusSurface = {
+      header: (
+        <FocusHeader>
           <Button
             buttonRef={studioFallbackRef}
             variant="quiet"
@@ -357,67 +401,74 @@ export function FocusApp({
           >
             {sidePanel.isOpen ? 'Close side panel' : 'Open side panel'}
           </Button>
-        </div>
-        <FocusEnvironment
-          environment={segment.environment}
-          reducedMotion={reducedMotion}
-          playing={session.status === 'running'}
-          volume={effectiveAmbientVolume(audioSettings())}
-          backgroundBlurPx={preferences.backgroundBlurPx}
-          backgroundBrightnessPercent={preferences.backgroundBrightnessPercent}
-          loadAssetUrl={dependencies.loadAssetUrl}
-          releaseAssetUrl={dependencies.releaseAssetUrl}
-        />
-        <div className="focus-app__content">
-          <ActiveSessionView
-            session={session}
-            dialogsEnabled={!studioOpen}
+        </FocusHeader>
+      ),
+      main: (
+        <main className="focus-app">
+          <FocusEnvironment
+            environment={segment.environment}
             reducedMotion={reducedMotion}
-            onPhaseBoundary={dependencies.sounds.playBell}
-            rewardInteraction={{
-              onRoll: dependencies.sounds.playDiceRoll,
-              rollReward: dependencies.rollReward,
-              rerollReward: dependencies.rerollReward,
-              continueReward: dependencies.continueReward,
-              skipReward: dependencies.skipReward,
-            }}
-            onPause={async (id) => {
-              void activateSounds();
-              await dependencies.pause(id);
-            }}
-            onResume={async (id) => {
-              void activateSounds();
-              await dependencies.resume(id);
-            }}
-            onRestartPhase={dependencies.restartPhase}
-            onRestartWorkflow={dependencies.restartWorkflow}
-            onSkipPhase={dependencies.skipPhase}
-            onStop={async (id) => {
-              void activateSounds();
-              await dependencies.stop(id);
-            }}
-            onBackToWorkflows={() => {
-              setDismissedTerminalSessionId(session.id);
-            }}
+            playing={session.status === 'running'}
+            volume={effectiveAmbientVolume(audioSettings())}
+            backgroundBlurPx={preferences.backgroundBlurPx}
+            backgroundBrightnessPercent={
+              preferences.backgroundBrightnessPercent
+            }
+            loadAssetUrl={dependencies.loadAssetUrl}
+            releaseAssetUrl={dependencies.releaseAssetUrl}
           />
-          {spaceShortcutError === null ? null : (
-            <p className="feedback feedback--error" role="alert">
-              {spaceShortcutError}
-            </p>
-          )}
-        </div>
-      </main>
-    );
+          <div className="focus-app__content">
+            <ActiveSessionView
+              session={session}
+              dialogsEnabled={!studioOpen}
+              reducedMotion={reducedMotion}
+              onPhaseBoundary={dependencies.sounds.playBell}
+              rewardInteraction={{
+                onRoll: dependencies.sounds.playDiceRoll,
+                rollReward: dependencies.rollReward,
+                rerollReward: dependencies.rerollReward,
+                continueReward: dependencies.continueReward,
+                skipReward: dependencies.skipReward,
+              }}
+              onPause={async (id) => {
+                void activateSounds();
+                await dependencies.pause(id);
+              }}
+              onResume={async (id) => {
+                void activateSounds();
+                await dependencies.resume(id);
+              }}
+              onRestartPhase={dependencies.restartPhase}
+              onRestartWorkflow={dependencies.restartWorkflow}
+              onSkipPhase={dependencies.skipPhase}
+              onStop={async (id) => {
+                void activateSounds();
+                await dependencies.stop(id);
+              }}
+              onBackToWorkflows={() => {
+                setDismissedTerminalSessionId(session.id);
+              }}
+            />
+            {spaceShortcutError === null ? null : (
+              <p className="feedback feedback--error" role="alert">
+                {spaceShortcutError}
+              </p>
+            )}
+          </div>
+        </main>
+      ),
+    };
   }
 
   return (
-    <div className="focus-document">
+    <div className="focus-document" data-focus-theme="neutral">
       <div
         className="focus-app-surface"
         inert={studioOpen ? true : undefined}
         aria-hidden={studioOpen ? true : undefined}
       >
-        {focusSurface}
+        {focusSurface.header}
+        {focusSurface.main}
       </div>
       {studioRequested ? (
         <WorkflowStudioOverlay

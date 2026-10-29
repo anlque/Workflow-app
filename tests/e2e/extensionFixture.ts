@@ -8,6 +8,14 @@ export type ExtensionUrls = Readonly<{
   focus: string;
 }>;
 
+export async function openNewWorkflow(page: Page): Promise<void> {
+  const back = page.getByRole('button', { name: 'Back to workflows' });
+  const create = page.getByRole('button', { name: 'New workflow' });
+  await back.or(create).waitFor();
+  if (await back.isVisible()) await back.click();
+  await create.click();
+}
+
 type ExtensionFixtures = Readonly<{
   context: BrowserContext;
   extensionId: string;

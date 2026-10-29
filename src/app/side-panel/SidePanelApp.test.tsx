@@ -49,6 +49,80 @@ function dependencies(
 }
 
 describe('SidePanelApp', () => {
+  test('keeps the Side Panel shell visible during initial catalog loading', () => {
+    const deps = dependencies();
+    Object.assign(deps, {
+      listWorkflows: () => new Promise<never>(() => undefined),
+    });
+
+    render(<SidePanelApp dependencies={deps} />);
+
+    expect(screen.getByRole('banner')).toBeVisible();
+    expect(screen.getByRole('main')).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading Workflows');
+  });
+
+  test('keeps the shell visible and recovers after initial catalog failure', async () => {
+    const user = userEvent.setup();
+    const deps = dependencies();
+    const listWorkflows = vi
+      .fn<SidePanelDependencies['listWorkflows']>()
+      .mockRejectedValueOnce(new Error('Catalog unavailable.'))
+      .mockResolvedValueOnce([]);
+    Object.assign(deps, { listWorkflows });
+
+    render(<SidePanelApp dependencies={deps} />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Catalog unavailable.',
+    );
+    expect(screen.getByRole('banner')).toBeVisible();
+    expect(screen.getByRole('main')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(
+      await screen.findByText('Build your first focus rhythm.'),
+    ).toBeVisible();
+    expect(listWorkflows).toHaveBeenCalledTimes(2);
+  });
+
+  test('does not hide an active Session when the catalog fails', async () => {
+    const workflow = createWorkflow({
+      id: 'panel-catalog-failure-workflow',
+      name: 'Keep session visible',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    const session = createSession(
+      'panel-catalog-failure-session',
+      workflow,
+      1_000,
+    );
+    const deps = dependencies([], session);
+    Object.assign(deps, {
+      listWorkflows: () => Promise.reject(new Error('Catalog unavailable.')),
+    });
+
+    render(<SidePanelApp dependencies={deps} />);
+
+    expect(await screen.findByRole('button', { name: 'Pause' })).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent('Catalog unavailable.');
+    expect(screen.getByRole('banner')).toBeVisible();
+  });
+
+  test('renders the themed single-column Side Panel shell', async () => {
+    const { container } = render(
+      <SidePanelApp dependencies={dependencies()} />,
+    );
+
+    await screen.findByText('Build your first focus rhythm.');
+    expect(container.querySelector('.side-panel-app')).toHaveAttribute(
+      'data-surface',
+      'side-panel',
+    );
+    expect(screen.getByRole('banner')).toBeVisible();
+    expect(screen.getByRole('main')).toBeVisible();
+  });
   test('routes ordinary, Bonus, and Reward skips once with exact targets', async () => {
     const user = userEvent.setup();
     const rewarded = createWorkflow({
@@ -302,7 +376,7 @@ describe('SidePanelApp', () => {
     expect(deps.openFocusView).toHaveBeenCalledOnce();
   });
 
-  test('shows mirrored controls for an active Session', async () => {
+  test('shows mirrored controls in the active Session surface', async () => {
     const workflow = createWorkflow({
       id: 'workflow-1',
       name: 'Deep work',
@@ -312,7 +386,7 @@ describe('SidePanelApp', () => {
       [workflow],
       createSession('session-1', workflow, Date.now()),
     );
-    render(<SidePanelApp dependencies={deps} />);
+    const { container } = render(<SidePanelApp dependencies={deps} />);
 
     expect(
       await screen.findByRole('heading', { name: 'Deep work' }),
@@ -321,6 +395,10 @@ describe('SidePanelApp', () => {
       screen.getByRole('button', { name: 'Open focus view' }),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Pause' })).toBeVisible();
+    expect(container.querySelector('.side-panel-app')).toHaveAttribute(
+      'data-view',
+      'session',
+    );
   });
 
   test('keeps active Session content available when Focus navigation fails and retries', async () => {
@@ -368,6 +446,11 @@ describe('SidePanelApp', () => {
 
     await user.click(
       await screen.findByRole('button', { name: 'Back to workflows' }),
+    );
+
+    expect(document.querySelector('.side-panel-app')).toHaveAttribute(
+      'data-view',
+      'workflows',
     );
 
     expect(

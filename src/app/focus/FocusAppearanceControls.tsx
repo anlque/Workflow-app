@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { Theme } from '@/features/settings';
-
 import type { SettingsPatch } from './createSettingsUpdater';
 
 type AppearancePreferences = Readonly<{
-  theme: Theme;
   backgroundBlurPx: number;
   backgroundBrightnessPercent: number;
 }>;
@@ -36,15 +33,6 @@ export function FocusAppearanceControls({
     };
   }, [preferences.backgroundBlurPx, preferences.backgroundBrightnessPercent]);
 
-  function update(patch: SettingsPatch): void {
-    setError(null);
-    void onUpdate(patch).catch((cause: unknown) => {
-      setError(
-        cause instanceof Error ? cause.message : 'Appearance update failed.',
-      );
-    });
-  }
-
   function commitAppearance(
     field: 'backgroundBlurPx' | 'backgroundBrightnessPercent',
     value: number,
@@ -65,22 +53,6 @@ export function FocusAppearanceControls({
     <details className="focus-appearance">
       <summary>Appearance</summary>
       <div className="focus-appearance__controls">
-        <label>
-          <span>Focus theme</span>
-          <select
-            value={preferences.theme}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              update({
-                theme: value === 'light' || value === 'dark' ? value : 'system',
-              });
-            }}
-          >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </label>
         <label>
           <span>Focus blur</span>
           <input

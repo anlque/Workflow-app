@@ -7,6 +7,7 @@ import { createWorkflow } from '@/features/workflow';
 import {
   continueRewardSession,
   createSession,
+  pauseSession,
   restartSessionWorkflow,
   rollSessionReward,
   stopSession,
@@ -47,6 +48,122 @@ function interaction() {
 }
 
 describe('ActiveSessionView', () => {
+  test.each([
+    [
+      'running',
+      createSession(
+        'presentation-running-session',
+        createWorkflow({
+          id: 'presentation-running-workflow',
+          name: 'Presentation running',
+          phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+        }),
+        1_000,
+      ),
+    ],
+    [
+      'paused',
+      pauseSession(
+        createSession(
+          'presentation-paused-session',
+          createWorkflow({
+            id: 'presentation-paused-workflow',
+            name: 'Presentation paused',
+            phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+          }),
+          1_000,
+        ),
+        2_000,
+      ),
+    ],
+    [
+      'transitioning',
+      deriveSessionState(
+        createSession(
+          'presentation-transition-session',
+          createWorkflow({
+            id: 'presentation-transition-workflow',
+            name: 'Presentation transition',
+            phases: [
+              { type: 'focus', durationSeconds: 1, environment: {} },
+              { type: 'break', durationSeconds: 60, environment: {} },
+            ],
+          }),
+          1_000,
+        ),
+        2_000,
+      ),
+    ],
+  ] as const)(
+    'exposes the authoritative %s presentation state',
+    (state, session) => {
+      const { container } = render(
+        <ActiveSessionView session={session} now={() => 2_000} {...actions} />,
+      );
+
+      expect(container.querySelector('.active-session')).toHaveAttribute(
+        'data-session-state',
+        state,
+      );
+    },
+  );
+
+  test('distinguishes ordinary and Bonus presentation segments', () => {
+    const ordinary = createSession(
+      'presentation-state-session',
+      createWorkflow({
+        id: 'presentation-state-workflow',
+        name: 'Presentation state',
+        phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+      }),
+      1_000,
+    );
+    const bonusWorkflow = createWorkflow({
+      id: 'presentation-bonus-workflow',
+      name: 'Presentation Bonus',
+      phases: [{ type: 'focus', durationSeconds: 1, environment: {} }],
+      rewardDice: {
+        frequency: 1,
+        sides: [
+          {
+            icon: '☕',
+            title: 'Tea',
+            bonusPhase: {
+              name: 'Tea break',
+              durationSeconds: 30,
+              environment: {},
+            },
+          },
+          { icon: '🌿', title: 'Fresh air' },
+        ],
+      },
+    });
+    const reward = deriveSessionState(
+      createSession('presentation-bonus-session', bonusWorkflow, 1_000),
+      3_000,
+    );
+    const bonus = continueRewardSession(
+      rollSessionReward(reward, () => 0, 'presentation-bonus-roll'),
+      4_000,
+      'presentation-bonus-continue',
+    );
+
+    const { container, rerender } = render(
+      <ActiveSessionView session={ordinary} now={() => 1_000} {...actions} />,
+    );
+    expect(container.querySelector('.active-session')).toHaveAttribute(
+      'data-session-segment',
+      'ordinary',
+    );
+
+    rerender(
+      <ActiveSessionView session={bonus} now={() => 4_000} {...actions} />,
+    );
+    expect(container.querySelector('.active-session')).toHaveAttribute(
+      'data-session-segment',
+      'bonus',
+    );
+  });
   test('shows phase and anchor-derived countdown', () => {
     render(
       <ActiveSessionView
@@ -189,15 +306,20 @@ describe('ActiveSessionView', () => {
     ],
   ] as const)(
     'offers Back to workflows for a %s Session',
-    async (_, session) => {
+    async (state, session) => {
       const user = userEvent.setup();
       const onBackToWorkflows = vi.fn();
-      render(
+      const { container } = render(
         <ActiveSessionView
           session={session}
           onBackToWorkflows={onBackToWorkflows}
           {...actions}
         />,
+      );
+
+      expect(container.querySelector('.active-session')).toHaveAttribute(
+        'data-session-state',
+        state,
       );
 
       await user.click(

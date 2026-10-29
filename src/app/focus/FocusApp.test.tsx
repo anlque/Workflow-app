@@ -123,6 +123,47 @@ function dependencies(
 }
 
 describe('FocusApp', () => {
+  test('renders a theme-neutral Focus shell with branded navigation', async () => {
+    const { container } = render(
+      <FocusApp dependencies={dependencies(null)} />,
+    );
+
+    await screen.findByRole('heading', { name: 'Choose a Workflow' });
+    expect(container.querySelector('.focus-document')).toHaveAttribute(
+      'data-focus-theme',
+      'neutral',
+    );
+    expect(screen.getByRole('banner')).toBeVisible();
+    expect(
+      screen.getByRole('navigation', { name: 'Focus controls' }),
+    ).toBeVisible();
+    expect(screen.queryByLabelText('Focus theme')).not.toBeInTheDocument();
+  });
+
+  test('keeps the Focus shell available while Session projection connects or fails', async () => {
+    let rejectConnection: ((cause: Error) => void) | undefined;
+    const deps = dependencies(null);
+    Object.assign(deps.sessions, {
+      getActive: () =>
+        new Promise<null>((_resolve, reject) => {
+          rejectConnection = reject;
+        }),
+    });
+    render(<FocusApp dependencies={deps} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Connecting to your session',
+    );
+    expect(screen.getByRole('banner')).toBeVisible();
+
+    act(() => {
+      rejectConnection?.(new Error('Background unavailable.'));
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Background unavailable.',
+    );
+    expect(screen.getByRole('banner')).toBeVisible();
+  });
   test('toggles authoritative Pause and Resume with Space from live preferences', async () => {
     const workflow = createWorkflow({
       id: 'focus-space-workflow',

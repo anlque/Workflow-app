@@ -116,7 +116,11 @@ export function ActiveSessionView({
 
   if (session.status === 'completed' || session.status === 'stopped') {
     return (
-      <section className="active-session" aria-live="polite">
+      <section
+        className="active-session"
+        aria-live="polite"
+        data-session-state={session.status}
+      >
         <h1>{workflow.name}</h1>
         <p className="session-terminal">
           {session.status === 'completed'
@@ -137,6 +141,8 @@ export function ActiveSessionView({
   return (
     <section
       className="active-session"
+      data-session-state={session.status}
+      data-session-segment={segment.isBonus ? 'bonus' : 'ordinary'}
       data-transitioning={
         session.status === 'transitioning' ? 'true' : undefined
       }

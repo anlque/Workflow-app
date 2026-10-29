@@ -117,17 +117,14 @@ export function SidePanelApp({
     }
   }, [activeSession, hasActiveSession]);
 
-  if (workflows === null && refreshError !== null) {
-    return (
-      <p className="feedback feedback--error" role="alert">
-        {refreshError}
-      </p>
-    );
-  }
-  if (workflows === null) return <p role="status">Loading Workflows…</p>;
-
   return (
-    <main className="side-panel-app">
+    <main
+      className="side-panel-app"
+      data-surface="side-panel"
+      data-view={
+        hasActiveSession && view === 'session' ? 'session' : 'workflows'
+      }
+    >
       <header className="side-panel-header">
         <img
           className="brand-logo"
@@ -160,6 +157,11 @@ export function SidePanelApp({
       {error === null ? null : (
         <p className="feedback feedback--error" role="alert">
           {error}
+        </p>
+      )}
+      {refreshError === null ? null : (
+        <p className="feedback feedback--error" role="alert">
+          {refreshError}
         </p>
       )}
       {!hasActiveSession || view !== 'session' ? null : (
@@ -204,13 +206,22 @@ export function SidePanelApp({
           </Button>
         </section>
       )}
-      {view === 'workflows' ? (
+      {view === 'workflows' && workflows === null ? (
+        refreshError === null ? (
+          <p role="status">Loading Workflows…</p>
+        ) : (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void reload();
+            }}
+          >
+            Retry
+          </Button>
+        )
+      ) : null}
+      {view === 'workflows' && workflows !== null ? (
         <>
-          {refreshError === null ? null : (
-            <p className="feedback feedback--error" role="alert">
-              {refreshError}
-            </p>
-          )}
           <WorkflowLibrary
             workflows={workflows}
             onCreate={async (mode) => {

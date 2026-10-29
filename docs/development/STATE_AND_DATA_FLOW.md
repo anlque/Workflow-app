@@ -158,6 +158,9 @@ Local React state owns values that do not need cross-context durability:
 
 - Options `workflows | assets | settings` tab;
 - side-panel `session | workflows` view;
+- Focus shell presentation state derived from the current connection/Session
+  projection; Focus chrome is theme-neutral while blur, brightness and reduced
+  motion remain durable Settings;
 - selected Workflow and unsaved editor draft;
 - open dialogs and roll animation progress;
 - pending, success and error feedback;

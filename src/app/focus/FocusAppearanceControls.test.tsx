@@ -11,7 +11,21 @@ const preferences = {
 };
 
 describe('FocusAppearanceControls', () => {
-  test('submits accessible theme and appearance patches', async () => {
+  test('keeps Focus theme-neutral while exposing appearance controls', async () => {
+    const user = userEvent.setup();
+    render(
+      <FocusAppearanceControls
+        preferences={preferences}
+        onUpdate={() => Promise.resolve()}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Focus theme')).not.toBeInTheDocument();
+    await user.click(screen.getByText('Appearance'));
+    expect(screen.getByLabelText('Focus blur')).toBeVisible();
+    expect(screen.getByLabelText('Focus brightness')).toBeVisible();
+  });
+  test('does not expose an application theme control', async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn(() => Promise.resolve());
     render(
@@ -19,9 +33,9 @@ describe('FocusAppearanceControls', () => {
     );
 
     await user.click(screen.getByText('Appearance'));
-    await user.selectOptions(screen.getByLabelText('Focus theme'), 'dark');
-    expect(onUpdate).toHaveBeenCalledWith({ theme: 'dark' });
-    expect(screen.getAllByRole('combobox')).toHaveLength(1);
+    expect(screen.queryByLabelText('Focus theme')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('combobox')).toHaveLength(0);
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 
   test('drafts multi-step pointer and keyboard changes and commits each interaction once', () => {
@@ -94,7 +108,9 @@ describe('FocusAppearanceControls', () => {
       />,
     );
     await user.click(screen.getByText('Appearance'));
-    await user.selectOptions(screen.getByLabelText('Focus theme'), 'light');
+    const blur = screen.getByLabelText('Focus blur');
+    fireEvent.change(blur, { target: { value: '8' } });
+    fireEvent.pointerUp(blur);
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Storage unavailable.',
     );
