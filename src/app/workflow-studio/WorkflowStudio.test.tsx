@@ -106,6 +106,16 @@ function dependencies(
 }
 
 describe('WorkflowStudio', () => {
+  test('shows library context in the Studio top bar', async () => {
+    render(<WorkflowStudio dependencies={dependencies()} />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Workflow Library' }),
+    ).toBeVisible();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByText('Locusora')).toBeVisible();
+  });
+
   test.each(['Assets', 'Settings'])(
     'preserves a new Detailed draft and selected Phase across Workflows → %s → Workflows',
     async (destination) => {

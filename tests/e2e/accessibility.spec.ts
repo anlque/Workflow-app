@@ -270,13 +270,14 @@ test('Workflow Studio shell is responsive without horizontal overflow', async ({
   const options = await context.newPage();
   await options.setViewportSize({ width: 1280, height: 800 });
   await options.goto(extensionUrls.options);
-  const shellBody = options.locator('.workflow-studio-shell__body');
+  const shellBody = options.locator('.workflow-studio-shell');
   const topBar = options.locator('.workflow-studio-shell__top-bar');
   const sidebar = options.locator('.workflow-studio-shell__sidebar');
   const tablist = options.getByRole('tablist', { name: 'Configuration' });
   const workflowTab = options.getByRole('tab', { name: 'Workflows' });
   const assetsTab = options.getByRole('tab', { name: 'Assets' });
   await expect(shellBody).toBeVisible();
+  await expect(options.getByRole('heading', { level: 1 })).toHaveCount(1);
 
   expect(
     await shellBody.evaluate(
@@ -326,7 +327,9 @@ test('Workflow Studio shell is responsive without horizontal overflow', async ({
   ).toBe(true);
 
   await options.setViewportSize({ width: 500, height: 800 });
-  const topBarIdentity = topBar.locator(':scope > .app-header__identity');
+  const topBarIdentity = topBar.locator(
+    ':scope > .workflow-studio-shell__context',
+  );
   const topBarButton = topBar.locator(':scope > .button');
   expect(
     await shellBody.evaluate(

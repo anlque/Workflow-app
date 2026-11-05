@@ -43,16 +43,28 @@ export function WorkflowStudioShell({
 
   return (
     <div className="workflow-studio-shell">
-      <header className="workflow-studio-shell__top-bar">{topBar}</header>
-      <div className="workflow-studio-shell__body">
-        <div className="workflow-studio-shell__sidebar">
-          <nav
-            aria-label="Studio sections"
-            className="workflow-studio-shell__navigation"
-          >
-            {navigation(orientation)}
-          </nav>
+      <aside
+        className="workflow-studio-shell__sidebar"
+        aria-label="Workflow Studio navigation"
+      >
+        <div className="workflow-studio-shell__brand">
+          <img
+            className="brand-logo"
+            src="/brand/locusora-mark.svg"
+            alt=""
+            aria-hidden="true"
+          />
+          <span className="workflow-studio-shell__brand-name">Locusora</span>
         </div>
+        <nav
+          aria-label="Studio sections"
+          className="workflow-studio-shell__navigation"
+        >
+          {navigation(orientation)}
+        </nav>
+      </aside>
+      <div className="workflow-studio-shell__workspace">
+        <header className="workflow-studio-shell__top-bar">{topBar}</header>
         <main className="workflow-studio-shell__content workflow-studio">
           {children}
         </main>

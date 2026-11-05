@@ -8,11 +8,13 @@ const stylesheet = readFileSync(
 );
 
 function declarationsFor(selector: string) {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-  const body = new RegExp(
-    `${escaped}\\s*\\{(?<body>[\\s\\S]*?)\\n\\}`,
-    'u',
-  ).exec(stylesheet)?.groups?.['body'];
+  const normalize = (value: string) => value.replace(/\s+/gu, ' ').trim();
+  const target = normalize(selector);
+  const source = stylesheet.replace(/@import\s+[^;]+;/gu, '');
+  const bodies = [...source.matchAll(/([^{}]+)\{([^{}]*)\}/gu)]
+    .filter((match) => match[1]?.split(',').map(normalize).includes(target))
+    .map((match) => match[2] ?? '');
+  const body = bodies.length === 0 ? undefined : bodies.join('\n');
 
   expect(body, `missing CSS block for ${selector}`).toBeDefined();
   return body ?? '';
@@ -205,7 +207,7 @@ describe('visual foundation', () => {
       'background: var(--color-primary);',
     );
     expect(declarationsFor('.button--secondary')).toContain(
-      'background: var(--color-chrome);',
+      'background: var(--color-surface);',
     );
     expect(declarationsFor('.button--quiet')).toContain(
       'background: transparent;',
@@ -226,16 +228,18 @@ describe('visual foundation', () => {
     expect(stylesheet).toMatch(
       /\.field input,[\s\S]*?border: 1px solid var\(--color-control-border\);/u,
     );
-    expect(declarationsFor(".tab[aria-selected='true']")).toContain(
-      'border-color: var(--color-selected-indicator);',
-    );
+    expect(
+      declarationsFor(
+        ".editor-section-tabs > [role='tab'][aria-selected='true']",
+      ),
+    ).toContain('border-bottom-color: var(--color-selected-indicator);');
   });
 
   test('provides responsive Workflow Studio shell contracts without page overflow', () => {
     expect(declarationsFor('.workflow-studio-shell')).toContain(
       'min-width: 0;',
     );
-    expect(declarationsFor('.workflow-studio-shell__body')).toContain(
+    expect(declarationsFor('.workflow-studio-shell')).toContain(
       'grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr);',
     );
     expect(declarationsFor('.workflow-studio-shell__content')).toContain(
@@ -248,7 +252,7 @@ describe('visual foundation', () => {
       'flex-direction: column;',
     );
     expect(stylesheet).toMatch(
-      /@media \(max-width: 52rem\)[\s\S]*?\.workflow-studio-shell__body\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/u,
+      /@media \(max-width: 52rem\)[\s\S]*?\.workflow-studio-shell\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/u,
     );
     expect(stylesheet).toMatch(
       /@media \(max-width: 52rem\)[\s\S]*?\.workflow-studio-shell__tabs\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u,
@@ -260,6 +264,47 @@ describe('visual foundation', () => {
       /@media \(max-width: 34rem\)[\s\S]*?\.workflow-studio-shell__top-bar > \.button\s*\{[^}]*width: 100%;/u,
     );
     expect(stylesheet).toMatch(/@media \(prefers-reduced-motion: reduce\)/u);
+  });
+
+  test('matches exact selectors rather than a more specific nested selector', () => {
+    expect(declarationsFor('.button--secondary')).toContain(
+      'background: var(--color-surface);',
+    );
+    expect(declarationsFor('.button--secondary')).not.toContain(
+      'color: #10271f;',
+    );
+    expect(
+      declarationsFor('.focus-app-surface .dialog .button--secondary'),
+    ).toContain('color: #10271f;');
+  });
+
+  test('uses the approved shared shell, hierarchy, tabs and semantic surfaces', () => {
+    expect(declarationsFor('.workflow-studio-shell__sidebar')).toContain(
+      'grid-template-rows: auto minmax(0, 1fr);',
+    );
+    expect(declarationsFor('.workflow-studio-shell__workspace')).toContain(
+      'grid-template-rows: auto minmax(0, 1fr);',
+    );
+    expect(declarationsFor('.workflow-studio-shell__top-bar h1')).toContain(
+      'font-size: clamp(2rem, 3vw, 2.25rem);',
+    );
+    expect(
+      declarationsFor(
+        ".workflow-studio-shell__tabs .tab[aria-selected='true']",
+      ),
+    ).toContain('border-color: transparent;');
+    expect(declarationsFor('.editor-section-tabs')).toContain(
+      'border-bottom: 1px solid var(--color-border);',
+    );
+    expect(declarationsFor('.settings-group')).toContain(
+      'background: var(--color-surface);',
+    );
+    expect(declarationsFor('.phase-editor')).toContain(
+      'background: var(--color-surface);',
+    );
+    expect(
+      declarationsFor('.focus-app-surface .dialog .button--secondary'),
+    ).toContain('background: #ffffff;');
   });
 
   test('provides theme-neutral Focus and single-column Side Panel contracts', () => {

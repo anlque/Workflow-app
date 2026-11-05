@@ -267,25 +267,51 @@ export function WorkflowStudio({
   const sidePanelLabel = sidePanel.isOpen
     ? 'Close side panel'
     : 'Open side panel';
+  const studioContext =
+    activeTab === 'assets'
+      ? { title: 'Asset Library', detail: 'Manage local images and audio.' }
+      : activeTab === 'settings'
+        ? {
+            title: 'Application settings',
+            detail: 'Appearance, audio and data.',
+          }
+        : workflowLibraryOpen
+          ? {
+              title: 'Workflow Library',
+              detail: 'Choose or shape your next focus ritual.',
+            }
+          : selectedWorkflow !== undefined
+            ? {
+                title: selectedWorkflow.name,
+                accessibleTitle: `Current workflow: ${selectedWorkflow.name}`,
+                detail:
+                  selectedWorkflow.mode === 'quick'
+                    ? 'Quick setup'
+                    : 'Detailed setup',
+              }
+            : {
+                title: 'New workflow',
+                detail:
+                  newWorkflowMode === 'quick'
+                    ? 'Quick setup'
+                    : 'Detailed setup',
+              };
 
   return (
     <WorkflowStudioShell
       topBar={
         <>
-          <div className="app-header__identity">
-            <img
-              className="brand-logo"
-              src="/brand/locusora-mark.svg"
-              alt=""
-              aria-hidden="true"
-            />
-            <div>
-              <h1>Locusora</h1>
-              <p>
-                Design the rhythms and environments that help you return to
-                focus.
-              </p>
-            </div>
+          <div className="workflow-studio-shell__context">
+            <h1
+              aria-label={
+                'accessibleTitle' in studioContext
+                  ? studioContext.accessibleTitle
+                  : undefined
+              }
+            >
+              {studioContext.title}
+            </h1>
+            <p>{studioContext.detail}</p>
           </div>
           <Button
             variant="secondary"

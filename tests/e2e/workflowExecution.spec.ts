@@ -102,8 +102,9 @@ test('loads every MVP extension surface in an isolated profile', async ({
   await options.goto(extensionUrls.options);
   await expect(options).toHaveTitle('Locusora Workflow Studio');
   await expect(
-    options.getByRole('heading', { name: 'Locusora' }),
-  ).toBeVisible();
+    options.locator('.workflow-studio-shell__brand-name'),
+  ).toHaveText('Locusora');
+  await expect(options.getByRole('heading', { level: 1 })).toHaveCount(1);
 
   const sidePanel = await context.newPage();
   await sidePanel.goto(extensionUrls.sidePanel);

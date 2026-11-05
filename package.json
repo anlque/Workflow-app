@@ -8,6 +8,8 @@
     "brand:export": "node scripts/brand/export-brand-assets.mjs",
     "brand:capture-screenshots": "pnpm build && node scripts/brand/capture-store-screenshots.mjs",
     "brand:verify": "node scripts/brand/verify-brand-assets.mjs",
+    "visual-parity:capture": "pnpm build && node scripts/visual-parity/captureVisualParity.mjs",
+    "visual-parity:report": "node scripts/visual-parity/createVisualParityReport.mjs",
     "dev": "wxt",
     "build": "wxt build",
     "postinstall": "wxt prepare",

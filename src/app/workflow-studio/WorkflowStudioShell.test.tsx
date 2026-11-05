@@ -5,7 +5,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { WorkflowStudioShell } from './WorkflowStudioShell';
 
 describe('WorkflowStudioShell', () => {
-  test('owns the Studio banner, labeled navigation and main landmark', () => {
+  test('owns the branded rail, contextual banner and main landmark', () => {
     render(
       <WorkflowStudioShell
         topBar={<strong>Workflow Studio</strong>}
@@ -15,13 +15,36 @@ describe('WorkflowStudioShell', () => {
       </WorkflowStudioShell>,
     );
 
+    const brand = screen.getByText('Locusora', {
+      selector: '.workflow-studio-shell__brand-name',
+    });
+    expect(
+      screen.getByRole('complementary', {
+        name: 'Workflow Studio navigation',
+      }),
+    ).toBeVisible();
+    const navigation = screen.getByRole('navigation', {
+      name: 'Studio sections',
+    });
     const banner = screen.getByRole('banner');
+    const main = screen.getByRole('main');
+    expect(brand).toBeVisible();
     expect(banner).toHaveTextContent('Workflow Studio');
     expect(banner).not.toHaveClass('app-header');
+    expect(navigation).toBeVisible();
+    expect(main).toHaveTextContent('Editor');
+    expect(screen.queryAllByRole('heading', { level: 1 })).toHaveLength(0);
     expect(
-      screen.getByRole('navigation', { name: 'Studio sections' }),
-    ).toBeVisible();
-    expect(screen.getByRole('main')).toHaveTextContent('Editor');
+      brand.compareDocumentPosition(navigation) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      navigation.compareDocumentPosition(banner) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      banner.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   test('keeps navigation before content in keyboard order', async () => {
