@@ -6,11 +6,11 @@ import { createWorkflow, type Workflow } from '@/features/workflow';
 
 import { WorkflowLibrary } from './WorkflowLibrary';
 
-function workflow(id: string, name: string): Workflow {
+function workflow(id: string, name: string, durationSeconds = 1_500): Workflow {
   return createWorkflow({
     id,
     name,
-    phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+    phases: [{ type: 'focus', durationSeconds, environment: {} }],
   });
 }
 
@@ -23,6 +23,24 @@ function quickWorkflow(id: string, name: string): Workflow {
       cycleCount: 2,
       focus: { durationSeconds: 1_500, environment: {} },
       shortBreak: { durationSeconds: 300, environment: {} },
+    },
+  });
+}
+
+function rewardWorkflow(id: string, name: string): Workflow {
+  return createWorkflow({
+    id,
+    name,
+    phases: [
+      { type: 'focus', durationSeconds: 1_500, environment: {} },
+      { type: 'break', durationSeconds: 300, environment: {} },
+    ],
+    rewardDice: {
+      frequency: 1,
+      sides: [
+        { icon: 'tea', title: 'Tea' },
+        { icon: 'walk', title: 'Walk' },
+      ],
     },
   });
 }
@@ -95,6 +113,41 @@ describe('WorkflowLibrary', () => {
       'Open Detailed two',
     ]);
   });
+
+  test('shows reliable duration, phase, and Reward summaries without speculative controls', () => {
+    setup([
+      workflow('plain', 'Plain focus'),
+      rewardWorkflow('reward', 'Reward focus'),
+    ]);
+
+    const plain = screen.getByRole('listitem', { name: 'Plain focus' });
+    expect(plain).toHaveTextContent('25 min');
+    expect(plain).toHaveTextContent('1 phase');
+    expect(plain).toHaveTextContent('Reward off');
+
+    const reward = screen.getByRole('listitem', { name: 'Reward focus' });
+    expect(reward).toHaveTextContent('30 min');
+    expect(reward).toHaveTextContent('2 phases');
+    expect(reward).toHaveTextContent('Reward on');
+
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /sort|import/u })).toBeNull();
+  });
+
+  test.each([
+    [1, '1 sec'],
+    [90, '1 min 30 sec'],
+    [3_600, '1 hr'],
+  ])(
+    'preserves significant seconds when formatting a %i-second Workflow',
+    (durationSeconds, expectedDuration) => {
+      setup([workflow('duration', 'Duration example', durationSeconds)]);
+
+      expect(
+        screen.getByRole('listitem', { name: 'Duration example' }),
+      ).toHaveTextContent(expectedDuration);
+    },
+  );
 
   test('omits empty group headings', () => {
     setup([quickWorkflow('quick-1', 'Quick one')]);

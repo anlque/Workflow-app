@@ -243,26 +243,24 @@ test('loads before visibility and synchronizes preferences across open documents
   await expect(focus.getByRole('button', { name: 'Resume' })).toBeVisible();
   await focus.keyboard.press('Space');
   await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
-  await options.getByRole('combobox', { name: 'Theme' }).selectOption('light');
-  await options
-    .getByRole('combobox', { name: 'Reduced motion' })
-    .selectOption('no-preference');
+  await options.getByRole('radio', { name: 'Light' }).check();
+  await options.getByRole('radio', { name: 'Allow motion' }).check();
   await options.getByRole('slider', { name: 'Cue volume' }).fill('42');
   const backgroundBlur = options.getByRole('slider', {
     name: /Background blur/,
   });
   await backgroundBlur.fill('10');
   await backgroundBlur.press('Tab');
-  await expect(options.getByLabel('Theme')).toBeEnabled();
+  await expect(options.getByRole('radio', { name: 'Light' })).toBeEnabled();
   const backgroundBrightness = options.getByRole('slider', {
     name: /Background brightness/,
   });
   await backgroundBrightness.fill('120');
   await backgroundBrightness.press('Tab');
-  await expect(options.getByLabel('Theme')).toBeEnabled();
-  const muteMusic = options.getByRole('checkbox', { name: 'Mute music' });
+  await expect(options.getByRole('radio', { name: 'Light' })).toBeEnabled();
+  const muteMusic = options.getByRole('checkbox', { name: 'Music on' });
   await muteMusic.click();
-  await expect(muteMusic).toBeChecked();
+  await expect(muteMusic).not.toBeChecked();
 
   await expect(focus.getByRole('slider', { name: 'Cue volume' })).toHaveValue(
     '42',
@@ -302,8 +300,8 @@ test('loads before visibility and synchronizes preferences across open documents
     options.getByRole('slider', { name: 'Music volume' }),
   ).toHaveValue('37');
   await expect(
-    options.getByRole('checkbox', { name: 'Mute cues', exact: true }),
-  ).toBeChecked();
+    options.getByRole('checkbox', { name: 'Cues on', exact: true }),
+  ).not.toBeChecked();
 
   for (const page of [options, focus, sidePanel]) {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');

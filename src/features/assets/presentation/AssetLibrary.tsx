@@ -2,7 +2,12 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 
 import { Button } from '@/shared';
 
-import type { Asset, AssetId, AssetKind } from '../domain/Asset';
+import {
+  createAssetId,
+  type Asset,
+  type AssetId,
+  type AssetKind,
+} from '../domain/Asset';
 import type { AssetRoleChangePreview } from '../application/AssetRoleChange';
 import type {
   AssetRetirementChoice,
@@ -54,6 +59,7 @@ export function AssetLibrary({
   createObjectUrl,
   revokeObjectUrl,
 }: AssetLibraryProps) {
+  const initialAsset = assets.find(({ kind }) => kind === 'image') ?? assets[0];
   const [deleting, setDeleting] = useState<Asset | null>(null);
   const deleteTrigger = useRef<HTMLButtonElement | null>(null);
   const library = useRef<HTMLElement | null>(null);
@@ -64,6 +70,21 @@ export function AssetLibrary({
   const restoreRoleFocus = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState<AssetId | undefined>(
+    initialAsset?.id,
+  );
+  const selectedAsset =
+    assets.find(({ id }) => id === selectedAssetId) ?? initialAsset;
+
+  useEffect(() => {
+    if (
+      selectedAssetId !== undefined &&
+      assets.some(({ id }) => id === selectedAssetId)
+    ) {
+      return;
+    }
+    setSelectedAssetId(initialAsset?.id);
+  }, [assets, initialAsset?.id, selectedAssetId]);
 
   async function importFile(
     event: ChangeEvent<HTMLInputElement>,
@@ -114,7 +135,121 @@ export function AssetLibrary({
         : choice.type === 'upload'
           ? choice.input.id
           : 'add';
+    if (choice.type === 'existing') setSelectedAssetId(choice.assetId);
+    else if (choice.type === 'upload')
+      setSelectedAssetId(createAssetId(choice.input.id));
+    else setSelectedAssetId(undefined);
     setDeleting(null);
+  }
+
+  function openRoleDialog(asset: Asset, trigger: HTMLButtonElement): void {
+    roleTrigger.current = trigger;
+    setManagingRole(asset);
+  }
+
+  function openRetirementDialog(
+    asset: Asset,
+    trigger: HTMLButtonElement,
+  ): void {
+    deleteTrigger.current = trigger;
+    setDeleting(asset);
+  }
+
+  function assetGroup(kind: AssetKind, label: string) {
+    const values = assets.filter((asset) => asset.kind === kind);
+    if (values.length === 0) return null;
+    return (
+      <section className="asset-library__group" role="group" aria-label={label}>
+        <h3>{label}</h3>
+        <ul
+          className={`asset-list asset-list--${kind === 'image' ? 'images' : 'audio'}`}
+        >
+          {values.map((asset) => (
+            <li
+              className={`asset-item asset-item--${kind}`}
+              key={asset.id}
+              aria-label={`${asset.kind === 'image' ? 'Image' : 'Audio'}: ${asset.name}`}
+              data-selected={
+                selectedAsset?.id === asset.id ? 'true' : undefined
+              }
+            >
+              {kind === 'image' ? (
+                <button
+                  className="asset-item__select"
+                  type="button"
+                  aria-label={`Select ${asset.name}`}
+                  aria-pressed={selectedAsset?.id === asset.id}
+                  onClick={() => {
+                    setSelectedAssetId(asset.id);
+                  }}
+                >
+                  <span className="asset-preview">
+                    <AssetPreview
+                      asset={asset}
+                      loadBlob={loadBlob}
+                      createObjectUrl={createObjectUrl}
+                      revokeObjectUrl={revokeObjectUrl}
+                    />
+                  </span>
+                  <span className="asset-item__summary">
+                    <strong>{asset.name}</strong>
+                    <span>Image · {formatBytes(asset.byteSize)}</span>
+                    <span>Role: {asset.role ?? 'No Role'}</span>
+                  </span>
+                </button>
+              ) : (
+                <>
+                  <span className="asset-audio-row__preview">
+                    <AssetPreview
+                      asset={asset}
+                      loadBlob={loadBlob}
+                      createObjectUrl={createObjectUrl}
+                      revokeObjectUrl={revokeObjectUrl}
+                    />
+                  </span>
+                  <button
+                    className="asset-audio-row__select"
+                    type="button"
+                    aria-label={`Select ${asset.name}`}
+                    aria-pressed={selectedAsset?.id === asset.id}
+                    onClick={() => {
+                      setSelectedAssetId(asset.id);
+                    }}
+                  >
+                    <strong>{asset.name}</strong>
+                    <span>Audio · {formatBytes(asset.byteSize)}</span>
+                    <span>Role: {asset.role ?? 'No Role'}</span>
+                  </button>
+                </>
+              )}
+              {selectedAsset?.id === asset.id ? null : (
+                <div className="asset-item__actions asset-item__actions--card">
+                  <Button
+                    variant="quiet"
+                    aria-label={`Manage role for ${asset.name}`}
+                    onClick={(event) => {
+                      openRoleDialog(asset, event.currentTarget);
+                    }}
+                  >
+                    Role
+                  </Button>
+                  <Button
+                    data-retirement-asset-id={asset.id}
+                    variant="quiet"
+                    aria-label={`Retire ${asset.name}`}
+                    onClick={(event) => {
+                      openRetirementDialog(asset, event.currentTarget);
+                    }}
+                  >
+                    Retire
+                  </Button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
   }
 
   useEffect(() => {
@@ -173,57 +308,51 @@ export function AssetLibrary({
           <p>Upload a local background image or ambient audio track.</p>
         </div>
       ) : (
-        <ul className="asset-list">
-          {assets.map((asset) => (
-            <li
-              className="asset-item"
-              key={asset.id}
-              aria-label={`${asset.kind === 'image' ? 'Image' : 'Audio'}: ${asset.name}`}
+        <div className="asset-library__workspace">
+          <div className="asset-library__collections">
+            {assetGroup('image', 'Images')}
+            {assetGroup('audio', 'Audio')}
+          </div>
+          {selectedAsset === undefined ? null : (
+            <aside
+              className="asset-library__details"
+              aria-label="Asset details"
             >
-              <div className="asset-preview">
-                <AssetPreview
-                  asset={asset}
-                  loadBlob={loadBlob}
-                  createObjectUrl={createObjectUrl}
-                  revokeObjectUrl={revokeObjectUrl}
-                />
+              <div>
+                <span className="eyebrow">
+                  {selectedAsset.kind === 'image' ? 'Image' : 'Audio'} asset
+                </span>
+                <h3>{selectedAsset.name}</h3>
+                <p>
+                  {selectedAsset.kind === 'image' ? 'Image' : 'Audio'} ·{' '}
+                  {formatBytes(selectedAsset.byteSize)}
+                </p>
+                <p>Role: {selectedAsset.role ?? 'No Role'}</p>
               </div>
-              <div className="asset-item__body">
-                <div>
-                  <strong>{asset.name}</strong>
-                  <p>
-                    {asset.kind === 'image' ? 'Image' : 'Audio'} ·{' '}
-                    {formatBytes(asset.byteSize)}
-                  </p>
-                  <p>Role: {asset.role ?? 'No Role'}</p>
-                </div>
-                <div className="asset-item__actions">
-                  <Button
-                    variant="quiet"
-                    aria-label={`Manage role for ${asset.name}`}
-                    onClick={(event) => {
-                      roleTrigger.current = event.currentTarget;
-                      setManagingRole(asset);
-                    }}
-                  >
-                    Role
-                  </Button>
-                  <Button
-                    data-retirement-asset-id={asset.id}
-                    variant="quiet"
-                    aria-label={`Retire ${asset.name}`}
-                    onClick={(event) => {
-                      deleteTrigger.current = event.currentTarget;
-                      setDeleting(asset);
-                    }}
-                  >
-                    Retire
-                  </Button>
-                </div>
+              <div className="asset-item__actions">
+                <Button
+                  variant="secondary"
+                  aria-label={`Manage role for ${selectedAsset.name}`}
+                  onClick={(event) => {
+                    openRoleDialog(selectedAsset, event.currentTarget);
+                  }}
+                >
+                  Manage Role
+                </Button>
+                <Button
+                  data-retirement-asset-id={selectedAsset.id}
+                  variant="danger"
+                  aria-label={`Retire ${selectedAsset.name}`}
+                  onClick={(event) => {
+                    openRetirementDialog(selectedAsset, event.currentTarget);
+                  }}
+                >
+                  Retire Asset
+                </Button>
               </div>
-            </li>
-          ))}
-        </ul>
+            </aside>
+          )}
+        </div>
       )}
 
       {deleting === null ? null : (

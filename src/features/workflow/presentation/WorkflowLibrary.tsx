@@ -4,6 +4,23 @@ import { Button, Dialog } from '@/shared';
 
 import type { Workflow, WorkflowId } from '../domain/Workflow';
 
+function formatWorkflowDuration(workflow: Workflow): string {
+  const totalSeconds = workflow.phases.reduce(
+    (total, phase) => total + phase.durationSeconds,
+    0,
+  );
+  const hours = Math.floor(totalSeconds / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const parts = [
+    hours > 0 ? `${String(hours)} hr` : undefined,
+    minutes > 0 ? `${String(minutes)} min` : undefined,
+    seconds > 0 || totalSeconds === 0 ? `${String(seconds)} sec` : undefined,
+  ];
+  return parts.filter((part) => part !== undefined).join(' ');
+}
+
 export type WorkflowLibraryProps = Readonly<{
   workflows: readonly Workflow[];
   selectedWorkflowId?: WorkflowId;
@@ -173,6 +190,7 @@ export function WorkflowLibrary({
                 <li
                   className="workflow-list__item"
                   key={workflow.id}
+                  aria-label={workflow.name}
                   aria-current={
                     selectedWorkflowId === workflow.id ? 'true' : undefined
                   }
@@ -189,10 +207,18 @@ export function WorkflowLibrary({
                     <span className="workflow-mode-badge">
                       {workflow.mode === 'quick' ? 'Quick' : 'Detailed'}
                     </span>
-                    <span>
-                      {String(workflow.phases.length)}{' '}
-                      {workflow.phases.length === 1 ? 'phase' : 'phases'}
+                    <span className="workflow-list__metadata">
+                      <span>{formatWorkflowDuration(workflow)}</span>
+                      <span>
+                        {String(workflow.phases.length)}{' '}
+                        {workflow.phases.length === 1 ? 'phase' : 'phases'}
+                      </span>
+                      <span>
+                        Reward{' '}
+                        {workflow.rewardDice === undefined ? 'off' : 'on'}
+                      </span>
                     </span>
+                    <span className="workflow-list__open-label">Open</span>
                   </button>
                   <div className="workflow-list__actions">
                     {onStart === undefined ? null : (

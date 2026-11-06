@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -134,6 +134,13 @@ describe('AssetLibrary', () => {
       />,
     );
     const playing = await screen.findByLabelText('Preview Rain');
+    expect(playing.closest('button')).toBeNull();
+    expect(
+      within(screen.getByRole('listitem', { name: 'Audio: Rain' })).getByRole(
+        'button',
+        { name: 'Select Rain' },
+      ),
+    ).toBeVisible();
     (playing as HTMLAudioElement).currentTime = 9;
 
     view.rerender(
@@ -176,16 +183,82 @@ describe('AssetLibrary', () => {
     expect(audioItem).toHaveTextContent('2 KB');
   });
 
+  test('separates media kinds and shows the selected Asset in a detail panel', async () => {
+    const user = userEvent.setup();
+    setup();
+
+    expect(
+      within(screen.getByRole('group', { name: 'Images' })).getByRole(
+        'button',
+        { name: 'Select Forest' },
+      ),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      within(screen.getByRole('group', { name: 'Audio' })).getByRole('button', {
+        name: 'Select Rain',
+      }),
+    ).toBeVisible();
+
+    const details = screen.getByRole('complementary', {
+      name: 'Asset details',
+    });
+    expect(details).toHaveTextContent('Forest');
+    expect(details).toHaveTextContent('Image · 1 KB');
+
+    await user.click(screen.getByRole('button', { name: 'Select Rain' }));
+    expect(details).toHaveTextContent('Rain');
+    expect(details).toHaveTextContent('Audio · 2 KB');
+    expect(screen.getByRole('button', { name: 'Select Rain' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.queryByRole('searchbox')).toBeNull();
+  });
+
+  test('keeps image cards selectable while audio uses compact independent controls', () => {
+    setup();
+
+    const images = screen.getByRole('group', { name: 'Images' });
+    const audioGroup = screen.getByRole('group', { name: 'Audio' });
+    expect(within(images).getByRole('list')).toHaveClass('asset-list--images');
+    expect(within(audioGroup).getByRole('list')).toHaveClass(
+      'asset-list--audio',
+    );
+    expect(
+      within(audioGroup).getByRole('button', { name: 'Select Rain' }),
+    ).not.toContainElement(within(audioGroup).queryByLabelText('Preview Rain'));
+  });
+
   test('opens Role management from an Asset card', async () => {
     const user = userEvent.setup();
     setup();
-    expect(screen.getAllByText(/No Role/)).toHaveLength(2);
+    expect(
+      within(
+        screen.getByRole('complementary', { name: 'Asset details' }),
+      ).getByText('Role: No Role'),
+    ).toBeVisible();
     await user.click(
       screen.getByRole('button', { name: 'Manage role for Forest' }),
     );
     expect(
       screen.getByRole('dialog', { name: 'Manage Role for Forest' }),
     ).toBeVisible();
+  });
+
+  test('keeps Role and retirement flows available for an unselected Asset', async () => {
+    const user = userEvent.setup();
+    setup();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Manage role for Rain' }),
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Manage Role for Rain' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await user.click(screen.getByRole('button', { name: 'Retire Rain' }));
+    expect(screen.getByRole('dialog', { name: 'Retire Rain' })).toBeVisible();
   });
 
   test('restores the invoking Role button after Cancel', async () => {
@@ -317,7 +390,12 @@ describe('AssetLibrary', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This Asset is used by the active Session. Stop the Session or wait for it to finish before deleting it.',
     );
-    expect(screen.getByText('Forest')).toBeVisible();
+    expect(
+      within(screen.getByRole('dialog', { name: 'Retire Forest' })).getByRole(
+        'heading',
+        { name: 'Retire Forest' },
+      ),
+    ).toBeVisible();
   });
 
   test('retires after explicitly choosing optional-reference removal', async () => {

@@ -124,7 +124,7 @@ test('round-trips application Settings independently', async ({
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
   await options.getByRole('tab', { name: 'Settings' }).click();
-  await options.getByLabel('Theme').selectOption('dark');
+  await options.getByRole('radio', { name: 'Dark' }).check();
   await expect(options.getByText('Theme updated.')).toBeVisible();
 
   const downloadPromise = options.waitForEvent('download');
@@ -132,11 +132,11 @@ test('round-trips application Settings independently', async ({
   const download = await downloadPromise;
   const packagePath = await download.path();
 
-  await options.getByLabel('Theme').selectOption('light');
+  await options.getByRole('radio', { name: 'Light' }).check();
   await expect(options.getByText('Theme updated.')).toBeVisible();
   await options.getByLabel('Import settings file').setInputFiles(packagePath);
   await expect(options.getByText('Settings imported.')).toBeVisible();
-  await expect(options.getByLabel('Theme')).toHaveValue('dark');
+  await expect(options.getByRole('radio', { name: 'Dark' })).toBeChecked();
 });
 
 test('rejects a corrupt Workflow package without changing existing data', async ({

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -74,7 +74,9 @@ describe('SettingsPage', () => {
     const user = userEvent.setup();
     const { onUpdate } = setup();
 
-    await user.click(screen.getByRole('checkbox', { name: 'Mute music' }));
+    const music = screen.getByRole('checkbox', { name: 'Music on' });
+    expect(music).toBeChecked();
+    await user.click(music);
     expect(onUpdate).toHaveBeenCalledWith({
       ...settings,
       ambientMuted: true,
@@ -100,7 +102,7 @@ describe('SettingsPage', () => {
     });
   });
 
-  test('keeps a multi-step volume interaction enabled and saves its latest value', () => {
+  test('keeps a multi-step volume interaction enabled and saves its latest value', async () => {
     const onUpdate = vi.fn<(value: Settings) => Promise<void>>(() =>
       Promise.resolve(),
     );
@@ -119,6 +121,7 @@ describe('SettingsPage', () => {
       ...settings,
       ambientVolumePercent: 63,
     });
+    await screen.findByText('Audio preferences updated.');
 
     const cueVolume = screen.getByRole('slider', { name: 'Cue volume' });
     cueVolume.focus();
@@ -138,8 +141,13 @@ describe('SettingsPage', () => {
     const user = userEvent.setup();
     const { onUpdate } = setup();
 
-    await user.selectOptions(screen.getByLabelText('Theme'), 'dark');
-    await user.selectOptions(screen.getByLabelText('Reduced motion'), 'reduce');
+    await user.click(screen.getByRole('radio', { name: 'Dark' }));
+    await user.click(screen.getByRole('radio', { name: 'Reduce motion' }));
+
+    expect(screen.getByRole('radiogroup', { name: 'Theme' })).toBeVisible();
+    expect(
+      screen.getByRole('radiogroup', { name: 'Reduced motion' }),
+    ).toBeVisible();
 
     expect(onUpdate).toHaveBeenNthCalledWith(1, {
       ...settings,
@@ -173,14 +181,75 @@ describe('SettingsPage', () => {
       backgroundBrightnessPercent: 125,
     });
 
-    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  test('uses approved management controls without changing existing setting semantics', () => {
+    setup();
+
+    expect(
+      within(screen.getByRole('radiogroup', { name: 'Theme' })).getByRole(
+        'radio',
+        { name: 'System' },
+      ),
+    ).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Music on' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Cues on' })).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Pause or resume with Space' }),
+    ).toBeChecked();
+    expect(screen.getByRole('group', { name: 'Workflow data' })).toBeVisible();
+    expect(
+      screen.getByRole('group', { name: 'Application settings' }),
+    ).toBeVisible();
+  });
+
+  test('disables every slider while a preference update is pending', async () => {
+    const user = userEvent.setup();
+    let resolveUpdate: (() => void) | undefined;
+    const update = new Promise<void>((resolve) => {
+      resolveUpdate = resolve;
+    });
+    setup({ onUpdate: () => update });
+
+    await user.click(screen.getByRole('radio', { name: 'Dark' }));
+
+    const sliders = screen.getAllByRole('slider');
+    expect(sliders).toHaveLength(4);
+    for (const slider of sliders) expect(slider).toBeDisabled();
+
+    await act(async () => {
+      resolveUpdate?.();
+      await update;
+    });
+
+    for (const slider of sliders) expect(slider).toBeEnabled();
+  });
+
+  test('uses dedicated Appearance and horizontal Audio compositions', () => {
+    setup();
+
+    const appearance = screen.getByRole('group', { name: 'Appearance' });
+    const audioGroup = screen.getByRole('group', { name: 'Audio' });
+    expect(
+      appearance.querySelector('.settings-appearance-grid'),
+    ).not.toBeNull();
+    expect(audioGroup.querySelector('.settings-audio-rows')).not.toBeNull();
+    expect(audioGroup.querySelectorAll('.settings-audio-row')).toHaveLength(3);
+    expect(audioGroup.querySelector('.form-grid')).toBeNull();
+    expect(
+      within(audioGroup).getByRole('checkbox', {
+        name: 'Mute cues with music',
+      }),
+    ).toHaveAccessibleName('Mute cues with music');
+    expect(within(audioGroup).getByText('Off')).toBeVisible();
   });
 
   test('places audio feedback in the neutral preferences status area', async () => {
     const user = userEvent.setup();
     setup();
 
-    await user.click(screen.getByRole('checkbox', { name: 'Mute music' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Music on' }));
 
     const status = await screen.findByText('Audio preferences updated.');
     expect(status).toHaveTextContent('Audio preferences updated.');

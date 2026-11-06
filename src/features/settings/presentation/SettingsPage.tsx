@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 
-import { Button, Select } from '@/shared';
+import { Button, SegmentedControl, Switch } from '@/shared';
 
 import type { Settings } from '../domain/Settings';
 
@@ -187,106 +187,132 @@ export function SettingsPage({
 
       <fieldset className="settings-group">
         <legend>Appearance</legend>
-        <div className="form-grid">
-          <Select
-            label="Theme"
-            value={settings.theme}
-            disabled={pending === 'preferences'}
-            onChange={(event) => {
-              const theme =
-                event.target.value === 'light' || event.target.value === 'dark'
-                  ? event.target.value
-                  : 'system';
-              void perform(
-                'preferences',
-                () => onUpdate({ ...settings, theme }),
-                'Theme updated.',
-              );
-            }}
-          >
-            <option value="system">Use system setting</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </Select>
-          <Select
-            label="Reduced motion"
-            value={settings.reducedMotion}
-            disabled={pending === 'preferences'}
-            onChange={(event) => {
-              const reducedMotion =
-                event.target.value === 'reduce' ||
-                event.target.value === 'no-preference'
-                  ? event.target.value
-                  : 'system';
-              void perform(
-                'preferences',
-                () => onUpdate({ ...settings, reducedMotion }),
-                'Motion preference updated.',
-              );
-            }}
-          >
-            <option value="system">Use system setting</option>
-            <option value="reduce">Reduce motion</option>
-            <option value="no-preference">Allow motion</option>
-          </Select>
-          <label>
-            <span>Background blur</span>
-            <input
-              type="range"
-              min="0"
-              max="24"
-              step="1"
-              value={blurDraft}
-              onChange={(event) => {
-                setBlurDraft(Number(event.currentTarget.value));
+        <div className="settings-appearance-grid">
+          <div className="settings-appearance-modes">
+            <SegmentedControl
+              label="Theme"
+              value={settings.theme}
+              options={[
+                { value: 'system', label: 'System' },
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+              ]}
+              disabled={pending === 'preferences'}
+              onChange={(theme) => {
+                void perform(
+                  'preferences',
+                  () => onUpdate({ ...settings, theme }),
+                  'Theme updated.',
+                );
               }}
-              onPointerUp={() =>
-                void commitAppearance('backgroundBlurPx', blurDraft)
-              }
-              onBlur={() =>
-                void commitAppearance('backgroundBlurPx', blurDraft)
-              }
             />
-            <output>{blurDraft} px</output>
-          </label>
-          <label>
-            <span>Background brightness</span>
-            <input
-              type="range"
-              min="50"
-              max="150"
-              step="5"
-              value={brightnessDraft}
-              onChange={(event) => {
-                setBrightnessDraft(Number(event.currentTarget.value));
+            <SegmentedControl
+              label="Reduced motion"
+              value={settings.reducedMotion}
+              options={[
+                { value: 'system', label: 'System' },
+                { value: 'reduce', label: 'Reduce motion' },
+                { value: 'no-preference', label: 'Allow motion' },
+              ]}
+              disabled={pending === 'preferences'}
+              onChange={(reducedMotion) => {
+                void perform(
+                  'preferences',
+                  () => onUpdate({ ...settings, reducedMotion }),
+                  'Motion preference updated.',
+                );
               }}
-              onPointerUp={() =>
-                void commitAppearance(
-                  'backgroundBrightnessPercent',
-                  brightnessDraft,
-                )
-              }
-              onBlur={() =>
-                void commitAppearance(
-                  'backgroundBrightnessPercent',
-                  brightnessDraft,
-                )
-              }
             />
-            <output>{brightnessDraft}%</output>
-          </label>
+          </div>
+          <div className="settings-appearance-ranges">
+            <label>
+              <span>Background blur</span>
+              <input
+                type="range"
+                min="0"
+                max="24"
+                step="1"
+                value={blurDraft}
+                disabled={pending === 'preferences'}
+                onChange={(event) => {
+                  setBlurDraft(Number(event.currentTarget.value));
+                }}
+                onPointerUp={() =>
+                  void commitAppearance('backgroundBlurPx', blurDraft)
+                }
+                onBlur={() =>
+                  void commitAppearance('backgroundBlurPx', blurDraft)
+                }
+              />
+              <output>{blurDraft} px</output>
+            </label>
+            <label>
+              <span>Background brightness</span>
+              <input
+                type="range"
+                min="50"
+                max="150"
+                step="5"
+                value={brightnessDraft}
+                disabled={pending === 'preferences'}
+                onChange={(event) => {
+                  setBrightnessDraft(Number(event.currentTarget.value));
+                }}
+                onPointerUp={() =>
+                  void commitAppearance(
+                    'backgroundBrightnessPercent',
+                    brightnessDraft,
+                  )
+                }
+                onBlur={() =>
+                  void commitAppearance(
+                    'backgroundBrightnessPercent',
+                    brightnessDraft,
+                  )
+                }
+              />
+              <output>{brightnessDraft}%</output>
+            </label>
+          </div>
         </div>
       </fieldset>
 
       <fieldset className="settings-group">
         <legend>Audio</legend>
         <p>Control ambient music and interface cues independently.</p>
-        <div className="form-grid settings-audio-grid">
-          <label>
-            <input
-              type="checkbox"
-              checked={settings.ambientMuted}
-              onChange={(event) => {
+        <div className="settings-audio-rows">
+          <div className="settings-audio-row">
+            <span className="settings-audio-row__copy">
+              <strong>Music</strong>
+              <span>Ambient tracks during phases.</span>
+            </span>
+            <label className="settings-audio-row__volume">
+              <span>Music volume</span>
+              <input
+                aria-label="Music volume"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={ambientVolumeDraft}
+                disabled={pending === 'preferences'}
+                onChange={(event) => {
+                  setAmbientVolumeDraft(Number(event.currentTarget.value));
+                }}
+                onPointerUp={() =>
+                  void commitVolume('ambientVolumePercent', ambientVolumeDraft)
+                }
+                onBlur={() =>
+                  void commitVolume('ambientVolumePercent', ambientVolumeDraft)
+                }
+              />
+              <output>{ambientVolumeDraft}%</output>
+            </label>
+            <Switch
+              label="Music on"
+              checked={!settings.ambientMuted}
+              disabled={pending === 'preferences'}
+              onChange={(musicOn) => {
                 void perform(
                   'preferences',
                   () =>
@@ -294,38 +320,45 @@ export function SettingsPage({
                       ...settings,
                       ambientVolumePercent: ambientVolumeDraft,
                       cueVolumePercent: cueVolumeDraft,
-                      ambientMuted: event.currentTarget.checked,
+                      ambientMuted: !musicOn,
                     }),
                   'Audio preferences updated.',
                 );
               }}
             />
-            Mute music
-          </label>
-          <label>
-            <span>Music volume</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={ambientVolumeDraft}
-              onChange={(event) => {
-                setAmbientVolumeDraft(Number(event.currentTarget.value));
-              }}
-              onPointerUp={() =>
-                void commitVolume('ambientVolumePercent', ambientVolumeDraft)
-              }
-              onBlur={() =>
-                void commitVolume('ambientVolumePercent', ambientVolumeDraft)
-              }
-            />
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={settings.cuesMuted}
-              onChange={(event) => {
+          </div>
+          <div className="settings-audio-row">
+            <span className="settings-audio-row__copy">
+              <strong>Cues</strong>
+              <span>Bells, rewards and completion sounds.</span>
+            </span>
+            <label className="settings-audio-row__volume">
+              <span>Cue volume</span>
+              <input
+                aria-label="Cue volume"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={cueVolumeDraft}
+                disabled={pending === 'preferences'}
+                onChange={(event) => {
+                  setCueVolumeDraft(Number(event.currentTarget.value));
+                }}
+                onPointerUp={() =>
+                  void commitVolume('cueVolumePercent', cueVolumeDraft)
+                }
+                onBlur={() =>
+                  void commitVolume('cueVolumePercent', cueVolumeDraft)
+                }
+              />
+              <output>{cueVolumeDraft}%</output>
+            </label>
+            <Switch
+              label="Cues on"
+              checked={!settings.cuesMuted}
+              disabled={pending === 'preferences'}
+              onChange={(cuesOn) => {
                 void perform(
                   'preferences',
                   () =>
@@ -333,38 +366,24 @@ export function SettingsPage({
                       ...settings,
                       ambientVolumePercent: ambientVolumeDraft,
                       cueVolumePercent: cueVolumeDraft,
-                      cuesMuted: event.currentTarget.checked,
+                      cuesMuted: !cuesOn,
                     }),
                   'Audio preferences updated.',
                 );
               }}
             />
-            Mute cues
-          </label>
-          <label>
-            <span>Cue volume</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={cueVolumeDraft}
-              onChange={(event) => {
-                setCueVolumeDraft(Number(event.currentTarget.value));
-              }}
-              onPointerUp={() =>
-                void commitVolume('cueVolumePercent', cueVolumeDraft)
-              }
-              onBlur={() =>
-                void commitVolume('cueVolumePercent', cueVolumeDraft)
-              }
-            />
-          </label>
-          <label>
-            <input
-              type="checkbox"
+          </div>
+          <div className="settings-audio-row settings-audio-row--switch-only">
+            <span className="settings-audio-row__copy">
+              <strong>Mute cues with music</strong>
+              <span>Muting music also silences cues when enabled.</span>
+            </span>
+            <Switch
+              label="Mute cues with music"
+              displayLabel={settings.muteCuesWithMusic ? 'On' : 'Off'}
               checked={settings.muteCuesWithMusic}
-              onChange={(event) => {
+              disabled={pending === 'preferences'}
+              onChange={(muteCuesWithMusic) => {
                 void perform(
                   'preferences',
                   () =>
@@ -372,38 +391,31 @@ export function SettingsPage({
                       ...settings,
                       ambientVolumePercent: ambientVolumeDraft,
                       cueVolumePercent: cueVolumeDraft,
-                      muteCuesWithMusic: event.currentTarget.checked,
+                      muteCuesWithMusic,
                     }),
                   'Audio preferences updated.',
                 );
               }}
             />
-            Mute cues with music
-          </label>
+          </div>
         </div>
       </fieldset>
 
       <fieldset className="settings-group">
         <legend>Controls</legend>
-        <label>
-          <input
-            type="checkbox"
-            checked={settings.pauseWithSpace}
-            disabled={pending === 'preferences'}
-            onChange={(event) => {
-              void perform(
-                'preferences',
-                () =>
-                  onUpdate({
-                    ...settings,
-                    pauseWithSpace: event.currentTarget.checked,
-                  }),
-                'Control preferences updated.',
-              );
-            }}
-          />
-          Pause or resume with Space
-        </label>
+        <Switch
+          label="Pause or resume with Space"
+          description="Use the Space key while Focus is active."
+          checked={settings.pauseWithSpace}
+          disabled={pending === 'preferences'}
+          onChange={(pauseWithSpace) => {
+            void perform(
+              'preferences',
+              () => onUpdate({ ...settings, pauseWithSpace }),
+              'Control preferences updated.',
+            );
+          }}
+        />
       </fieldset>
 
       <fieldset className="settings-group">

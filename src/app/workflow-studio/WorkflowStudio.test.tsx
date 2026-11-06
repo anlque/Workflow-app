@@ -225,7 +225,7 @@ describe('WorkflowStudio', () => {
       } else {
         await user.click(screen.getByRole('tab', { name: 'Settings' }));
         if (operation === 'settings update') {
-          await user.selectOptions(screen.getByLabelText('Theme'), 'dark');
+          await user.click(screen.getByRole('radio', { name: 'Dark' }));
         } else {
           await user.upload(
             screen.getByLabelText(
@@ -640,8 +640,10 @@ describe('WorkflowStudio', () => {
     expect(screen.getByRole('slider', { name: 'Cue volume' })).toHaveValue(
       '46',
     );
-    expect(screen.getByRole('checkbox', { name: 'Mute music' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Mute cues' })).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Music on' }),
+    ).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Cues on' })).not.toBeChecked();
     expect(
       screen.getByRole('checkbox', { name: 'Mute cues with music' }),
     ).toBeChecked();
@@ -1230,9 +1232,7 @@ describe('WorkflowStudio', () => {
     >;
     render(<WorkflowStudio dependencies={deps} />);
     await user.click(await screen.findByRole('tab', { name: 'Settings' }));
-    expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveValue(
-      'system',
-    );
+    expect(screen.getAllByRole('radio', { name: 'System' })[0]).toBeChecked();
     act(() => {
       preferences.setSnapshot({
         ...preferences.getSnapshot(),
@@ -1241,10 +1241,8 @@ describe('WorkflowStudio', () => {
         effectiveReducedMotion: true,
       });
     });
-    expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveValue('dark');
-    expect(
-      screen.getByRole('combobox', { name: 'Reduced motion' }),
-    ).toHaveValue('reduce');
+    expect(screen.getByRole('radio', { name: 'Dark' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Reduce motion' })).toBeChecked();
   });
 
   test('provides a keyboard-operable three-tab workspace', async () => {

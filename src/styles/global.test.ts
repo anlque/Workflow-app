@@ -278,6 +278,62 @@ describe('visual foundation', () => {
     ).toContain('color: #10271f;');
   });
 
+  test('provides selected-state management controls and responsive library workspaces', () => {
+    expect(declarationsFor('.switch-control__track')).toContain(
+      'background: var(--color-surface-muted);',
+    );
+    expect(declarationsFor('.switch-control__track')).toContain(
+      'pointer-events: none;',
+    );
+    expect(
+      declarationsFor(
+        '.switch-control__input input:checked + .switch-control__track',
+      ),
+    ).toContain('background: var(--color-primary);');
+    expect(
+      declarationsFor('.segmented-control input:checked + span'),
+    ).toContain('background: var(--color-surface);');
+    expect(declarationsFor('.asset-library__workspace')).toContain(
+      'grid-template-columns: minmax(0, 1fr) minmax(15rem, 20rem);',
+    );
+    expect(declarationsFor('.asset-list--audio')).toContain(
+      'flex-direction: column;',
+    );
+    expect(declarationsFor('.asset-item--audio')).toContain(
+      'grid-template-columns: minmax(12rem, 18rem) minmax(10rem, 1fr) auto;',
+    );
+    expect(declarationsFor('.settings-appearance-grid')).toContain(
+      'grid-template-columns: minmax(0, 1.35fr) minmax(15rem, 1fr);',
+    );
+    expect(declarationsFor('.settings-audio-row')).toContain(
+      'grid-template-columns: minmax(12rem, 1fr) minmax(15rem, 1.25fr) auto;',
+    );
+    expect(declarationsFor('.segmented-control label > span')).toContain(
+      'white-space: nowrap;',
+    );
+    expect(declarationsFor(".settings-page input[type='range']")).toContain(
+      'accent-color: var(--color-primary);',
+    );
+    expect(
+      declarationsFor(".settings-page input[type='range']:focus-visible"),
+    ).toContain('outline: 3px solid var(--color-focus);');
+    expect(
+      declarationsFor(".settings-page input[type='range']:disabled"),
+    ).toContain('opacity: 0.52;');
+    expect(declarationsFor('.workflow-list__metadata')).toContain(
+      'display: flex;',
+    );
+    expect(declarationsFor('.workflow-list__open span')).toContain(
+      'color: var(--color-ink-muted);',
+    );
+    expect(
+      declarationsFor('.workflow-list__open span.workflow-list__open-label'),
+    ).toContain('color: var(--color-primary);');
+    expect(stylesheet).toMatch(
+      /@media \(max-width: 52rem\)[\s\S]*?\.asset-library__workspace\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/u,
+    );
+  });
+
   test('uses the approved shared shell, hierarchy, tabs and semantic surfaces', () => {
     expect(declarationsFor('.workflow-studio-shell__sidebar')).toContain(
       'grid-template-rows: auto minmax(0, 1fr);',
