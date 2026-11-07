@@ -330,7 +330,9 @@ test('Workflow Studio shell is responsive without horizontal overflow', async ({
   const topBarIdentity = topBar.locator(
     ':scope > .workflow-studio-shell__context',
   );
-  const topBarButton = topBar.locator(':scope > .button');
+  const topBarButton = topBar.locator(
+    ':scope > .workflow-studio-shell__top-bar-controls > .button',
+  );
   expect(
     await shellBody.evaluate(
       (element) =>
@@ -432,10 +434,10 @@ test('Detailed Studio preview and phase sequence stay usable across supported wi
     name: 'Settle in preview',
   });
   const firstPhase = options.getByRole('button', {
-    name: 'Select Phase 1: Settle in',
+    name: /^Select Phase 1: Settle in ·/u,
   });
   const secondPhase = options.getByRole('button', {
-    name: 'Select Phase 2: Short break',
+    name: /^Select Phase 2: Short break ·/u,
   });
 
   await expect(sequence).toBeVisible();
@@ -448,6 +450,22 @@ test('Detailed Studio preview and phase sequence stay usable across supported wi
     name: 'Short break preview',
   });
   await expect(preview).toContainText('Short break');
+
+  await options.setViewportSize({ width: 1440, height: 1024 });
+  const basicCard = options.getByRole('region', { name: 'Basic' });
+  const environmentCard = options.getByRole('region', { name: 'Environment' });
+  const [basicBounds, environmentBounds] = await Promise.all([
+    basicCard.boundingBox(),
+    environmentCard.boundingBox(),
+  ]);
+  expect(basicBounds).not.toBeNull();
+  expect(environmentBounds).not.toBeNull();
+  if (basicBounds !== null && environmentBounds !== null) {
+    expect(basicBounds.y + basicBounds.height).toBeLessThanOrEqual(1024);
+    expect(environmentBounds.y + environmentBounds.height).toBeLessThanOrEqual(
+      1024,
+    );
+  }
 
   for (const width of [500, 640]) {
     await options.setViewportSize({ width, height: 800 });
@@ -503,6 +521,51 @@ test('Detailed Studio preview and phase sequence stay usable across supported wi
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
+});
+
+test('Quick Reward drawer anchors its footer and scrolls long side lists', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.setViewportSize({ width: 1280, height: 800 });
+  await options.goto(extensionUrls.options);
+  await options.getByRole('button', { name: 'Back to workflows' }).click();
+  await options.getByRole('button', { name: 'New workflow' }).click();
+  await options.getByRole('button', { name: 'Quick setup' }).click();
+  await options.getByLabel('Use Reward Dice').check();
+  await options.getByRole('button', { name: 'Configure sides' }).click();
+
+  const drawer = options.getByRole('dialog', { name: 'Reward sides drawer' });
+  const sides = drawer.locator('.quick-reward-drawer__sides');
+  const footer = drawer.locator('.quick-reward-drawer__footer');
+  const shortGeometry = await drawer.evaluate((element) => {
+    const footerElement = element.querySelector<HTMLElement>(
+      '.quick-reward-drawer__footer',
+    );
+    return {
+      drawerBottom: element.getBoundingClientRect().bottom,
+      footerBottom: footerElement?.getBoundingClientRect().bottom ?? 0,
+    };
+  });
+  expect(shortGeometry.drawerBottom - shortGeometry.footerBottom).toBeLessThan(
+    32,
+  );
+
+  for (let index = 0; index < 8; index += 1) {
+    await footer
+      .getByRole('button', { name: 'Add side' })
+      .evaluate((button) => {
+        (button as HTMLButtonElement).click();
+      });
+  }
+  await expect(drawer.getByLabel('Reward side 10 title')).toBeAttached();
+  expect(
+    await sides.evaluate(
+      (element) => element.scrollHeight > element.clientHeight,
+    ),
+  ).toBe(true);
+  await expect(footer).toBeVisible();
 });
 
 test('Asset Role dialog has no detectable axe violations', async ({

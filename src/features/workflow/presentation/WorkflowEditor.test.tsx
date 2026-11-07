@@ -4,6 +4,7 @@ import {
   render,
   renderHook,
   screen,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -62,6 +63,56 @@ afterEach(() => {
 });
 
 describe('WorkflowEditor', () => {
+  test('keeps Add phase outside the ordered sequence and describes Phase metadata', () => {
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-sequence-semantics',
+          name: 'Sequence semantics',
+          phases: [
+            {
+              name: 'Writing',
+              type: 'focus',
+              durationSeconds: 1_500,
+              environment: {},
+            },
+            {
+              name: 'Tea',
+              type: 'break',
+              durationSeconds: 300,
+              environment: {},
+            },
+          ],
+          rewardDice: {
+            frequency: 1,
+            sides: [
+              { icon: 'tea', title: 'Tea' },
+              { icon: 'walk', title: 'Walk' },
+            ],
+          },
+        })}
+        workflowId="workflow-sequence-semantics"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    const sequence = screen.getByRole('list', { name: 'Phase sequence' });
+    const addPhase = screen.getByRole('button', { name: 'Add phase' });
+    expect(sequence).not.toContainElement(addPhase);
+    expect(within(sequence).getAllByRole('listitem')).toHaveLength(2);
+    expect(
+      screen.getByRole('button', {
+        name: 'Select Phase 1: Writing · Focus · 25 min · Reward after this phase',
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', {
+        name: 'Select Phase 2: Tea · Break · 5 min',
+      }),
+    ).toBeVisible();
+  });
+
   test('shows only the selected Phase Basic and Environment settings', async () => {
     const user = userEvent.setup();
     render(
@@ -91,10 +142,28 @@ describe('WorkflowEditor', () => {
     );
 
     await user.click(
-      screen.getByRole('button', { name: 'Select Phase 2: Two' }),
+      screen.getByRole('button', { name: /^Select Phase 2: Two ·/u }),
     );
+    expect(
+      screen.getByRole('button', { name: 'Add phase' }).parentElement,
+    ).toHaveClass('phase-sequence__add');
+    const selectedPhase = screen.getByRole('button', {
+      name: /^Select Phase 2: Two ·/u,
+    });
+    expect(
+      selectedPhase.querySelector('.phase-sequence__type'),
+    ).toHaveTextContent('Break');
+    expect(
+      selectedPhase.querySelector('.phase-sequence__duration'),
+    ).toHaveTextContent('1 min');
     expect(screen.getByRole('heading', { name: 'Basic' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Environment' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Basic' }).closest('section'),
+    ).toHaveClass('phase-settings__card--basic');
+    expect(
+      screen.getByRole('heading', { name: 'Environment' }).closest('section'),
+    ).toHaveClass('phase-settings__card--environment');
     expect(screen.getByLabelText('Phase 2 name')).toHaveValue('Two');
     expect(screen.queryByLabelText('Phase 1 name')).toBeNull();
     expect(screen.getByLabelText('Phase 2 type')).toBeVisible();
@@ -142,7 +211,7 @@ describe('WorkflowEditor', () => {
     );
 
     await user.click(
-      screen.getByRole('button', { name: 'Select Phase 2: Two' }),
+      screen.getByRole('button', { name: /^Select Phase 2: Two ·/u }),
     );
     await user.clear(screen.getByLabelText('Phase 2 duration in minutes'));
     await user.click(screen.getByRole('tab', { name: 'Reward Dice' }));
@@ -188,7 +257,7 @@ describe('WorkflowEditor', () => {
       'background-color: rgb(17, 34, 51)',
     );
     await user.click(
-      screen.getByRole('button', { name: 'Select Phase 2: Tea' }),
+      screen.getByRole('button', { name: /^Select Phase 2: Tea ·/u }),
     );
     expect(screen.getByRole('region', { name: 'Tea preview' })).toHaveStyle(
       'background-color: rgb(68, 85, 102)',
@@ -201,7 +270,7 @@ describe('WorkflowEditor', () => {
       'background-color: rgb(171, 205, 239)',
     );
     expect(
-      screen.getByRole('button', { name: 'Select Phase 2: Tea' }),
+      screen.getByRole('button', { name: /^Select Phase 2: Tea ·/u }),
     ).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -234,12 +303,12 @@ describe('WorkflowEditor', () => {
     );
 
     await user.click(
-      screen.getByRole('button', { name: 'Select Phase 2: Two' }),
+      screen.getByRole('button', { name: /^Select Phase 2: Two ·/u }),
     );
     await user.click(screen.getByRole('button', { name: 'Move Phase 2 up' }));
     expect(screen.getByRole('region', { name: 'Two preview' })).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Select Phase 1: Two' }),
+      screen.getByRole('button', { name: /^Select Phase 1: Two ·/u }),
     ).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(screen.getByRole('button', { name: 'Remove Phase 1' }));
@@ -280,16 +349,18 @@ describe('WorkflowEditor', () => {
       />,
     );
 
-    const first = screen.getByRole('button', { name: 'Select Phase 1: One' });
+    const first = screen.getByRole('button', {
+      name: /^Select Phase 1: One ·/u,
+    });
     first.focus();
     await user.keyboard('{ArrowRight}');
     expect(
-      screen.getByRole('button', { name: 'Select Phase 2: Two' }),
+      screen.getByRole('button', { name: /^Select Phase 2: Two ·/u }),
     ).toHaveFocus();
     expect(screen.getByRole('region', { name: 'Two preview' })).toBeVisible();
     await user.keyboard('{End}');
     expect(
-      screen.getByRole('button', { name: 'Select Phase 3: Three' }),
+      screen.getByRole('button', { name: /^Select Phase 3: Three ·/u }),
     ).toHaveFocus();
     await user.keyboard('{Home}');
     expect(first).toHaveFocus();
@@ -388,13 +459,13 @@ describe('WorkflowEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Duplicate Phase 1' }));
 
     expect(
-      screen.getByRole('button', { name: 'Select Phase 1: Writing' }),
+      screen.getByRole('button', { name: /^Select Phase 1: Writing ·/u }),
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Select Phase 2: Writing' }),
+      screen.getByRole('button', { name: /^Select Phase 2: Writing ·/u }),
     ).toBeVisible();
     await user.click(
-      screen.getByRole('button', { name: 'Select Phase 2: Writing' }),
+      screen.getByRole('button', { name: /^Select Phase 2: Writing ·/u }),
     );
     expect(
       screen.getByRole('button', { name: 'Collapse Phase 2: Writing' }),
@@ -965,7 +1036,12 @@ describe('WorkflowEditor', () => {
     await user.click(marker);
 
     expect(marker).not.toBeChecked();
-    expect(screen.getByLabelText('Reward schedule')).toHaveValue('custom');
+    expect(
+      screen.getByRole('radio', {
+        name: 'Custom',
+        hidden: true,
+      }),
+    ).toBeChecked();
   });
 
   test('defaults rerolls to zero and rejects drafts outside the allowed range', () => {
@@ -1004,7 +1080,9 @@ describe('WorkflowEditor', () => {
       `direct:${image.id}`,
     );
     await user.click(screen.getByRole('button', { name: 'Add phase' }));
-    await user.click(screen.getByRole('button', { name: 'Select Phase 2' }));
+    await user.click(
+      screen.getByRole('button', { name: /^Select Phase 2 ·/u }),
+    );
     await user.selectOptions(screen.getByLabelText('Phase 2 type'), 'break');
     await user.click(screen.getByRole('button', { name: 'Move Phase 2 up' }));
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
@@ -1064,7 +1142,7 @@ describe('WorkflowEditor', () => {
       screen.getByRole('button', { name: 'Expand Phase 2: Writing' }),
     ).toBeVisible();
     await user.click(
-      screen.getByRole('button', { name: 'Select Phase 1: Review' }),
+      screen.getByRole('button', { name: /^Select Phase 1: Review ·/u }),
     );
     expect(
       screen.getByRole('button', { name: 'Move Phase 1 up' }),
@@ -1103,7 +1181,9 @@ describe('WorkflowEditor', () => {
         onSave={() => Promise.resolve()}
       />,
     );
-    const items = screen.getAllByRole('listitem');
+    const items = Array.from(
+      document.querySelectorAll<HTMLElement>('.phase-sequence__entry'),
+    );
     items.forEach((item, index) => {
       vi.spyOn(item, 'getBoundingClientRect').mockReturnValue({
         top: 0,
@@ -1143,9 +1223,9 @@ describe('WorkflowEditor', () => {
         .getAllByRole('button', { name: /^Select Phase/ })
         .map((button) => button.getAttribute('aria-label')),
     ).toEqual([
-      'Select Phase 1: Two',
-      'Select Phase 2: Three',
-      'Select Phase 3: One',
+      'Select Phase 1: Two · Break · 1 min',
+      'Select Phase 2: Three · Focus · 1 min',
+      'Select Phase 3: One · Focus · 1 min',
     ]);
     expect(
       screen.getByText('Moved One to position 3 of 3.'),
@@ -1331,7 +1411,9 @@ describe('WorkflowEditor', () => {
         onSave={onSave}
       />,
     );
-    await user.click(screen.getByRole('button', { name: 'Select Phase 2' }));
+    await user.click(
+      screen.getByRole('button', { name: /^Select Phase 2 ·/u }),
+    );
     await user.click(screen.getByRole('button', { name: 'Move Phase 2 up' }));
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
     const saved = onSave.mock.calls[0]?.[0];

@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
@@ -91,6 +92,16 @@ describe('QuickWorkflowEditor', () => {
     render(
       <QuickWorkflowEditor workflowId="quick-1" assets={[]} onSave={onSave} />,
     );
+    expect(
+      screen.getByRole('heading', { name: 'Session recipe' }),
+    ).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Focus assets' })).toBeVisible();
+    expect(
+      screen.getByRole('region', { name: 'Short Break assets' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('region', { name: 'Generated rhythm preview' }),
+    ).toBeVisible();
     expect(screen.getByLabelText('Cycles')).toHaveValue(4);
     expect(screen.getByLabelText('Focus duration in minutes')).toHaveValue(
       '25',
@@ -116,6 +127,64 @@ describe('QuickWorkflowEditor', () => {
       configuration: { cycleCount: 4 },
     });
     expect(onSave.mock.calls[0]?.[0]).not.toHaveProperty('phases');
+  });
+
+  test('presents the materialized cadence for long breaks and Rewards accessibly', async () => {
+    const user = userEvent.setup();
+    render(
+      <QuickWorkflowEditor
+        workflowId="quick-rhythm"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    await user.click(screen.getByRole('checkbox', { name: 'Use Long Break' }));
+    const longBreakFrequency = screen.getByLabelText(
+      'Long Break every N cycles',
+    );
+    await user.clear(longBreakFrequency);
+    await user.type(longBreakFrequency, '2');
+    await user.click(screen.getByRole('checkbox', { name: 'Use Reward Dice' }));
+    const rewardFrequency = screen.getByLabelText('Reward every N cycles');
+    await user.clear(rewardFrequency);
+    await user.type(rewardFrequency, '2');
+
+    const rhythm = screen.getByRole('list', { name: 'Generated rhythm' });
+    expect(within(rhythm).getAllByRole('listitem')).toHaveLength(4);
+    expect(within(rhythm).getAllByRole('listitem')[0]).toHaveAccessibleName(
+      'Cycle 1: Focus, 25 minutes; Short break, 5 minutes',
+    );
+    expect(within(rhythm).getAllByRole('listitem')[1]).toHaveAccessibleName(
+      'Cycle 2: Focus, 25 minutes; Long break, 15 minutes; Reward after cycle 2',
+    );
+    expect(within(rhythm).getAllByRole('listitem')[2]).toHaveAccessibleName(
+      'Cycle 3: Focus, 25 minutes; Short break, 5 minutes',
+    );
+    expect(within(rhythm).getAllByRole('listitem')[3]).toHaveAccessibleName(
+      'Cycle 4: Focus, 25 minutes; Long break, 15 minutes; Reward after cycle 4',
+    );
+  });
+
+  test('withholds the generated rhythm for cadence outside the cycle count', async () => {
+    const user = userEvent.setup();
+    render(
+      <QuickWorkflowEditor
+        workflowId="quick-invalid-rhythm"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    await user.click(screen.getByRole('checkbox', { name: 'Use Reward Dice' }));
+    const rewardFrequency = screen.getByLabelText('Reward every N cycles');
+    await user.clear(rewardFrequency);
+    await user.type(rewardFrequency, '5');
+
+    expect(screen.queryByRole('list', { name: 'Generated rhythm' })).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Complete the cadence settings to preview it.',
+    );
   });
 
   test('reuses direct and Role Asset selection in every source Environment', async () => {
@@ -158,11 +227,35 @@ describe('QuickWorkflowEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Configure sides' }));
     const drawer = screen.getByRole('dialog', { name: 'Reward sides drawer' });
     expect(drawer).toHaveClass('quick-reward-drawer');
+    expect(within(drawer).getByText('2 sides')).toBeVisible();
+    expect(within(drawer).getByText('Total chance 100%')).toBeVisible();
+    expect(drawer.querySelector('.quick-reward-drawer__footer')).not.toBeNull();
     expect(screen.getAllByLabelText(/Reward side \d icon/u)).toHaveLength(2);
     await user.click(
       screen.getByRole('button', { name: 'Remove Reward side 1' }),
     );
     expect(screen.getAllByLabelText(/Reward side \d icon/u)).toHaveLength(2);
+  });
+
+  test('does not show a probability summary for an incomplete Reward weight draft', async () => {
+    const user = userEvent.setup();
+    render(
+      <QuickWorkflowEditor
+        workflowId="quick-incomplete-weights"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+    await user.click(screen.getByRole('checkbox', { name: 'Use Reward Dice' }));
+    await user.click(screen.getByRole('button', { name: 'Configure sides' }));
+    await user.type(screen.getByLabelText('Reward side 1 weight'), '2');
+
+    const drawer = screen.getByRole('dialog', { name: 'Reward sides drawer' });
+    expect(
+      within(drawer).queryByText(/Total (probability|chance)/u),
+    ).toBeNull();
+    expect(within(drawer).getByText('Weight 2')).toBeVisible();
+    expect(within(drawer).getByText('Weight not set')).toBeVisible();
   });
 
   test('keeps a recoverable draft after save failure and exposes validation errors', async () => {

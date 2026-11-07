@@ -261,7 +261,7 @@ describe('visual foundation', () => {
       /@media \(max-width: 34rem\)[\s\S]*?\.workflow-studio-shell__top-bar\s*\{[^}]*align-items: stretch;[^}]*flex-direction: column;/u,
     );
     expect(stylesheet).toMatch(
-      /@media \(max-width: 34rem\)[\s\S]*?\.workflow-studio-shell__top-bar > \.button\s*\{[^}]*width: 100%;/u,
+      /@media \(max-width: 34rem\)[\s\S]*?\.workflow-studio-shell__top-bar-controls \.button\s*\{[^}]*width: 100%;/u,
     );
     expect(stylesheet).toMatch(/@media \(prefers-reduced-motion: reduce\)/u);
   });
@@ -445,14 +445,41 @@ describe('visual foundation', () => {
     expect(sequence).toContain('display: flex;');
     expect(sequence).toContain('overflow-x: auto;');
     expect(sequence).toContain('scroll-snap-type: inline proximity;');
-    expect(entry).toContain('flex: 1 0 10rem;');
+    expect(entry).toContain('flex: 1 0 14rem;');
     expect(indicator).toContain('flex: 0 0 0.25rem;');
     expect(indicator).toContain('width: 0.25rem;');
     expect(indicator).toContain('align-self: stretch;');
     expect(dragging).toContain('background: var(--color-accent-soft);');
     expect(dragging).toContain('border-color: var(--color-accent);');
     expect(preview).toContain('overflow: hidden;');
-    expect(preview).toContain('min-height: clamp(16rem, 38vw, 28rem);');
+    expect(preview).toContain('height: clamp(10rem, 18vw, 13rem);');
+    expect(declarationsFor('.phase-settings__cards')).toContain(
+      'grid-template-columns: repeat(2, minmax(0, 1fr));',
+    );
+    expect(declarationsFor('.reward-editor__configuration')).toContain(
+      'grid-template-columns: repeat(3, minmax(0, 1fr));',
+    );
+    expect(declarationsFor('.quick-setup__recipe')).toContain(
+      'grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);',
+    );
+    expect(
+      declarationsFor('.quick-reward-side').replace(/\s+/gu, ' '),
+    ).toContain(
+      'grid-template-columns: minmax(3.5rem, 0.45fr) minmax(0, 1.5fr) minmax(5.5rem, 0.65fr) auto;',
+    );
+    expect(declarationsFor('.quick-reward-drawer')).toContain('display: flex;');
+    expect(declarationsFor('.quick-reward-drawer')).toContain(
+      'flex-direction: column;',
+    );
+    expect(declarationsFor('.quick-reward-drawer__sides')).toContain(
+      'flex: 1 1 auto;',
+    );
+    expect(declarationsFor('.quick-reward-drawer__sides')).toContain(
+      'overflow-y: auto;',
+    );
+    expect(declarationsFor('.quick-reward-drawer__footer')).toContain(
+      'margin-top: auto;',
+    );
     expect(image).toContain('object-fit: cover;');
     expect(stylesheet).toMatch(
       /\.phase-sequence__item\[aria-pressed='true'\][\s\S]*?border: 2px solid var\(--color-selected-indicator\);/u,

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -53,6 +53,21 @@ describe('RewardDiceEditor', () => {
     };
     render(<RewardDiceEditor {...props} />);
 
+    expect(
+      screen.getByRole('group', { name: 'Reward configuration' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('radiogroup', { name: 'Reward schedule' }),
+    ).toBeVisible();
+    expect(screen.getByRole('radio', { name: 'Frequency' })).toBeChecked();
+    const selectedSide = screen.getByRole('region', {
+      name: 'Selected reward side',
+    });
+    expect(selectedSide).toBeVisible();
+    expect(
+      within(selectedSide).getByText('Any · Equal weight · 50% chance'),
+    ).toBeVisible();
+
     const tea = screen.getByRole('button', {
       name: 'Select reward side 1: Tea',
     });
@@ -69,6 +84,65 @@ describe('RewardDiceEditor', () => {
     expect(walk).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('Reward side 2 title')).toHaveValue('Walk');
     expect(screen.queryByLabelText('Reward side 1 title')).toBeNull();
+  });
+
+  test('shows normalized chances without presenting relative weights as percentages', () => {
+    render(
+      <RewardDiceEditor
+        assets={[]}
+        draft={{
+          enabled: true,
+          scheduleMode: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: '1',
+          customPhaseKeys: [],
+          rerolls: '0',
+          sides: [
+            {
+              key: 'one',
+              icon: '1',
+              title: 'One',
+              description: '',
+              weight: '0.1',
+              availability: 'any',
+            },
+            {
+              key: 'two',
+              icon: '2',
+              title: 'Two',
+              description: '',
+              weight: '0.2',
+              availability: 'any',
+            },
+            {
+              key: 'three',
+              icon: '3',
+              title: 'Three',
+              description: '',
+              weight: '0.3',
+              availability: 'any',
+            },
+          ],
+        }}
+        errors={{}}
+        onEnabledChange={() => undefined}
+        onScheduleModeChange={() => undefined}
+        onTriggerPhaseTypeChange={() => undefined}
+        onFrequencyChange={() => undefined}
+        onRerollsChange={() => undefined}
+        onSideChange={() => undefined}
+        onBonusDurationChange={() => undefined}
+        onBonusDurationCommit={() => undefined}
+        onBonusDurationStep={() => undefined}
+        onAddSide={() => undefined}
+        onRemoveSide={() => undefined}
+      />,
+    );
+
+    expect(
+      screen.getAllByText(/Weight 0\.1 · 16\.7% chance/u),
+    ).not.toHaveLength(0);
+    expect(screen.queryByText(/0\.1% weight/u)).toBeNull();
   });
 
   test('keeps optional reward controls hidden until enabled', async () => {
@@ -103,7 +177,9 @@ describe('RewardDiceEditor', () => {
 
     expect(screen.getByRole('region', { name: 'Reward Dice' })).toBeVisible();
     expect(screen.queryByLabelText('Reward frequency')).toBeNull();
-    await user.click(screen.getByLabelText('Enable Reward Dice'));
+    const enabled = screen.getByLabelText('Enable Reward Dice');
+    expect(enabled.closest('label')).toHaveClass('switch-control');
+    await user.click(enabled);
     expect(onEnabledChange).toHaveBeenCalledWith(true);
   });
 

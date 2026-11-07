@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import type { AssetReference } from '../domain/Environment';
 import type { QuickWorkflow } from '../domain/QuickWorkflow';
 import type { CreateWorkflowInput } from '../domain/Workflow';
+import { parseQuickIntegerInRange } from './quickDraftParsing';
 import {
   minutesToDurationSeconds,
   normalizedDurationMinutes,
@@ -101,14 +102,6 @@ export function createQuickWorkflowDraft(
   };
 }
 
-function integerInRange(value: string, minimum: number, maximum: number) {
-  if (!/^\d+$/u.test(value)) return null;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed >= minimum && parsed <= maximum
-    ? parsed
-    : null;
-}
-
 function environmentInput(draft: QuickEnvironmentDraft) {
   return {
     durationSeconds: minutesToDurationSeconds(draft.durationMinutes) ?? 1,
@@ -131,7 +124,7 @@ export function validateQuickWorkflowDraft(
 ): QuickWorkflowDraftValidation {
   const errors: Record<string, string> = {};
   if (draft.name.trim() === '') errors['name'] = 'Name is required.';
-  const cycleCount = integerInRange(draft.cycleCount, 1, 20);
+  const cycleCount = parseQuickIntegerInRange(draft.cycleCount, 1, 20);
   if (cycleCount === null) errors['cycleCount'] = 'Choose 1 through 20 cycles.';
   for (const [name, phase] of [
     ['focus', draft.focus],
@@ -147,12 +140,16 @@ export function validateQuickWorkflowDraft(
     }
   }
   const maximum = cycleCount ?? 0;
-  const longFrequency = integerInRange(draft.longBreak.frequency, 1, maximum);
+  const longFrequency = parseQuickIntegerInRange(
+    draft.longBreak.frequency,
+    1,
+    maximum,
+  );
   if (draft.longBreak.enabled && longFrequency === null) {
     errors['longBreak:frequency'] =
       `Choose a cycle from 1 through ${String(maximum)}.`;
   }
-  const rewardFrequency = integerInRange(
+  const rewardFrequency = parseQuickIntegerInRange(
     draft.rewardDice.frequency,
     1,
     maximum,

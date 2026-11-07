@@ -17,6 +17,7 @@ import { Button, Field, Select } from '@/shared';
 import type { CreateWorkflowInput, Workflow } from '../domain/Workflow';
 import { RewardDiceEditor } from './RewardDiceEditor';
 import { PhaseEnvironmentPreview } from './PhaseEnvironmentPreview';
+import { WorkflowEditorChromeActions } from './WorkflowEditorChrome';
 import {
   useWorkflowEditor,
   validateWorkflowDraft,
@@ -294,9 +295,11 @@ export function WorkflowEditor({
     editor.draft.phases.findIndex(({ key }) => key === selectedPhaseKey),
   );
   const selectedPhase = editor.draft.phases[selectedPhaseIndex];
+  const formId = `workflow-editor-${workflowId}`;
 
   return (
     <form
+      id={formId}
       className="workflow-editor"
       noValidate
       onSubmit={(event) => {
@@ -304,22 +307,27 @@ export function WorkflowEditor({
         void save();
       }}
     >
-      <header className="editor-header">
-        <div>
-          <h2>{workflow === undefined ? 'New Workflow' : workflow.name}</h2>
-          <p>Shape the sequence, atmosphere and optional reward ritual.</p>
-        </div>
+      <WorkflowEditorChromeActions>
         <div className="editor-header__save">
           {saved ? (
             <span className="editor-header__save-status" role="status">
               Workflow saved
             </span>
           ) : null}
-          <Button type="submit" variant="primary" pending={pending}>
+          <Button
+            form={formId}
+            type="submit"
+            variant="primary"
+            pending={pending}
+          >
             Save workflow
           </Button>
         </div>
-      </header>
+      </WorkflowEditorChromeActions>
+
+      <p className="editor-introduction">
+        Shape the sequence, atmosphere and optional reward ritual.
+      </p>
 
       {Object.keys(errors).length === 0 ? null : (
         <p className="feedback feedback--error" role="alert">
@@ -408,87 +416,110 @@ export function WorkflowEditor({
             <h3 id="phases-title">Phases</h3>
             <p>Run from top to bottom.</p>
           </div>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              editor.addPhase();
-            }}
-          >
-            Add phase
-          </Button>
         </div>
-        <ol
-          ref={phaseListRef}
-          className="phase-sequence"
-          aria-label="Phase sequence"
-        >
-          {editor.draft.phases.map((phase, index) => {
-            const fallbackName = `Phase ${String(index + 1)}`;
-            const displayName = phase.name.trim() || fallbackName;
-            return (
-              <Fragment key={phase.key}>
-                {dropGapIndex === index ? (
+        <div className="phase-sequence-layout">
+          <div className="phase-sequence__add">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                editor.addPhase();
+              }}
+            >
+              Add phase
+            </Button>
+          </div>
+          <ol
+            ref={phaseListRef}
+            className="phase-sequence"
+            aria-label="Phase sequence"
+          >
+            {editor.draft.phases.map((phase, index) => {
+              const fallbackName = `Phase ${String(index + 1)}`;
+              const displayName = phase.name.trim() || fallbackName;
+              const hasRewardMarker =
+                editor.draft.rewardDice.enabled &&
+                editor.rewardAfterPhaseKeys.includes(phase.key);
+              const accessibleName = `Select ${fallbackName}${
+                displayName === fallbackName ? '' : `: ${displayName}`
+              } · ${phase.type === 'focus' ? 'Focus' : 'Break'} · ${
+                phase.durationMinutes
+              } min${hasRewardMarker ? ' · Reward after this phase' : ''}`;
+              return (
+                <Fragment key={phase.key}>
+                  {dropGapIndex === index ? (
+                    <li
+                      className="phase-drop-indicator"
+                      data-testid="phase-drop-indicator"
+                      aria-hidden="true"
+                    />
+                  ) : null}
                   <li
-                    className="phase-drop-indicator"
-                    data-testid="phase-drop-indicator"
-                    aria-hidden="true"
-                  />
-                ) : null}
-                <li
-                  className="phase-sequence__entry"
-                  data-dragging={
-                    phaseDrag.activePhaseKey === phase.key || undefined
-                  }
-                  ref={(node) => {
-                    phaseDrag.registerPhase(phase.key, node);
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="phase-drag-handle"
-                    tabIndex={-1}
-                    aria-label={`Drag ${fallbackName}${displayName === fallbackName ? '' : `: ${displayName}`}`}
-                    title={`Drag ${fallbackName}${displayName === fallbackName ? '' : `: ${displayName}`}`}
-                    {...phaseDrag.getHandleProps(phase.key)}
-                  >
-                    ⠿
-                  </button>
-                  <button
+                    className="phase-sequence__entry"
+                    data-dragging={
+                      phaseDrag.activePhaseKey === phase.key || undefined
+                    }
                     ref={(node) => {
-                      if (node === null) phaseTabs.current.delete(phase.key);
-                      else phaseTabs.current.set(phase.key, node);
-                    }}
-                    type="button"
-                    className="phase-sequence__item"
-                    aria-label={`Select ${fallbackName}${displayName === fallbackName ? '' : `: ${displayName}`}`}
-                    aria-pressed={phase.key === selectedPhaseKey}
-                    tabIndex={phase.key === selectedPhaseKey ? 0 : -1}
-                    onClick={() => {
-                      setSelectedPhaseKey(phase.key);
-                    }}
-                    onKeyDown={(event) => {
-                      handlePhaseTabKey(event, phase.key);
+                      phaseDrag.registerPhase(phase.key, node);
                     }}
                   >
-                    <span>{String(index + 1).padStart(2, '0')}</span>
-                    <strong>{displayName}</strong>
-                    <small>
-                      {phase.durationMinutes} min ·{' '}
-                      {phase.type === 'focus' ? 'Focus' : 'Break'}
-                    </small>
-                  </button>
-                </li>
-              </Fragment>
-            );
-          })}
-          {dropGapIndex === editor.draft.phases.length ? (
-            <li
-              className="phase-drop-indicator"
-              data-testid="phase-drop-indicator"
-              aria-hidden="true"
-            />
-          ) : null}
-        </ol>
+                    <button
+                      type="button"
+                      className="phase-drag-handle"
+                      tabIndex={-1}
+                      aria-label={`Drag ${fallbackName}${displayName === fallbackName ? '' : `: ${displayName}`}`}
+                      title={`Drag ${fallbackName}${displayName === fallbackName ? '' : `: ${displayName}`}`}
+                      {...phaseDrag.getHandleProps(phase.key)}
+                    >
+                      ⠿
+                    </button>
+                    <button
+                      ref={(node) => {
+                        if (node === null) phaseTabs.current.delete(phase.key);
+                        else phaseTabs.current.set(phase.key, node);
+                      }}
+                      type="button"
+                      className="phase-sequence__item"
+                      aria-label={accessibleName}
+                      aria-pressed={phase.key === selectedPhaseKey}
+                      tabIndex={phase.key === selectedPhaseKey ? 0 : -1}
+                      onClick={() => {
+                        setSelectedPhaseKey(phase.key);
+                      }}
+                      onKeyDown={(event) => {
+                        handlePhaseTabKey(event, phase.key);
+                      }}
+                    >
+                      <span className="phase-sequence__type">
+                        {String(index + 1).padStart(2, '0')} ·{' '}
+                        {phase.type === 'focus' ? 'Focus' : 'Break'}
+                      </span>
+                      <strong>{displayName}</strong>
+                      <small className="phase-sequence__duration">
+                        {phase.durationMinutes} min
+                      </small>
+                      {hasRewardMarker ? (
+                        <span
+                          className="phase-sequence__reward-marker"
+                          title="Reward after this phase"
+                          aria-label="Reward after this phase"
+                        >
+                          ◇
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                </Fragment>
+              );
+            })}
+            {dropGapIndex === editor.draft.phases.length ? (
+              <li
+                className="phase-drop-indicator"
+                data-testid="phase-drop-indicator"
+                aria-hidden="true"
+              />
+            ) : null}
+          </ol>
+        </div>
         {selectedPhase === undefined ? null : (
           <PhaseEnvironmentPreview
             phaseName={selectedPhase.name}
@@ -519,7 +550,7 @@ export function WorkflowEditor({
                   aria-label={`${displayName} settings`}
                 >
                   <div className="phase-item__header">
-                    <h3>Basic</h3>
+                    <h3>{displayName} settings</h3>
                     <div className="phase-item__actions">
                       <Button
                         variant="quiet"
@@ -601,96 +632,109 @@ export function WorkflowEditor({
                       </Button>
                     </div>
                   </div>
-                  <div id={contentId} hidden={collapsed}>
-                    {editor.draft.rewardDice.enabled ? (
-                      <label className="check-control">
-                        <input
-                          type="checkbox"
-                          checked={editor.rewardAfterPhaseKeys.includes(
-                            phase.key,
-                          )}
-                          onChange={() => {
-                            editor.toggleRewardAfterPhase(phase.key);
-                          }}
-                        />
-                        Reward after Phase {String(index + 1)}
-                      </label>
-                    ) : null}
-                    <div className="form-grid phase-settings__basic">
-                      <Field label={`${fallbackName} name`} hint="Optional.">
-                        <input
-                          value={phase.name}
-                          onChange={(event) => {
-                            editor.updatePhase(phase.key, {
-                              name: event.target.value,
-                            });
-                          }}
-                        />
-                      </Field>
-                      <Select
-                        label={`Phase ${String(index + 1)} type`}
-                        value={phase.type}
-                        onChange={(event) => {
-                          editor.updatePhase(phase.key, {
-                            type:
-                              event.target.value === 'break'
-                                ? 'break'
-                                : 'focus',
-                          });
-                        }}
-                      >
-                        <option value="focus">Focus</option>
-                        <option value="break">Break</option>
-                      </Select>
-                      <Field
-                        label={`Phase ${String(index + 1)} duration in minutes`}
-                        error={errors[`phase:${phase.key}:duration`]}
-                      >
-                        <input
-                          ref={(node) => {
-                            if (node === null)
-                              phaseDurationInputs.current.delete(phase.key);
-                            else
-                              phaseDurationInputs.current.set(phase.key, node);
-                          }}
-                          inputMode="decimal"
-                          type="text"
-                          value={phase.durationMinutes}
-                          onChange={(event) => {
-                            setDurationError(
-                              `phase:${phase.key}:duration`,
-                              false,
-                            );
-                            editor.updatePhase(phase.key, {
-                              durationMinutes: event.target.value,
-                            });
-                          }}
-                          onBlur={() => {
-                            setDurationError(
-                              `phase:${phase.key}:duration`,
-                              !editor.commitPhaseDuration(phase.key),
-                            );
-                          }}
-                          onKeyDown={(event) => {
-                            if (
-                              event.key !== 'ArrowUp' &&
-                              event.key !== 'ArrowDown'
-                            )
-                              return;
-                            event.preventDefault();
-                            setDurationError(
-                              `phase:${phase.key}:duration`,
-                              !editor.stepPhaseDuration(
-                                phase.key,
-                                event.key === 'ArrowUp' ? 1 : -1,
-                              ),
-                            );
-                          }}
-                        />
-                      </Field>
-                    </div>
+                  <div
+                    id={contentId}
+                    className="phase-settings__cards"
+                    hidden={collapsed}
+                  >
                     <section
-                      className="phase-settings__environment"
+                      className="phase-settings__card phase-settings__card--basic"
+                      aria-labelledby={`phase-${phase.key}-basic-title`}
+                    >
+                      <h3 id={`phase-${phase.key}-basic-title`}>Basic</h3>
+                      {editor.draft.rewardDice.enabled ? (
+                        <label className="check-control">
+                          <input
+                            type="checkbox"
+                            checked={editor.rewardAfterPhaseKeys.includes(
+                              phase.key,
+                            )}
+                            onChange={() => {
+                              editor.toggleRewardAfterPhase(phase.key);
+                            }}
+                          />
+                          Reward after Phase {String(index + 1)}
+                        </label>
+                      ) : null}
+                      <div className="form-grid phase-settings__basic">
+                        <Field label={`${fallbackName} name`} hint="Optional.">
+                          <input
+                            value={phase.name}
+                            onChange={(event) => {
+                              editor.updatePhase(phase.key, {
+                                name: event.target.value,
+                              });
+                            }}
+                          />
+                        </Field>
+                        <Select
+                          label={`Phase ${String(index + 1)} type`}
+                          value={phase.type}
+                          onChange={(event) => {
+                            editor.updatePhase(phase.key, {
+                              type:
+                                event.target.value === 'break'
+                                  ? 'break'
+                                  : 'focus',
+                            });
+                          }}
+                        >
+                          <option value="focus">Focus</option>
+                          <option value="break">Break</option>
+                        </Select>
+                        <Field
+                          label={`Phase ${String(index + 1)} duration in minutes`}
+                          error={errors[`phase:${phase.key}:duration`]}
+                        >
+                          <input
+                            ref={(node) => {
+                              if (node === null)
+                                phaseDurationInputs.current.delete(phase.key);
+                              else
+                                phaseDurationInputs.current.set(
+                                  phase.key,
+                                  node,
+                                );
+                            }}
+                            inputMode="decimal"
+                            type="text"
+                            value={phase.durationMinutes}
+                            onChange={(event) => {
+                              setDurationError(
+                                `phase:${phase.key}:duration`,
+                                false,
+                              );
+                              editor.updatePhase(phase.key, {
+                                durationMinutes: event.target.value,
+                              });
+                            }}
+                            onBlur={() => {
+                              setDurationError(
+                                `phase:${phase.key}:duration`,
+                                !editor.commitPhaseDuration(phase.key),
+                              );
+                            }}
+                            onKeyDown={(event) => {
+                              if (
+                                event.key !== 'ArrowUp' &&
+                                event.key !== 'ArrowDown'
+                              )
+                                return;
+                              event.preventDefault();
+                              setDurationError(
+                                `phase:${phase.key}:duration`,
+                                !editor.stepPhaseDuration(
+                                  phase.key,
+                                  event.key === 'ArrowUp' ? 1 : -1,
+                                ),
+                              );
+                            }}
+                          />
+                        </Field>
+                      </div>
+                    </section>
+                    <section
+                      className="phase-settings__card phase-settings__card--environment phase-settings__environment"
                       aria-labelledby={`phase-${phase.key}-environment-title`}
                     >
                       <h3 id={`phase-${phase.key}-environment-title`}>

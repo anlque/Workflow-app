@@ -30,6 +30,8 @@ import {
 import {
   QuickWorkflowEditor,
   WorkflowEditor,
+  WorkflowEditorChromeProvider,
+  WorkflowEditorChromeTarget,
   WorkflowLibrary,
   type AssetReferenceTransform,
 } from '@/features/workflow/studio';
@@ -283,7 +285,6 @@ export function WorkflowStudio({
           : selectedWorkflow !== undefined
             ? {
                 title: selectedWorkflow.name,
-                accessibleTitle: `Current workflow: ${selectedWorkflow.name}`,
                 detail:
                   selectedWorkflow.mode === 'quick'
                     ? 'Quick setup'
@@ -296,417 +297,429 @@ export function WorkflowStudio({
                     ? 'Quick setup'
                     : 'Detailed setup',
               };
+  const editorContext = activeTab === 'workflows' && !workflowLibraryOpen;
 
   return (
-    <WorkflowStudioShell
-      topBar={
-        <>
-          <div className="workflow-studio-shell__context">
-            <h1
-              aria-label={
-                'accessibleTitle' in studioContext
-                  ? studioContext.accessibleTitle
-                  : undefined
-              }
-            >
-              {studioContext.title}
-            </h1>
-            <p>{studioContext.detail}</p>
-          </div>
-          <Button
-            variant="secondary"
-            pending={sidePanel.pending}
-            pendingLabel={sidePanelLabel}
-            onClick={() => {
-              void sidePanel.toggle();
-            }}
-          >
-            {sidePanelLabel}
-          </Button>
-        </>
-      }
-      navigation={(orientation) => (
-        <div
-          className="tabs workflow-studio-shell__tabs"
-          role="tablist"
-          aria-label="Configuration"
-          aria-orientation={orientation}
-        >
-          {tabs.map((tab) => {
-            const label = tabLabel(tab);
-            return (
-              <button
-                key={tab}
-                ref={(node) => {
-                  if (node === null) tabRefs.current.delete(tab);
-                  else tabRefs.current.set(tab, node);
-                }}
-                id={`tab-${tab}`}
-                className="tab"
-                type="button"
-                role="tab"
-                aria-selected={activeTab === tab}
-                aria-controls={`panel-${tab}`}
-                tabIndex={activeTab === tab ? 0 : -1}
+    <WorkflowEditorChromeProvider>
+      <WorkflowStudioShell
+        topBar={
+          <>
+            <div className="workflow-studio-shell__context">
+              <h1>{studioContext.title}</h1>
+              {editorContext ? (
+                <h2>{studioContext.detail}</h2>
+              ) : (
+                <p>{studioContext.detail}</p>
+              )}
+            </div>
+            <div className="workflow-studio-shell__top-bar-controls">
+              {editorContext ? <WorkflowEditorChromeTarget /> : null}
+              <Button
+                variant="secondary"
+                pending={sidePanel.pending}
+                pendingLabel={sidePanelLabel}
                 onClick={() => {
-                  selectTab(tab);
-                }}
-                onKeyDown={(event) => {
-                  handleTabKey(event, orientation);
+                  void sidePanel.toggle();
                 }}
               >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    >
-      {sidePanel.error === null ? null : (
-        <p className="feedback feedback--error" role="alert">
-          {sidePanel.error}
-        </p>
-      )}
-      <section
-        className="tab-panel"
-        id="panel-workflows"
-        role="tabpanel"
-        aria-labelledby="tab-workflows"
-        hidden={activeTab !== 'workflows'}
-      >
-        <div className="workflow-workspace">
-          <aside
-            className="workflow-workspace__library"
-            hidden={!workflowLibraryOpen}
-          >
-            <WorkflowLibrary
-              workflows={snapshot.workflows}
-              {...(selectedWorkflowId === undefined
-                ? {}
-                : { selectedWorkflowId })}
-              onCreate={(mode) => {
-                navigate(() => {
-                  setQuickDirty(false);
-                  setNewWorkflowId(dependencies.createId());
-                  setNewWorkflowMode(mode);
-                  setSelectedWorkflowId(undefined);
-                  setWorkflowLibraryOpen(false);
-                });
-                return Promise.resolve();
-              }}
-              onOpen={(id) => {
-                navigate(() => {
-                  setQuickDirty(false);
-                  setNewWorkflowId(null);
-                  setSelectedWorkflowId(id);
-                  setWorkflowLibraryOpen(false);
-                });
-              }}
-              onDuplicate={async (id) => {
-                await dependencies.duplicateWorkflow(id);
-                await load(id);
-              }}
-              onDelete={async (id) => {
-                await dependencies.deleteWorkflow(id);
-                setNewWorkflowId(null);
-                await load();
-              }}
-              onReorder={async (ids) => {
-                await dependencies.reorderWorkflows(ids);
-                await load(selectedWorkflowId);
-              }}
-            />
-          </aside>
+                {sidePanelLabel}
+              </Button>
+            </div>
+          </>
+        }
+        navigation={(orientation) => (
           <div
-            className="workflow-workspace__editor"
-            hidden={workflowLibraryOpen}
+            className="tabs workflow-studio-shell__tabs"
+            role="tablist"
+            aria-label="Configuration"
+            aria-orientation={orientation}
           >
-            {selectedWorkflow === undefined && newWorkflowId === null ? null : (
-              <div className="workflow-editor-navigation">
-                <Button
-                  variant="quiet"
+            {tabs.map((tab) => {
+              const label = tabLabel(tab);
+              return (
+                <button
+                  key={tab}
+                  ref={(node) => {
+                    if (node === null) tabRefs.current.delete(tab);
+                    else tabRefs.current.set(tab, node);
+                  }}
+                  id={`tab-${tab}`}
+                  className="tab"
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab}
+                  aria-controls={`panel-${tab}`}
+                  tabIndex={activeTab === tab ? 0 : -1}
                   onClick={() => {
-                    navigate(() => {
-                      setWorkflowLibraryOpen(true);
-                    });
+                    selectTab(tab);
+                  }}
+                  onKeyDown={(event) => {
+                    handleTabKey(event, orientation);
                   }}
                 >
-                  Back to workflows
-                </Button>
-              </div>
-            )}
-            {selectedWorkflow === undefined && newWorkflowId === null ? (
-              <div className="workspace-prompt">
-                <h2>Select or create a Workflow.</h2>
-                <p>The editor will open here without leaving this page.</p>
-              </div>
-            ) : selectedWorkflow?.mode === 'quick' ||
-              (selectedWorkflow === undefined &&
-                newWorkflowMode === 'quick') ? (
-              <QuickWorkflowEditor
-                key={selectedWorkflow?.id ?? newWorkflowId ?? 'new'}
-                workflowId={
-                  selectedWorkflow?.id ??
-                  newWorkflowId ??
-                  dependencies.createId()
-                }
-                assets={snapshot.assets}
-                {...(selectedWorkflow?.mode === 'quick'
-                  ? { workflow: selectedWorkflow }
-                  : {})}
-                onDirtyChange={setQuickDirty}
-                {...(selectedWorkflow?.mode !== 'quick'
-                  ? {}
-                  : {
-                      onConvert: (input, keepQuickCopy) =>
-                        dependencies.convertQuickWorkflow(input, keepQuickCopy),
-                      onSynchronizeConversion: async () => {
-                        await dependencies.synchronizeWorkflowConversion();
-                        await load(selectedWorkflow.id);
-                        setQuickDirty(false);
-                      },
-                    })}
-                onUploadAsset={async (file, kind) => {
-                  const asset = await dependencies.importAsset(file, kind);
-                  setSnapshot((current) =>
-                    current === null
-                      ? current
-                      : {
-                          ...current,
-                          assets: [
-                            ...current.assets.filter(
-                              ({ id }) => id !== asset.id,
-                            ),
-                            asset,
-                          ],
-                        },
-                  );
-                  return asset;
-                }}
-                onSynchronizeAssetUpload={async () => {
-                  await dependencies.synchronizeAssetImport();
-                  await reloadSnapshot();
-                }}
-                onSave={async (input) => {
-                  await dependencies.saveWorkflow(input);
-                  const id = createWorkflowId(input.id);
-                  if (newWorkflowId !== null) {
-                    const loaded = await dependencies.load();
-                    const ids = loaded.workflows.map(({ id: value }) => value);
-                    const currentIndex = ids.indexOf(id);
-                    const firstModeIndex = loaded.workflows.findIndex(
-                      (workflow) =>
-                        workflow.id !== id && workflow.mode === input.mode,
-                    );
-                    if (
-                      currentIndex >= 0 &&
-                      firstModeIndex >= 0 &&
-                      currentIndex !== firstModeIndex
-                    ) {
-                      ids.splice(currentIndex, 1);
-                      ids.splice(firstModeIndex, 0, id);
-                      await dependencies.reorderWorkflows(ids);
-                    }
-                  }
-                  await load(id);
-                  setNewWorkflowId(null);
-                }}
-              />
-            ) : (
-              <WorkflowEditor
-                key={selectedWorkflow?.id ?? newWorkflowId ?? 'new'}
-                workflowId={
-                  selectedWorkflow?.id ??
-                  newWorkflowId ??
-                  dependencies.createId()
-                }
-                assets={snapshot.assets}
-                loadAssetBlob={dependencies.loadAssetBlob}
-                createObjectUrl={dependencies.createObjectUrl}
-                revokeObjectUrl={dependencies.revokeObjectUrl}
-                onUploadAsset={async (file, kind) => {
-                  const asset = await dependencies.importAsset(file, kind);
-                  setSnapshot((current) =>
-                    current === null
-                      ? current
-                      : {
-                          ...current,
-                          assets: [
-                            ...current.assets.filter(
-                              ({ id }) => id !== asset.id,
-                            ),
-                            asset,
-                          ],
-                        },
-                  );
-                  return asset;
-                }}
-                onSynchronizeAssetUpload={async () => {
-                  await dependencies.synchronizeAssetImport();
-                  await reloadSnapshot();
-                }}
-                {...(selectedWorkflow === undefined
-                  ? {}
-                  : { workflow: selectedWorkflow })}
-                {...(assetReferenceTransform === undefined
-                  ? {}
-                  : { assetReferenceTransform })}
-                onSave={async (input) => {
-                  await dependencies.saveWorkflow(input);
-                  const id = createWorkflowId(input.id);
-                  if (newWorkflowId !== null) {
-                    const loaded = await dependencies.load();
-                    const ids = loaded.workflows.map(({ id: value }) => value);
-                    const currentIndex = ids.indexOf(id);
-                    const firstModeIndex = loaded.workflows.findIndex(
-                      (workflow) =>
-                        workflow.id !== id && workflow.mode === 'detailed',
-                    );
-                    if (
-                      currentIndex >= 0 &&
-                      firstModeIndex >= 0 &&
-                      currentIndex !== firstModeIndex
-                    ) {
-                      ids.splice(currentIndex, 1);
-                      ids.splice(firstModeIndex, 0, id);
-                      await dependencies.reorderWorkflows(ids);
-                    }
-                  }
-                  await load(id);
-                  setNewWorkflowId(null);
-                }}
-              />
-            )}
+                  {label}
+                </button>
+              );
+            })}
           </div>
-        </div>
-      </section>
-      <section
-        className="tab-panel"
-        id="panel-assets"
-        role="tabpanel"
-        aria-labelledby="tab-assets"
-        hidden={activeTab !== 'assets'}
+        )}
       >
-        <AssetLibrary
-          assets={snapshot.assets}
-          onImport={async (file, kind) => {
-            await dependencies.importAsset(file, kind);
-            await reloadSnapshot();
-          }}
-          onInspectRetirement={(id) => dependencies.inspectAssetRetirement(id)}
-          onRetire={async (preview, choice) => {
-            pendingRetirementTransform.current = retirementReferenceTransform(
-              preview,
-              choice,
-            );
-            await dependencies.retireAsset(preview, choice);
-          }}
-          onSynchronizeRetirement={async () => {
-            await dependencies.synchronizeAssetRetirement();
-            await reloadSnapshot();
-            if (pendingRetirementTransform.current !== undefined) {
-              setAssetReferenceTransform(pendingRetirementTransform.current);
-              pendingRetirementTransform.current = undefined;
-            }
-          }}
-          createRetirementUploadInput={(file, kind) =>
-            dependencies.createAssetRetirementUploadInput(file, kind)
-          }
-          onInspectRoleChange={(id, value) =>
-            dependencies.inspectAssetRoleChange(id, value)
-          }
-          onApplyRoleChange={async (preview) => {
-            pendingRoleTransform.current = roleReferenceTransform(preview);
-            await dependencies.applyAssetRoleChange(preview);
-            await reloadSnapshot();
-            if (pendingRoleTransform.current !== undefined) {
-              setAssetReferenceTransform(pendingRoleTransform.current);
-              pendingRoleTransform.current = undefined;
-            }
-          }}
-          onSynchronizeRoleChange={async () => {
-            await dependencies.synchronizeAssetRoleChange();
-            await reloadSnapshot();
-            if (pendingRoleTransform.current !== undefined) {
-              setAssetReferenceTransform(pendingRoleTransform.current);
-              pendingRoleTransform.current = undefined;
-            }
-          }}
-          loadBlob={dependencies.loadAssetBlob}
-          createObjectUrl={dependencies.createObjectUrl}
-          revokeObjectUrl={dependencies.revokeObjectUrl}
-        />
-      </section>
-      <section
-        className="tab-panel"
-        id="panel-settings"
-        role="tabpanel"
-        aria-labelledby="tab-settings"
-        hidden={activeTab !== 'settings'}
-      >
-        <SettingsPage
-          settings={{
-            ...snapshot.settings,
-            theme: documentPreferences.theme,
-            reducedMotion: documentPreferences.reducedMotion,
-            ambientVolumePercent: documentPreferences.ambientVolumePercent,
-            ambientMuted: documentPreferences.ambientMuted,
-            cueVolumePercent: documentPreferences.cueVolumePercent,
-            cuesMuted: documentPreferences.cuesMuted,
-            muteCuesWithMusic: documentPreferences.muteCuesWithMusic,
-            backgroundBlurPx: documentPreferences.backgroundBlurPx,
-            backgroundBrightnessPercent:
-              documentPreferences.backgroundBrightnessPercent,
-            pauseWithSpace: documentPreferences.pauseWithSpace,
-          }}
-          onUpdate={async (settings) => {
-            await dependencies.updateSettings(settings);
-            await reloadSnapshot();
-          }}
-          onExportSettings={() => dependencies.exportSettings()}
-          onImportSettings={async (file) => {
-            await dependencies.importSettings(file);
-            await reloadSnapshot();
-          }}
-          onExportWorkflow={() =>
-            dependencies.exportWorkflow(selectedWorkflowId)
-          }
-          onImportWorkflow={async (file) => {
-            await dependencies.importWorkflow(file);
-            await reloadSnapshot();
-          }}
-        />
-      </section>
-      <Dialog
-        open={pendingNavigation !== null}
-        title="Discard changes?"
-        onCancel={() => {
-          setPendingNavigation(null);
-        }}
-      >
-        <p>Your unsaved Quick Workflow changes will be lost.</p>
-        <div className="dialog__actions">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setPendingNavigation(null);
+        {sidePanel.error === null ? null : (
+          <p className="feedback feedback--error" role="alert">
+            {sidePanel.error}
+          </p>
+        )}
+        <section
+          className="tab-panel"
+          id="panel-workflows"
+          role="tabpanel"
+          aria-labelledby="tab-workflows"
+          hidden={activeTab !== 'workflows'}
+        >
+          <div className="workflow-workspace">
+            <aside
+              className="workflow-workspace__library"
+              hidden={!workflowLibraryOpen}
+            >
+              <WorkflowLibrary
+                workflows={snapshot.workflows}
+                {...(selectedWorkflowId === undefined
+                  ? {}
+                  : { selectedWorkflowId })}
+                onCreate={(mode) => {
+                  navigate(() => {
+                    setQuickDirty(false);
+                    setNewWorkflowId(dependencies.createId());
+                    setNewWorkflowMode(mode);
+                    setSelectedWorkflowId(undefined);
+                    setWorkflowLibraryOpen(false);
+                  });
+                  return Promise.resolve();
+                }}
+                onOpen={(id) => {
+                  navigate(() => {
+                    setQuickDirty(false);
+                    setNewWorkflowId(null);
+                    setSelectedWorkflowId(id);
+                    setWorkflowLibraryOpen(false);
+                  });
+                }}
+                onDuplicate={async (id) => {
+                  await dependencies.duplicateWorkflow(id);
+                  await load(id);
+                }}
+                onDelete={async (id) => {
+                  await dependencies.deleteWorkflow(id);
+                  setNewWorkflowId(null);
+                  await load();
+                }}
+                onReorder={async (ids) => {
+                  await dependencies.reorderWorkflows(ids);
+                  await load(selectedWorkflowId);
+                }}
+              />
+            </aside>
+            <div
+              className="workflow-workspace__editor"
+              hidden={workflowLibraryOpen}
+            >
+              {selectedWorkflow === undefined &&
+              newWorkflowId === null ? null : (
+                <div className="workflow-editor-navigation">
+                  <Button
+                    variant="quiet"
+                    onClick={() => {
+                      navigate(() => {
+                        setWorkflowLibraryOpen(true);
+                      });
+                    }}
+                  >
+                    Back to workflows
+                  </Button>
+                </div>
+              )}
+              {selectedWorkflow === undefined && newWorkflowId === null ? (
+                <div className="workspace-prompt">
+                  <h2>Select or create a Workflow.</h2>
+                  <p>The editor will open here without leaving this page.</p>
+                </div>
+              ) : selectedWorkflow?.mode === 'quick' ||
+                (selectedWorkflow === undefined &&
+                  newWorkflowMode === 'quick') ? (
+                <QuickWorkflowEditor
+                  key={selectedWorkflow?.id ?? newWorkflowId ?? 'new'}
+                  workflowId={
+                    selectedWorkflow?.id ??
+                    newWorkflowId ??
+                    dependencies.createId()
+                  }
+                  assets={snapshot.assets}
+                  {...(selectedWorkflow?.mode === 'quick'
+                    ? { workflow: selectedWorkflow }
+                    : {})}
+                  onDirtyChange={setQuickDirty}
+                  {...(selectedWorkflow?.mode !== 'quick'
+                    ? {}
+                    : {
+                        onConvert: (input, keepQuickCopy) =>
+                          dependencies.convertQuickWorkflow(
+                            input,
+                            keepQuickCopy,
+                          ),
+                        onSynchronizeConversion: async () => {
+                          await dependencies.synchronizeWorkflowConversion();
+                          await load(selectedWorkflow.id);
+                          setQuickDirty(false);
+                        },
+                      })}
+                  onUploadAsset={async (file, kind) => {
+                    const asset = await dependencies.importAsset(file, kind);
+                    setSnapshot((current) =>
+                      current === null
+                        ? current
+                        : {
+                            ...current,
+                            assets: [
+                              ...current.assets.filter(
+                                ({ id }) => id !== asset.id,
+                              ),
+                              asset,
+                            ],
+                          },
+                    );
+                    return asset;
+                  }}
+                  onSynchronizeAssetUpload={async () => {
+                    await dependencies.synchronizeAssetImport();
+                    await reloadSnapshot();
+                  }}
+                  onSave={async (input) => {
+                    await dependencies.saveWorkflow(input);
+                    const id = createWorkflowId(input.id);
+                    if (newWorkflowId !== null) {
+                      const loaded = await dependencies.load();
+                      const ids = loaded.workflows.map(
+                        ({ id: value }) => value,
+                      );
+                      const currentIndex = ids.indexOf(id);
+                      const firstModeIndex = loaded.workflows.findIndex(
+                        (workflow) =>
+                          workflow.id !== id && workflow.mode === input.mode,
+                      );
+                      if (
+                        currentIndex >= 0 &&
+                        firstModeIndex >= 0 &&
+                        currentIndex !== firstModeIndex
+                      ) {
+                        ids.splice(currentIndex, 1);
+                        ids.splice(firstModeIndex, 0, id);
+                        await dependencies.reorderWorkflows(ids);
+                      }
+                    }
+                    await load(id);
+                    setNewWorkflowId(null);
+                  }}
+                />
+              ) : (
+                <WorkflowEditor
+                  key={selectedWorkflow?.id ?? newWorkflowId ?? 'new'}
+                  workflowId={
+                    selectedWorkflow?.id ??
+                    newWorkflowId ??
+                    dependencies.createId()
+                  }
+                  assets={snapshot.assets}
+                  loadAssetBlob={dependencies.loadAssetBlob}
+                  createObjectUrl={dependencies.createObjectUrl}
+                  revokeObjectUrl={dependencies.revokeObjectUrl}
+                  onUploadAsset={async (file, kind) => {
+                    const asset = await dependencies.importAsset(file, kind);
+                    setSnapshot((current) =>
+                      current === null
+                        ? current
+                        : {
+                            ...current,
+                            assets: [
+                              ...current.assets.filter(
+                                ({ id }) => id !== asset.id,
+                              ),
+                              asset,
+                            ],
+                          },
+                    );
+                    return asset;
+                  }}
+                  onSynchronizeAssetUpload={async () => {
+                    await dependencies.synchronizeAssetImport();
+                    await reloadSnapshot();
+                  }}
+                  {...(selectedWorkflow === undefined
+                    ? {}
+                    : { workflow: selectedWorkflow })}
+                  {...(assetReferenceTransform === undefined
+                    ? {}
+                    : { assetReferenceTransform })}
+                  onSave={async (input) => {
+                    await dependencies.saveWorkflow(input);
+                    const id = createWorkflowId(input.id);
+                    if (newWorkflowId !== null) {
+                      const loaded = await dependencies.load();
+                      const ids = loaded.workflows.map(
+                        ({ id: value }) => value,
+                      );
+                      const currentIndex = ids.indexOf(id);
+                      const firstModeIndex = loaded.workflows.findIndex(
+                        (workflow) =>
+                          workflow.id !== id && workflow.mode === 'detailed',
+                      );
+                      if (
+                        currentIndex >= 0 &&
+                        firstModeIndex >= 0 &&
+                        currentIndex !== firstModeIndex
+                      ) {
+                        ids.splice(currentIndex, 1);
+                        ids.splice(firstModeIndex, 0, id);
+                        await dependencies.reorderWorkflows(ids);
+                      }
+                    }
+                    await load(id);
+                    setNewWorkflowId(null);
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        </section>
+        <section
+          className="tab-panel"
+          id="panel-assets"
+          role="tabpanel"
+          aria-labelledby="tab-assets"
+          hidden={activeTab !== 'assets'}
+        >
+          <AssetLibrary
+            assets={snapshot.assets}
+            onImport={async (file, kind) => {
+              await dependencies.importAsset(file, kind);
+              await reloadSnapshot();
             }}
-          >
-            Stay
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              const action = pendingNavigation;
-              setPendingNavigation(null);
-              setQuickDirty(false);
-              action?.();
+            onInspectRetirement={(id) =>
+              dependencies.inspectAssetRetirement(id)
+            }
+            onRetire={async (preview, choice) => {
+              pendingRetirementTransform.current = retirementReferenceTransform(
+                preview,
+                choice,
+              );
+              await dependencies.retireAsset(preview, choice);
             }}
-          >
-            Discard changes
-          </Button>
-        </div>
-      </Dialog>
-    </WorkflowStudioShell>
+            onSynchronizeRetirement={async () => {
+              await dependencies.synchronizeAssetRetirement();
+              await reloadSnapshot();
+              if (pendingRetirementTransform.current !== undefined) {
+                setAssetReferenceTransform(pendingRetirementTransform.current);
+                pendingRetirementTransform.current = undefined;
+              }
+            }}
+            createRetirementUploadInput={(file, kind) =>
+              dependencies.createAssetRetirementUploadInput(file, kind)
+            }
+            onInspectRoleChange={(id, value) =>
+              dependencies.inspectAssetRoleChange(id, value)
+            }
+            onApplyRoleChange={async (preview) => {
+              pendingRoleTransform.current = roleReferenceTransform(preview);
+              await dependencies.applyAssetRoleChange(preview);
+              await reloadSnapshot();
+              if (pendingRoleTransform.current !== undefined) {
+                setAssetReferenceTransform(pendingRoleTransform.current);
+                pendingRoleTransform.current = undefined;
+              }
+            }}
+            onSynchronizeRoleChange={async () => {
+              await dependencies.synchronizeAssetRoleChange();
+              await reloadSnapshot();
+              if (pendingRoleTransform.current !== undefined) {
+                setAssetReferenceTransform(pendingRoleTransform.current);
+                pendingRoleTransform.current = undefined;
+              }
+            }}
+            loadBlob={dependencies.loadAssetBlob}
+            createObjectUrl={dependencies.createObjectUrl}
+            revokeObjectUrl={dependencies.revokeObjectUrl}
+          />
+        </section>
+        <section
+          className="tab-panel"
+          id="panel-settings"
+          role="tabpanel"
+          aria-labelledby="tab-settings"
+          hidden={activeTab !== 'settings'}
+        >
+          <SettingsPage
+            settings={{
+              ...snapshot.settings,
+              theme: documentPreferences.theme,
+              reducedMotion: documentPreferences.reducedMotion,
+              ambientVolumePercent: documentPreferences.ambientVolumePercent,
+              ambientMuted: documentPreferences.ambientMuted,
+              cueVolumePercent: documentPreferences.cueVolumePercent,
+              cuesMuted: documentPreferences.cuesMuted,
+              muteCuesWithMusic: documentPreferences.muteCuesWithMusic,
+              backgroundBlurPx: documentPreferences.backgroundBlurPx,
+              backgroundBrightnessPercent:
+                documentPreferences.backgroundBrightnessPercent,
+              pauseWithSpace: documentPreferences.pauseWithSpace,
+            }}
+            onUpdate={async (settings) => {
+              await dependencies.updateSettings(settings);
+              await reloadSnapshot();
+            }}
+            onExportSettings={() => dependencies.exportSettings()}
+            onImportSettings={async (file) => {
+              await dependencies.importSettings(file);
+              await reloadSnapshot();
+            }}
+            onExportWorkflow={() =>
+              dependencies.exportWorkflow(selectedWorkflowId)
+            }
+            onImportWorkflow={async (file) => {
+              await dependencies.importWorkflow(file);
+              await reloadSnapshot();
+            }}
+          />
+        </section>
+        <Dialog
+          open={pendingNavigation !== null}
+          title="Discard changes?"
+          onCancel={() => {
+            setPendingNavigation(null);
+          }}
+        >
+          <p>Your unsaved Quick Workflow changes will be lost.</p>
+          <div className="dialog__actions">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setPendingNavigation(null);
+              }}
+            >
+              Stay
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const action = pendingNavigation;
+                setPendingNavigation(null);
+                setQuickDirty(false);
+                action?.();
+              }}
+            >
+              Discard changes
+            </Button>
+          </div>
+        </Dialog>
+      </WorkflowStudioShell>
+    </WorkflowEditorChromeProvider>
   );
 }

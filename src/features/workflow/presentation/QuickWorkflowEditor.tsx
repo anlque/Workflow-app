@@ -6,10 +6,13 @@ import {
   type AssetPickerUpload,
   type AssetPickerUploadSynchronization,
 } from '@/features/assets/studio';
-import { Button, Dialog, Field } from '@/shared';
+import { Button, Dialog, Field, Switch } from '@/shared';
 
 import type { QuickWorkflow } from '../domain/QuickWorkflow';
 import type { CreateWorkflowInput } from '../domain/Workflow';
+import { createQuickRhythmPresentation } from './quickRhythmPresentation';
+import { WorkflowEditorChromeActions } from './WorkflowEditorChrome';
+import { formatRewardWeightPresentation } from './rewardWeightPresentation';
 import {
   useQuickWorkflowEditor,
   validateQuickWorkflowDraft,
@@ -60,6 +63,20 @@ export function QuickWorkflowEditor({
   const [pendingRewardFocusKey, setPendingRewardFocusKey] = useState<
     string | null
   >(null);
+  const rhythm = createQuickRhythmPresentation({
+    cycleCount: editor.draft.cycleCount,
+    focusDurationMinutes: editor.draft.focus.durationMinutes,
+    shortBreakDurationMinutes: editor.draft.shortBreak.durationMinutes,
+    longBreak: {
+      enabled: editor.draft.longBreak.enabled,
+      frequency: editor.draft.longBreak.frequency,
+      durationMinutes: editor.draft.longBreak.durationMinutes,
+    },
+    reward: {
+      enabled: editor.draft.rewardDice.enabled,
+      frequency: editor.draft.rewardDice.frequency,
+    },
+  });
 
   useEffect(() => onDirtyChange?.(editor.dirty), [editor.dirty, onDirtyChange]);
 
@@ -122,35 +139,41 @@ export function QuickWorkflowEditor({
     );
   }
 
+  function durationField(phase: PhaseKey, label: string) {
+    const value = editor.draft[phase];
+    return (
+      <Field
+        label={`${label} duration in minutes`}
+        error={errors[durationKey(phase)]}
+      >
+        <input
+          type="text"
+          inputMode="decimal"
+          value={value.durationMinutes}
+          onChange={(event) => {
+            updatePhase(phase, { durationMinutes: event.target.value });
+          }}
+          onBlur={() => {
+            const valid = editor.commitDuration(phase);
+            setFieldError(
+              durationKey(phase),
+              valid
+                ? null
+                : 'Duration must be at least 0.5 minutes in 0.5-minute increments.',
+            );
+          }}
+          onKeyDown={(event) => {
+            handleDurationKey(event, phase);
+          }}
+        />
+      </Field>
+    );
+  }
+
   function phaseFields(phase: PhaseKey, label: string) {
     const value = editor.draft[phase];
     return (
       <div className="quick-setup__section-fields">
-        <Field
-          label={`${label} duration in minutes`}
-          error={errors[durationKey(phase)]}
-        >
-          <input
-            type="text"
-            inputMode="decimal"
-            value={value.durationMinutes}
-            onChange={(event) => {
-              updatePhase(phase, { durationMinutes: event.target.value });
-            }}
-            onBlur={() => {
-              const valid = editor.commitDuration(phase);
-              setFieldError(
-                durationKey(phase),
-                valid
-                  ? null
-                  : 'Duration must be at least 0.5 minutes in 0.5-minute increments.',
-              );
-            }}
-            onKeyDown={(event) => {
-              handleDurationKey(event, phase);
-            }}
-          />
-        </Field>
         <AssetPicker
           label={`${label} background image`}
           kind="image"
@@ -184,6 +207,11 @@ export function QuickWorkflowEditor({
       </div>
     );
   }
+
+  const rewardWeightPresentation = formatRewardWeightPresentation(
+    editor.draft.rewardDice.sides.map(({ weight }) => weight),
+  );
+  const formId = `quick-workflow-editor-${workflowId}`;
 
   async function save() {
     const result = validateQuickWorkflowDraft(editor.draft);
@@ -249,6 +277,7 @@ export function QuickWorkflowEditor({
 
   return (
     <form
+      id={formId}
       className="quick-setup"
       noValidate
       onSubmit={(event) => {
@@ -256,14 +285,7 @@ export function QuickWorkflowEditor({
         void save();
       }}
     >
-      <header className="editor-header">
-        <div>
-          <h2>Quick setup</h2>
-          <p>
-            Individual Phases and advanced Reward settings are available after
-            conversion to Detailed setup.
-          </p>
-        </div>
+      <WorkflowEditorChromeActions>
         <div className="editor-header__save">
           {saved ? (
             <span className="editor-header__save-status" role="status">
@@ -284,6 +306,7 @@ export function QuickWorkflowEditor({
             </Button>
           )}
           <Button
+            form={formId}
             variant="primary"
             type="submit"
             pending={saving}
@@ -292,7 +315,11 @@ export function QuickWorkflowEditor({
             Save workflow
           </Button>
         </div>
-      </header>
+      </WorkflowEditorChromeActions>
+      <p className="editor-introduction">
+        Individual Phases and advanced Reward settings are available after
+        conversion to Detailed setup.
+      </p>
       {Object.keys(errors).length === 0 ? null : (
         <p className="feedback feedback--error" role="alert">
           Review the highlighted fields before saving.
@@ -303,7 +330,7 @@ export function QuickWorkflowEditor({
           {saveError}
         </p>
       )}
-      <div className="form-grid">
+      <div className="quick-setup__identity">
         <Field label="Workflow name" error={errors['name']}>
           <input
             value={editor.draft.name}
@@ -312,31 +339,57 @@ export function QuickWorkflowEditor({
             }}
           />
         </Field>
-        <Field label="Cycles" error={errors['cycleCount']}>
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={editor.draft.cycleCount}
-            onChange={(event) => {
-              editor.setCycleCount(event.target.value);
-            }}
-          />
-        </Field>
       </div>
 
       <section
-        className="quick-setup__section"
-        aria-labelledby="quick-focus-title"
+        className="quick-setup__recipe"
+        aria-labelledby="quick-recipe-title"
       >
-        <h3 id="quick-focus-title">Focus</h3>
+        <div className="quick-setup__recipe-heading">
+          <h3 id="quick-recipe-title">Session recipe</h3>
+          <p>Define the rhythm generated from this Quick setup.</p>
+        </div>
+        <div className="quick-setup__recipe-step quick-setup__recipe-step--focus">
+          {durationField('focus', 'Focus')}
+        </div>
+        <span className="quick-setup__recipe-operator" aria-hidden="true">
+          +
+        </span>
+        <div className="quick-setup__recipe-step quick-setup__recipe-step--break">
+          {durationField('shortBreak', 'Short Break')}
+        </div>
+        <span className="quick-setup__recipe-operator" aria-hidden="true">
+          ×
+        </span>
+        <div className="quick-setup__recipe-step quick-setup__recipe-step--cycles">
+          <Field label="Cycles" error={errors['cycleCount']}>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={editor.draft.cycleCount}
+              onChange={(event) => {
+                editor.setCycleCount(event.target.value);
+              }}
+            />
+          </Field>
+        </div>
+      </section>
+
+      <section
+        className="quick-setup__section quick-setup__section--focus"
+        aria-labelledby="quick-focus-title"
+        aria-label="Focus assets"
+      >
+        <h3 id="quick-focus-title">Focus assets</h3>
         {phaseFields('focus', 'Focus')}
       </section>
       <section
-        className="quick-setup__section"
+        className="quick-setup__section quick-setup__section--break"
         aria-labelledby="quick-short-break-title"
+        aria-label="Short Break assets"
       >
-        <h3 id="quick-short-break-title">Short Break</h3>
+        <h3 id="quick-short-break-title">Short Break assets</h3>
         {phaseFields('shortBreak', 'Short Break')}
       </section>
       <section
@@ -344,22 +397,16 @@ export function QuickWorkflowEditor({
         aria-labelledby="quick-long-break-title"
       >
         <h3 id="quick-long-break-title">Long Break</h3>
-        <label className="check-control">
-          <input
-            type="checkbox"
-            checked={editor.draft.longBreak.enabled}
-            onChange={(event) => {
-              editor.setDraft((current) => ({
-                ...current,
-                longBreak: {
-                  ...current.longBreak,
-                  enabled: event.target.checked,
-                },
-              }));
-            }}
-          />
-          Use Long Break
-        </label>
+        <Switch
+          label="Use Long Break"
+          checked={editor.draft.longBreak.enabled}
+          onChange={(enabled) => {
+            editor.setDraft((current) => ({
+              ...current,
+              longBreak: { ...current.longBreak, enabled },
+            }));
+          }}
+        />
         {editor.draft.longBreak.enabled ? (
           <>
             <Field
@@ -382,6 +429,7 @@ export function QuickWorkflowEditor({
                 }}
               />
             </Field>
+            {durationField('longBreak', 'Long Break')}
             {phaseFields('longBreak', 'Long Break')}
           </>
         ) : null}
@@ -392,22 +440,16 @@ export function QuickWorkflowEditor({
         aria-labelledby="quick-reward-title"
       >
         <h3 id="quick-reward-title">Reward Dice</h3>
-        <label className="check-control">
-          <input
-            type="checkbox"
-            checked={editor.draft.rewardDice.enabled}
-            onChange={(event) => {
-              editor.setDraft((current) => ({
-                ...current,
-                rewardDice: {
-                  ...current.rewardDice,
-                  enabled: event.target.checked,
-                },
-              }));
-            }}
-          />
-          Use Reward Dice
-        </label>
+        <Switch
+          label="Use Reward Dice"
+          checked={editor.draft.rewardDice.enabled}
+          onChange={(enabled) => {
+            editor.setDraft((current) => ({
+              ...current,
+              rewardDice: { ...current.rewardDice, enabled },
+            }));
+          }}
+        />
         {editor.draft.rewardDice.enabled ? (
           <div className="quick-setup__reward-controls">
             <Field
@@ -446,6 +488,50 @@ export function QuickWorkflowEditor({
         ) : null}
       </section>
 
+      <section
+        className="quick-setup__rhythm"
+        aria-labelledby="quick-rhythm-title"
+      >
+        <h3 id="quick-rhythm-title">Generated rhythm preview</h3>
+        <p>The sequence updates automatically with the settings above.</p>
+        {rhythm === null ? (
+          <p role="status">Complete the cadence settings to preview it.</p>
+        ) : (
+          <ol
+            className="quick-setup__rhythm-track"
+            aria-label="Generated rhythm"
+          >
+            {rhythm.map((cycle) => (
+              <li
+                className="quick-setup__rhythm-cycle"
+                key={cycle.cycleNumber}
+                aria-label={`Cycle ${String(cycle.cycleNumber)}: Focus, ${cycle.focusDurationMinutes} minutes; ${cycle.breakType}, ${cycle.breakDurationMinutes} minutes${cycle.rewardAfterCycle ? `; Reward after cycle ${String(cycle.cycleNumber)}` : ''}`}
+              >
+                <strong>Cycle {cycle.cycleNumber}</strong>
+                <span className="quick-setup__rhythm-phase quick-setup__rhythm-phase--focus">
+                  Focus · {cycle.focusDurationMinutes} min
+                </span>
+                <span aria-hidden="true">→</span>
+                <span
+                  className={`quick-setup__rhythm-phase ${
+                    cycle.breakType === 'Long break'
+                      ? 'quick-setup__rhythm-phase--long-break'
+                      : 'quick-setup__rhythm-phase--break'
+                  }`}
+                >
+                  {cycle.breakType} · {cycle.breakDurationMinutes} min
+                </span>
+                {cycle.rewardAfterCycle ? (
+                  <span className="quick-setup__rhythm-reward">
+                    Reward after cycle {cycle.cycleNumber}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
       <Dialog
         open={drawerOpen}
         className="quick-reward-drawer"
@@ -454,10 +540,19 @@ export function QuickWorkflowEditor({
           setDrawerOpen(false);
         }}
       >
+        <div className="quick-reward-drawer__summary">
+          <strong>{String(editor.draft.rewardDice.sides.length)} sides</strong>
+          {rewardWeightPresentation.summary === null ? null : (
+            <span>{rewardWeightPresentation.summary}</span>
+          )}
+        </div>
         <div className="quick-reward-drawer__sides">
           {editor.draft.rewardDice.sides.map((side, index) => (
             <fieldset className="quick-reward-side" key={side.key}>
               <legend>Reward side {String(index + 1)}</legend>
+              <span className="quick-reward-side__chance">
+                {rewardWeightPresentation.sides[index]}
+              </span>
               <Field
                 label={`Reward side ${String(index + 1)} icon`}
                 error={errors[`reward:${side.key}:icon`]}
@@ -560,7 +655,7 @@ export function QuickWorkflowEditor({
             </fieldset>
           ))}
         </div>
-        <div className="dialog__actions">
+        <div className="dialog__actions quick-reward-drawer__footer">
           <Button
             type="button"
             variant="secondary"

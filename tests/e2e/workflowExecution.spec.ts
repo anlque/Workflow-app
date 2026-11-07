@@ -251,11 +251,11 @@ test('names, duplicates and locally collapses Workflow Phases', async ({
   await options.getByLabel('Phase 1 name').fill('Writing');
   await options.getByRole('button', { name: 'Duplicate Phase 1' }).click();
   await options
-    .getByRole('button', { name: 'Select Phase 2: Writing' })
+    .getByRole('button', { name: /^Select Phase 2: Writing ·/u })
     .click();
   await options.getByLabel('Phase 2 name').fill('Review');
   await expect(
-    options.getByRole('button', { name: 'Select Phase 1: Writing' }),
+    options.getByRole('button', { name: /^Select Phase 1: Writing ·/u }),
   ).toBeVisible();
 
   await options.getByLabel('Phase 2 duration in minutes').fill('1.2');
@@ -280,7 +280,9 @@ test('names, duplicates and locally collapses Workflow Phases', async ({
   await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options.getByRole('button', { name: 'Open Structured focus' }).click();
   await expect(options.getByLabel('Phase 1 name')).toHaveValue('Writing');
-  await options.getByRole('button', { name: 'Select Phase 2: Review' }).click();
+  await options
+    .getByRole('button', { name: /^Select Phase 2: Review ·/u })
+    .click();
   await expect(options.getByLabel('Phase 2 name')).toHaveValue('Review');
 });
 
@@ -295,18 +297,22 @@ test('reorders Phases by pointer and keyboard while preserving a custom Reward m
   await options.getByLabel('Workflow name').fill('Reordered phases');
   await options.getByLabel('Phase 1 name').fill('One');
   await options.getByRole('button', { name: 'Add phase' }).click();
-  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await options.getByRole('button', { name: /^Select Phase 2 ·/u }).click();
   await options.getByLabel('Phase 2 name').fill('Two');
   await options.getByRole('button', { name: 'Add phase' }).click();
-  await options.getByRole('button', { name: 'Select Phase 3' }).click();
+  await options.getByRole('button', { name: /^Select Phase 3 ·/u }).click();
   await options.getByLabel('Phase 3 name').fill('Three');
   await options.getByRole('tab', { name: 'Reward Dice' }).click();
   await options.getByLabel('Enable Reward Dice').check();
-  await options.getByLabel('Reward schedule').selectOption('custom');
+  await options.getByRole('radio', { name: 'Custom' }).check();
   await options.getByRole('tab', { name: 'Phases' }).click();
-  await options.getByRole('button', { name: 'Select Phase 1: One' }).click();
+  await options
+    .getByRole('button', { name: /^Select Phase 1: One ·/u })
+    .click();
   await options.getByLabel('Reward after Phase 1').uncheck();
-  await options.getByRole('button', { name: 'Select Phase 3: Three' }).click();
+  await options
+    .getByRole('button', { name: /^Select Phase 3: Three ·/u })
+    .click();
   await options.getByLabel('Reward after Phase 3').uncheck();
   await options.getByRole('tab', { name: 'Reward Dice' }).click();
   await options.getByLabel('Reward side 1 icon').fill('☕');
@@ -315,11 +321,17 @@ test('reorders Phases by pointer and keyboard while preserving a custom Reward m
   await options.getByLabel('Reward side 2 icon').fill('🌿');
   await options.getByLabel('Reward side 2 title').fill('Walk');
   await options.getByRole('tab', { name: 'Phases' }).click();
-  await options.getByRole('button', { name: 'Select Phase 1: One' }).click();
+  await options
+    .getByRole('button', { name: /^Select Phase 1: One ·/u })
+    .click();
   await options.getByRole('button', { name: 'Collapse Phase 1: One' }).click();
-  await options.getByRole('button', { name: 'Select Phase 2: Two' }).click();
+  await options
+    .getByRole('button', { name: /^Select Phase 2: Two ·/u })
+    .click();
   await options.getByRole('button', { name: 'Collapse Phase 2: Two' }).click();
-  await options.getByRole('button', { name: 'Select Phase 3: Three' }).click();
+  await options
+    .getByRole('button', { name: /^Select Phase 3: Three ·/u })
+    .click();
   await options
     .getByRole('button', { name: 'Collapse Phase 3: Three' })
     .click();
@@ -369,20 +381,22 @@ test('reorders Phases by pointer and keyboard while preserving a custom Reward m
     options.getByText('Moved One to position 3 of 3.'),
   ).toBeAttached();
 
-  await options.getByRole('button', { name: 'Select Phase 1: Two' }).click();
+  await options
+    .getByRole('button', { name: /^Select Phase 1: Two ·/u })
+    .click();
   await options.getByRole('button', { name: 'Move Phase 1 down' }).focus();
   await options.keyboard.press('Enter');
   await expect(
     options.getByText('Moved Two to position 2 of 3.'),
   ).toBeAttached();
   await expect(
-    options.getByRole('button', { name: 'Select Phase 1: Three' }),
+    options.getByRole('button', { name: /^Select Phase 1: Three ·/u }),
   ).toBeVisible();
   await expect(
-    options.getByRole('button', { name: 'Select Phase 2: Two' }),
+    options.getByRole('button', { name: /^Select Phase 2: Two ·/u }),
   ).toBeVisible();
   await expect(
-    options.getByRole('button', { name: 'Select Phase 3: One' }),
+    options.getByRole('button', { name: /^Select Phase 3: One ·/u }),
   ).toBeVisible();
 
   await options.getByRole('button', { name: 'Save workflow' }).click();
@@ -391,13 +405,19 @@ test('reorders Phases by pointer and keyboard while preserving a custom Reward m
   await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options.getByRole('button', { name: 'Open Reordered phases' }).click();
   await expect(
-    options.getByRole('button', { name: 'Select Phase 1: Three' }),
+    options.getByRole('button', { name: /^Select Phase 1: Three ·/u }),
   ).toBeVisible();
-  await options.getByRole('button', { name: 'Select Phase 1: Three' }).click();
+  await options
+    .getByRole('button', { name: /^Select Phase 1: Three ·/u })
+    .click();
   await expect(options.getByLabel('Reward after Phase 1')).not.toBeChecked();
-  await options.getByRole('button', { name: 'Select Phase 2: Two' }).click();
+  await options
+    .getByRole('button', { name: /^Select Phase 2: Two ·/u })
+    .click();
   await expect(options.getByLabel('Reward after Phase 2')).toBeChecked();
-  await options.getByRole('button', { name: 'Select Phase 3: One' }).click();
+  await options
+    .getByRole('button', { name: /^Select Phase 3: One ·/u })
+    .click();
   await expect(options.getByLabel('Reward after Phase 3')).not.toBeChecked();
 });
 
@@ -700,9 +720,9 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
     .selectOption('role:bonus ambience');
 
   await options.getByRole('tab', { name: 'Phases' }).click();
-  await options.getByRole('button', { name: 'Select Phase 1' }).click();
+  await options.getByRole('button', { name: /^Select Phase 1 ·/u }).click();
   await options.getByLabel('Reward after Phase 1').uncheck();
-  await options.getByRole('button', { name: 'Select Phase 5' }).click();
+  await options.getByRole('button', { name: /^Select Phase 5 ·/u }).click();
   await options.getByLabel('Reward after Phase 5').uncheck();
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByRole('status')).toHaveText('Workflow saved');
@@ -711,7 +731,7 @@ test('persists a six-phase custom Reward schedule by phase marker', async ({
   await options.getByRole('button', { name: 'Back to workflows' }).click();
   await options.getByRole('button', { name: 'Open Custom rewards' }).click();
   await options.getByRole('tab', { name: 'Reward Dice' }).click();
-  await expect(options.getByLabel('Reward schedule')).toHaveValue('custom');
+  await expect(options.getByRole('radio', { name: 'Custom' })).toBeChecked();
   await expect(options.getByLabel('Reward side 1 availability')).toHaveValue(
     'early',
   );
@@ -788,7 +808,7 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
     label: 'reward-background.png',
   });
   await options.getByRole('button', { name: 'Add phase' }).click();
-  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await options.getByRole('button', { name: /^Select Phase 2 ·/u }).click();
   await options.getByLabel('Phase 2 type').selectOption('break');
   await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
   await options.getByRole('tab', { name: 'Reward Dice' }).click();
@@ -967,7 +987,7 @@ test('executes and restores a non-final Bonus Reward Phase authoritatively', asy
   await options.getByLabel('Workflow name').fill('Bonus Reward journey');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();
-  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await options.getByRole('button', { name: /^Select Phase 2 ·/u }).click();
   await options.getByLabel('Phase 2 type').selectOption('break');
   await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
   await options.getByRole('tab', { name: 'Reward Dice' }).click();
@@ -1048,7 +1068,7 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
   await options.getByLabel('Workflow name').fill('Restart journey');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();
-  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await options.getByRole('button', { name: /^Select Phase 2 ·/u }).click();
   await options.getByLabel('Phase 2 type').selectOption('break');
   await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
   await options.getByRole('tab', { name: 'Reward Dice' }).click();
@@ -1148,7 +1168,7 @@ test('skips ordinary, Reward and Bonus progress authoritatively across surfaces'
   await options.getByLabel('Workflow name').fill('Skip journey');
   await options.getByLabel('Phase 1 duration in minutes').fill('0.5');
   await options.getByRole('button', { name: 'Add phase' }).click();
-  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await options.getByRole('button', { name: /^Select Phase 2 ·/u }).click();
   await options.getByLabel('Phase 2 type').selectOption('break');
   await options.getByLabel('Phase 2 duration in minutes').fill('0.5');
   await options.getByRole('tab', { name: 'Reward Dice' }).click();

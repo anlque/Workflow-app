@@ -116,6 +116,126 @@ describe('WorkflowStudio', () => {
     expect(screen.getByText('Locusora')).toBeVisible();
   });
 
+  test('uses New workflow as the page title and setup mode as detail', async () => {
+    const user = userEvent.setup();
+    render(<WorkflowStudio dependencies={dependencies()} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Create workflow' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Quick setup' }));
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'New workflow',
+    );
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
+      'Quick setup',
+    );
+  });
+
+  test('limits editor chrome actions to the visible editor context', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'chrome-workflow',
+      name: 'Chrome workflow',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load: () =>
+            Promise.resolve({
+              workflows: [workflow],
+              assets: [],
+              settings: {
+                ...defaultSettings,
+                lastSelectedWorkflowId: workflow.id,
+              },
+            }),
+        })}
+      />,
+    );
+
+    expect(
+      await screen.findByRole('button', { name: 'Save workflow' }),
+    ).toBeVisible();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Chrome workflow',
+    );
+    expect(screen.getByText('Detailed setup')).toBeVisible();
+
+    await user.clear(screen.getByLabelText('Workflow name'));
+    await user.type(screen.getByLabelText('Workflow name'), 'Preserved draft');
+    await user.click(screen.getByRole('button', { name: 'Back to workflows' }));
+    expect(screen.queryByRole('button', { name: 'Save workflow' })).toBeNull();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open Chrome workflow' }),
+    );
+    expect(screen.getByRole('button', { name: 'Save workflow' })).toBeVisible();
+    expect(screen.getByLabelText('Workflow name')).toHaveValue(
+      'Preserved draft',
+    );
+    await user.click(screen.getByRole('tab', { name: 'Assets' }));
+    expect(screen.queryByRole('button', { name: 'Save workflow' })).toBeNull();
+    await user.click(screen.getByRole('tab', { name: 'Settings' }));
+    expect(screen.queryByRole('button', { name: 'Save workflow' })).toBeNull();
+    await user.click(screen.getByRole('tab', { name: 'Workflows' }));
+    expect(screen.getByRole('button', { name: 'Save workflow' })).toBeVisible();
+    expect(screen.getByLabelText('Workflow name')).toHaveValue(
+      'Preserved draft',
+    );
+  });
+
+  test('hides Quick Convert and Saved chrome feedback outside editor context', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      mode: 'quick',
+      id: 'quick-chrome-workflow',
+      name: 'Quick chrome workflow',
+      configuration: {
+        cycleCount: 2,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+      },
+    });
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load: () =>
+            Promise.resolve({
+              workflows: [workflow],
+              assets: [],
+              settings: {
+                ...defaultSettings,
+                lastSelectedWorkflowId: workflow.id,
+              },
+            }),
+        })}
+      />,
+    );
+
+    expect(
+      await screen.findByRole('button', { name: 'Convert to detailed' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Save workflow' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Workflow saved',
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Assets' }));
+    expect(
+      screen.queryByRole('button', { name: 'Convert to detailed' }),
+    ).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+
+    await user.click(screen.getByRole('tab', { name: 'Workflows' }));
+    expect(
+      screen.getByRole('button', { name: 'Convert to detailed' }),
+    ).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('Workflow saved');
+  });
+
   test.each(['Assets', 'Settings'])(
     'preserves a new Detailed draft and selected Phase across Workflows → %s → Workflows',
     async (destination) => {
@@ -139,6 +259,11 @@ describe('WorkflowStudio', () => {
         await screen.findByRole('button', { name: 'Create workflow' }),
       );
       await user.click(screen.getByRole('button', { name: 'Detailed setup' }));
+      expect(
+        screen
+          .getByRole('button', { name: 'Save workflow' })
+          .closest('.workflow-studio-shell__top-bar'),
+      ).not.toBeNull();
       await user.type(screen.getByLabelText('Workflow name'), 'Draft ritual');
       await user.click(screen.getByRole('button', { name: 'Add phase' }));
       await user.click(screen.getByRole('button', { name: /Select Phase 2/ }));

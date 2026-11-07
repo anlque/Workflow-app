@@ -143,7 +143,7 @@ test('creates, follows and explicitly moves an Asset Role', async ({
   );
   await options.getByRole('button', { name: 'Add phase' }).focus();
   await options.keyboard.press('Enter');
-  await options.getByRole('button', { name: 'Select Phase 2' }).focus();
+  await options.getByRole('button', { name: /^Select Phase 2 ·/u }).focus();
   await options.keyboard.press('Enter');
   await options.getByLabel('Background image').focus();
   await options.keyboard.type('forest.png');
@@ -157,7 +157,7 @@ test('creates, follows and explicitly moves an Asset Role', async ({
   await expect(options.getByLabel('Background image')).toHaveValue(
     'role:hero scene',
   );
-  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await options.getByRole('button', { name: /^Select Phase 2 ·/u }).click();
   await expect(options.getByLabel('Background image')).toHaveValue(/^direct:/u);
 
   await options.getByRole('tab', { name: 'Assets' }).click();
@@ -176,19 +176,19 @@ test('creates, follows and explicitly moves an Asset Role', async ({
   ).toContainText('Role: Hero scene');
 
   await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'Select Phase 1' }).click();
+  await options.getByRole('button', { name: /^Select Phase 1 ·/u }).click();
   await expect(options.getByLabel('Background image')).toHaveValue(
     'role:hero scene',
   );
-  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await options.getByRole('button', { name: /^Select Phase 2 ·/u }).click();
   await expect(options.getByLabel('Background image')).toHaveValue(/^direct:/u);
-  await options.getByRole('button', { name: 'Select Phase 1' }).click();
+  await options.getByRole('button', { name: /^Select Phase 1 ·/u }).click();
   await options.getByLabel('Background color').fill('#112233');
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await expect(options.getByLabel('Background image')).toHaveValue(
     'role:hero scene',
   );
-  await options.getByRole('button', { name: 'Select Phase 2' }).click();
+  await options.getByRole('button', { name: /^Select Phase 2 ·/u }).click();
   await expect(options.getByLabel('Background image')).toHaveValue(/^direct:/u);
 });
 

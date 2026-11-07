@@ -15,6 +15,11 @@ export {
   type RewardDiceEditorProps,
 } from './presentation/RewardDiceEditor';
 export {
+  WorkflowEditorChromeActions,
+  WorkflowEditorChromeProvider,
+  WorkflowEditorChromeTarget,
+} from './presentation/WorkflowEditorChrome';
+export {
   useWorkflowEditor,
   validateWorkflowDraft,
   type PhaseDraft,
