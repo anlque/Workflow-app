@@ -6,6 +6,7 @@ export type DialogProps = Readonly<{
   children: ReactNode;
   className?: string;
   describedBy?: string;
+  surface?: 'glass';
   onCancel(): void;
 }>;
 
@@ -15,6 +16,7 @@ export function Dialog({
   children,
   className,
   describedBy,
+  surface,
   onCancel,
 }: DialogProps) {
   const titleId = useId();
@@ -37,6 +39,7 @@ export function Dialog({
       ref={dialogRef}
       className={['dialog', className].filter(Boolean).join(' ')}
       data-position="viewport-center"
+      data-surface={surface}
       aria-labelledby={titleId}
       aria-describedby={describedBy}
       onCancel={(event) => {

@@ -33,6 +33,32 @@ const otherSide = createWorkflow({
 afterEach(() => vi.useRealTimers());
 
 describe('RewardResultDialog', () => {
+  test('uses the Focus glass Reward surface while preserving dialog semantics', () => {
+    render(
+      <RewardResultDialog
+        reward={null}
+        usedRerolls={0}
+        rerolls={1}
+        reducedMotion={false}
+        onRoll={vi.fn()}
+        requestRoll={() => Promise.resolve()}
+        requestReroll={() => Promise.resolve()}
+        onContinue={() => Promise.resolve()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: 'Reward unlocked' }),
+    ).toHaveAttribute('data-surface', 'glass');
+    const dialog = screen.getByRole('dialog', { name: 'Reward unlocked' });
+    expect(dialog).toContainElement(
+      screen.getByRole('heading', { name: 'Reward unlocked' }),
+    );
+    expect(dialog).toContainElement(screen.getByTestId('reward-cube'));
+    expect(dialog).toContainElement(
+      screen.getByRole('button', { name: 'Roll dice' }),
+    );
+  });
   test('offers a retryable pre-roll Reward skip without nested confirmation', async () => {
     const onSkip = vi
       .fn<() => Promise<void>>()

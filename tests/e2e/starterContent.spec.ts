@@ -14,11 +14,11 @@ const starterAssetNames = [
 ] as const;
 
 const starterWorkflows = [
-  { name: 'Quick Focus', firstPhase: 'Focus · Quick focus · Phase 1 of 1' },
-  { name: 'Balanced Flow', firstPhase: 'Focus · Settle in · Phase 1 of 3' },
+  { name: 'Quick Focus', firstPhase: 'Quick focus' },
+  { name: 'Balanced Flow', firstPhase: 'Settle in' },
   {
     name: 'Reward Journey',
-    firstPhase: 'Focus · Focused effort · Phase 1 of 3',
+    firstPhase: 'Focused effort',
   },
 ] as const;
 
@@ -180,9 +180,11 @@ test('seeds three ordinary offline Workflows once and does not restore a deleted
       .getByRole('button', { name: `Start workflow: ${workflow.name}` })
       .click();
     await expect(
-      focus.getByRole('heading', { name: workflow.name }),
+      focus.getByRole('heading', { name: workflow.name, exact: true }),
     ).toBeVisible();
-    await expect(focus.getByText(workflow.firstPhase)).toBeVisible();
+    await expect(
+      focus.getByRole('heading', { name: workflow.firstPhase, exact: true }),
+    ).toBeVisible();
     await focus.getByRole('button', { name: 'Stop' }).click();
     await focus.getByRole('button', { name: 'Stop session' }).click();
     await focus.getByRole('button', { name: 'Back to workflows' }).click();

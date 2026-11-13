@@ -176,6 +176,41 @@ describe('ActiveSessionView', () => {
     expect(screen.getByText('00:01')).toBeVisible();
   });
 
+  test('presents Workflow context before a phase-first heading and metadata', () => {
+    render(
+      <ActiveSessionView
+        session={createSession(
+          'session-hierarchy',
+          createWorkflow({
+            id: 'workflow-hierarchy',
+            name: 'Deep work',
+            phases: [
+              {
+                name: 'Writing',
+                type: 'focus',
+                durationSeconds: 60,
+                environment: {},
+              },
+            ],
+          }),
+          1_000,
+        )}
+        now={() => 1_000}
+        {...actions}
+      />,
+    );
+
+    expect(screen.getByText('Deep work')).toHaveClass(
+      'active-session__workflow',
+    );
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Writing' }),
+    ).toBeVisible();
+    expect(screen.getByText('Focus · Phase 1 of 1')).toHaveClass(
+      'session-phase',
+    );
+  });
+
   test('renders authoritative Reward state after remount', () => {
     const paused = deriveSessionState(
       createSession('session-1', workflow, 1_000),

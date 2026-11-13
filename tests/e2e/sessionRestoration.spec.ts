@@ -182,10 +182,14 @@ test('restores a final Bonus Reward Phase and completes only after its deadline'
     focus.getByRole('dialog', { name: 'Reward unlocked' }),
   ).toContainText(title ?? '');
   await focus.getByRole('button', { name: 'Continue' }).click();
-  await expect(focus.getByText('Bonus · Final Bonus')).toBeVisible();
+  await expect(
+    focus.getByRole('heading', { name: 'Final Bonus' }),
+  ).toBeVisible();
   await expect(focus.getByText('Session complete')).toHaveCount(0);
   await focus.reload();
-  await expect(focus.getByText('Bonus · Final Bonus')).toBeVisible();
+  await expect(
+    focus.getByRole('heading', { name: 'Final Bonus' }),
+  ).toBeVisible();
   await expireActiveSessionDeadline(focus);
   await expect(focus.getByText('Session complete')).toBeVisible();
 });

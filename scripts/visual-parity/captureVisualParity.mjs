@@ -463,7 +463,7 @@ export async function captureVisualParity() {
     });
     await capture(focus, 'focus-reward-rolled');
     await reward.getByRole('button', { name: 'Continue' }).click();
-    await focus.getByText(/Break · Important Break/u).waitFor();
+    await focus.getByRole('heading', { name: 'Important Break' }).waitFor();
     await capture(focus, 'focus-break-color');
     await stopSession(focus);
 

@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
 import { useStore } from 'zustand';
@@ -62,6 +63,30 @@ function FocusHeader({ children }: Readonly<{ children: ReactNode }>) {
         {children}
       </nav>
     </header>
+  );
+}
+
+function SidePanelUtilityButton({
+  isOpen,
+  pending,
+  onClick,
+}: Readonly<{
+  isOpen: boolean;
+  pending: boolean;
+  onClick(): void;
+}>) {
+  const label = isOpen ? 'Close side panel' : 'Open side panel';
+  return (
+    <Button
+      className="focus-app__close-panel focus-utility-button"
+      variant="quiet"
+      aria-label={label}
+      pending={pending}
+      pendingLabel={<span aria-hidden="true">▤</span>}
+      onClick={onClick}
+    >
+      <span aria-hidden="true">▤</span>
+    </Button>
   );
 }
 
@@ -144,6 +169,9 @@ export function FocusApp({
   const preferences = useDocumentPreferences(dependencies.preferences);
   const reducedMotion = preferences.effectiveReducedMotion;
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [openUtility, setOpenUtility] = useState<'appearance' | 'sound' | null>(
+    null,
+  );
   const sidePanel = useSidePanelControl(dependencies);
   const [studioOpen, setStudioOpen] = useState(false);
   const [studioRequested, setStudioRequested] = useState(false);
@@ -269,28 +297,30 @@ export function FocusApp({
         <FocusHeader>
           <Button
             buttonRef={studioFallbackRef}
+            className="focus-utility-button"
             variant="quiet"
+            aria-label="Open Workflow Studio"
             onClick={(event) => {
               openStudio(event.currentTarget);
             }}
           >
-            Open Workflow Studio
+            <span aria-hidden="true">▣</span>
           </Button>
           <FocusAppearanceControls
             preferences={preferences}
             onUpdate={dependencies.updateSettings}
+            open={openUtility === 'appearance'}
+            onOpenChange={(open) => {
+              setOpenUtility((current) =>
+                open ? 'appearance' : current === 'appearance' ? null : current,
+              );
+            }}
           />
-          <Button
-            className="focus-app__close-panel"
-            variant="quiet"
+          <SidePanelUtilityButton
+            isOpen={sidePanel.isOpen}
             pending={sidePanel.pending}
-            pendingLabel={
-              sidePanel.isOpen ? 'Close side panel' : 'Open side panel'
-            }
             onClick={togglePanel}
-          >
-            {sidePanel.isOpen ? 'Close side panel' : 'Open side panel'}
-          </Button>
+          />
         </FocusHeader>
       ),
       main: (
@@ -311,73 +341,96 @@ export function FocusApp({
         <FocusHeader>
           <Button
             buttonRef={studioFallbackRef}
+            className="focus-utility-button"
             variant="quiet"
+            aria-label="Open Workflow Studio"
             onClick={(event) => {
               openStudio(event.currentTarget);
             }}
           >
-            Open Workflow Studio
+            <span aria-hidden="true">▣</span>
           </Button>
           <FocusAppearanceControls
             preferences={preferences}
             onUpdate={dependencies.updateSettings}
+            open={openUtility === 'appearance'}
+            onOpenChange={(open) => {
+              setOpenUtility((current) =>
+                open ? 'appearance' : current === 'appearance' ? null : current,
+              );
+            }}
           />
-          <div className="focus-app__volume-control">
-            <div>
-              <Button
-                className="focus-app__sound-toggle"
-                variant="quiet"
-                aria-pressed={preferences.ambientMuted}
-                onClick={() => {
-                  updateAudio({ ambientMuted: !preferences.ambientMuted });
-                }}
-              >
-                {preferences.ambientMuted ? 'Unmute music' : 'Mute music'}
-              </Button>
-              <label>
-                <span>Music volume</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={preferences.ambientVolumePercent}
-                  onChange={(event) => {
-                    updateAudio({
-                      ambientVolumePercent: Number(event.currentTarget.value),
-                    });
+          <details
+            className="focus-audio"
+            open={openUtility === 'sound'}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setOpenUtility((current) =>
+                open ? 'sound' : current === 'sound' ? null : current,
+              );
+            }}
+          >
+            <summary className="focus-utility-button">
+              <span aria-hidden="true">♪</span>
+              <span className="visually-hidden">Sound settings</span>
+            </summary>
+            <div className="focus-app__volume-control">
+              <div>
+                <Button
+                  className="focus-app__sound-toggle"
+                  variant="quiet"
+                  aria-pressed={preferences.ambientMuted}
+                  onClick={() => {
+                    updateAudio({ ambientMuted: !preferences.ambientMuted });
                   }}
-                />
-              </label>
-            </div>
-            <div>
-              <Button
-                className="focus-app__sound-toggle"
-                variant="quiet"
-                aria-pressed={preferences.cuesMuted}
-                onClick={() => {
-                  updateAudio({ cuesMuted: !preferences.cuesMuted });
-                }}
-              >
-                {preferences.cuesMuted ? 'Unmute cues' : 'Mute cues'}
-              </Button>
-              <label>
-                <span>Cue volume</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={preferences.cueVolumePercent}
-                  onChange={(event) => {
-                    updateAudio({
-                      cueVolumePercent: Number(event.currentTarget.value),
-                    });
+                >
+                  {preferences.ambientMuted ? 'Unmute music' : 'Mute music'}
+                </Button>
+                <label>
+                  <span>Music volume</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={preferences.ambientVolumePercent}
+                    onChange={(event) => {
+                      updateAudio({
+                        ambientVolumePercent: Number(event.currentTarget.value),
+                      });
+                    }}
+                  />
+                </label>
+              </div>
+              <div>
+                <Button
+                  className="focus-app__sound-toggle"
+                  variant="quiet"
+                  aria-pressed={preferences.cuesMuted}
+                  onClick={() => {
+                    updateAudio({ cuesMuted: !preferences.cuesMuted });
                   }}
-                />
-              </label>
+                >
+                  {preferences.cuesMuted ? 'Unmute cues' : 'Mute cues'}
+                </Button>
+                <label>
+                  <span>Cue volume</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={preferences.cueVolumePercent}
+                    onChange={(event) => {
+                      updateAudio({
+                        cueVolumePercent: Number(event.currentTarget.value),
+                      });
+                    }}
+                  />
+                </label>
+              </div>
             </div>
-          </div>
+          </details>
           {audioError === null ? null : <p role="alert">{audioError}</p>}
           {soundState === 'locked' ? (
             <Button
@@ -390,17 +443,11 @@ export function FocusApp({
               Enable sounds
             </Button>
           ) : null}
-          <Button
-            className="focus-app__close-panel"
-            variant="quiet"
+          <SidePanelUtilityButton
+            isOpen={sidePanel.isOpen}
             pending={sidePanel.pending}
-            pendingLabel={
-              sidePanel.isOpen ? 'Close side panel' : 'Open side panel'
-            }
             onClick={togglePanel}
-          >
-            {sidePanel.isOpen ? 'Close side panel' : 'Open side panel'}
-          </Button>
+          />
         </FocusHeader>
       ),
       main: (
@@ -417,7 +464,20 @@ export function FocusApp({
             loadAssetUrl={dependencies.loadAssetUrl}
             releaseAssetUrl={dependencies.releaseAssetUrl}
           />
-          <div className="focus-app__content">
+          <div
+            className="focus-app__content"
+            data-background={
+              segment.environment.backgroundAsset?.type === 'direct'
+                ? 'image'
+                : 'color'
+            }
+            style={
+              {
+                '--focus-phase-color':
+                  segment.environment.backgroundColor ?? '#183128',
+              } as CSSProperties
+            }
+          >
             <ActiveSessionView
               session={session}
               dialogsEnabled={!studioOpen}

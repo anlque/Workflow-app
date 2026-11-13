@@ -9,7 +9,7 @@ export type ButtonProps = Omit<
   Readonly<{
     children: ReactNode;
     pending?: boolean;
-    pendingLabel?: string;
+    pendingLabel?: ReactNode;
     variant?: ButtonVariant;
     buttonRef?: Ref<HTMLButtonElement>;
   }>;

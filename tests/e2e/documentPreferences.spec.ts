@@ -1,5 +1,51 @@
 import { expect, test } from './extensionFixture';
 
+test('keeps red and blue phase hues in Focus and Reward glass', async ({
+  page,
+  extensionUrls,
+}) => {
+  await page.goto(extensionUrls.focus);
+  await page.getByRole('main').waitFor();
+  const colors = await page
+    .locator('.focus-app-surface')
+    .evaluate((surface) => {
+      surface.insertAdjacentHTML(
+        'beforeend',
+        `<div class="focus-app__content" data-background="color" data-testid="red-glass" style="--focus-phase-color:#b50000">
+        <dialog open class="dialog dialog--reward" data-testid="red-reward">Reward</dialog>
+      </div>
+      <div class="focus-app__content" data-background="color" data-testid="blue-glass" style="--focus-phase-color:#206ad6">
+        <dialog open class="dialog dialog--reward" data-testid="blue-reward">Reward</dialog>
+      </div>`,
+      );
+      const readRgb = (selector: string) => {
+        const element = surface.querySelector(selector);
+        if (element === null) throw new Error(`Missing ${selector}`);
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const context = canvas.getContext('2d');
+        if (context === null) throw new Error('Canvas context unavailable');
+        context.fillStyle = getComputedStyle(element).backgroundColor;
+        context.fillRect(0, 0, 1, 1);
+        return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+      };
+      return {
+        red: readRgb('[data-testid="red-glass"]'),
+        redReward: readRgb('[data-testid="red-reward"]'),
+        blue: readRgb('[data-testid="blue-glass"]'),
+        blueReward: readRgb('[data-testid="blue-reward"]'),
+      };
+    });
+
+  expect(colors.red[0]).toBeGreaterThan((colors.red[1] ?? 0) * 2);
+  expect(colors.red[0]).toBeGreaterThan((colors.red[2] ?? 0) * 2);
+  expect(colors.blue[2]).toBeGreaterThan((colors.blue[0] ?? 0) * 2);
+  expect(colors.blue[2]).toBeGreaterThan((colors.blue[1] ?? 0) * 2);
+  expect(colors.redReward).toEqual(colors.red);
+  expect(colors.blueReward).toEqual(colors.blue);
+});
+
 test('keeps all Focus semantic states invariant across document themes', async ({
   page,
   extensionUrls,
@@ -37,7 +83,7 @@ test('keeps all Focus semantic states invariant across document themes', async (
       surface.querySelector('[data-testid="focus-theme-fixtures"]')?.remove();
       surface.insertAdjacentHTML(
         'beforeend',
-        `<div data-testid="focus-theme-fixtures" style="position:fixed;left:-10000px;top:0;pointer-events:none">
+        `<div class="focus-app__content" data-background="image" data-testid="focus-theme-fixtures" style="position:fixed;left:-10000px;top:0;pointer-events:none">
           <div class="active-session" data-session-segment="bonus">
             <p class="session-phase" data-testid="focus-bonus">Bonus</p>
           </div>
@@ -131,8 +177,8 @@ test('keeps all Focus semantic states invariant across document themes', async (
   });
   expect(dark.hoverBackground).toBe('rgb(59, 137, 104)');
   expect(dark.focusOutline).toBe('rgb(74, 122, 255)');
-  expect(dark.stateStyles.bonus.color).toBe('rgb(129, 77, 15)');
-  expect(dark.stateStyles.reward.background).toBe('rgb(245, 250, 247)');
+  expect(dark.stateStyles.bonus.color).toBe('rgb(255, 210, 150)');
+  expect(dark.stateStyles.reward.background).toBe('rgba(8, 22, 17, 0.58)');
   expect(dark.stateStyles.danger).toMatchObject({
     background: 'rgb(255, 244, 241)',
     color: 'rgb(132, 60, 48)',
@@ -262,6 +308,7 @@ test('loads before visibility and synchronizes preferences across open documents
   await muteMusic.click();
   await expect(muteMusic).not.toBeChecked();
 
+  await focus.locator('summary').filter({ hasText: 'Sound settings' }).click();
   await expect(focus.getByRole('slider', { name: 'Cue volume' })).toHaveValue(
     '42',
   );
@@ -294,6 +341,7 @@ test('loads before visibility and synchronizes preferences across open documents
     options.getByRole('slider', { name: /Background brightness/ }),
   ).toHaveValue('130');
 
+  await focus.locator('summary').filter({ hasText: 'Sound settings' }).click();
   await focus.getByRole('slider', { name: 'Music volume' }).fill('37');
   await focus.getByRole('button', { name: 'Mute cues' }).click();
   await expect(

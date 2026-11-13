@@ -5,6 +5,8 @@ import type { Session } from '../domain/Session';
 export type ActiveSessionSegment = Readonly<{
   isBonus: boolean;
   label: string;
+  title: string;
+  metadata: string;
   environment: Environment;
 }>;
 
@@ -20,6 +22,8 @@ export function getActiveSessionSegment(
       return Object.freeze({
         isBonus: true,
         label: bonus.name,
+        title: bonus.name,
+        metadata: `Bonus Reward · Phase ${String(session.currentPhaseIndex + 1)} of ${String(workflow.phases.length)}`,
         environment: bonus.environment,
       });
     }
@@ -28,6 +32,11 @@ export function getActiveSessionSegment(
     workflow.phases[session.currentPhaseIndex] ?? workflow.phases[0];
   return Object.freeze({
     isBonus: false,
+    title: phaseDisplayName(phase, session.currentPhaseIndex),
+    metadata:
+      phase.name === undefined
+        ? `${phase.type === 'focus' ? 'Focus' : 'Break'} · ${phaseDisplayName(phase, session.currentPhaseIndex)} of ${String(workflow.phases.length)}`
+        : `${phase.type === 'focus' ? 'Focus' : 'Break'} · Phase ${String(session.currentPhaseIndex + 1)} of ${String(workflow.phases.length)}`,
     label:
       phase.name === undefined
         ? `${phase.type === 'focus' ? 'Focus' : 'Break'} · ${phaseDisplayName(phase, session.currentPhaseIndex)} of ${String(workflow.phases.length)}`

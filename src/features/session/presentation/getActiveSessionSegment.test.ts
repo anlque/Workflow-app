@@ -48,6 +48,8 @@ describe('getActiveSessionSegment', () => {
     expect(getActiveSessionSegment(bonus)).toEqual({
       isBonus: true,
       label: 'Tea break',
+      title: 'Tea break',
+      metadata: 'Bonus Reward · Phase 2 of 2',
       environment: { backgroundColor: '#123456' },
     });
     expect(bonus.currentPhaseIndex).toBe(1);
@@ -73,6 +75,8 @@ describe('getActiveSessionSegment', () => {
     expect(getActiveSessionSegment(session)).toEqual({
       isBonus: false,
       label: 'Focus · Writing · Phase 1 of 1',
+      title: 'Writing',
+      metadata: 'Focus · Phase 1 of 1',
       environment: { backgroundColor: '#abcdef' },
     });
   });

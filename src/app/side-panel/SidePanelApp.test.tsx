@@ -388,9 +388,7 @@ describe('SidePanelApp', () => {
     );
     const { container } = render(<SidePanelApp dependencies={deps} />);
 
-    expect(
-      await screen.findByRole('heading', { name: 'Deep work' }),
-    ).toBeVisible();
+    expect(await screen.findByText('Deep work')).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Open focus view' }),
     ).toBeVisible();

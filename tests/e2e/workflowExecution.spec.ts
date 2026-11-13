@@ -830,9 +830,7 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
   await focus
     .getByRole('button', { name: 'Start workflow: Rewarded focus' })
     .click();
-  await expect(
-    focus.getByRole('heading', { name: 'Rewarded focus' }),
-  ).toBeVisible();
+  await expect(focus.getByText('Rewarded focus')).toBeVisible();
   await expect(focus.locator('.focus-environment img')).toHaveAttribute(
     'src',
     /^blob:/u,
@@ -889,6 +887,51 @@ test('completes a Workflow with a local environment and Reward Dice', async ({
     );
   });
   expect(coversTimerCard).toBe(true);
+  await expect(reward).toHaveAttribute('data-surface', 'glass');
+  const rewardGlass = await reward.evaluate((dialog) => {
+    const timerCard = document.querySelector('.focus-app__content');
+    const title = dialog.querySelector('.dialog__title');
+    const cube = dialog.querySelector('[data-testid="reward-cube"]');
+    const actions = dialog.querySelector('.dialog__actions');
+    if (
+      timerCard === null ||
+      title === null ||
+      cube === null ||
+      actions === null
+    ) {
+      throw new Error('Reward glass composition is incomplete.');
+    }
+    const dialogBounds = dialog.getBoundingClientRect();
+    const horizontalCenter = dialogBounds.left + dialogBounds.width / 2;
+    const centers = [title, cube, actions].map((element) => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        center: bounds.left + bounds.width / 2,
+        inside:
+          bounds.left >= dialogBounds.left &&
+          bounds.right <= dialogBounds.right &&
+          bounds.top >= dialogBounds.top &&
+          bounds.bottom <= dialogBounds.bottom,
+      };
+    });
+    return {
+      background: getComputedStyle(dialog).backgroundColor,
+      timerBackground: getComputedStyle(timerCard).backgroundColor,
+      cubeWidthRatio: cube.getBoundingClientRect().width / dialogBounds.width,
+      centered: centers.every(
+        ({ center, inside }) =>
+          inside && Math.abs(center - horizontalCenter) <= 2,
+      ),
+    };
+  });
+  expect(rewardGlass.background).toBe(rewardGlass.timerBackground);
+  expect(rewardGlass.cubeWidthRatio).toBeGreaterThanOrEqual(0.55);
+  expect(rewardGlass.centered).toBe(true);
+  expect(
+    await reward.evaluate(
+      (dialog) => getComputedStyle(dialog, '::backdrop').backgroundColor,
+    ),
+  ).toBe('rgba(0, 0, 0, 0)');
   await expect(focus.getByTestId('reward-cube')).toHaveAttribute(
     'data-state',
     'ready',
@@ -1033,13 +1076,17 @@ test('executes and restores a non-final Bonus Reward Phase authoritatively', asy
   await focus.getByRole('button', { name: 'Roll dice' }).click();
   await focus.getByRole('button', { name: 'Continue' }).click();
 
-  await expect(focus.getByText('Bonus · Bonus reset')).toBeVisible();
+  await expect(
+    focus.getByRole('heading', { name: 'Bonus reset' }),
+  ).toBeVisible();
   await expect(focus.locator('.focus-environment__backdrop')).toHaveCSS(
     'background-color',
     'rgb(18, 52, 86)',
   );
   await focus.reload();
-  await expect(focus.getByText('Bonus · Bonus reset')).toBeVisible();
+  await expect(
+    focus.getByRole('heading', { name: 'Bonus reset' }),
+  ).toBeVisible();
   await focus.getByRole('button', { name: 'Pause' }).click();
   await expect(focus.getByRole('button', { name: 'Resume' })).toBeVisible();
   await focus.getByRole('button', { name: 'Resume' }).click();
@@ -1121,11 +1168,15 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
     timeout: 10_000,
   });
   await focus.getByRole('button', { name: 'Continue' }).click();
-  await expect(focus.getByText('Bonus · Restart bonus')).toBeVisible();
+  await expect(
+    focus.getByRole('heading', { name: 'Restart bonus' }),
+  ).toBeVisible();
 
   const sidePanel = await context.newPage();
   await sidePanel.goto(extensionUrls.sidePanel);
-  await expect(sidePanel.getByText('Bonus · Restart bonus')).toBeVisible();
+  await expect(
+    sidePanel.getByRole('heading', { name: 'Restart bonus' }),
+  ).toBeVisible();
 
   await focus.getByRole('button', { name: 'Restart workflow' }).click();
   await focus
@@ -1134,8 +1185,12 @@ test('restarts a normal Phase and the Workflow authoritatively across surfaces',
     .click();
   await expect(focus.getByText('Focus · Phase 1 of 2')).toBeVisible();
   await expect(sidePanel.getByText('Focus · Phase 1 of 2')).toBeVisible();
-  await expect(focus.getByText('Bonus · Restart bonus')).toHaveCount(0);
-  await expect(sidePanel.getByText('Bonus · Restart bonus')).toHaveCount(0);
+  await expect(
+    focus.getByRole('heading', { name: 'Restart bonus' }),
+  ).toHaveCount(0);
+  await expect(
+    sidePanel.getByRole('heading', { name: 'Restart bonus' }),
+  ).toHaveCount(0);
   await expect(
     focus.getByRole('dialog', { name: 'Reward unlocked' }),
   ).toHaveCount(0);
@@ -1249,7 +1304,9 @@ test('skips ordinary, Reward and Bonus progress authoritatively across surfaces'
     timeout: 10_000,
   });
   await focus.getByRole('button', { name: 'Continue' }).click();
-  await expect(focus.getByText('Bonus · Skippable bonus')).toBeVisible();
+  await expect(
+    focus.getByRole('heading', { name: 'Skippable bonus' }),
+  ).toBeVisible();
   await focus.getByRole('button', { name: 'Skip phase' }).click();
   await expect(focus.getByRole('dialog', { name: /Skip/u })).toHaveCount(0);
   await expireActiveSessionDeadline(focus);

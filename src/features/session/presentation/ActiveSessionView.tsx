@@ -147,13 +147,12 @@ export function ActiveSessionView({
         session.status === 'transitioning' ? 'true' : undefined
       }
     >
-      <h1>{workflow.name}</h1>
+      <h2 className="active-session__workflow">{workflow.name}</h2>
+      <h1>{segment.title}</h1>
       <p className="session-phase">
-        {session.status === 'transitioning' ? (
-          'Transitioning to the next phase…'
-        ) : (
-          <>{segment.isBonus ? `Bonus · ${segment.label}` : segment.label}</>
-        )}
+        {session.status === 'transitioning'
+          ? 'Transitioning to the next phase…'
+          : segment.metadata}
       </p>
       <output className="session-countdown" aria-label="Time remaining">
         {formatSessionCountdown(session, displayNow)}

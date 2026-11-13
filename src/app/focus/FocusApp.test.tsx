@@ -423,9 +423,7 @@ describe('FocusApp', () => {
       act(() => {
         publish?.(createSession(`new-${status}-session`, workflow, 4_000));
       });
-      expect(
-        await screen.findByRole('heading', { name: workflow.name }),
-      ).toBeVisible();
+      expect(await screen.findByText(workflow.name)).toBeVisible();
       expect(
         screen.queryByRole('button', { name: 'Back to workflows' }),
       ).not.toBeInTheDocument();
@@ -512,7 +510,7 @@ describe('FocusApp', () => {
     vi.mocked(deps.sessions.subscribe).mockReturnValue(disconnect);
     vi.mocked(deps.loadAssetUrl).mockResolvedValue('blob:ambient-overlay');
     render(<FocusApp dependencies={deps} />);
-    await screen.findByRole('heading', { name: 'Ambient focus' });
+    await screen.findByText('Ambient focus');
     await act(async () => Promise.resolve());
     const audio = document.querySelector('audio');
     expect(audio).toBeInstanceOf(HTMLAudioElement);
@@ -645,7 +643,7 @@ describe('FocusApp', () => {
       return vi.fn();
     });
     render(<FocusApp dependencies={deps} />);
-    await screen.findByRole('heading', { name: 'Reward focus' });
+    await screen.findByText('Reward focus');
 
     await user.click(
       screen.getByRole('button', { name: 'Open Workflow Studio' }),
@@ -678,7 +676,7 @@ describe('FocusApp', () => {
       typeof createTestDocumentPreferences
     >;
     const { container } = render(<FocusApp dependencies={deps} />);
-    await screen.findByRole('heading', { name: 'Deep work' });
+    await screen.findByText('Deep work');
     expect(container.querySelector('.focus-environment')).toHaveAttribute(
       'data-reduced-motion',
       'false',
@@ -748,9 +746,7 @@ describe('FocusApp', () => {
     });
     render(<FocusApp dependencies={deps} />);
 
-    expect(
-      await screen.findByRole('heading', { name: 'Deep work' }),
-    ).toBeVisible();
+    expect(await screen.findByText('Deep work')).toBeVisible();
     expect(screen.getByTestId('focus-environment-backdrop')).toHaveStyle({
       backgroundColor: '#123456',
     });
@@ -785,7 +781,10 @@ describe('FocusApp', () => {
     const deps = dependencies(session, studioDependencies(), preferences);
     render(<FocusApp dependencies={deps} />);
 
-    const musicVolume = await screen.findByRole('slider', {
+    await user.click(
+      await screen.findByText('Sound settings', { selector: 'summary *' }),
+    );
+    const musicVolume = screen.getByRole('slider', {
       name: 'Music volume',
     });
     const cueVolume = screen.getByRole('slider', { name: 'Cue volume' });
@@ -816,6 +815,49 @@ describe('FocusApp', () => {
       });
     });
     expect(deps.sounds.setVolume).toHaveBeenLastCalledWith(0);
+  });
+
+  test('keeps active Focus utilities compact until their controls are requested', async () => {
+    const user = userEvent.setup();
+    const session = createSession(
+      'compact-utilities-session',
+      createWorkflow({
+        id: 'compact-utilities-workflow',
+        name: 'Compact utilities',
+        phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+      }),
+      Date.now(),
+    );
+    render(<FocusApp dependencies={dependencies(session)} />);
+
+    expect(
+      await screen.findByRole('button', { name: 'Open Workflow Studio' }),
+    ).toHaveClass('focus-utility-button');
+    const sidePanel = screen.getByRole('button', { name: 'Open side panel' });
+    expect(sidePanel).toHaveClass('focus-utility-button');
+    expect(sidePanel).toHaveTextContent('▤');
+    expect(sidePanel).not.toHaveTextContent('Open side panel');
+    expect(
+      screen.getByRole('slider', { name: 'Music volume' }),
+    ).not.toBeVisible();
+    await user.click(
+      screen.getByText('Sound settings', { selector: 'summary *' }),
+    );
+    expect(screen.getByRole('slider', { name: 'Music volume' })).toBeVisible();
+
+    await user.click(screen.getByText('Appearance', { selector: 'summary *' }));
+    expect(
+      screen.getByRole('slider', { name: 'Music volume' }),
+    ).not.toBeVisible();
+    expect(screen.getByRole('slider', { name: /^Focus blur/ })).toBeVisible();
+
+    await user.click(
+      screen.getByText('Sound settings', { selector: 'summary *' }),
+    );
+    expect(
+      screen.getByRole('slider', { name: /^Focus blur/ }),
+    ).not.toBeVisible();
+    expect(screen.getByRole('slider', { name: 'Music volume' })).toBeVisible();
   });
 
   test('keeps the Session countdown running when ambient audio pauses', async () => {
@@ -908,10 +950,12 @@ describe('FocusApp', () => {
     render(<FocusApp dependencies={deps} />);
     await screen.findByRole('heading', { name: 'Choose a Workflow' });
 
-    expect(
-      screen.getByRole('button', { name: 'Open side panel' }),
-    ).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Open side panel' }));
+    const sidePanel = screen.getByRole('button', { name: 'Open side panel' });
+    expect(sidePanel).toBeVisible();
+    expect(sidePanel).toHaveClass('focus-utility-button');
+    expect(sidePanel).toHaveTextContent('▤');
+    expect(sidePanel).not.toHaveTextContent('Open side panel');
+    await user.click(sidePanel);
     expect(deps.sounds.unlock).toHaveBeenCalledOnce();
     expect(deps.openSidePanel).toHaveBeenCalledOnce();
     expect(
@@ -984,9 +1028,45 @@ describe('FocusApp', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open side panel' }));
 
-    expect(
-      screen.getByRole('button', { name: 'Close side panel' }),
-    ).toBeVisible();
+    const pending = screen.getByRole('button', { name: 'Close side panel' });
+    expect(pending).toBeVisible();
+    expect(pending).toHaveAttribute('aria-busy', 'true');
+    expect(pending).toHaveTextContent('▤');
+    expect(pending).not.toHaveTextContent('Close side panel');
+    finishOpen?.();
+  });
+
+  test('keeps the active side-panel control icon-only while pending', async () => {
+    const user = userEvent.setup();
+    let finishOpen: (() => void) | undefined;
+    const session = createSession(
+      'active-panel-session',
+      createWorkflow({
+        id: 'active-panel-workflow',
+        name: 'Active panel focus',
+        phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+      }),
+      Date.now(),
+    );
+    const deps = dependencies(session);
+    vi.mocked(deps.openSidePanel).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishOpen = resolve;
+        }),
+    );
+    render(<FocusApp dependencies={deps} />);
+
+    const sidePanel = await screen.findByRole('button', {
+      name: 'Open side panel',
+    });
+    await user.click(sidePanel);
+
+    const pending = screen.getByRole('button', { name: 'Close side panel' });
+    expect(pending).toHaveClass('focus-utility-button');
+    expect(pending).toHaveAttribute('aria-busy', 'true');
+    expect(pending).toHaveTextContent('▤');
+    expect(pending).not.toHaveTextContent('Close side panel');
     finishOpen?.();
   });
 

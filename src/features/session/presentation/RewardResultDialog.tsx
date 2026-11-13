@@ -199,6 +199,7 @@ export function RewardResultDialog({
     <Dialog
       open
       className="dialog--reward"
+      surface="glass"
       title="Reward unlocked"
       onCancel={() => undefined}
     >

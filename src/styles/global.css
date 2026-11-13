@@ -406,13 +406,54 @@ body {
   align-items: flex-start;
 }
 
+.button.focus-utility-button,
+.focus-utility-button {
+  display: grid;
+  width: var(--control-height);
+  min-width: var(--control-height);
+  min-height: var(--control-height);
+  place-items: center;
+  padding: 0;
+  color: #f5faf7;
+  background: rgb(8 22 17 / 72%);
+  border: 1px solid rgb(245 250 247 / 42%);
+  border-radius: 50%;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 22%);
+  cursor: pointer;
+}
+
+.button.focus-utility-button:hover:not(:disabled),
+.focus-utility-button:hover {
+  color: #ffffff;
+  background: rgb(22 59 46 / 88%);
+}
+
+.focus-audio,
+.focus-appearance {
+  position: relative;
+}
+
+.focus-audio > summary,
+.focus-appearance > summary {
+  list-style: none;
+}
+
+.focus-audio > summary::-webkit-details-marker,
+.focus-appearance > summary::-webkit-details-marker {
+  display: none;
+}
+
 .focus-app__volume-control {
   --color-text: #10271f;
   --color-text-muted: #4c655b;
   --color-ink: #10271f;
   --color-ink-muted: #4c655b;
-  display: flex;
-  align-items: center;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  display: grid;
+  width: min(19rem, calc(100vw - 2rem));
+  align-items: stretch;
   gap: 0.625rem;
   padding: 0.375rem;
   color: var(--color-ink);
@@ -446,18 +487,11 @@ body {
   --color-text-muted: #4c655b;
   --color-ink: #10271f;
   --color-ink-muted: #4c655b;
-  position: relative;
   color: var(--color-ink);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-ink-muted);
-  border-radius: var(--radius-control);
-  box-shadow: 0 2px 6px oklch(0.2 0.02 160 / 28%);
 }
 
 .focus-appearance > summary {
-  padding: 0.65rem 0.8rem;
   font-weight: 700;
-  cursor: pointer;
 }
 
 .focus-appearance__controls {
@@ -524,7 +558,7 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.42;
+  opacity: 1;
   transition: opacity 600ms ease;
 }
 
@@ -575,14 +609,42 @@ body {
   place-items: center;
   padding: clamp(1.5rem, 5vw, 3.5rem);
   text-align: center;
-  background: color-mix(in oklch, var(--color-surface) 88%, transparent);
-  border: 1px solid color-mix(in oklch, var(--color-border) 75%, transparent);
+  color: #f5faf7;
+  border: 2px solid rgb(98 194 151 / 52%);
   border-radius: 50%;
   backdrop-filter: blur(18px);
+  background: var(--focus-glass-background);
+}
+
+.focus-app__content[data-background='image'] {
+  --focus-glass-background: rgb(8 22 17 / 58%);
+  box-shadow:
+    0 1.5rem 4rem rgb(0 0 0 / 34%),
+    inset 0 0 3rem rgb(255 255 255 / 5%);
+}
+
+.focus-app__content[data-background='color'] {
+  --focus-glass-background: color-mix(
+    in srgb,
+    var(--focus-phase-color) 58%,
+    rgb(0 0 0 / 72%)
+  );
+  box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 24%);
 }
 
 .focus-app__content > * {
   width: min(100%, 32rem);
+}
+
+.active-session__workflow {
+  margin: 0 0 var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-weight: 650;
+}
+
+.focus-app__content .active-session__workflow {
+  color: #86d4ae;
 }
 
 .active-session h1 {
@@ -600,10 +662,26 @@ body {
   color: var(--color-reward-foreground);
 }
 
+.focus-app__content
+  .active-session[data-session-state='paused']
+  .session-countdown {
+  color: #9be0bc;
+}
+
+.focus-app__content
+  .active-session[data-session-segment='bonus']
+  .session-phase {
+  color: #ffd296;
+}
+
 .session-phase {
   margin: 1rem 0 0;
   color: var(--color-ink-muted);
   font-weight: 650;
+}
+
+.focus-app__content .session-phase {
+  color: #d8e5de;
 }
 
 .session-countdown {
@@ -629,6 +707,25 @@ body {
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.75rem;
+}
+
+.session-control.button {
+  width: var(--control-height);
+  min-width: var(--control-height);
+  padding: 0;
+  color: #f5faf7;
+  background: rgb(8 22 17 / 76%);
+  border: 1px solid rgb(245 250 247 / 32%);
+  border-radius: 50%;
+}
+
+.button.session-control:hover:not(:disabled) {
+  color: #ffffff;
+  background: rgb(24 76 56 / 92%);
+}
+
+.session-control--primary.button {
+  background: #205f47;
 }
 
 .session-controls [role='alert'] {
@@ -859,7 +956,6 @@ textarea {
   background: transparent;
 }
 
-.button.focus-app__close-panel,
 .button.focus-app__enable-sounds,
 .button.focus-app__sound-toggle {
   color: #10271f;
@@ -963,11 +1059,33 @@ textarea {
 }
 
 .dialog--reward {
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
   width: min(45.375rem, calc(100vw - 2rem), calc(100dvh - 2rem));
   min-height: min(45.375rem, calc(100vw - 2rem), calc(100dvh - 2rem));
   max-height: min(45.375rem, calc(100vw - 2rem), calc(100dvh - 2rem));
   padding: clamp(1.5rem, 5vw, 3.5rem);
-  background: var(--color-surface);
+  color: #f5faf7;
+  background: var(--focus-glass-background);
+  border: 2px solid rgb(98 194 151 / 52%);
+  border-radius: 50%;
+  box-shadow:
+    0 1.5rem 4rem rgb(0 0 0 / 34%),
+    inset 0 0 3rem rgb(255 255 255 / 5%);
+  backdrop-filter: blur(18px);
+}
+
+.dialog--reward[open] {
+  display: flex;
+}
+
+.dialog--reward > * {
+  width: min(100%, 32rem);
+}
+
+.dialog--reward::backdrop {
+  background: transparent;
 }
 
 .reward-dialog__content {
@@ -983,6 +1101,11 @@ textarea {
 .dialog--reward .dialog__actions {
   justify-content: center;
   margin-top: 2rem;
+}
+
+.dialog--reward .dialog__title {
+  margin-bottom: 0;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
 }
 
 .dialog__title {
@@ -2791,7 +2914,7 @@ textarea {
   overflow-x: hidden;
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 52rem) {
   .focus-app-surface {
     display: grid;
     height: 100dvh;
@@ -2811,12 +2934,12 @@ textarea {
   }
 
   .focus-app__utility-actions {
-    width: 100%;
+    align-self: flex-end;
     flex-wrap: wrap;
   }
 
   .focus-app__utility-actions > * {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
   }
 
   .focus-app--empty {
@@ -2832,6 +2955,14 @@ textarea {
   .focus-app__content {
     width: min(calc(100% - 1rem), 34rem);
     aspect-ratio: auto;
+    padding: clamp(1rem, 5vw, 2rem);
+    border-radius: var(--radius-surface);
+  }
+
+  .dialog--reward {
+    width: min(calc(100vw - 1rem), 34rem);
+    min-height: 0;
+    max-height: calc(100dvh - 1rem);
     padding: clamp(1rem, 5vw, 2rem);
     border-radius: var(--radius-surface);
   }

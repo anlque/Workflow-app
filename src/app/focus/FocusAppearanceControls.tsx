@@ -10,9 +10,13 @@ type AppearancePreferences = Readonly<{
 export function FocusAppearanceControls({
   preferences,
   onUpdate,
+  open,
+  onOpenChange,
 }: Readonly<{
   preferences: AppearancePreferences;
   onUpdate(patch: SettingsPatch): Promise<void>;
+  open?: boolean;
+  onOpenChange?(open: boolean): void;
 }>) {
   const [error, setError] = useState<string | null>(null);
   const [blurDraft, setBlurDraft] = useState(preferences.backgroundBlurPx);
@@ -50,8 +54,17 @@ export function FocusAppearanceControls({
   }
 
   return (
-    <details className="focus-appearance">
-      <summary>Appearance</summary>
+    <details
+      className="focus-appearance"
+      open={open}
+      onToggle={(event) => {
+        onOpenChange?.(event.currentTarget.open);
+      }}
+    >
+      <summary className="focus-utility-button">
+        <span aria-hidden="true">◐</span>
+        <span className="visually-hidden">Appearance</span>
+      </summary>
       <div className="focus-appearance__controls">
         <label>
           <span>Focus blur</span>

@@ -121,16 +121,20 @@ export function SessionControls({
     <div className="session-controls">
       {session.status === 'running' ? (
         <Button
+          className="session-control session-control--primary"
+          aria-label={pending === 'pause' ? undefined : 'Pause'}
           pending={pending === 'pause'}
           pendingLabel="Pausing…"
           onClick={() => {
             void execute('pause', onPause);
           }}
         >
-          Pause
+          <span aria-hidden="true">Ⅱ</span>
         </Button>
       ) : (
         <Button
+          className="session-control session-control--primary"
+          aria-label={pending === 'resume' ? undefined : 'Resume'}
           variant="primary"
           pending={pending === 'resume'}
           pendingLabel="Resuming…"
@@ -138,21 +142,25 @@ export function SessionControls({
             void execute('resume', onResume);
           }}
         >
-          Resume
+          <span aria-hidden="true">▶</span>
         </Button>
       )}
       <Button
+        className="session-control"
+        aria-label="Stop"
         variant="quiet"
         onClick={() => {
           setError(null);
           setConfirmingStop(true);
         }}
       >
-        Stop
+        <span aria-hidden="true">■</span>
       </Button>
       {onSkipPhase === undefined ? null : (
         <Button
           buttonRef={skipTriggerRef}
+          className="session-control"
+          aria-label={pending === 'skip' ? undefined : 'Skip phase'}
           variant="quiet"
           pending={pending === 'skip' && skipConfirmationRequest === null}
           pendingLabel="Skipping…"
@@ -170,31 +178,35 @@ export function SessionControls({
             void execute('skip', (id) => onSkipPhase(id, skipTarget));
           }}
         >
-          Skip phase
+          <span aria-hidden="true">▶|</span>
         </Button>
       )}
       {onRestartPhase === undefined ? null : (
         <Button
           buttonRef={restartPhaseTriggerRef}
+          className="session-control"
+          aria-label="Restart phase"
           variant="quiet"
           onClick={() => {
             setError(null);
             setConfirmingRestart(true);
           }}
         >
-          Restart phase
+          <span aria-hidden="true">↶</span>
         </Button>
       )}
       {onRestartWorkflow === undefined ? null : (
         <Button
           buttonRef={restartWorkflowTriggerRef}
+          className="session-control"
+          aria-label="Restart workflow"
           variant="quiet"
           onClick={() => {
             setError(null);
             setConfirmingWorkflowRestart(true);
           }}
         >
-          Restart workflow
+          <span aria-hidden="true">↺</span>
         </Button>
       )}
       {error === null ||

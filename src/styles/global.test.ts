@@ -221,6 +221,44 @@ describe('visual foundation', () => {
     expect(stylesheet).not.toMatch(/\.button:hover:not\(:disabled\)/u);
   });
 
+  test('defines contextual Focus glass and compact responsive utility contracts', () => {
+    const imageGlass = declarationsFor(
+      ".focus-app__content[data-background='image']",
+    );
+    const colorGlass = declarationsFor(
+      ".focus-app__content[data-background='color']",
+    );
+    expect(imageGlass).toContain(
+      '--focus-glass-background: rgb(8 22 17 / 58%);',
+    );
+    expect(colorGlass).toMatch(
+      /--focus-glass-background:\s*color-mix\(\s*in srgb,\s*var\(--focus-phase-color\) 58%,\s*rgb\(0 0 0 \/ 72%\)\s*\);/u,
+    );
+    expect(declarationsFor('.focus-app__content')).toContain(
+      'background: var(--focus-glass-background);',
+    );
+    expect(declarationsFor('.focus-environment__backdrop img')).toContain(
+      'opacity: 1;',
+    );
+    expect(declarationsFor('.focus-utility-button')).toContain(
+      'width: var(--control-height);',
+    );
+    expect(stylesheet).toMatch(
+      /@media \(max-width: 52rem\)[\s\S]*?\.focus-header\s*\{[\s\S]*?position: relative;/u,
+    );
+    const rewardGlass = declarationsFor('.dialog--reward');
+    expect(rewardGlass).toContain('background: var(--focus-glass-background);');
+    expect(rewardGlass).toContain('border-radius: 50%;');
+    expect(rewardGlass).toContain('align-items: center;');
+    expect(rewardGlass).toContain('justify-content: center;');
+    expect(declarationsFor('.dialog--reward > *')).toContain(
+      'width: min(100%, 32rem);',
+    );
+    expect(declarationsFor('.dialog--reward::backdrop')).toContain(
+      'background: transparent;',
+    );
+  });
+
   test('applies accessible semantic tokens to errors, controls and selection', () => {
     expect(stylesheet).toMatch(
       /\.field__error\s*\{\s*color: var\(--color-danger-foreground\);/u,
@@ -386,25 +424,23 @@ describe('visual foundation', () => {
     expect(focus).toContain('--color-selected-indicator: #2f7b5c;');
     expect(focus).toContain('color-scheme: light;');
     expect(focus).toContain('background: var(--color-canvas);');
-    expect(declarationsFor('.focus-app__content')).toContain(
-      '--color-ink: #10271f;',
-    );
+    expect(declarationsFor('.focus-app__content')).toContain('color: #f5faf7;');
     expect(header).toContain('justify-content: space-between;');
     expect(panel).toContain('overflow-x: hidden;');
     expect(stylesheet).toMatch(
       /\.compact-session-summary__identity span\s*\{[^}]*color: var\(--color-ink\);/u,
     );
     expect(stylesheet).toMatch(
-      /@media \(max-width: 40rem\)[\s\S]*?\.focus-header\s*\{[^}]*align-items: stretch;[^}]*flex-direction: column;/u,
+      /@media \(max-width: 52rem\)[\s\S]*?\.focus-header\s*\{[^}]*align-items: stretch;[^}]*flex-direction: column;/u,
     );
     expect(stylesheet).toMatch(
-      /@media \(max-width: 40rem\)[\s\S]*?\.focus-header\s*\{[^}]*position: relative;/u,
+      /@media \(max-width: 52rem\)[\s\S]*?\.focus-header\s*\{[^}]*position: relative;/u,
     );
     expect(stylesheet).toMatch(
-      /@media \(max-width: 40rem\)[\s\S]*?\.focus-app-surface\s*\{[^}]*grid-template-rows: auto minmax\(0, 1fr\);/u,
+      /@media \(max-width: 52rem\)[\s\S]*?\.focus-app-surface\s*\{[^}]*grid-template-rows: auto minmax\(0, 1fr\);/u,
     );
     expect(stylesheet).toMatch(
-      /@media \(max-width: 40rem\)[\s\S]*?\.focus-app__utility-actions\s*\{[^}]*width: 100%;[^}]*flex-wrap: wrap;/u,
+      /@media \(max-width: 52rem\)[\s\S]*?\.focus-app__utility-actions\s*\{[^}]*align-self: flex-end;[^}]*flex-wrap: wrap;/u,
     );
     expect(stylesheet).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.focus-app__content:has\(\.active-session\[data-transitioning='true'\]\)/u,
@@ -428,7 +464,7 @@ describe('visual foundation', () => {
       'min-height: min(45.375rem, calc(100vw - 2rem), calc(100dvh - 2rem));',
     );
     expect(stylesheet).toMatch(
-      /@media \(max-width: 40rem\)[\s\S]*?\.focus-app__content\s*\{[^}]*aspect-ratio: auto;[^}]*border-radius: var\(--radius-surface\);/u,
+      /@media \(max-width: 52rem\)[\s\S]*?\.focus-app__content\s*\{[^}]*aspect-ratio: auto;[^}]*border-radius: var\(--radius-surface\);/u,
     );
   });
 

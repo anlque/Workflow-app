@@ -139,6 +139,44 @@ test('active Focus keeps header utilities clear of timer content at effective 20
   }
 });
 
+test('active Focus reflows utilities and session controls at the approved effective 200% viewport', async ({
+  context,
+  extensionUrls,
+}) => {
+  const focus = await context.newPage();
+  await focus.setViewportSize({ width: 756, height: 493 });
+  await focus.goto(extensionUrls.focus);
+  await focus
+    .getByRole('button', { name: /Start workflow:/u })
+    .first()
+    .click();
+  await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
+
+  const header = await focus.locator('.focus-header').boundingBox();
+  const timer = await focus.locator('.focus-app__content').boundingBox();
+  const countdown = await focus.locator('.session-countdown').boundingBox();
+  expect(header).not.toBeNull();
+  expect(timer).not.toBeNull();
+  expect(countdown).not.toBeNull();
+  if (header !== null && timer !== null && countdown !== null) {
+    expect(overlapArea(header, timer)).toBe(0);
+    expect(countdown.y).toBeGreaterThanOrEqual(timer.y);
+    expect(countdown.y + countdown.height).toBeLessThanOrEqual(
+      timer.y + timer.height,
+    );
+  }
+  expect(
+    await focus.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await expect(focus.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(focus.getByRole('button', { name: 'Stop' })).toBeVisible();
+  await expectNoAccessibilityViolations(focus);
+});
+
 test('real Focus and Side Panel Session states have no detectable axe violations', async ({
   context,
   extensionUrls,
@@ -190,7 +228,7 @@ test('real Focus and Side Panel Session states have no detectable axe violations
   await expect(pausedSession).toHaveAttribute('data-session-state', 'paused');
   await expect(pausedSession.locator('.session-countdown')).toHaveCSS(
     'color',
-    'rgb(47, 123, 92)',
+    'rgb(155, 224, 188)',
   );
   await focus.getByRole('button', { name: 'Resume' }).click();
   await expect(pausedSession).toHaveAttribute('data-session-state', 'running');
@@ -220,14 +258,18 @@ test('real Focus and Side Panel Session states have no detectable axe violations
   await reward.getByRole('button', { name: 'Roll dice' }).click();
   await focus.getByTestId('reward-dice-video').dispatchEvent('error');
   await reward.getByRole('button', { name: 'Continue' }).click();
-  await expect(focus.getByText('Bonus · Accessible Bonus')).toBeVisible();
+  await expect(
+    focus.getByRole('heading', { name: 'Accessible Bonus' }),
+  ).toBeVisible();
   const bonusSession = focus.locator('.active-session');
   await expect(bonusSession).toHaveAttribute('data-session-segment', 'bonus');
   await expect(bonusSession.locator('.session-phase')).toHaveCSS(
     'color',
-    'rgb(129, 77, 15)',
+    'rgb(255, 210, 150)',
   );
-  await expect(sidePanel.getByText('Bonus · Accessible Bonus')).toBeVisible();
+  await expect(
+    sidePanel.getByRole('heading', { name: 'Accessible Bonus' }),
+  ).toBeVisible();
   await expectNoAccessibilityViolations(focus);
   await expectNoAccessibilityViolations(sidePanel);
 
