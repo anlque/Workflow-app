@@ -232,6 +232,16 @@ describe('visual foundation', () => {
     expect(stylesheet).not.toMatch(/\.button:hover:not\(:disabled\)/u);
   });
 
+  test('defines shared icon sizing and stable circular icon controls', () => {
+    expect(declarationsFor('.icon')).toContain('display: block;');
+    expect(declarationsFor('.icon')).toContain('flex: 0 0 auto;');
+    expect(declarationsFor('.button--icon')).toContain(
+      'width: var(--control-height);',
+    );
+    expect(declarationsFor('.button--icon')).toContain('padding: 0;');
+    expect(declarationsFor('.button--icon')).toContain('border-radius: 50%;');
+  });
+
   test('defines contextual Focus glass and compact responsive utility contracts', () => {
     const imageGlass = declarationsFor(
       ".focus-app__content[data-background='image']",

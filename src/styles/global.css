@@ -895,6 +895,13 @@ textarea {
   outline-offset: 2px;
 }
 
+.icon {
+  display: block;
+  width: var(--icon-size, 1.5rem);
+  height: var(--icon-size, 1.5rem);
+  flex: 0 0 auto;
+}
+
 .button {
   display: inline-flex;
   align-items: center;
@@ -911,6 +918,13 @@ textarea {
     background-color var(--transition-state),
     color var(--transition-state),
     transform var(--transition-state);
+}
+
+.button--icon {
+  width: var(--control-height);
+  min-width: var(--control-height);
+  padding: 0;
+  border-radius: 50%;
 }
 
 .button:active:not(:disabled) {

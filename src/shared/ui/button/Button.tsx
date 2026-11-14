@@ -12,6 +12,7 @@ export type ButtonProps = Omit<
     pendingLabel?: ReactNode;
     variant?: ButtonVariant;
     buttonRef?: Ref<HTMLButtonElement>;
+    iconOnly?: boolean;
   }>;
 
 export function Button({
@@ -22,10 +23,16 @@ export function Button({
   className,
   disabled,
   buttonRef,
+  iconOnly = false,
   type = 'button',
   ...props
 }: ButtonProps) {
-  const classes = ['button', `button--${variant}`, className]
+  const classes = [
+    'button',
+    `button--${variant}`,
+    iconOnly && 'button--icon',
+    className,
+  ]
     .filter(Boolean)
     .join(' ');
 
@@ -38,7 +45,7 @@ export function Button({
       disabled={disabled === true || pending}
       aria-busy={pending || undefined}
     >
-      {pending ? pendingLabel : children}
+      {pending && !iconOnly ? pendingLabel : children}
     </button>
   );
 }
