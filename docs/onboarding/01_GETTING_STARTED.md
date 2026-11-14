@@ -117,13 +117,14 @@ manually if Chrome retains an old background worker, manifest or extension page.
 | Surface | How to reach it | Responsibility |
 | --- | --- | --- |
 | Focus view | Click the Locusora toolbar action or **Open focus view** in the side panel | Select a Workflow when idle and display the full active Session environment |
-| Side panel | Use Chrome's extension side-panel control or the focus-view button | Compact Workflow Library and mirrored Session controls |
-| Options page | Open Locusora details → **Extension options**, or use an in-product settings action | Workflow editing, local Assets and application Settings |
+| Side panel | Use Chrome's extension side-panel control or the focus-view button | Read-only Workflow chooser and mirrored Session controls |
+| Options page | Open Locusora details → **Extension options**, or open a Workflow from Side Panel | System fallback host for Workflow Studio editing, local Assets and application Settings |
 | Background worker | Inspect the service worker from `chrome://extensions` | Authoritative Session commands, persistence reconciliation and alarms |
 
-The focus view is an extension application hosted in a normal browser focus tab.
-The side panel and Options page are separate extension documents. They do not
-share React state or JavaScript memory.
+The focus view is an extension application hosted in a normal browser focus tab
+and can open Workflow Studio as a lazy full-screen overlay. The side panel and
+Options fallback are separate extension documents. They do not share React
+state or JavaScript memory.
 
 ## Verification Commands
 

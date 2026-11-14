@@ -6,13 +6,8 @@ import {
   updateSettingsUseCase,
 } from '@/features/settings';
 import {
-  createWorkflowId,
-  createWorkflowUseCase,
-  deleteWorkflowUseCase,
   DexieWorkflowRepository,
-  duplicateWorkflowUseCase,
   listWorkflowsUseCase,
-  reorderWorkflowsUseCase,
 } from '@/features/workflow';
 import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 import type { WorkflowCatalogEvents } from '@/platform/messaging';
@@ -23,7 +18,6 @@ import {
   type SessionRuntime,
 } from '../session/ChromeSessionClient';
 import type { SidePanelDependencies } from './SidePanelApp';
-import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
 import { createChromeFocusTabController } from '../focus/createChromeFocusTabController';
 import { closeSidePanel } from '../closeSidePanel';
 import { createProductionDatabase } from '../databaseSchemas';
@@ -68,77 +62,8 @@ export function createSidePanelDependencies(
     listWorkflows: () => listWorkflowsUseCase(workflows),
     subscribeWorkflowChanges: (listener) =>
       catalogEvents.subscribeChanged(listener),
-    async createWorkflow(mode) {
-      await runWorkflowCatalogMutation(async () => {
-        const created = await createWorkflowUseCase(
-          workflows,
-          mode === 'quick'
-            ? {
-                id: crypto.randomUUID(),
-                name: 'Untitled Workflow',
-                mode: 'quick',
-                configuration: {
-                  cycleCount: 4,
-                  focus: { durationSeconds: 1_500, environment: {} },
-                  shortBreak: { durationSeconds: 300, environment: {} },
-                },
-              }
-            : {
-                id: crypto.randomUUID(),
-                name: 'Untitled Workflow',
-                mode: 'detailed',
-                phases: [
-                  {
-                    type: 'focus',
-                    durationSeconds: 1_500,
-                    environment: {},
-                  },
-                ],
-              },
-        );
-        const ordered = await listWorkflowsUseCase(workflows);
-        const ids = ordered.map(({ id }) => id);
-        const createdIndex = ids.indexOf(created.id);
-        const firstModeIndex = ordered.findIndex(
-          (workflow) =>
-            workflow.id !== created.id && workflow.mode === created.mode,
-        );
-        if (createdIndex >= 0 && firstModeIndex >= 0) {
-          ids.splice(createdIndex, 1);
-          ids.splice(firstModeIndex, 0, created.id);
-          await reorderWorkflowsUseCase(workflows, ids);
-        }
-      }, catalogEvents);
-    },
-    async duplicateWorkflow(id) {
-      await runWorkflowCatalogMutation(async () => {
-        const duplicate = await duplicateWorkflowUseCase(
-          workflows,
-          id,
-          createWorkflowId(crypto.randomUUID()),
-        );
-        const ordered = await listWorkflowsUseCase(workflows);
-        const ids = ordered.map(({ id: value }) => value);
-        const duplicateIndex = ids.indexOf(duplicate.id);
-        const sourceIndex = ids.indexOf(id);
-        if (duplicateIndex >= 0 && sourceIndex >= 0) {
-          ids.splice(duplicateIndex, 1);
-          ids.splice(sourceIndex + 1, 0, duplicate.id);
-          await reorderWorkflowsUseCase(workflows, ids);
-        }
-      }, catalogEvents);
-    },
-    async deleteWorkflow(id) {
-      await runWorkflowCatalogMutation(
-        () => deleteWorkflowUseCase(workflows, id),
-        catalogEvents,
-      );
-    },
-    async reorderWorkflows(ids) {
-      await runWorkflowCatalogMutation(
-        () => reorderWorkflowsUseCase(workflows, ids),
-        catalogEvents,
-      );
+    async openWorkflowStudio() {
+      await browser.runtime.openOptionsPage();
     },
     async openWorkflow(id) {
       const current = await getSettingsUseCase(settings);

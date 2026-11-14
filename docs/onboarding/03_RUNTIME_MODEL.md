@@ -9,9 +9,9 @@ they do not share memory.
 | Context | Entrypoint | Composition root | React root | Lifetime | Durable access | Runtime message role | Authoritative responsibility |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Background worker | [`entrypoints/background.ts`](../../entrypoints/background.ts) | [`bootstrapBackground()`](../../src/app/background/bootstrapBackground.ts) | None | Event-driven MV3 service worker; Chrome may suspend and restart it | Workflow and Session repositories in IndexedDB; all schema fragments are registered | Receives Session commands/active request; broadcasts `session/changed` | Executes and reconciles the active Session, schedules alarms and opens/activates the focus tab from the toolbar action |
-| Focus view | [`entrypoints/focus/main.tsx`](../../entrypoints/focus/main.tsx) | [`bootstrapFocus()`](../../src/app/focus/bootstrapFocus.tsx) | One root in `focus.html` | While the focus tab document is loaded | Workflow and Asset repositories in IndexedDB; Settings in Chrome Storage | Sends Session commands/request; receives Session projections and Workflow catalog invalidation | Owns only focus-view UI state, media object URLs, Web Audio state and effects |
-| Options page | [`entrypoints/options/main.tsx`](../../entrypoints/options/main.tsx) | [`bootstrapOptions()`](../../src/app/options/bootstrapOptions.tsx) | One root in `options.html` | While the Options document is loaded | Workflow and Asset repositories in IndexedDB; Settings in Chrome Storage | Publishes Workflow catalog invalidation after successful mutations | Owns local form/tab/dialog state and invokes persistent CRUD/import/export use cases |
-| Side panel | [`entrypoints/sidepanel/main.tsx`](../../entrypoints/sidepanel/main.tsx) | [`bootstrapSidePanel()`](../../src/app/side-panel/bootstrapSidePanel.tsx) | One root in `sidepanel.html` | While Chrome keeps the side-panel document loaded; it may be recreated after close | Workflow repository in IndexedDB; Settings in Chrome Storage | Sends Session commands/request, receives Session projections, and publishes/subscribes to Workflow catalog invalidation | Owns compact local view state; never authoritative Session state |
+| Focus view | [`entrypoints/focus/main.tsx`](../../entrypoints/focus/main.tsx) | [`bootstrapFocus()`](../../src/app/focus/bootstrapFocus.tsx) | One root in `focus.html` | While the focus tab document is loaded | Workflow and Asset repositories in IndexedDB; Settings in Chrome Storage | Sends Session commands/request; receives Session projections and Workflow catalog invalidation; embedded Workflow Studio publishes catalog invalidation after successful mutations | Owns focus-view UI state, media object URLs, Web Audio state and effects; may host the lazy Workflow Studio overlay |
+| Options page | [`entrypoints/options/main.tsx`](../../entrypoints/options/main.tsx) | [`bootstrapOptions()`](../../src/app/options/bootstrapOptions.tsx) | One root in `options.html` | While the Options document is loaded | Workflow and Asset repositories in IndexedDB; Settings in Chrome Storage | Fallback Workflow Studio publishes Workflow catalog invalidation after successful mutations | Hosts the reusable Workflow Studio as Chrome's system fallback |
+| Side panel | [`entrypoints/sidepanel/main.tsx`](../../entrypoints/sidepanel/main.tsx) | [`bootstrapSidePanel()`](../../src/app/side-panel/bootstrapSidePanel.tsx) | One root in `sidepanel.html` | While Chrome keeps the side-panel document loaded; it may be recreated after close | Workflow repository in IndexedDB; Settings in Chrome Storage | Sends Session commands/request, receives Session projections, and subscribes to Workflow catalog invalidation | Owns compact local view state and the read-only Workflow chooser; never authoritative Session state |
 
 Every context that opens IndexedDB composes the same cumulative feature schema
 fragments into `LocusoraDatabase`. The database is one extension-origin
@@ -103,8 +103,10 @@ Consequences:
 
 Workflow records live in shared IndexedDB, but an open React surface will not
 notice another context's write merely because the database changed. Successful
-catalog mutations publish `workflow/catalog-changed`. Catalog hooks then reload
-from IndexedDB.
+Workflow Studio catalog mutations publish `workflow/catalog-changed`, whether
+Studio is embedded in Focus or hosted by the Options fallback. Focus and Side
+Panel catalog consumers then reload from IndexedDB; Side Panel never publishes
+this event.
 
 The event carries invalidation, not Workflow data. An active Session keeps the
 immutable Workflow snapshot captured at start, so catalog reload does not alter

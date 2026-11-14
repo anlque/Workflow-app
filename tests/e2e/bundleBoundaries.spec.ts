@@ -83,6 +83,51 @@ test('Focus initial preload graph excludes Workflow Studio modules', () => {
   expect(entrySource).toMatch(/import\([^)]*LazyWorkflowStudio/u);
 });
 
+test('Side Panel initial graph excludes Workflow management code', () => {
+  const sidePanelHtml = readFileSync(
+    resolve(outputRoot, 'sidepanel.html'),
+    'utf8',
+  );
+  const chunkNames = readdirSync(resolve(outputRoot, 'chunks'));
+  const initialGraph = collectStaticModuleGraph([
+    ...assetPaths(sidePanelHtml, 'script'),
+    ...assetPaths(sidePanelHtml, 'modulepreload'),
+  ]);
+  const initialGraphSource = [...initialGraph]
+    .map((path) =>
+      readFileSync(resolve(outputRoot, path.replace(/^\//u, '')), 'utf8'),
+    )
+    .join('\n');
+  const completeChunkSource = chunkNames
+    .map((name) => readFileSync(resolve(outputRoot, 'chunks', name), 'utf8'))
+    .join('\n');
+
+  expect(initialGraphSource).not.toContain('Create workflow');
+  expect(initialGraphSource).not.toContain('Duplicate ${');
+  expect(initialGraphSource).not.toContain('Delete workflow');
+  expect(completeChunkSource).toContain('Create workflow');
+  expect(completeChunkSource).toContain('Duplicate ${');
+  expect(completeChunkSource).toContain('Delete workflow');
+  expect(
+    chunkNames.some((name) =>
+      name.startsWith('createWorkflowStudioDependencies-'),
+    ),
+  ).toBe(true);
+  expect(
+    [...initialGraph].some((path) =>
+      path.includes('createWorkflowStudioDependencies-'),
+    ),
+  ).toBe(false);
+  expect(
+    [...initialGraph].some((path) =>
+      path.includes('runWorkflowCatalogMutation-'),
+    ),
+  ).toBe(false);
+  expect(
+    [...initialGraph].some((path) => path.includes('WorkflowStudio-')),
+  ).toBe(false);
+});
+
 test('production bundle contains the approved Reward Dice media and audio cues', () => {
   for (const path of [
     'video/reward-dice-roll.webm',

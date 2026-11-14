@@ -10,8 +10,8 @@ Role, rewrites all imported references and writes Assets plus Workflow atomicall
 
 ## Trigger
 
-The user selects one of four Options actions: export/import the selected
-Workflow package, or export/import the application Settings package.
+The user selects one of four Workflow Studio actions: export/import the
+selected Workflow package, or export/import the application Settings package.
 
 These are two independent public envelopes. A Workflow package is not a Settings
 backup, and a Settings package never contains Workflows or Assets.
@@ -24,15 +24,15 @@ backup, and a Settings package never contains Workflows or Assets.
 - Workflow import receives an Asset MIME/size policy and collision-safe identity
   generators.
 
-Current Options limits are 100 MiB per Workflow package and 1 MiB per Settings
-package. Embedded Asset limits remain 10 MiB image / 50 MiB audio with the
-configured MIME allowlists.
+Current Workflow Studio limits are 100 MiB per Workflow package and 1 MiB per
+Settings package. Embedded Asset limits remain 10 MiB image / 50 MiB audio with
+the configured MIME allowlists.
 
 ## Sequence
 
 ### Workflow Export
 
-1. Options resolves the selected Workflow from the repository.
+1. Workflow Studio resolves the selected Workflow from the repository.
 2. [`exportWorkflowUseCase()`](../../../src/features/workflow/application/exportWorkflowUseCase.ts)
    resolves distinct background/audio references to their Assets and sorts the
    embedded Assets lexically by ID.
@@ -45,8 +45,8 @@ configured MIME allowlists.
 5. The use case serializes `{ kind: 'locusora/workflow', version: 7, workflow,
    assets }`. Sorted Assets and stable property/array order make repeated export
    deterministic for unchanged input.
-6. Options creates a temporary JSON Blob/object URL, clicks a download link and
-   revokes the URL.
+6. Workflow Studio creates a temporary JSON Blob/object URL, clicks a download
+   link and revokes the URL.
 
 ### Workflow Import
 
@@ -85,8 +85,8 @@ configured MIME allowlists.
    opens one `workflows + assets` transaction. Reading local Workflow IDs and
    Asset IDs/Roles, reserving collision keys, remapping IDs/Roles and all Asset
    and Workflow writes happen inside that same transaction.
-9. Options wraps this mutation with catalog invalidation and reloads its local
-   snapshot.
+9. Workflow Studio wraps this mutation with catalog invalidation and reloads
+   its local snapshot.
 
 ### Settings Export and Import
 
@@ -102,8 +102,9 @@ configured MIME allowlists.
    shared volume and absent appearance fields are normalized before the single
    write; v1–v3 default `pauseWithSpace` to `true`, while malformed canonical v4
    values are rejected.
-4. Only then does it perform one `chrome.storage.local.set`; Options reloads and
-   reapplies live document theme, motion, audio and Focus appearance values.
+4. Only then does it perform one `chrome.storage.local.set`; Workflow Studio
+   reloads and reapplies live document theme, motion, audio and Focus appearance
+   values.
 
 ## Authoritative Changes
 
@@ -118,8 +119,8 @@ configured MIME allowlists.
 
 Successful Workflow import publishes the payload-free
 `workflow/catalog-changed` event after the transaction. Settings import publishes
-no runtime message; Options reloads its own snapshot. No package bytes travel
-through Chrome runtime messaging.
+no runtime message; Workflow Studio reloads its own snapshot. No package bytes
+travel through Chrome runtime messaging.
 
 ## Persistence
 
@@ -149,7 +150,7 @@ present a combined cross-storage atomic backup.
   `src/features/workflow/infrastructure/DexieWorkflowPackageUnitOfWork.test.ts`.
 - Settings package/default/no-write behavior:
   `src/features/settings/application/settingsUseCases.test.ts`.
-- Options operation feedback/composition:
+- Workflow Studio operation feedback/composition:
   `src/features/settings/presentation/SettingsPage.test.tsx` and
   `src/app/workflow-studio/WorkflowStudio.test.tsx`.
 - assembled file journeys: `tests/e2e/dataPortability.spec.ts`.

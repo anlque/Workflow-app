@@ -273,8 +273,9 @@ Version 1 includes:
 
 The MVP targets Chrome on Manifest V3 and contains these extension surfaces:
 
-- side panel as a compact Workflow Library and Session surface;
-- options page for Workflow editing, Asset management and application settings;
+- side panel as a compact read-only Workflow chooser and Session surface;
+- Workflow Studio for Workflow editing, Asset management and application
+  settings, embedded in Focus with the options page as its system fallback;
 - background service worker for authoritative Session coordination;
 - a full-page focus view hosted in a dedicated browser focus tab. The tab is
   opened or activated from the extension toolbar or side panel. When no Session
@@ -386,9 +387,10 @@ Direct interaction with the focus tab activates UI sounds under Chrome's
 autoplay policy. A restored Session exposes a non-blocking `Enable sounds`
 control while Web Audio remains locked.
 
-Focus controls can open or close the side panel and open the extension Options
-page directly in a regular tab. Successful Workflow saves provide transient,
-accessible confirmation without blocking further editing.
+Focus controls can open or close the side panel and open Workflow Studio as a
+same-document overlay. Chrome's Options page remains the system fallback host
+for Studio. Successful Workflow saves provide transient, accessible
+confirmation without blocking further editing.
 
 The initial application settings are theme (`system`, `light` or `dark`), reduced
 motion (`system`, `reduce` or `no-preference`) and last selected Workflow.

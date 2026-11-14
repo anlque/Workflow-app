@@ -248,12 +248,13 @@ package differences and migrations.
 
 ### `WorkflowLibrary`
 
-Renders one catalog as non-empty Quick then Detailed groups while preserving
-repository order inside each group. Mode badges identify every card; creation
-explicitly chooses Quick or Detailed setup. It delegates open, duplicate,
-delete, within-group reorder and optional start actions, owns pending/error
-feedback and deletion confirmation, and receives all operations as props.
-Options and side panel compose different capabilities from the same component.
+Renders the Workflow Studio catalog as non-empty Quick then Detailed groups
+while preserving repository order inside each group. Mode badges identify
+every card; creation explicitly chooses Quick or Detailed setup. It delegates
+open, duplicate, delete, within-group reorder and optional start actions, owns
+pending/error feedback and deletion confirmation, and receives all operations
+as props. The bounded Side Panel chooser is a separate read-only presentation
+for list/open/start and does not compose management operations.
 
 ### `QuickWorkflowEditor`
 
@@ -319,10 +320,11 @@ validation converts them to numeric constructor input.
 
 Current consumers:
 
-- Options renders Library plus Editor and provides full CRUD/import/export;
-- side panel renders the Library, opens selected Workflows in Options and can
-  start a Session;
-- idle focus view uses the catalog hook in its launcher and starts existing
+- Workflow Studio renders Library plus Editor and provides full
+  CRUD/import/export, either embedded in Focus or through the Options fallback;
+- Side Panel renders a compact read-only chooser, opens selected Workflows in
+  the Options fallback and can start a Session;
+- idle Focus uses the catalog hook in its launcher and starts existing
   Workflows.
 
 ## Dependencies

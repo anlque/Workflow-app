@@ -2994,6 +2994,113 @@ textarea {
   margin-left: auto;
 }
 
+.side-panel-workflow-chooser {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.side-panel-workflow-chooser__header h2,
+.side-panel-workflow-group h3,
+.side-panel-workflow-chooser--empty h2 {
+  margin: 0;
+}
+
+.side-panel-workflow-chooser__header p,
+.side-panel-workflow-chooser--empty p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-ink-muted);
+}
+
+.side-panel-workflow-group {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.side-panel-workflow-group h3 {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-body);
+}
+
+.side-panel-workflow-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.side-panel-workflow-item {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.side-panel-workflow-item__open {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  color: var(--color-ink);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+.side-panel-workflow-item__open strong,
+.side-panel-workflow-item__open span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-panel-workflow-item__open span {
+  color: color-mix(in srgb, var(--color-ink-muted), var(--color-ink) 16%);
+  font-size: var(--font-size-caption);
+}
+
+.side-panel-workflow-item__open:hover {
+  background: var(--color-surface-muted);
+}
+
+.side-panel-workflow-item__open:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.side-panel-workflow-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.side-panel-workflow-item__actions .button {
+  min-height: 2.5rem;
+  padding-inline: var(--space-3);
+}
+
+@media (max-width: 26rem) {
+  .side-panel-workflow-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side-panel-workflow-item__actions .button {
+    width: 100%;
+  }
+}
+
 .side-panel-session {
   display: flex;
   flex-direction: column;

@@ -19,18 +19,14 @@ import {
   type WorkflowCatalogSource,
   type WorkflowId,
 } from '@/features/workflow';
-import { WorkflowLibrary } from '@/features/workflow/studio';
-
 import { CompactActiveSessionBar } from './CompactActiveSessionBar';
+import { SidePanelWorkflowChooser } from './SidePanelWorkflowChooser';
 
 export type SidePanelDependencies = Readonly<{
   preferences: DocumentPreferences;
   listWorkflows(): Promise<readonly Workflow[]>;
   subscribeWorkflowChanges(listener: () => void): () => void;
-  createWorkflow(mode: Workflow['mode']): Promise<void>;
-  duplicateWorkflow(id: WorkflowId): Promise<void>;
-  deleteWorkflow(id: WorkflowId): Promise<void>;
-  reorderWorkflows(ids: readonly WorkflowId[]): Promise<void>;
+  openWorkflowStudio(): Promise<void>;
   openWorkflow(id: WorkflowId): Promise<void>;
   sessions: SessionProjectionClient;
   startSession(id: WorkflowId): Promise<void>;
@@ -222,12 +218,9 @@ export function SidePanelApp({
       ) : null}
       {view === 'workflows' && workflows !== null ? (
         <>
-          <WorkflowLibrary
+          <SidePanelWorkflowChooser
             workflows={workflows}
-            onCreate={async (mode) => {
-              await dependencies.createWorkflow(mode);
-              await reload();
-            }}
+            onOpenStudio={dependencies.openWorkflowStudio}
             onOpen={(id) => {
               setError(null);
               void dependencies.openWorkflow(id).catch((cause: unknown) => {
@@ -235,18 +228,6 @@ export function SidePanelApp({
                   cause instanceof Error ? cause.message : 'Opening failed.',
                 );
               });
-            }}
-            onDuplicate={async (id) => {
-              await dependencies.duplicateWorkflow(id);
-              await reload();
-            }}
-            onDelete={async (id) => {
-              await dependencies.deleteWorkflow(id);
-              await reload();
-            }}
-            onReorder={async (ids) => {
-              await dependencies.reorderWorkflows(ids);
-              await reload();
             }}
             onStart={async (id) => {
               await dependencies.startSession(id);

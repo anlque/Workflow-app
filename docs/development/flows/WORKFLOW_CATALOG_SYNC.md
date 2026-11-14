@@ -2,8 +2,9 @@
 
 ## Trigger
 
-A Workflow catalog mutation succeeds in Options or side panel: create, update,
-duplicate, delete, reorder or package import.
+A Workflow catalog mutation succeeds in Workflow Studio: create, update,
+duplicate, delete, reorder or package import. Studio may be embedded in Focus
+or hosted by the Options fallback.
 
 ## Preconditions
 
@@ -32,17 +33,18 @@ duplicate, delete, reorder or package import.
    refresh error.
 8. A failed reload preserves the last valid list and exposes `refreshError`.
    Later invalidation or manual `reload()` retries against IndexedDB.
-9. Options does not use this hook for its workspace snapshot. After its own
-   operations it explicitly calls `load()`; other documents learn about
-   Workflow changes through the event.
+9. Workflow Studio does not use this hook for its workspace snapshot. After its
+   own operations it explicitly calls `load()`; other catalog consumers learn
+   about Workflow changes through the event.
 
-Current wrapped mutations:
+Current wrapped mutations are owned by Workflow Studio: create/update save,
+duplicate, delete, reorder and Workflow import. Side Panel is a read-only
+catalog consumer that can list, open and start Workflows; it never publishes
+catalog invalidation.
 
-- Options: create/update save, duplicate, delete, reorder and Workflow import;
-- side panel: create, duplicate, delete and reorder.
-
-Opening a Workflow only updates Settings and opens Options, so it is not a
-catalog mutation. Asset and Settings changes do not publish this event.
+Opening a Workflow from Side Panel only updates Settings and opens the Options
+fallback, so it is not a catalog mutation. Asset and Settings changes do not
+publish this event.
 
 ## Authoritative Changes
 

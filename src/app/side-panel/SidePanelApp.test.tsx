@@ -13,6 +13,19 @@ import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferen
 
 import { SidePanelApp, type SidePanelDependencies } from './SidePanelApp';
 
+function quickWorkflow(id: string, name: string) {
+  return createWorkflow({
+    mode: 'quick',
+    id,
+    name,
+    configuration: {
+      cycleCount: 2,
+      focus: { durationSeconds: 1_500, environment: {} },
+      shortBreak: { durationSeconds: 300, environment: {} },
+    },
+  });
+}
+
 function dependencies(
   workflows: Awaited<ReturnType<SidePanelDependencies['listWorkflows']>> = [],
   activeSession: Awaited<
@@ -23,10 +36,7 @@ function dependencies(
     preferences: createTestDocumentPreferences(),
     listWorkflows: () => Promise.resolve(workflows),
     subscribeWorkflowChanges: vi.fn(() => vi.fn()),
-    createWorkflow: vi.fn(() => Promise.resolve()),
-    duplicateWorkflow: () => Promise.resolve(),
-    deleteWorkflow: () => Promise.resolve(),
-    reorderWorkflows: () => Promise.resolve(),
+    openWorkflowStudio: vi.fn(() => Promise.resolve()),
     openWorkflow: vi.fn(() => Promise.resolve()),
     sessions: {
       getActive: () => Promise.resolve(activeSession),
@@ -215,17 +225,112 @@ describe('SidePanelApp', () => {
     );
   });
 
-  test('forwards the selected creation mode', async () => {
+  test('opens Workflow Studio from the empty state without creating a Workflow', async () => {
     const user = userEvent.setup();
     const deps = dependencies();
     render(<SidePanelApp dependencies={deps} />);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Create workflow' }),
-    );
-    await user.click(screen.getByRole('button', { name: 'Quick setup' }));
+    const openStudio = await screen.findByRole('button', {
+      name: 'Open Workflow Studio',
+    });
+    await user.click(openStudio);
 
-    expect(deps.createWorkflow).toHaveBeenCalledWith('quick');
+    expect(deps.openWorkflowStudio).toHaveBeenCalledOnce();
+    expect(deps.openWorkflow).not.toHaveBeenCalled();
+  });
+
+  test('keeps empty-state Studio navigation retryable after failure', async () => {
+    const user = userEvent.setup();
+    let finishOpen: (() => void) | undefined;
+    const deps = dependencies();
+    vi.mocked(deps.openWorkflowStudio)
+      .mockRejectedValueOnce(new Error('Workflow Studio unavailable.'))
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishOpen = resolve;
+          }),
+      );
+    render(<SidePanelApp dependencies={deps} />);
+    const openStudio = await screen.findByRole('button', {
+      name: 'Open Workflow Studio',
+    });
+
+    await user.click(openStudio);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Workflow Studio unavailable.',
+    );
+
+    await user.click(openStudio);
+    expect(openStudio).toBeDisabled();
+    expect(openStudio).toHaveAttribute('aria-busy', 'true');
+    expect(deps.openWorkflowStudio).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      finishOpen?.();
+      await Promise.resolve();
+    });
+    expect(openStudio).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  test('renders a compact grouped chooser without management actions', async () => {
+    const quick = quickWorkflow('quick-workflow', 'Quick rhythm');
+    const detailed = createWorkflow({
+      id: 'detailed-workflow',
+      name: 'Detailed rhythm',
+      phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+    });
+
+    render(<SidePanelApp dependencies={dependencies([quick, detailed])} />);
+
+    expect(
+      await screen.findByRole('group', { name: 'Quick Workflows' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('group', { name: 'Detailed Workflows' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Open Quick rhythm' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Start workflow: Quick rhythm' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: /Create|New workflow/u }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Move .* (?:up|down)/u }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Duplicate|Delete/u }),
+    ).not.toBeInTheDocument();
+  });
+
+  test('keeps compact chooser actions keyboard operable', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'keyboard-workflow',
+      name: 'Keyboard rhythm',
+      phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+    });
+    const deps = dependencies([workflow]);
+    render(<SidePanelApp dependencies={deps} />);
+
+    const open = await screen.findByRole('button', {
+      name: 'Open Keyboard rhythm',
+    });
+    open.focus();
+    await user.keyboard('{Enter}');
+    expect(deps.openWorkflow).toHaveBeenCalledWith(workflow.id);
+
+    const start = screen.getByRole('button', {
+      name: 'Start workflow: Keyboard rhythm',
+    });
+    start.focus();
+    await user.keyboard(' ');
+    expect(deps.startSession).toHaveBeenCalledWith(workflow.id);
+    expect(deps.openFocusView).toHaveBeenCalledOnce();
   });
 
   test('opens a Workflow in the options editor', async () => {
@@ -374,6 +479,37 @@ describe('SidePanelApp', () => {
     );
     expect(deps.startSession).toHaveBeenCalledWith(workflow.id);
     expect(deps.openFocusView).toHaveBeenCalledOnce();
+  });
+
+  test('keeps the compact chooser available after a start failure and allows retry', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'workflow-start-retry',
+      name: 'Retry rhythm',
+      phases: [{ type: 'focus', durationSeconds: 1_500, environment: {} }],
+    });
+    const deps = dependencies([workflow]);
+    vi.mocked(deps.startSession)
+      .mockRejectedValueOnce(new Error('Session unavailable.'))
+      .mockResolvedValueOnce(undefined);
+    render(<SidePanelApp dependencies={deps} />);
+    const start = await screen.findByRole('button', {
+      name: 'Start workflow: Retry rhythm',
+    });
+
+    await user.click(start);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Session unavailable.',
+    );
+    expect(start).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Open Retry rhythm' }),
+    ).toBeVisible();
+
+    await user.click(start);
+    expect(deps.startSession).toHaveBeenCalledTimes(2);
+    expect(deps.openFocusView).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   test('shows mirrored controls in the active Session surface', async () => {

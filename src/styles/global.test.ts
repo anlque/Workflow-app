@@ -193,6 +193,17 @@ describe('visual foundation', () => {
     });
   });
 
+  test('keeps the Side Panel chooser compact and horizontally bounded', () => {
+    const list = declarationsFor('.side-panel-workflow-list');
+    const item = declarationsFor('.side-panel-workflow-item');
+    const actions = declarationsFor('.side-panel-workflow-item__actions');
+
+    expect(list).toContain('grid-template-columns: minmax(0, 1fr);');
+    expect(item).toContain('grid-template-columns: minmax(0, 1fr) auto;');
+    expect(item).toContain('min-width: 0;');
+    expect(actions).toContain('flex-wrap: wrap;');
+  });
+
   test('preserves button variants during pending and distinguishes disabled', () => {
     const pending = declarationsFor(".button[aria-busy='true']");
     const disabled = declarationsFor(
@@ -317,6 +328,9 @@ describe('visual foundation', () => {
   });
 
   test('provides selected-state management controls and responsive library workspaces', () => {
+    expect(declarationsFor('.side-panel-workflow-item__open span')).toContain(
+      'var(--color-ink) 16%',
+    );
     expect(declarationsFor('.switch-control__track')).toContain(
       'background: var(--color-surface-muted);',
     );

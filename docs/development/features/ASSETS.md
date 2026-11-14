@@ -50,9 +50,9 @@ Source root: [`src/features/assets/`](../../../src/features/assets/).
 - ambient-audio playback in the focus surface;
 - remote providers, bundled catalogs, video or animation.
 
-The Options composition supplies the current import policy: PNG, JPEG and WebP
-images up to 10 MiB; MP3, Ogg and WAV audio up to 50 MiB. These limits are app
-policy, not hidden Asset Domain constants.
+The Workflow Studio composition supplies the current import policy: PNG, JPEG
+and WebP images up to 10 MiB; MP3, Ogg and WAV audio up to 50 MiB. These limits
+are app policy, not hidden Asset Domain constants.
 
 ## Public API
 
@@ -164,10 +164,10 @@ See [Persistence and Compatibility](../PERSISTENCE.md) and
 
 ### `AssetLibrary`
 
-Options uses the library for local import, preview, Role management and a
-two-step retirement dialog. The first step lists affected Workflows and direct/
-Role occurrences with normal Phase or Reward Side Bonus ownership, location
-and optionality; the second chooses an
+Workflow Studio uses the library for local import, preview, Role management and
+a two-step retirement dialog. The first step lists affected Workflows and
+direct/Role occurrences with normal Phase or Reward Side Bonus ownership,
+location and optionality; the second chooses an
 existing same-kind Asset, a new upload or
 optional-reference removal. The injected Application operation remains the
 authoritative kind/size/MIME and transaction boundary. Rejections remain inline

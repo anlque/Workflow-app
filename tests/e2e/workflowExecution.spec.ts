@@ -488,7 +488,7 @@ test('embeds Workflow Studio over idle and active Focus without navigation', asy
 
   const loadedStudioChunks = () =>
     [...loadedAssets].filter((name) =>
-      /^(?:LazyWorkflowStudio|WorkflowStudio|createWorkflowStudioDependencies|studio)-/u.test(
+      /^(?:LazyWorkflowStudio|WorkflowStudio|createWorkflowStudioDependencies)-/u.test(
         name,
       ),
     );
@@ -505,7 +505,6 @@ test('embeds Workflow Studio over idle and active Focus without navigation', asy
         expect.stringMatching(/^LazyWorkflowStudio-/u),
         expect.stringMatching(/^WorkflowStudio-/u),
         expect.stringMatching(/^createWorkflowStudioDependencies-/u),
-        expect.stringMatching(/^studio-/u),
       ]),
     );
   await expect(

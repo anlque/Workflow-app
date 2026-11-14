@@ -85,6 +85,138 @@ test('Focus and Side Panel stay operable without horizontal overflow', async ({
   await expectNoAccessibilityViolations(sidePanel);
 });
 
+test('Side Panel compact chooser stays bounded across supported widths', async ({
+  context,
+  extensionUrls,
+}) => {
+  const sidePanel = await context.newPage();
+  await sidePanel.goto(extensionUrls.sidePanel);
+
+  for (const viewport of [
+    { width: 640, height: 900 },
+    { width: 420, height: 900 },
+    { width: 320, height: 900 },
+    { width: 210, height: 450 },
+  ]) {
+    await sidePanel.setViewportSize(viewport);
+    const chooser = sidePanel.locator('.side-panel-workflow-chooser');
+    await expect(chooser).toBeVisible();
+    await expect(
+      sidePanel.getByRole('button', { name: /Start workflow:/u }).first(),
+    ).toBeVisible();
+    await expect(
+      sidePanel.getByRole('button', { name: /Create|Move|Duplicate|Delete/u }),
+    ).toHaveCount(0);
+    expect(
+      await sidePanel.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+
+    const open = sidePanel.getByRole('button', { name: /Open .+/u }).first();
+    const start = sidePanel
+      .getByRole('button', { name: /Start workflow:/u })
+      .first();
+    for (const control of [open, start]) {
+      const bounds = await control.boundingBox();
+      expect(bounds).not.toBeNull();
+      if (bounds !== null) {
+        expect(bounds.x).toBeGreaterThanOrEqual(0);
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+      }
+    }
+    if (viewport.width === 210) {
+      const openBounds = await open.boundingBox();
+      const startBounds = await start.boundingBox();
+      expect(openBounds).not.toBeNull();
+      expect(startBounds).not.toBeNull();
+      if (openBounds !== null && startBounds !== null) {
+        expect(openBounds.width).toBeGreaterThan(100);
+        expect(startBounds.y).toBeGreaterThanOrEqual(
+          openBounds.y + openBounds.height,
+        );
+      }
+    }
+  }
+
+  await expectNoAccessibilityViolations(sidePanel);
+});
+
+test('Side Panel empty chooser keeps Studio navigation operable across supported widths', async ({
+  context,
+  extensionUrls,
+}) => {
+  const sidePanel = await context.newPage();
+  await sidePanel.goto(extensionUrls.sidePanel);
+  await expect(
+    sidePanel.getByRole('button', { name: 'Start workflow: Quick Focus' }),
+  ).toBeVisible();
+  await sidePanel.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('locusora');
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        reject(request.error ?? new Error('Unable to open the test database.'));
+      };
+    });
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction('workflows', 'readwrite');
+      transaction.objectStore('workflows').clear();
+      transaction.oncomplete = () => {
+        resolve();
+      };
+      transaction.onerror = () => {
+        reject(
+          transaction.error ?? new Error('Unable to clear test Workflows.'),
+        );
+      };
+      transaction.onabort = () => {
+        reject(
+          transaction.error ?? new Error('Clearing test Workflows aborted.'),
+        );
+      };
+    });
+    database.close();
+  });
+  await sidePanel.reload();
+
+  for (const viewport of [
+    { width: 420, height: 900 },
+    { width: 320, height: 900 },
+    { width: 210, height: 450 },
+  ]) {
+    await sidePanel.setViewportSize(viewport);
+    await expect(
+      sidePanel.getByRole('heading', {
+        name: 'Build your first focus rhythm.',
+      }),
+    ).toBeVisible();
+    const openStudio = sidePanel.getByRole('button', {
+      name: 'Open Workflow Studio',
+    });
+    await expect(openStudio).toBeVisible();
+    const bounds = await openStudio.boundingBox();
+    expect(bounds).not.toBeNull();
+    if (bounds !== null) {
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+    }
+    expect(
+      await sidePanel.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+  }
+
+  await expectNoAccessibilityViolations(sidePanel);
+});
+
 test('active Focus keeps header utilities clear of timer content at effective 200% width', async ({
   context,
   extensionUrls,
@@ -234,6 +366,23 @@ test('real Focus and Side Panel Session states have no detectable axe violations
   await expect(pausedSession).toHaveAttribute('data-session-state', 'running');
   await sidePanel.reload();
   await expect(sidePanel.getByRole('button', { name: 'Pause' })).toBeVisible();
+  for (const viewport of [
+    { width: 420, height: 900 },
+    { width: 320, height: 900 },
+    { width: 210, height: 450 },
+  ]) {
+    await sidePanel.setViewportSize(viewport);
+    await expect(
+      sidePanel.getByRole('button', { name: 'Pause' }),
+    ).toBeVisible();
+    expect(
+      await sidePanel.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+  }
   await expectNoAccessibilityViolations(focus);
   await expectNoAccessibilityViolations(sidePanel);
   await sidePanel.getByRole('button', { name: 'Back to workflows' }).click();

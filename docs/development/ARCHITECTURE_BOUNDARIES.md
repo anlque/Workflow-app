@@ -193,12 +193,12 @@ The architecture test additionally rejects Focus-owned imports from the shared
 Workflow Studio after resolving and normalizing alias or relative paths. This
 Studio-specific rule is not duplicated in ESLint.
 
-It also restricts the three documented `studio.ts` presentation APIs to the
-Workflow Studio, Side Panel Workflow Library and Workflow presentation
-consumers. This lazy-bundle exception is not permission for arbitrary feature
-deep imports. ESLint has the matching exact Asset Studio exception only for the
-two Workflow editor modules that render `AssetPicker`; it retains the general
-deep-import restriction there.
+It also restricts the three documented `studio.ts` presentation APIs to
+Workflow Studio and the allowlisted Workflow presentation consumers. Side Panel
+uses the feature root and its own bounded read-only chooser. This lazy-bundle
+exception is not permission for arbitrary feature deep imports. ESLint has the
+matching exact Asset Studio exception only for the Workflow editor modules that
+render `AssetPicker`; it retains the general deep-import restriction there.
 
 Examples of rejected dependencies:
 
