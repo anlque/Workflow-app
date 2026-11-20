@@ -5,6 +5,15 @@ import {
 
 export function OptionsApp({
   dependencies,
-}: Readonly<{ dependencies: WorkflowStudioDependencies }>) {
-  return <WorkflowStudio dependencies={dependencies} />;
+  onNavigateToFocus,
+}: Readonly<{
+  dependencies: WorkflowStudioDependencies;
+  onNavigateToFocus(): void | Promise<void>;
+}>) {
+  return (
+    <WorkflowStudio
+      dependencies={dependencies}
+      onNavigateToFocus={onNavigateToFocus}
+    />
+  );
 }

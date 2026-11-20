@@ -469,6 +469,24 @@ test('Workflow Studio shell is responsive without horizontal overflow', async ({
   const assetsTab = options.getByRole('tab', { name: 'Assets' });
   await expect(shellBody).toBeVisible();
   await expect(options.getByRole('heading', { level: 1 })).toHaveCount(1);
+  await expect(
+    options.getByRole('button', { name: 'Focus', exact: true }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('button', { name: 'Back to workflows' }),
+  ).toContainText('Switch workflow');
+  await expect(
+    options.locator('.workflow-studio-shell__mode-indicator'),
+  ).toHaveText('Detailed setup');
+  await expect(
+    options.getByRole('button', { name: /side panel/iu }),
+  ).toHaveCount(0);
+  await expect(options.getByText('WORKSPACE')).toBeVisible();
+  await expect(workflowTab.locator('svg')).toHaveCount(1);
+  await expect(assetsTab.locator('svg')).toHaveCount(1);
+  await expect(
+    options.getByRole('tab', { name: 'Settings' }).locator('svg'),
+  ).toHaveCount(1);
 
   expect(
     await shellBody.evaluate(
@@ -497,6 +515,8 @@ test('Workflow Studio shell is responsive without horizontal overflow', async ({
   expect(wideWorkflow).not.toBeNull();
   expect(wideAssets).not.toBeNull();
   if (wideSidebar !== null && wideWorkflow !== null && wideAssets !== null) {
+    expect(wideSidebar.width).toBeGreaterThanOrEqual(218);
+    expect(wideSidebar.width).toBeLessThanOrEqual(222);
     expect(wideWorkflow.x).toBe(wideAssets.x);
     expect(wideAssets.y).toBeGreaterThan(wideWorkflow.y);
     expect(wideWorkflow.x + wideWorkflow.width).toBeLessThanOrEqual(
@@ -521,9 +541,10 @@ test('Workflow Studio shell is responsive without horizontal overflow', async ({
   const topBarIdentity = topBar.locator(
     ':scope > .workflow-studio-shell__context',
   );
-  const topBarButton = topBar.locator(
-    ':scope > .workflow-studio-shell__top-bar-controls > .button',
-  );
+  const topBarButton = topBar.getByRole('button', {
+    name: 'Focus',
+    exact: true,
+  });
   expect(
     await shellBody.evaluate(
       (element) =>

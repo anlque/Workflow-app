@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ComponentProps } from 'react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { createAsset, createAssetRole } from '@/features/assets';
@@ -13,9 +14,34 @@ import {
 } from '@/features/workflow';
 
 import {
-  WorkflowStudio,
+  WorkflowStudio as WorkflowStudioView,
   type WorkflowStudioDependencies,
 } from './WorkflowStudio';
+
+type WorkflowStudioTestProps = Omit<
+  ComponentProps<typeof WorkflowStudioView>,
+  'onNavigateToFocus'
+> &
+  Partial<Pick<ComponentProps<typeof WorkflowStudioView>, 'onNavigateToFocus'>>;
+
+function WorkflowStudio({
+  onNavigateToFocus = () => undefined,
+  ...props
+}: WorkflowStudioTestProps) {
+  return (
+    <WorkflowStudioView {...props} onNavigateToFocus={onNavigateToFocus} />
+  );
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (cause: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 const imageAsset = createAsset({
   id: 'default-image',
@@ -39,9 +65,6 @@ function dependencies(
 ): WorkflowStudioDependencies {
   return {
     preferences: createTestDocumentPreferences(),
-    openSidePanel: () => Promise.resolve(),
-    closeSidePanel: () => Promise.resolve(),
-    subscribeSidePanelState: () => () => undefined,
     load: () =>
       Promise.resolve({ workflows: [], assets: [], settings: defaultSettings }),
     saveWorkflow: () => Promise.resolve(),
@@ -106,14 +129,118 @@ function dependencies(
 }
 
 describe('WorkflowStudio', () => {
-  test('shows library context in the Studio top bar', async () => {
-    render(<WorkflowStudio dependencies={dependencies()} />);
+  test('delegates Focus navigation to its host composition', async () => {
+    const user = userEvent.setup();
+    const navigateToFocus = vi.fn();
+    render(
+      <WorkflowStudio
+        dependencies={dependencies()}
+        onNavigateToFocus={navigateToFocus}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Focus' }));
+    expect(navigateToFocus).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: /side panel/iu })).toBeNull();
+  });
+
+  test('shows workspace navigation, collection counts and one management heading', async () => {
+    const workflow = createWorkflow({
+      id: 'counted-workflow',
+      name: 'Counted workflow',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load: () =>
+            Promise.resolve({
+              workflows: [workflow],
+              assets: [imageAsset, audioAsset],
+              settings: defaultSettings,
+            }),
+        })}
+      />,
+    );
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Back to workflows' }),
+    );
 
     expect(
-      await screen.findByRole('heading', { name: 'Workflow Library' }),
+      await screen.findByRole('heading', { name: 'Workflows', level: 1 }),
     ).toBeVisible();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByText('Locusora')).toBeVisible();
+    expect(screen.getByText('WORKSPACE')).toBeVisible();
+    expect(screen.getByRole('tab', { name: 'Workflows' })).toHaveTextContent(
+      '1',
+    );
+    expect(screen.getByRole('tab', { name: 'Assets' })).toHaveTextContent('2');
+    expect(
+      screen.getByRole('tab', { name: 'Workflows' }).querySelector('svg'),
+    ).not.toBeNull();
+    expect(
+      screen
+        .getByRole('heading', { name: 'Workflows', level: 1 })
+        .closest('.workflow-studio-shell__top-bar'),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Duplicate workflow' }),
+    ).toBeNull();
+    const managementActions = screen
+      .getByText('Stored locally')
+      .closest('.workflow-studio-shell__top-bar-controls');
+    expect(managementActions).not.toBeNull();
+    expect(managementActions).toContainElement(
+      screen.getByRole('button', { name: 'Focus' }),
+    );
+  });
+
+  test('orders editor status and actions according to the contextual hierarchy', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'ordered-chrome-workflow',
+      name: 'Ordered chrome workflow',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load: () =>
+            Promise.resolve({
+              workflows: [workflow],
+              assets: [],
+              settings: {
+                ...defaultSettings,
+                lastSelectedWorkflowId: workflow.id,
+              },
+            }),
+        })}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Save workflow' }),
+    );
+    const status = await screen.findByRole('status');
+    const duplicate = screen.getByRole('button', {
+      name: 'Duplicate workflow',
+    });
+    const save = screen.getByRole('button', { name: 'Save workflow' });
+    const focus = screen.getByRole('button', { name: 'Focus' });
+
+    expect(
+      status.compareDocumentPosition(duplicate) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      duplicate.compareDocumentPosition(save) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      save.compareDocumentPosition(focus) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   test('uses New workflow as the page title and setup mode as detail', async () => {
@@ -128,8 +255,9 @@ describe('WorkflowStudio', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'New workflow',
     );
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
-      'Quick setup',
+    expect(screen.queryByRole('button', { name: 'Quick setup' })).toBeNull();
+    expect(screen.getByText('Quick setup')).toHaveClass(
+      'workflow-studio-shell__mode-indicator',
     );
   });
 
@@ -162,12 +290,29 @@ describe('WorkflowStudio', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Chrome workflow',
     );
-    expect(screen.getByText('Detailed setup')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Detailed setup' })).toBeNull();
+    expect(screen.getByText('Detailed setup')).toHaveClass(
+      'workflow-studio-shell__mode-indicator',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Back to workflows' }),
+    ).toHaveTextContent('Chrome workflowSwitch workflow');
+    expect(
+      screen
+        .getByRole('button', { name: 'Back to workflows' })
+        .closest('.workflow-editor-navigation'),
+    ).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Duplicate workflow' }),
+    ).toBeVisible();
 
     await user.clear(screen.getByLabelText('Workflow name'));
     await user.type(screen.getByLabelText('Workflow name'), 'Preserved draft');
     await user.click(screen.getByRole('button', { name: 'Back to workflows' }));
     expect(screen.queryByRole('button', { name: 'Save workflow' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Duplicate workflow' }),
+    ).toBeNull();
 
     await user.click(
       screen.getByRole('button', { name: 'Open Chrome workflow' }),
@@ -185,6 +330,88 @@ describe('WorkflowStudio', () => {
     expect(screen.getByLabelText('Workflow name')).toHaveValue(
       'Preserved draft',
     );
+  });
+
+  test('guards duplicate workflow while pending and keeps the draft on rejection', async () => {
+    const user = userEvent.setup();
+    const operation = deferred<undefined>();
+    const workflow = createWorkflow({
+      id: 'duplicate-workflow',
+      name: 'Duplicate workflow source',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    const duplicateWorkflow = vi.fn(() => operation.promise);
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          duplicateWorkflow,
+          load: () =>
+            Promise.resolve({
+              workflows: [workflow],
+              assets: [],
+              settings: {
+                ...defaultSettings,
+                lastSelectedWorkflowId: workflow.id,
+              },
+            }),
+        })}
+      />,
+    );
+
+    const name = await screen.findByLabelText('Workflow name');
+    await user.clear(name);
+    await user.type(name, 'Unsaved duplicate draft');
+    const duplicate = screen.getByRole('button', {
+      name: 'Duplicate workflow',
+    });
+    await user.click(duplicate);
+    await user.click(duplicate);
+    expect(duplicateWorkflow).toHaveBeenCalledOnce();
+    expect(duplicate).toBeDisabled();
+
+    operation.reject(new Error('Duplicate unavailable.'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Duplicate unavailable.',
+    );
+    expect(name).toHaveValue('Unsaved duplicate draft');
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Duplicate workflow' }),
+      ).toBeEnabled();
+    });
+  });
+
+  test('refreshes the catalog once after a successful duplicate', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'successful-duplicate',
+      name: 'Successful duplicate',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    const duplicateWorkflow = vi.fn(() => Promise.resolve());
+    const load = vi.fn(() =>
+      Promise.resolve({
+        workflows: [workflow],
+        assets: [],
+        settings: {
+          ...defaultSettings,
+          lastSelectedWorkflowId: workflow.id,
+        },
+      }),
+    );
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({ duplicateWorkflow, load })}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Duplicate workflow' }),
+    );
+    await waitFor(() => {
+      expect(duplicateWorkflow).toHaveBeenCalledOnce();
+      expect(load).toHaveBeenCalledTimes(2);
+    });
   });
 
   test('hides Quick Convert and Saved chrome feedback outside editor context', async () => {
@@ -215,9 +442,11 @@ describe('WorkflowStudio', () => {
       />,
     );
 
-    expect(
-      await screen.findByRole('button', { name: 'Convert to detailed' }),
-    ).toBeVisible();
+    const convert = await screen.findByRole('button', {
+      name: 'Convert to detailed',
+    });
+    expect(convert).toBeVisible();
+    expect(convert.querySelectorAll('svg')).toHaveLength(2);
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Workflow saved',
@@ -719,7 +948,9 @@ describe('WorkflowStudio', () => {
     await user.clear(workflowName);
     await user.type(workflowName, 'Unsaved name');
     await user.click(screen.getByRole('button', { name: 'Back to workflows' }));
-    expect(screen.getByRole('heading', { name: 'Workflows' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Workflows', level: 1 }),
+    ).toBeVisible();
     expect(screen.getByLabelText('Workflow name')).not.toBeVisible();
 
     await user.click(
@@ -799,68 +1030,11 @@ describe('WorkflowStudio', () => {
     ).toHaveValue('14');
   });
 
-  test('controls Side Panel state from lifecycle events and pending actions', async () => {
-    const user = userEvent.setup();
-    let notify: ((open: boolean) => void) | undefined;
-    let finishOpen: (() => void) | undefined;
-    const deps = dependencies();
-    Object.assign(deps, {
-      openSidePanel: vi.fn(
-        () =>
-          new Promise<void>((resolve) => {
-            finishOpen = resolve;
-          }),
-      ),
-      closeSidePanel: vi.fn(() => Promise.resolve()),
-      subscribeSidePanelState: vi.fn((listener: (open: boolean) => void) => {
-        notify = listener;
-        return vi.fn();
-      }),
-    });
-    render(<WorkflowStudio dependencies={deps} />);
+  test('does not expose Side Panel controls from Workflow Studio', async () => {
+    render(<WorkflowStudio dependencies={dependencies()} />);
 
-    const open = await screen.findByRole('button', {
-      name: 'Open side panel',
-    });
-    await user.click(open);
-    const close = screen.getByRole('button', { name: 'Close side panel' });
-    expect(close).toBeDisabled();
-    expect(close).toHaveAttribute('aria-busy', 'true');
-
-    act(() => finishOpen?.());
-    await waitFor(() => expect(close).toBeEnabled());
-    act(() => notify?.(false));
-    expect(
-      screen.getByRole('button', { name: 'Open side panel' }),
-    ).toBeVisible();
-  });
-
-  test('shows a recoverable Side Panel error and allows retry', async () => {
-    const user = userEvent.setup();
-    const deps = dependencies();
-    const openSidePanel = vi
-      .fn<() => Promise<void>>()
-      .mockRejectedValueOnce(new Error('Unable to open the Side Panel.'))
-      .mockResolvedValueOnce();
-    Object.assign(deps, {
-      openSidePanel,
-      closeSidePanel: vi.fn(() => Promise.resolve()),
-      subscribeSidePanelState: vi.fn(() => vi.fn()),
-    });
-    render(<WorkflowStudio dependencies={deps} />);
-
-    await user.click(
-      await screen.findByRole('button', { name: 'Open side panel' }),
-    );
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Unable to open the Side Panel.',
-    );
-    expect(screen.getByRole('tab', { name: 'Workflows' })).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Open side panel' }));
-    expect(openSidePanel).toHaveBeenCalledTimes(2);
-    await waitFor(() => {
-      expect(screen.queryByRole('alert')).toBeNull();
-    });
+    await screen.findByRole('tab', { name: 'Workflows' });
+    expect(screen.queryByRole('button', { name: /side panel/iu })).toBeNull();
   });
 
   test('keeps a new draft selected while reloading the catalog after inline upload', async () => {
@@ -938,7 +1112,10 @@ describe('WorkflowStudio', () => {
       await screen.findByRole('button', { name: 'Create workflow' }),
     );
     await user.click(screen.getByRole('button', { name: 'Quick setup' }));
-    expect(screen.getByRole('heading', { name: 'Quick setup' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Quick setup' })).toBeNull();
+    expect(screen.getByText('Quick setup')).toHaveClass(
+      'workflow-studio-shell__mode-indicator',
+    );
     await user.type(screen.getByLabelText('Workflow name'), 'Fast flow');
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
     await waitFor(() => {
@@ -1014,7 +1191,10 @@ describe('WorkflowStudio', () => {
       screen.getByRole('dialog', { name: 'Discard changes?' }),
     ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Stay' }));
-    expect(screen.getByRole('heading', { name: 'Quick setup' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Quick setup' })).toBeNull();
+    expect(screen.getByText('Quick setup')).toHaveClass(
+      'workflow-studio-shell__mode-indicator',
+    );
     await user.click(screen.getByRole('tab', { name: 'Assets' }));
     await user.click(screen.getByRole('button', { name: 'Discard changes' }));
     expect(screen.getByRole('heading', { name: 'Local Assets' })).toBeVisible();

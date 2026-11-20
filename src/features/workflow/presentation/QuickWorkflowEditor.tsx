@@ -6,12 +6,16 @@ import {
   type AssetPickerUpload,
   type AssetPickerUploadSynchronization,
 } from '@/features/assets/studio';
-import { Button, Dialog, Field, Switch } from '@/shared';
+import { Button, Dialog, Field, Icon, Switch } from '@/shared';
 
 import type { QuickWorkflow } from '../domain/QuickWorkflow';
 import type { CreateWorkflowInput } from '../domain/Workflow';
 import { createQuickRhythmPresentation } from './quickRhythmPresentation';
-import { WorkflowEditorChromeActions } from './WorkflowEditorChrome';
+import {
+  WorkflowEditorChromeActions,
+  WorkflowEditorChromeStatus,
+  WorkflowEditorChromeModeAction,
+} from './WorkflowEditorChrome';
 import { formatRewardWeightPresentation } from './rewardWeightPresentation';
 import {
   useQuickWorkflowEditor,
@@ -286,36 +290,46 @@ export function QuickWorkflowEditor({
       }}
     >
       <WorkflowEditorChromeActions>
-        <div className="editor-header__save">
-          {saved ? (
-            <span className="editor-header__save-status" role="status">
-              Workflow saved
-            </span>
-          ) : null}
-          {workflow === undefined || onConvert === undefined ? null : (
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => {
-                setConversionError(null);
-                setKeepQuickCopy(false);
-                setConversionOpen(true);
-              }}
-            >
-              Convert to detailed
-            </Button>
-          )}
-          <Button
-            form={formId}
-            variant="primary"
-            type="submit"
-            pending={saving}
-            pendingLabel="Saving…"
-          >
-            Save workflow
-          </Button>
-        </div>
+        <Button
+          form={formId}
+          variant="primary"
+          type="submit"
+          pending={saving}
+          pendingLabel="Saving…"
+        >
+          Save workflow
+        </Button>
       </WorkflowEditorChromeActions>
+      <WorkflowEditorChromeStatus>
+        {saved ? (
+          <span className="editor-header__save-status" role="status">
+            Workflow saved
+          </span>
+        ) : null}
+      </WorkflowEditorChromeStatus>
+      <WorkflowEditorChromeModeAction>
+        {workflow === undefined || onConvert === undefined ? (
+          <span className="workflow-studio-shell__mode-indicator">
+            <Icon name="quick" size={18} />
+            Quick setup
+          </span>
+        ) : (
+          <Button
+            variant="secondary"
+            type="button"
+            aria-label="Convert to detailed"
+            onClick={() => {
+              setConversionError(null);
+              setKeepQuickCopy(false);
+              setConversionOpen(true);
+            }}
+          >
+            <Icon name="quick" size={18} />
+            Quick setup
+            <Icon name="arrowDown" size={16} />
+          </Button>
+        )}
+      </WorkflowEditorChromeModeAction>
       <p className="editor-introduction">
         Individual Phases and advanced Reward settings are available after
         conversion to Detailed setup.

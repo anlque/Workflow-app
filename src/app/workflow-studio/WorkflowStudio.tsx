@@ -13,13 +13,9 @@ import {
 import { AssetLibrary } from '@/features/assets/studio';
 import type { Settings } from '@/features/settings';
 import { SettingsPage } from '@/features/settings/studio';
-import { Button, Dialog } from '@/shared';
+import { Button, Dialog, Icon, type IconName } from '@/shared';
 import type { DocumentPreferences } from '@/app/document-preferences/DocumentPreferences';
 import { useDocumentPreferences } from '@/app/document-preferences/useDocumentPreferences';
-import {
-  useSidePanelControl,
-  type SidePanelControlDependencies,
-} from '@/app/useSidePanelControl';
 import {
   createWorkflowId,
   type CreateWorkflowInput,
@@ -30,7 +26,9 @@ import {
 import {
   QuickWorkflowEditor,
   WorkflowEditor,
+  WorkflowEditorChromeModeTarget,
   WorkflowEditorChromeProvider,
+  WorkflowEditorChromeStatusTarget,
   WorkflowEditorChromeTarget,
   WorkflowLibrary,
   type AssetReferenceTransform,
@@ -84,14 +82,19 @@ export type WorkflowStudioDependencies = Readonly<{
   exportWorkflow(id: WorkflowId | undefined): Promise<void>;
   importWorkflow(file: File): Promise<void>;
   createId(): string;
-}> &
-  SidePanelControlDependencies;
+}>;
 
 type Tab = 'workflows' | 'assets' | 'settings';
 const tabs: readonly Tab[] = ['workflows', 'assets', 'settings'];
 
 function tabLabel(tab: Tab): string {
   return tab.charAt(0).toUpperCase() + tab.slice(1);
+}
+
+function tabIcon(tab: Tab): IconName {
+  if (tab === 'workflows') return 'workflowStudio';
+  if (tab === 'assets') return 'image';
+  return 'settings';
 }
 
 function roleReferenceTransform(
@@ -125,9 +128,12 @@ function retirementReferenceTransform(
 
 export function WorkflowStudio({
   dependencies,
-}: Readonly<{ dependencies: WorkflowStudioDependencies }>) {
+  onNavigateToFocus,
+}: Readonly<{
+  dependencies: WorkflowStudioDependencies;
+  onNavigateToFocus(): void | Promise<void>;
+}>) {
   const documentPreferences = useDocumentPreferences(dependencies.preferences);
-  const sidePanel = useSidePanelControl(dependencies);
   const [snapshot, setSnapshot] = useState<WorkflowStudioSnapshot | null>(null);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<
     WorkflowId | undefined
@@ -144,7 +150,12 @@ export function WorkflowStudio({
     (() => void) | null
   >(null);
   const [activeTab, setActiveTab] = useState<Tab>('workflows');
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState(false);
+  const [navigatingToFocus, setNavigatingToFocus] = useState(false);
+  const duplicatePending = useRef(false);
+  const focusNavigationPending = useRef(false);
   const tabRefs = useRef(new Map<Tab, HTMLButtonElement>());
   const pendingRoleTransform = useRef<AssetReferenceTransform | undefined>(
     undefined,
@@ -176,6 +187,41 @@ export function WorkflowStudio({
     setSnapshot(await dependencies.load());
   }
 
+  async function duplicateSelectedWorkflow(): Promise<void> {
+    if (selectedWorkflow === undefined || duplicatePending.current) return;
+    duplicatePending.current = true;
+    setDuplicating(true);
+    try {
+      setOperationError(null);
+      await dependencies.duplicateWorkflow(selectedWorkflow.id);
+      await load(selectedWorkflow.id);
+    } catch (cause: unknown) {
+      setOperationError(
+        cause instanceof Error ? cause.message : 'Workflow duplication failed.',
+      );
+    } finally {
+      duplicatePending.current = false;
+      setDuplicating(false);
+    }
+  }
+
+  async function navigateToFocus(): Promise<void> {
+    if (focusNavigationPending.current) return;
+    focusNavigationPending.current = true;
+    setNavigatingToFocus(true);
+    try {
+      setOperationError(null);
+      await onNavigateToFocus();
+    } catch (cause: unknown) {
+      setOperationError(
+        cause instanceof Error ? cause.message : 'Focus navigation failed.',
+      );
+    } finally {
+      focusNavigationPending.current = false;
+      setNavigatingToFocus(false);
+    }
+  }
+
   useEffect(() => {
     let active = true;
     void dependencies.load().then(
@@ -193,7 +239,9 @@ export function WorkflowStudio({
       },
       (cause: unknown) => {
         if (active) {
-          setError(cause instanceof Error ? cause.message : 'Loading failed.');
+          setLoadError(
+            cause instanceof Error ? cause.message : 'Loading failed.',
+          );
         }
       },
     );
@@ -248,10 +296,10 @@ export function WorkflowStudio({
     if (tab !== undefined) selectTab(tab);
   }
 
-  if (error !== null) {
+  if (loadError !== null) {
     return (
       <p className="app-message feedback feedback--error" role="alert">
-        {error}
+        {loadError}
       </p>
     );
   }
@@ -266,9 +314,6 @@ export function WorkflowStudio({
   const selectedWorkflow = snapshot.workflows.find(
     ({ id }) => id === selectedWorkflowId,
   );
-  const sidePanelLabel = sidePanel.isOpen
-    ? 'Close side panel'
-    : 'Open side panel';
   const studioContext =
     activeTab === 'assets'
       ? { title: 'Asset Library', detail: 'Manage local images and audio.' }
@@ -298,36 +343,99 @@ export function WorkflowStudio({
                     : 'Detailed setup',
               };
   const editorContext = activeTab === 'workflows' && !workflowLibraryOpen;
+  const managementHeading =
+    activeTab === 'assets'
+      ? { title: 'Asset Library', detail: 'Manage local images and audio.' }
+      : activeTab === 'settings'
+        ? { title: 'Settings', detail: 'Appearance, audio and data.' }
+        : {
+            title: 'Workflows',
+            detail: 'Choose or shape your next focus ritual.',
+          };
 
   return (
     <WorkflowEditorChromeProvider>
       <WorkflowStudioShell
+        workflowCount={snapshot.workflows.length}
+        assetCount={snapshot.assets.length}
+        railContext={
+          editorContext ? (
+            <Button
+              className="workflow-studio-shell__workflow-switcher"
+              variant="secondary"
+              aria-label="Back to workflows"
+              onClick={() => {
+                navigate(() => {
+                  setWorkflowLibraryOpen(true);
+                });
+              }}
+            >
+              <span>
+                <strong>{studioContext.title}</strong>
+                <small>Switch workflow</small>
+              </span>
+              <Icon name="arrowDown" size={16} />
+            </Button>
+          ) : null
+        }
         topBar={
           <>
-            <div className="workflow-studio-shell__context">
-              <h1>{studioContext.title}</h1>
-              {editorContext ? (
-                <h2>{studioContext.detail}</h2>
-              ) : (
-                <p>{studioContext.detail}</p>
-              )}
-            </div>
+            {editorContext ? (
+              <div className="workflow-studio-shell__context workflow-studio-shell__context--editor">
+                <span className="workflow-studio-shell__eyebrow">
+                  Workflow Studio
+                </span>
+                <h1>{studioContext.title}</h1>
+                {studioContext.detail === 'Detailed setup' ? (
+                  <span className="workflow-studio-shell__mode-indicator">
+                    <Icon name="detailed" size={18} />
+                    Detailed setup
+                  </span>
+                ) : (
+                  <WorkflowEditorChromeModeTarget />
+                )}
+              </div>
+            ) : null}
             <div className="workflow-studio-shell__top-bar-controls">
-              {editorContext ? <WorkflowEditorChromeTarget /> : null}
+              {editorContext ? (
+                <>
+                  <WorkflowEditorChromeStatusTarget />
+                  {selectedWorkflow === undefined ? null : (
+                    <Button
+                      variant="secondary"
+                      pending={duplicating}
+                      pendingLabel="Duplicating…"
+                      onClick={() => {
+                        void duplicateSelectedWorkflow();
+                      }}
+                    >
+                      <Icon name="duplicate" size={18} />
+                      Duplicate workflow
+                    </Button>
+                  )}
+                  <WorkflowEditorChromeTarget />
+                </>
+              ) : (
+                <p className="workflow-studio-shell__storage-status">
+                  <Icon name="stored" size={18} />
+                  Stored locally
+                </p>
+              )}
               <Button
-                variant="secondary"
-                pending={sidePanel.pending}
-                pendingLabel={sidePanelLabel}
+                variant="quiet"
+                pending={navigatingToFocus}
+                pendingLabel="Opening Focus…"
                 onClick={() => {
-                  void sidePanel.toggle();
+                  void navigateToFocus();
                 }}
               >
-                {sidePanelLabel}
+                Focus
+                <Icon name="enter" size={18} />
               </Button>
             </div>
           </>
         }
-        navigation={(orientation) => (
+        navigation={(orientation, counts) => (
           <div
             className="tabs workflow-studio-shell__tabs"
             role="tablist"
@@ -349,6 +457,7 @@ export function WorkflowStudio({
                   role="tab"
                   aria-selected={activeTab === tab}
                   aria-controls={`panel-${tab}`}
+                  aria-label={label}
                   tabIndex={activeTab === tab ? 0 : -1}
                   onClick={() => {
                     selectTab(tab);
@@ -357,17 +466,36 @@ export function WorkflowStudio({
                     handleTabKey(event, orientation);
                   }}
                 >
-                  {label}
+                  <Icon name={tabIcon(tab)} size={18} />
+                  <span className="workflow-studio-shell__tab-label">
+                    {label}
+                  </span>
+                  {tab === 'settings' ? null : (
+                    <span
+                      className="workflow-studio-shell__count"
+                      aria-hidden="true"
+                    >
+                      {tab === 'workflows'
+                        ? counts.workflowCount
+                        : counts.assetCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
         )}
       >
-        {sidePanel.error === null ? null : (
+        {operationError === null ? null : (
           <p className="feedback feedback--error" role="alert">
-            {sidePanel.error}
+            {operationError}
           </p>
+        )}
+        {editorContext ? null : (
+          <header className="workflow-studio-shell__page-header">
+            <h1>{managementHeading.title}</h1>
+            <p>{managementHeading.detail}</p>
+          </header>
         )}
         <section
           className="tab-panel"
@@ -423,21 +551,6 @@ export function WorkflowStudio({
               className="workflow-workspace__editor"
               hidden={workflowLibraryOpen}
             >
-              {selectedWorkflow === undefined &&
-              newWorkflowId === null ? null : (
-                <div className="workflow-editor-navigation">
-                  <Button
-                    variant="quiet"
-                    onClick={() => {
-                      navigate(() => {
-                        setWorkflowLibraryOpen(true);
-                      });
-                    }}
-                  >
-                    Back to workflows
-                  </Button>
-                </div>
-              )}
               {selectedWorkflow === undefined && newWorkflowId === null ? (
                 <div className="workspace-prompt">
                   <h2>Select or create a Workflow.</h2>

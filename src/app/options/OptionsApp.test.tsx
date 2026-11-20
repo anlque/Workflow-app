@@ -9,8 +9,9 @@ import type { WorkflowStudioDependencies } from '../workflow-studio/WorkflowStud
 import { OptionsApp } from './OptionsApp';
 
 const renderWorkflowStudio = vi.fn(
-  (dependencies: WorkflowStudioDependencies) => {
+  (dependencies: WorkflowStudioDependencies, onNavigateToFocus: () => void) => {
     void dependencies;
+    void onNavigateToFocus;
     return <p>Shared Workflow Studio</p>;
   },
 );
@@ -18,16 +19,16 @@ const renderWorkflowStudio = vi.fn(
 vi.mock('../workflow-studio/WorkflowStudio', () => ({
   WorkflowStudio: ({
     dependencies,
-  }: Readonly<{ dependencies: WorkflowStudioDependencies }>) =>
-    renderWorkflowStudio(dependencies),
+    onNavigateToFocus,
+  }: Readonly<{
+    dependencies: WorkflowStudioDependencies;
+    onNavigateToFocus: () => void;
+  }>) => renderWorkflowStudio(dependencies, onNavigateToFocus),
 }));
 
 function dependencies(): WorkflowStudioDependencies {
   return {
     preferences: createTestDocumentPreferences(),
-    openSidePanel: vi.fn(() => Promise.resolve()),
-    closeSidePanel: vi.fn(() => Promise.resolve()),
-    subscribeSidePanelState: vi.fn(() => vi.fn()),
     load: () =>
       Promise.resolve({ workflows: [], assets: [], settings: defaultSettings }),
     saveWorkflow: () => Promise.resolve(),
@@ -76,10 +77,13 @@ function dependencies(): WorkflowStudioDependencies {
 describe('OptionsApp', () => {
   test('delegates the fallback options page to WorkflowStudio', () => {
     const deps = dependencies();
+    const navigateToFocus = vi.fn();
 
-    render(<OptionsApp dependencies={deps} />);
+    render(
+      <OptionsApp dependencies={deps} onNavigateToFocus={navigateToFocus} />,
+    );
 
     expect(screen.getByText('Shared Workflow Studio')).toBeVisible();
-    expect(renderWorkflowStudio).toHaveBeenCalledWith(deps);
+    expect(renderWorkflowStudio).toHaveBeenCalledWith(deps, navigateToFocus);
   });
 });

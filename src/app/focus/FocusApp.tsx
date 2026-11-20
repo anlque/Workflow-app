@@ -539,7 +539,10 @@ export function FocusApp({
           }
           onClose={closeStudio}
         >
-          <LazyWorkflowStudio loadDependencies={dependencies.loadStudio} />
+          <LazyWorkflowStudio
+            loadDependencies={dependencies.loadStudio}
+            onNavigateToFocus={closeStudio}
+          />
         </WorkflowStudioOverlay>
       ) : null}
     </div>

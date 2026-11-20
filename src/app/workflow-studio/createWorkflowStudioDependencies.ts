@@ -45,11 +45,6 @@ import { createChromeWorkflowCatalogEvents } from '@/platform/messaging';
 import type { WorkflowCatalogEvents } from '@/platform/messaging';
 
 import type { WorkflowStudioDependencies } from '../workflow-studio/WorkflowStudio';
-import {
-  closeSidePanel,
-  openSidePanel,
-  subscribeSidePanelState,
-} from '../closeSidePanel';
 import { runWorkflowCatalogMutation } from '../runWorkflowCatalogMutation';
 import { DexieAssetRoleManagementUnitOfWork } from './DexieAssetRoleManagementUnitOfWork';
 import { DexieAssetRetirementUnitOfWork } from './DexieAssetRetirementUnitOfWork';
@@ -116,9 +111,6 @@ export function createWorkflowStudioDependencies(
 
   return {
     preferences,
-    closeSidePanel,
-    openSidePanel,
-    subscribeSidePanelState,
     async load() {
       const [workflowValues, assetValues, settingsValue] = await Promise.all([
         listWorkflowsUseCase(workflows),

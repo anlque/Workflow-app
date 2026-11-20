@@ -31,13 +31,17 @@ import {
 } from '@/features/workflow';
 import { LocusoraDatabase } from '@/platform/storage';
 import { createTestDocumentPreferences } from '@/test/createTestDocumentPreferences';
-import {
-  closeSidePanel,
-  openSidePanel,
-  subscribeSidePanelState,
-} from '../closeSidePanel';
-
 import { createWorkflowStudioDependencies } from './createWorkflowStudioDependencies';
+import type { WorkflowStudioDependencies } from './WorkflowStudio';
+
+type WorkflowStudioHasSidePanelDependencies =
+  WorkflowStudioDependencies extends Readonly<{
+    openSidePanel(): Promise<void>;
+  }>
+    ? true
+    : false;
+
+const workflowStudioHasSidePanelDependencies: WorkflowStudioHasSidePanelDependencies = false;
 
 const databaseNames: string[] = [];
 
@@ -69,15 +73,16 @@ async function seedAsset(
 }
 
 describe('createWorkflowStudioDependencies inline Asset upload', () => {
-  test('provides the existing Side Panel browser boundary', () => {
+  test('does not expose Focus-owned Side Panel controls', () => {
     const dependencies = createWorkflowStudioDependencies(
       createTestDocumentPreferences(),
       createDatabase(),
     );
 
-    expect(dependencies.openSidePanel).toBe(openSidePanel);
-    expect(dependencies.closeSidePanel).toBe(closeSidePanel);
-    expect(dependencies.subscribeSidePanelState).toBe(subscribeSidePanelState);
+    expect(dependencies).not.toHaveProperty('openSidePanel');
+    expect(dependencies).not.toHaveProperty('closeSidePanel');
+    expect(dependencies).not.toHaveProperty('subscribeSidePanelState');
+    expect(workflowStudioHasSidePanelDependencies).toBe(false);
   });
 
   test('uses Asset validation, commits once and synchronizes separately', async () => {

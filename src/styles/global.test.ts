@@ -242,6 +242,30 @@ describe('visual foundation', () => {
     expect(declarationsFor('.button--icon')).toContain('border-radius: 50%;');
   });
 
+  test('defines the approved fixed rail, mint top bar and white Studio canvas', () => {
+    expect(declarationsFor('.workflow-studio-shell')).toContain(
+      'background: var(--color-chrome);',
+    );
+    expect(declarationsFor('.workflow-studio-shell__sidebar')).toContain(
+      'position: sticky;',
+    );
+    expect(declarationsFor('.workflow-studio-shell__top-bar')).toContain(
+      'background: var(--color-chrome);',
+    );
+    expect(
+      declarationsFor('.workflow-studio-shell__top-bar-controls'),
+    ).toContain('margin-left: auto;');
+    expect(declarationsFor('.workflow-studio-shell__content')).toContain(
+      'background: var(--color-surface);',
+    );
+    expect(
+      declarationsFor('.workflow-studio-shell__workspace-label'),
+    ).toContain('text-transform: uppercase;');
+    expect(declarationsFor('.workflow-studio-shell__count')).toContain(
+      'border-radius: 999px;',
+    );
+  });
+
   test('defines contextual Focus glass and compact responsive utility contracts', () => {
     const imageGlass = declarationsFor(
       ".focus-app__content[data-background='image']",
@@ -299,7 +323,7 @@ describe('visual foundation', () => {
       'min-width: 0;',
     );
     expect(declarationsFor('.workflow-studio-shell')).toContain(
-      'grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr);',
+      'grid-template-columns: 13.75rem minmax(0, 1fr);',
     );
     expect(declarationsFor('.workflow-studio-shell__content')).toContain(
       'min-width: 0;',
@@ -309,6 +333,12 @@ describe('visual foundation', () => {
     );
     expect(declarationsFor('.workflow-studio-shell__tabs')).toContain(
       'flex-direction: column;',
+    );
+    expect(declarationsFor('.workflow-studio-shell__mode-indicator')).toContain(
+      'display: inline-flex;',
+    );
+    expect(declarationsFor('.workflow-studio-shell__mode-indicator')).toContain(
+      'background: var(--color-surface-soft);',
     );
     expect(stylesheet).toMatch(
       /@media \(max-width: 52rem\)[\s\S]*?\.workflow-studio-shell\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/u,
@@ -398,13 +428,13 @@ describe('visual foundation', () => {
 
   test('uses the approved shared shell, hierarchy, tabs and semantic surfaces', () => {
     expect(declarationsFor('.workflow-studio-shell__sidebar')).toContain(
-      'grid-template-rows: auto minmax(0, 1fr);',
+      'grid-template-rows: auto auto auto minmax(0, 1fr);',
     );
     expect(declarationsFor('.workflow-studio-shell__workspace')).toContain(
       'grid-template-rows: auto minmax(0, 1fr);',
     );
     expect(declarationsFor('.workflow-studio-shell__top-bar h1')).toContain(
-      'font-size: clamp(2rem, 3vw, 2.25rem);',
+      'font-size: 1.25rem;',
     );
     expect(
       declarationsFor(

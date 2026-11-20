@@ -13,12 +13,21 @@ function isNarrowStudio(): boolean {
 
 export type WorkflowStudioShellProps = Readonly<{
   topBar: ReactNode;
-  navigation(orientation: WorkflowStudioNavigationOrientation): ReactNode;
+  railContext: ReactNode;
+  workflowCount: number;
+  assetCount: number;
+  navigation(
+    orientation: WorkflowStudioNavigationOrientation,
+    counts: Readonly<{ workflowCount: number; assetCount: number }>,
+  ): ReactNode;
   children: ReactNode;
 }>;
 
 export function WorkflowStudioShell({
   topBar,
+  railContext,
+  workflowCount,
+  assetCount,
   navigation,
   children,
 }: WorkflowStudioShellProps) {
@@ -56,11 +65,16 @@ export function WorkflowStudioShell({
           />
           <span className="workflow-studio-shell__brand-name">Locusora</span>
         </div>
+        {railContext}
+        <p className="workflow-studio-shell__workspace-label">WORKSPACE</p>
         <nav
           aria-label="Studio sections"
           className="workflow-studio-shell__navigation"
         >
-          {navigation(orientation)}
+          {navigation(orientation, {
+            workflowCount,
+            assetCount,
+          })}
         </nav>
       </aside>
       <div className="workflow-studio-shell__workspace">

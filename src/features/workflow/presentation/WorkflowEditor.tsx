@@ -17,7 +17,10 @@ import { Button, Field, Select } from '@/shared';
 import type { CreateWorkflowInput, Workflow } from '../domain/Workflow';
 import { RewardDiceEditor } from './RewardDiceEditor';
 import { PhaseEnvironmentPreview } from './PhaseEnvironmentPreview';
-import { WorkflowEditorChromeActions } from './WorkflowEditorChrome';
+import {
+  WorkflowEditorChromeActions,
+  WorkflowEditorChromeStatus,
+} from './WorkflowEditorChrome';
 import {
   useWorkflowEditor,
   validateWorkflowDraft,
@@ -308,22 +311,17 @@ export function WorkflowEditor({
       }}
     >
       <WorkflowEditorChromeActions>
-        <div className="editor-header__save">
-          {saved ? (
-            <span className="editor-header__save-status" role="status">
-              Workflow saved
-            </span>
-          ) : null}
-          <Button
-            form={formId}
-            type="submit"
-            variant="primary"
-            pending={pending}
-          >
-            Save workflow
-          </Button>
-        </div>
+        <Button form={formId} type="submit" variant="primary" pending={pending}>
+          Save workflow
+        </Button>
       </WorkflowEditorChromeActions>
+      <WorkflowEditorChromeStatus>
+        {saved ? (
+          <span className="editor-header__save-status" role="status">
+            Workflow saved
+          </span>
+        ) : null}
+      </WorkflowEditorChromeStatus>
 
       <p className="editor-introduction">
         Shape the sequence, atmosphere and optional reward ritual.
@@ -413,7 +411,7 @@ export function WorkflowEditor({
       >
         <div className="section-heading">
           <div>
-            <h3 id="phases-title">Phases</h3>
+            <h2 id="phases-title">Phases</h2>
             <p>Run from top to bottom.</p>
           </div>
         </div>

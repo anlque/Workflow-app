@@ -5,10 +5,12 @@ import type { WorkflowStudioDependencies } from '../workflow-studio/WorkflowStud
 
 export type LazyWorkflowStudioProps = Readonly<{
   loadDependencies(): Promise<WorkflowStudioDependencies>;
+  onNavigateToFocus(): void;
 }>;
 
 export default function LazyWorkflowStudio({
   loadDependencies,
+  onNavigateToFocus,
 }: LazyWorkflowStudioProps) {
   const [dependencies, setDependencies] =
     useState<WorkflowStudioDependencies | null>(null);
@@ -39,5 +41,10 @@ export default function LazyWorkflowStudio({
   if (dependencies === null) {
     return <p role="status">Loading Workflow Studio…</p>;
   }
-  return <WorkflowStudio dependencies={dependencies} />;
+  return (
+    <WorkflowStudio
+      dependencies={dependencies}
+      onNavigateToFocus={onNavigateToFocus}
+    />
+  );
 }
