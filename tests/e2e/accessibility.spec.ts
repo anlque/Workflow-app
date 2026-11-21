@@ -795,6 +795,10 @@ test('Asset Role dialog has no detectable axe violations', async ({
       'base64',
     ),
   });
+  const moreTrigger = options.getByRole('button', {
+    name: 'More actions for role-image.png',
+  });
+  await moreTrigger.click();
   const trigger = options.getByRole('button', {
     name: 'Manage role for role-image.png',
   });
@@ -806,7 +810,7 @@ test('Asset Role dialog has no detectable axe violations', async ({
   await options.getByRole('button', { name: 'Assign role' }).click();
   await expect(
     options.getByRole('listitem', { name: 'Image: role-image.png' }),
-  ).toContainText('Role: Backdrop');
+  ).toContainText('Backdrop');
   await options.getByRole('tab', { name: 'Workflows' }).click();
   const backToWorkflows = options.getByRole('button', {
     name: 'Back to workflows',
@@ -821,6 +825,83 @@ test('Asset Role dialog has no detectable axe violations', async ({
     options.getByRole('option', { name: 'Backdrop — role-image.png' }),
   ).toHaveCount(1);
   await expectNoAccessibilityViolations(options);
+});
+
+test('Asset Library discovery and details stay accessible and responsive', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  await options.getByRole('tab', { name: 'Assets' }).click();
+
+  const search = options.getByRole('searchbox', { name: 'Search assets' });
+  await expect(search).toBeVisible();
+  await expect(
+    options.getByRole('radiogroup', { name: 'Filter Assets by kind' }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('combobox', { name: 'Filter Assets by Role' }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('complementary', { name: 'Asset details' }),
+  ).toBeVisible();
+
+  await search.focus();
+  await expect(search).toBeFocused();
+  await search.fill('Amber');
+  await expect(
+    options.getByRole('listitem', { name: /Image: Amber Library/u }),
+  ).toBeVisible();
+  await search.fill('');
+
+  for (const viewport of [
+    { width: 1_440, height: 1_024 },
+    { width: 1_024, height: 800 },
+    { width: 900, height: 720 },
+    { width: 850, height: 720 },
+    { width: 640, height: 720 },
+  ]) {
+    await options.setViewportSize(viewport);
+    expect(
+      await options.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+    await expect(
+      options.getByRole('button', { name: /Select /u }).first(),
+    ).toBeVisible();
+    if (viewport.width === 1_440) {
+      const audioRow = await options
+        .getByRole('listitem', { name: /Audio:/u })
+        .first()
+        .boundingBox();
+      expect(audioRow).not.toBeNull();
+      expect(audioRow?.height).toBeLessThanOrEqual(64);
+    }
+    for (const control of [
+      search,
+      options.getByRole('radiogroup', {
+        name: 'Filter Assets by kind',
+      }),
+      options.getByRole('combobox', {
+        name: 'Filter Assets by Role',
+      }),
+    ]) {
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box?.x).toBeGreaterThanOrEqual(0);
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
+        viewport.width,
+      );
+    }
+  }
+  const results = await new AxeBuilder({ page: options })
+    .include('.asset-library')
+    .analyze();
+  expect(results.violations).toEqual([]);
 });
 
 test('Asset retirement dialog has no detectable axe violations', async ({
@@ -838,6 +919,10 @@ test('Asset retirement dialog has no detectable axe violations', async ({
       'base64',
     ),
   });
+  const moreTrigger = options.getByRole('button', {
+    name: 'More actions for retire-image.png',
+  });
+  await moreTrigger.click();
   const trigger = options.getByRole('button', {
     name: 'Retire retire-image.png',
   });
@@ -853,7 +938,7 @@ test('Asset retirement dialog has no detectable axe violations', async ({
   ).toBeFocused();
   await expectNoAccessibilityViolations(options);
   await options.keyboard.press('Escape');
-  await expect(trigger).toBeFocused();
+  await expect(moreTrigger).toBeFocused();
 });
 
 test('local extension documents become interactive within 500 ms', async ({

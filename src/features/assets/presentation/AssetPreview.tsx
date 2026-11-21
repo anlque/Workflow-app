@@ -2,11 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { Asset, AssetId } from '../domain/Asset';
 
+export type AssetPreviewMetadata =
+  | Readonly<{ kind: 'image'; width: number; height: number }>
+  | Readonly<{ kind: 'audio'; durationSeconds: number }>;
+
 export type AssetPreviewProps = Readonly<{
   asset: Asset;
   loadBlob(id: AssetId): Promise<Blob | null>;
   createObjectUrl(blob: Blob): string;
   revokeObjectUrl(url: string): void;
+  onMetadata?(metadata: AssetPreviewMetadata): void;
 }>;
 
 export function AssetPreview({
@@ -14,6 +19,7 @@ export function AssetPreview({
   loadBlob,
   createObjectUrl,
   revokeObjectUrl,
+  onMetadata,
 }: AssetPreviewProps) {
   const [url, setUrl] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
@@ -52,6 +58,18 @@ export function AssetPreview({
       className="asset-preview__image"
       src={url}
       alt={`Preview of ${asset.name}`}
+      onLoad={(event) => {
+        const { naturalWidth: width, naturalHeight: height } =
+          event.currentTarget;
+        if (
+          Number.isFinite(width) &&
+          width > 0 &&
+          Number.isFinite(height) &&
+          height > 0
+        ) {
+          onMetadata?.({ kind: 'image', width, height });
+        }
+      }}
     />
   ) : (
     <audio
@@ -59,6 +77,12 @@ export function AssetPreview({
       src={url}
       controls
       aria-label={`Preview ${asset.name}`}
+      onLoadedMetadata={(event) => {
+        const { duration } = event.currentTarget;
+        if (Number.isFinite(duration) && duration > 0) {
+          onMetadata?.({ kind: 'audio', durationSeconds: duration });
+        }
+      }}
     />
   );
 }

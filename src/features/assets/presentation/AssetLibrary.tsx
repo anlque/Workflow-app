@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 
-import { Button } from '@/shared';
+import { Button, Icon, SegmentedControl, Select } from '@/shared';
 
 import {
   createAssetId,
+  assetRoleKey,
   type Asset,
   type AssetId,
   type AssetKind,
@@ -14,12 +15,13 @@ import type {
   AssetRetirementPreview,
 } from '../application/AssetRetirement';
 import type { ImportAssetInput } from '../application/importAssetUseCase';
-import { AssetPreview } from './AssetPreview';
+import { AssetPreview, type AssetPreviewMetadata } from './AssetPreview';
 import { AssetRetirementDialog } from './AssetRetirementDialog';
 import { AssetRoleDialog } from './AssetRoleDialog';
 
 export type AssetLibraryProps = Readonly<{
   assets: readonly Asset[];
+  usageSummaries?: ReadonlyMap<AssetId, AssetUsageSummary>;
   onImport(file: File, kind: AssetKind): Promise<void>;
   onInspectRetirement(id: AssetId): Promise<AssetRetirementPreview>;
   onRetire(
@@ -39,14 +41,30 @@ export type AssetLibraryProps = Readonly<{
   revokeObjectUrl(url: string): void;
 }>;
 
+export type AssetUsageSummary = Readonly<{
+  workflowCount: number;
+  workflows: readonly Readonly<{ id: string; name: string }>[];
+  occurrences: number;
+}>;
+
+type AssetKindFilter = 'all' | AssetKind;
+
 function formatBytes(value: number): string {
   if (value < 1_024) return `${String(value)} B`;
   if (value < 1_048_576) return `${String(Math.round(value / 1_024))} KB`;
   return `${(value / 1_048_576).toFixed(1)} MB`;
 }
 
+function formatDuration(value: number): string {
+  const totalSeconds = Math.round(value);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
+}
+
 export function AssetLibrary({
   assets,
+  usageSummaries = new Map(),
   onImport,
   onInspectRetirement,
   onRetire,
@@ -70,11 +88,64 @@ export function AssetLibrary({
   const restoreRoleFocus = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [kindFilter, setKindFilter] = useState<AssetKindFilter>('all');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [openActionsId, setOpenActionsId] = useState<AssetId | null>(null);
+  const actionTriggers = useRef(new Map<AssetId, HTMLButtonElement>());
+  const [metadata, setMetadata] = useState<
+    ReadonlyMap<AssetId, AssetPreviewMetadata>
+  >(new Map());
   const [selectedAssetId, setSelectedAssetId] = useState<AssetId | undefined>(
     initialAsset?.id,
   );
   const selectedAsset =
     assets.find(({ id }) => id === selectedAssetId) ?? initialAsset;
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const filteredAssets = assets.filter(
+    (asset) =>
+      asset.name.toLocaleLowerCase().includes(normalizedQuery) &&
+      (kindFilter === 'all' || asset.kind === kindFilter) &&
+      (roleFilter === 'all' ||
+        (asset.role !== undefined && assetRoleKey(asset.role) === roleFilter)),
+  );
+  const roles = [
+    ...new Map(
+      assets.flatMap((asset) =>
+        asset.role === undefined
+          ? []
+          : [[assetRoleKey(asset.role), asset.role] as const],
+      ),
+    ),
+  ];
+
+  useEffect(() => {
+    if (roleFilter !== 'all' && !roles.some(([key]) => key === roleFilter)) {
+      setRoleFilter('all');
+    }
+  }, [roleFilter, roles]);
+
+  function recordMetadata(assetId: AssetId, value: AssetPreviewMetadata): void {
+    setMetadata((current) => {
+      const next = new Map(current);
+      next.set(assetId, value);
+      return next;
+    });
+  }
+
+  function metadataLabel(asset: Asset): string | undefined {
+    const value = metadata.get(asset.id);
+    if (value?.kind === 'image')
+      return `${String(value.width)} × ${String(value.height)}`;
+    if (value?.kind === 'audio') return formatDuration(value.durationSeconds);
+    return undefined;
+  }
+
+  function usageLabel(asset: Asset): string | undefined {
+    const occurrences = usageSummaries.get(asset.id)?.occurrences ?? 0;
+    if (occurrences === 0) return undefined;
+    return `${String(occurrences)} ${occurrences === 1 ? 'use' : 'uses'}`;
+  }
 
   useEffect(() => {
     if (
@@ -85,6 +156,15 @@ export function AssetLibrary({
     }
     setSelectedAssetId(initialAsset?.id);
   }, [assets, initialAsset?.id, selectedAssetId]);
+
+  useEffect(() => {
+    if (
+      openActionsId !== null &&
+      !filteredAssets.some(({ id }) => id === openActionsId)
+    ) {
+      setOpenActionsId(null);
+    }
+  }, [assets, kindFilter, openActionsId, query, roleFilter]);
 
   async function importFile(
     event: ChangeEvent<HTMLInputElement>,
@@ -156,11 +236,13 @@ export function AssetLibrary({
   }
 
   function assetGroup(kind: AssetKind, label: string) {
-    const values = assets.filter((asset) => asset.kind === kind);
+    const values = filteredAssets.filter((asset) => asset.kind === kind);
     if (values.length === 0) return null;
     return (
       <section className="asset-library__group" role="group" aria-label={label}>
-        <h3>{label}</h3>
+        <h2>
+          {label} ({String(values.length)})
+        </h2>
         <ul
           className={`asset-list asset-list--${kind === 'image' ? 'images' : 'audio'}`}
         >
@@ -180,6 +262,7 @@ export function AssetLibrary({
                   aria-label={`Select ${asset.name}`}
                   aria-pressed={selectedAsset?.id === asset.id}
                   onClick={() => {
+                    setOpenActionsId(null);
                     setSelectedAssetId(asset.id);
                   }}
                 >
@@ -189,12 +272,26 @@ export function AssetLibrary({
                       loadBlob={loadBlob}
                       createObjectUrl={createObjectUrl}
                       revokeObjectUrl={revokeObjectUrl}
+                      onMetadata={(value) => {
+                        recordMetadata(asset.id, value);
+                      }}
                     />
                   </span>
                   <span className="asset-item__summary">
                     <strong>{asset.name}</strong>
-                    <span>Image · {formatBytes(asset.byteSize)}</span>
-                    <span>Role: {asset.role ?? 'No Role'}</span>
+                    <span>
+                      {[metadataLabel(asset), formatBytes(asset.byteSize)]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                    <span className="asset-item__metadata-line">
+                      <span className="asset-item__role">
+                        {asset.role ?? 'No Role'}
+                      </span>
+                      {usageLabel(asset) === undefined ? null : (
+                        <span>{usageLabel(asset)}</span>
+                      )}
+                    </span>
                   </span>
                 </button>
               ) : (
@@ -205,6 +302,9 @@ export function AssetLibrary({
                       loadBlob={loadBlob}
                       createObjectUrl={createObjectUrl}
                       revokeObjectUrl={revokeObjectUrl}
+                      onMetadata={(value) => {
+                        recordMetadata(asset.id, value);
+                      }}
                     />
                   </span>
                   <button
@@ -213,36 +313,76 @@ export function AssetLibrary({
                     aria-label={`Select ${asset.name}`}
                     aria-pressed={selectedAsset?.id === asset.id}
                     onClick={() => {
+                      setOpenActionsId(null);
                       setSelectedAssetId(asset.id);
                     }}
                   >
                     <strong>{asset.name}</strong>
-                    <span>Audio · {formatBytes(asset.byteSize)}</span>
-                    <span>Role: {asset.role ?? 'No Role'}</span>
+                    <span>
+                      {[metadataLabel(asset), formatBytes(asset.byteSize)]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                    <span className="asset-item__metadata-line">
+                      <span className="asset-item__role">
+                        {asset.role ?? 'No Role'}
+                      </span>
+                      {usageLabel(asset) === undefined ? null : (
+                        <span>{usageLabel(asset)}</span>
+                      )}
+                    </span>
                   </button>
                 </>
               )}
               {selectedAsset?.id === asset.id ? null : (
-                <div className="asset-item__actions asset-item__actions--card">
+                <div className="asset-item__overflow-anchor">
                   <Button
+                    buttonRef={(node) => {
+                      if (node === null)
+                        actionTriggers.current.delete(asset.id);
+                      else actionTriggers.current.set(asset.id, node);
+                    }}
                     variant="quiet"
-                    aria-label={`Manage role for ${asset.name}`}
-                    onClick={(event) => {
-                      openRoleDialog(asset, event.currentTarget);
+                    iconOnly
+                    aria-label={`More actions for ${asset.name}`}
+                    aria-expanded={openActionsId === asset.id}
+                    data-asset-actions-id={asset.id}
+                    onClick={() => {
+                      setOpenActionsId((current) =>
+                        current === asset.id ? null : asset.id,
+                      );
                     }}
                   >
-                    Role
+                    <Icon name="more" size={18} />
                   </Button>
-                  <Button
-                    data-retirement-asset-id={asset.id}
-                    variant="quiet"
-                    aria-label={`Retire ${asset.name}`}
-                    onClick={(event) => {
-                      openRetirementDialog(asset, event.currentTarget);
-                    }}
-                  >
-                    Retire
-                  </Button>
+                  {openActionsId !== asset.id ? null : (
+                    <div className="asset-item__overflow">
+                      <Button
+                        variant="quiet"
+                        aria-label={`Manage role for ${asset.name}`}
+                        onClick={() => {
+                          const trigger = actionTriggers.current.get(asset.id);
+                          if (trigger === undefined) return;
+                          setOpenActionsId(null);
+                          openRoleDialog(asset, trigger);
+                        }}
+                      >
+                        Manage Role
+                      </Button>
+                      <Button
+                        variant="quiet"
+                        aria-label={`Retire ${asset.name}`}
+                        onClick={() => {
+                          const trigger = actionTriggers.current.get(asset.id);
+                          if (trigger === undefined) return;
+                          setOpenActionsId(null);
+                          openRetirementDialog(asset, trigger);
+                        }}
+                      >
+                        Retire Asset
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </li>
@@ -261,9 +401,13 @@ export function AssetLibrary({
       else {
         const trigger = Array.from(
           library.current?.querySelectorAll<HTMLButtonElement>(
-            '[data-retirement-asset-id]',
+            '[data-retirement-asset-id], [data-asset-actions-id]',
           ) ?? [],
-        ).find(({ dataset }) => dataset['retirementAssetId'] === target);
+        ).find(
+          ({ dataset }) =>
+            dataset['retirementAssetId'] === target ||
+            dataset['assetActionsId'] === target,
+        );
         trigger?.focus();
       }
     }, 0);
@@ -302,6 +446,47 @@ export function AssetLibrary({
         </p>
       )}
 
+      {assets.length === 0 ? null : (
+        <div className="asset-library__toolbar">
+          <label className="asset-library__search">
+            <span className="visually-hidden">Search assets</span>
+            <input
+              type="search"
+              aria-label="Search assets"
+              placeholder="Search assets"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.currentTarget.value);
+              }}
+            />
+          </label>
+          <SegmentedControl<AssetKindFilter>
+            label="Filter Assets by kind"
+            value={kindFilter}
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'image', label: 'Images' },
+              { value: 'audio', label: 'Audio' },
+            ]}
+            onChange={setKindFilter}
+          />
+          <Select
+            label="Filter Assets by Role"
+            value={roleFilter}
+            onChange={(event) => {
+              setRoleFilter(event.currentTarget.value);
+            }}
+          >
+            <option value="all">All roles</option>
+            {roles.map(([key, role]) => (
+              <option key={key} value={key}>
+                {role}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+
       {assets.length === 0 ? (
         <div className="asset-library__empty">
           <h3>Add atmosphere to your Workflows.</h3>
@@ -312,6 +497,9 @@ export function AssetLibrary({
           <div className="asset-library__collections">
             {assetGroup('image', 'Images')}
             {assetGroup('audio', 'Audio')}
+            {filteredAssets.length === 0 ? (
+              <p>No Assets match these filters.</p>
+            ) : null}
           </div>
           {selectedAsset === undefined ? null : (
             <aside
@@ -322,13 +510,54 @@ export function AssetLibrary({
                 <span className="eyebrow">
                   {selectedAsset.kind === 'image' ? 'Image' : 'Audio'} asset
                 </span>
-                <h3>{selectedAsset.name}</h3>
+                <h2>{selectedAsset.name}</h2>
                 <p>
                   {selectedAsset.kind === 'image' ? 'Image' : 'Audio'} ·{' '}
                   {formatBytes(selectedAsset.byteSize)}
                 </p>
                 <p>Role: {selectedAsset.role ?? 'No Role'}</p>
+                {metadataLabel(selectedAsset) === undefined ? null : (
+                  <p>{metadataLabel(selectedAsset)}</p>
+                )}
               </div>
+              {selectedAsset.kind === 'image' ? (
+                <div className="asset-library__details-preview">
+                  <AssetPreview
+                    asset={selectedAsset}
+                    loadBlob={loadBlob}
+                    createObjectUrl={createObjectUrl}
+                    revokeObjectUrl={revokeObjectUrl}
+                    onMetadata={(value) => {
+                      recordMetadata(selectedAsset.id, value);
+                    }}
+                  />
+                </div>
+              ) : null}
+              {usageSummaries.get(selectedAsset.id) === undefined ? null : (
+                <section
+                  className="asset-library__usage"
+                  aria-label="Asset usage"
+                >
+                  <h3>
+                    Used in{' '}
+                    {String(
+                      usageSummaries.get(selectedAsset.id)?.workflowCount ?? 0,
+                    )}{' '}
+                    {(usageSummaries.get(selectedAsset.id)?.workflowCount ??
+                      0) === 1
+                      ? 'Workflow'
+                      : 'Workflows'}
+                  </h3>
+                  <p>{usageLabel(selectedAsset) ?? '0 uses'}</p>
+                  <ul>
+                    {usageSummaries
+                      .get(selectedAsset.id)
+                      ?.workflows.map(({ id, name }) => (
+                        <li key={id}>{name}</li>
+                      ))}
+                  </ul>
+                </section>
+              )}
               <div className="asset-item__actions">
                 <Button
                   variant="secondary"

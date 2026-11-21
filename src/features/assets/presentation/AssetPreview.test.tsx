@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { createAsset } from '../domain/Asset';
@@ -26,6 +26,92 @@ afterEach(() => {
 });
 
 describe('AssetPreview', () => {
+  test('reports real image dimensions after the local preview loads', async () => {
+    const onMetadata = vi.fn();
+    render(
+      <AssetPreview
+        asset={image}
+        loadBlob={() => Promise.resolve(new Blob(['image']))}
+        createObjectUrl={() => 'blob:forest'}
+        revokeObjectUrl={() => undefined}
+        onMetadata={onMetadata}
+      />,
+    );
+    const preview = await screen.findByRole('img', {
+      name: 'Preview of Forest',
+    });
+    Object.defineProperties(preview, {
+      naturalWidth: { value: 1_920 },
+      naturalHeight: { value: 1_080 },
+    });
+    fireEvent.load(preview);
+
+    expect(onMetadata).toHaveBeenCalledWith({
+      kind: 'image',
+      width: 1_920,
+      height: 1_080,
+    });
+  });
+
+  test('reports only finite positive audio duration', async () => {
+    const onMetadata = vi.fn();
+    const view = render(
+      <AssetPreview
+        asset={audio}
+        loadBlob={() => Promise.resolve(new Blob(['audio']))}
+        createObjectUrl={() => 'blob:rain'}
+        revokeObjectUrl={() => undefined}
+        onMetadata={onMetadata}
+      />,
+    );
+    const preview = await screen.findByLabelText('Preview Rain');
+    Object.defineProperty(preview, 'duration', {
+      value: Number.POSITIVE_INFINITY,
+      configurable: true,
+    });
+    fireEvent.loadedMetadata(preview);
+    Object.defineProperty(preview, 'duration', {
+      value: 0,
+      configurable: true,
+    });
+    fireEvent.loadedMetadata(preview);
+    Object.defineProperty(preview, 'duration', {
+      value: 90,
+      configurable: true,
+    });
+    fireEvent.loadedMetadata(preview);
+
+    expect(onMetadata).toHaveBeenCalledOnce();
+    expect(onMetadata).toHaveBeenCalledWith({
+      kind: 'audio',
+      durationSeconds: 90,
+    });
+    view.unmount();
+  });
+
+  test('does not report invalid image dimensions', async () => {
+    const onMetadata = vi.fn();
+    render(
+      <AssetPreview
+        asset={image}
+        loadBlob={() => Promise.resolve(new Blob(['image']))}
+        createObjectUrl={() => 'blob:forest'}
+        revokeObjectUrl={() => undefined}
+        onMetadata={onMetadata}
+      />,
+    );
+    const preview = await screen.findByRole('img', {
+      name: 'Preview of Forest',
+    });
+    Object.defineProperties(preview, {
+      naturalWidth: { value: 0 },
+      naturalHeight: { value: Number.NaN },
+    });
+    fireEvent.load(preview);
+
+    expect(onMetadata).not.toHaveBeenCalled();
+  });
+
   test('keeps the playing audio URL across callback-only rerenders', async () => {
     const play = vi
       .spyOn(HTMLMediaElement.prototype, 'play')

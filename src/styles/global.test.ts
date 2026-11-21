@@ -386,13 +386,40 @@ describe('visual foundation', () => {
       declarationsFor('.segmented-control input:checked + span'),
     ).toContain('background: var(--color-surface);');
     expect(declarationsFor('.asset-library__workspace')).toContain(
-      'grid-template-columns: minmax(0, 1fr) minmax(15rem, 20rem);',
+      'grid-template-columns: minmax(0, 1fr) minmax(20rem, 25rem);',
+    );
+    expect(declarationsFor('.asset-library__toolbar')).toContain(
+      'grid-template-columns: minmax(12rem, 1fr) auto minmax(10rem, 12rem);',
+    );
+    expect(declarationsFor('.asset-library__toolbar')).toContain(
+      'margin-right: calc(min(25rem, 32vw) + var(--space-4));',
+    );
+    expect(declarationsFor('.asset-library__details')).toContain(
+      'position: fixed;',
+    );
+    expect(declarationsFor('.asset-library__details')).toContain('bottom: 0;');
+    expect(
+      declarationsFor('.asset-library__toolbar .segmented-control'),
+    ).toContain('min-width: 14rem;');
+    expect(declarationsFor('.asset-list--images')).toContain(
+      'grid-template-columns: repeat(3, minmax(0, 1fr));',
     );
     expect(declarationsFor('.asset-list--audio')).toContain(
       'flex-direction: column;',
     );
+    expect(declarationsFor('.asset-item__overflow')).toContain(
+      'position: absolute;',
+    );
+    expect(
+      declarationsFor(
+        ".asset-item--image:not([data-selected='true']) .asset-item__summary",
+      ),
+    ).toContain('min-height: 4.75rem;');
     expect(declarationsFor('.asset-item--audio')).toContain(
-      'grid-template-columns: minmax(12rem, 18rem) minmax(10rem, 1fr) auto;',
+      'grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr) auto;',
+    );
+    expect(declarationsFor('.asset-item--audio')).toContain(
+      'min-height: 3.5rem;',
     );
     expect(declarationsFor('.settings-appearance-grid')).toContain(
       'grid-template-columns: minmax(0, 1.35fr) minmax(15rem, 1fr);',
@@ -437,7 +464,10 @@ describe('visual foundation', () => {
       'position: absolute;',
     );
     expect(stylesheet).toMatch(
-      /@media \(max-width: 52rem\)[\s\S]*?\.asset-library__workspace\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/u,
+      /@media \(max-width: 75rem\)[\s\S]*?\.asset-library__workspace\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/u,
+    );
+    expect(stylesheet).toMatch(
+      /@media \(max-width: 56rem\)[\s\S]*?\.asset-library__toolbar\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/u,
     );
   });
 

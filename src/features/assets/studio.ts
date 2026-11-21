@@ -8,6 +8,7 @@ export {
 export {
   AssetLibrary,
   type AssetLibraryProps,
+  type AssetUsageSummary,
 } from './presentation/AssetLibrary';
 export {
   AssetRoleDialog,
@@ -15,6 +16,7 @@ export {
 } from './presentation/AssetRoleDialog';
 export {
   AssetPreview,
+  type AssetPreviewMetadata,
   type AssetPreviewProps,
 } from './presentation/AssetPreview';
 export {

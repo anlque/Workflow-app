@@ -1,10 +1,17 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
 import {
   createAsset,
   createAssetRole,
+  type Asset,
   type AssetId,
   type AssetKind,
 } from '../domain/Asset';
@@ -41,7 +48,16 @@ function setup(
     onImport(file: File, kind: AssetKind): Promise<void>;
     onDelete(id: AssetId): Promise<void>;
     onInspectRetirement(id: AssetId): Promise<AssetRetirementPreview>;
-    assets: readonly (typeof image)[];
+    assets: readonly Asset[];
+    usageSummaries: ReadonlyMap<
+      AssetId,
+      {
+        workflowCount: number;
+        workflows: readonly { id: string; name: string }[];
+        occurrences: number;
+      }
+    >;
+    loadBlob(id: AssetId): Promise<Blob | null>;
   }> = {},
 ) {
   const assets = overrides.assets ?? [image, audio];
@@ -51,9 +67,12 @@ function setup(
   const onDelete = vi.fn<(id: AssetId) => Promise<void>>(
     overrides.onDelete ?? (() => Promise.resolve()),
   );
-  render(
+  const view = render(
     <AssetLibrary
       assets={assets}
+      {...(overrides.usageSummaries === undefined
+        ? {}
+        : { usageSummaries: overrides.usageSummaries })}
       onImport={onImport}
       onInspectRetirement={
         overrides.onInspectRetirement ??
@@ -88,15 +107,133 @@ function setup(
       }}
       onApplyRoleChange={() => Promise.resolve()}
       onSynchronizeRoleChange={() => Promise.resolve()}
-      loadBlob={() => Promise.resolve(null)}
+      loadBlob={overrides.loadBlob ?? (() => Promise.resolve(null))}
       createObjectUrl={() => 'blob:asset'}
       revokeObjectUrl={() => undefined}
     />,
   );
-  return { onImport, onDelete };
+  return { onImport, onDelete, view };
 }
 
 describe('AssetLibrary', () => {
+  test('filters by name, kind and canonical Role without mutating source order', async () => {
+    const user = userEvent.setup();
+    const forest = createAsset({ ...image, role: 'Hero Scene' });
+    const rainfall = createAsset({ ...audio, role: 'AMBIENT' });
+    const source = [rainfall, meadow, forest];
+    setup({ assets: source });
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search assets' }),
+      'FOREST',
+    );
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(
+      screen.getByRole('listitem', { name: 'Image: Forest' }),
+    ).toBeVisible();
+    await user.clear(screen.getByRole('searchbox', { name: 'Search assets' }));
+
+    await user.click(screen.getByRole('radio', { name: 'Audio' }));
+    expect(screen.getByRole('listitem', { name: 'Audio: Rain' })).toBeVisible();
+    expect(screen.queryByRole('group', { name: 'Images' })).toBeNull();
+    await user.click(screen.getByRole('radio', { name: 'All' }));
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Filter Assets by Role' }),
+      'hero scene',
+    );
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(
+      screen.getByRole('listitem', { name: 'Image: Forest' }),
+    ).toBeVisible();
+    expect(source.map(({ id }) => id)).toEqual([audio.id, meadow.id, image.id]);
+  });
+
+  test('shows only loaded metadata and real Workflow usage in the selected drawer', async () => {
+    const usageSummaries = new Map([
+      [
+        image.id,
+        {
+          workflowCount: 2,
+          workflows: [
+            { id: 'deep-work', name: 'Deep work' },
+            { id: 'writing-ritual', name: 'Writing ritual' },
+          ],
+          occurrences: 3,
+        },
+      ],
+    ]);
+    setup({
+      assets: [image],
+      usageSummaries,
+      loadBlob: () => Promise.resolve(new Blob(['image'])),
+    });
+
+    const details = screen.getByRole('complementary', {
+      name: 'Asset details',
+    });
+    expect(details).not.toHaveTextContent('×');
+    const [preview] = await screen.findAllByRole('img', {
+      name: 'Preview of Forest',
+    });
+    expect(preview).toBeDefined();
+    Object.defineProperties(preview, {
+      naturalWidth: { value: 1_920 },
+      naturalHeight: { value: 1_080 },
+    });
+    fireEvent.load(preview as HTMLImageElement);
+
+    expect(details).toHaveTextContent('1920 × 1080');
+    expect(details).toHaveTextContent('Used in 2 Workflows');
+    expect(details).toHaveTextContent('3 uses');
+    expect(details).toHaveTextContent('Deep work');
+    expect(details).toHaveTextContent('Writing ritual');
+  });
+
+  test('resets a Role filter when that Role disappears from the catalog', async () => {
+    const user = userEvent.setup();
+    const forest = createAsset({ ...image, role: 'Hero Scene' });
+    const { view } = setup({ assets: [forest, audio] });
+    const roleFilter = screen.getByRole('combobox', {
+      name: 'Filter Assets by Role',
+    });
+    await user.selectOptions(roleFilter, 'hero scene');
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+
+    view.rerender(
+      <AssetLibrary
+        assets={[image, audio]}
+        onImport={() => Promise.resolve()}
+        onInspectRetirement={(id) =>
+          Promise.resolve({
+            asset: id === image.id ? image : audio,
+            usages: [],
+          })
+        }
+        onRetire={() => Promise.resolve()}
+        onSynchronizeRetirement={() => Promise.resolve()}
+        createRetirementUploadInput={(file, kind) => ({
+          id: 'uploaded',
+          name: file.name,
+          kind,
+          blob: file,
+          createdAt: 1,
+        })}
+        onInspectRoleChange={() => Promise.reject(new Error('unused'))}
+        onApplyRoleChange={() => Promise.resolve()}
+        onSynchronizeRoleChange={() => Promise.resolve()}
+        loadBlob={() => Promise.resolve(null)}
+        createObjectUrl={() => 'blob:asset'}
+        revokeObjectUrl={() => undefined}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(roleFilter).toHaveValue('all');
+    });
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
   test('explains that Workflows follow the Asset owning a Role', () => {
     setup();
     expect(
@@ -212,7 +349,9 @@ describe('AssetLibrary', () => {
       'aria-pressed',
       'true',
     );
-    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(
+      screen.getByRole('searchbox', { name: 'Search assets' }),
+    ).toBeVisible();
   });
 
   test('keeps image cards selectable while audio uses compact independent controls', () => {
@@ -250,6 +389,9 @@ describe('AssetLibrary', () => {
     setup();
 
     await user.click(
+      screen.getByRole('button', { name: 'More actions for Rain' }),
+    );
+    await user.click(
       screen.getByRole('button', { name: 'Manage role for Rain' }),
     );
     expect(
@@ -257,8 +399,50 @@ describe('AssetLibrary', () => {
     ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
+    await user.click(
+      screen.getByRole('button', { name: 'More actions for Rain' }),
+    );
     await user.click(screen.getByRole('button', { name: 'Retire Rain' }));
     expect(screen.getByRole('dialog', { name: 'Retire Rain' })).toBeVisible();
+  });
+
+  test('closes an Asset overflow when that Asset is selected', async () => {
+    const user = userEvent.setup();
+    const { view } = setup();
+    const trigger = screen.getByRole('button', {
+      name: 'More actions for Rain',
+    });
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Select Rain' }));
+
+    expect(view.container.querySelector('.asset-item__overflow')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'More actions for Rain' }),
+    ).toBeNull();
+  });
+
+  test('does not restore overflow after its Asset leaves and returns to the filtered projection', async () => {
+    const user = userEvent.setup();
+    setup();
+    const trigger = screen.getByRole('button', {
+      name: 'More actions for Rain',
+    });
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(screen.getByRole('radio', { name: 'Images' }));
+    expect(screen.queryByRole('button', { name: 'Select Rain' })).toBeNull();
+    await user.click(screen.getByRole('radio', { name: 'All' }));
+
+    const restoredTrigger = screen.getByRole('button', {
+      name: 'More actions for Rain',
+    });
+    expect(restoredTrigger).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.queryByRole('button', { name: 'Manage role for Rain' }),
+    ).toBeNull();
   });
 
   test('restores the invoking Role button after Cancel', async () => {

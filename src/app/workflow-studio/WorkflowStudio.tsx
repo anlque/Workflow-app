@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 
 import {
   type Asset,
@@ -36,6 +42,7 @@ import {
 
 import { WorkflowStudioShell } from './WorkflowStudioShell';
 import type { WorkflowStudioNavigationOrientation } from './WorkflowStudioShell';
+import { createAssetUsageSummaries } from './createAssetUsageSummaries';
 import { resolveWorkflowPreviewAsset } from './resolveWorkflowPreviewAsset';
 
 export type WorkflowStudioSnapshot = Readonly<{
@@ -296,6 +303,14 @@ export function WorkflowStudio({
     const tab = tabs[next];
     if (tab !== undefined) selectTab(tab);
   }
+
+  const assetUsageSummaries = useMemo(
+    () =>
+      snapshot === null
+        ? new Map()
+        : createAssetUsageSummaries(snapshot.workflows, snapshot.assets),
+    [snapshot],
+  );
 
   if (loadError !== null) {
     return (
@@ -733,6 +748,7 @@ export function WorkflowStudio({
         >
           <AssetLibrary
             assets={snapshot.assets}
+            usageSummaries={assetUsageSummaries}
             onImport={async (file, kind) => {
               await dependencies.importAsset(file, kind);
               await reloadSnapshot();

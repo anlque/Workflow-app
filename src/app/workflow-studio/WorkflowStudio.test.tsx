@@ -129,6 +129,44 @@ function dependencies(
 }
 
 describe('WorkflowStudio', () => {
+  test('composes real Workflow usage summaries for the Asset Library', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'usage-workflow',
+      name: 'Deep work',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 60,
+          environment: {
+            backgroundAsset: { type: 'direct', assetId: imageAsset.id },
+          },
+        },
+      ],
+    });
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load: () =>
+            Promise.resolve({
+              workflows: [workflow],
+              assets: [imageAsset],
+              settings: defaultSettings,
+            }),
+        })}
+      />,
+    );
+
+    await user.click(await screen.findByRole('tab', { name: 'Assets' }));
+
+    const details = screen.getByRole('complementary', {
+      name: 'Asset details',
+    });
+    expect(details).toHaveTextContent('Used in 1 Workflow');
+    expect(details).toHaveTextContent('Deep work');
+    expect(details).toHaveTextContent('1 use');
+  });
+
   test('delegates Focus navigation to its host composition', async () => {
     const user = userEvent.setup();
     const navigateToFocus = vi.fn();
@@ -1485,7 +1523,7 @@ describe('WorkflowStudio', () => {
     expect(load).toHaveBeenCalledTimes(3);
     expect(
       screen.getByRole('listitem', { name: 'Image: Forest' }),
-    ).toHaveTextContent('Role: Hero');
+    ).toHaveTextContent('Hero');
   });
 
   test('forwards an approved Role change and reloads the catalog once', async () => {
