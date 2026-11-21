@@ -320,19 +320,20 @@ async function stopSession(focus) {
 async function removeAllWorkflows(options) {
   await options.getByRole('tab', { name: 'Workflows' }).click();
   await openWorkflowLibrary(options);
-  const deleteButtons = options.getByRole('button', { name: /^Delete /u });
-  while ((await deleteButtons.count()) > 0) {
-    const button = deleteButtons.first();
-    const accessibleName = await button.getAttribute('aria-label');
-    if (accessibleName === null) {
-      throw new Error('Workflow delete action has no accessible name.');
+  const rows = options.locator('.workflow-list__item');
+  while ((await rows.count()) > 0) {
+    const row = rows.first();
+    const workflowName = await row.getAttribute('aria-label');
+    if (workflowName === null) {
+      throw new Error('Workflow row has no accessible name.');
     }
-    await button.evaluate((element) => {
-      element.click();
-    });
+    await row
+      .getByRole('button', { name: `More actions for ${workflowName}` })
+      .click();
+    await row.getByRole('button', { name: `Delete ${workflowName}` }).click();
     await options.getByRole('button', { name: 'Delete workflow' }).click();
     await options
-      .getByRole('button', { name: accessibleName, exact: true })
+      .getByRole('listitem', { name: workflowName, exact: true })
       .waitFor({ state: 'detached' });
   }
 }

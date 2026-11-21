@@ -53,9 +53,20 @@ function setup(workflows: readonly Workflow[] = []) {
     onDelete: vi.fn(() => Promise.resolve()),
     onReorder: vi.fn(() => Promise.resolve()),
     onStart: vi.fn(() => Promise.resolve()),
+    onExport: vi.fn(() => Promise.resolve()),
+    onImport: vi.fn(() => Promise.resolve()),
   };
   render(<WorkflowLibrary workflows={workflows} {...callbacks} />);
   return callbacks;
+}
+
+async function openActions(
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+) {
+  await user.click(
+    screen.getByRole('button', { name: `More actions for ${name}` }),
+  );
 }
 
 describe('WorkflowLibrary', () => {
@@ -76,6 +87,7 @@ describe('WorkflowLibrary', () => {
     const { onOpen, onDuplicate } = setup([deepWork]);
 
     await user.click(screen.getByRole('button', { name: 'Open Deep work' }));
+    await openActions(user, 'Deep work');
     await user.click(
       screen.getByRole('button', { name: 'Duplicate Deep work' }),
     );
@@ -130,8 +142,170 @@ describe('WorkflowLibrary', () => {
     expect(reward).toHaveTextContent('2 phases');
     expect(reward).toHaveTextContent('Reward on');
 
-    expect(screen.queryByRole('searchbox')).toBeNull();
-    expect(screen.queryByRole('button', { name: /sort|import/u })).toBeNull();
+    expect(
+      screen.getByRole('searchbox', { name: 'Search workflows' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('combobox', { name: 'Sort workflows' }),
+    ).toHaveValue('manual');
+  });
+
+  test('filters both groups case-insensitively and sorts only the rendered projection', async () => {
+    const user = userEvent.setup();
+    const source = [
+      workflow('detailed-z', 'Zulu Detailed'),
+      quickWorkflow('quick-a', 'Alpha Quick'),
+      workflow('detailed-a', 'Alpha Detailed'),
+      quickWorkflow('quick-z', 'Zulu Quick'),
+    ];
+    setup(source);
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search workflows' }),
+      'ALPHA',
+    );
+    expect(
+      screen
+        .getAllByRole('listitem')
+        .map((item) => item.getAttribute('aria-label')),
+    ).toEqual(['Alpha Quick', 'Alpha Detailed']);
+
+    await user.clear(
+      screen.getByRole('searchbox', { name: 'Search workflows' }),
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Sort workflows' }),
+      'name-asc',
+    );
+    expect(
+      screen
+        .getAllByRole('button', { name: /^Open /u })
+        .map((button) => button.getAttribute('aria-label')),
+    ).toEqual([
+      'Open Alpha Quick',
+      'Open Zulu Quick',
+      'Open Alpha Detailed',
+      'Open Zulu Detailed',
+    ]);
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Sort workflows' }),
+      'name-desc',
+    );
+    expect(
+      screen
+        .getAllByRole('button', { name: /^Open /u })
+        .map((button) => button.getAttribute('aria-label')),
+    ).toEqual([
+      'Open Zulu Quick',
+      'Open Alpha Quick',
+      'Open Zulu Detailed',
+      'Open Alpha Detailed',
+    ]);
+    expect(source.map(({ id }) => id)).toEqual([
+      'detailed-z',
+      'quick-a',
+      'detailed-a',
+      'quick-z',
+    ]);
+    expect(
+      screen.queryByRole('button', { name: /Move .* (up|down)/u }),
+    ).toBeNull();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Sort workflows' }),
+      'manual',
+    );
+    await openActions(user, 'Alpha Quick');
+    expect(
+      screen.getByRole('button', { name: 'Move Alpha Quick down' }),
+    ).toBeEnabled();
+  });
+
+  test.each(['Move Middle up', 'Move Middle down', 'Duplicate Middle'])(
+    'closes overflow and restores its trigger focus after %s succeeds',
+    async (actionName) => {
+      const user = userEvent.setup();
+      setup([
+        workflow('first', 'First'),
+        workflow('middle', 'Middle'),
+        workflow('last', 'Last'),
+      ]);
+      const trigger = screen.getByRole('button', {
+        name: 'More actions for Middle',
+      });
+
+      await user.click(trigger);
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      await user.click(screen.getByRole('button', { name: actionName }));
+
+      expect(
+        screen.queryByRole('button', { name: actionName }),
+      ).not.toBeInTheDocument();
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(trigger).toHaveFocus();
+    },
+  );
+
+  test('supports page import, row export and overflow management actions', async () => {
+    const user = userEvent.setup();
+    const deepWork = workflow('workflow-1', 'Deep work');
+    const callbacks = setup([deepWork]);
+
+    await user.click(screen.getByRole('button', { name: 'Import workflow' }));
+    const input = screen.getByLabelText('Import workflow file');
+    await user.upload(
+      input,
+      new File(['{}'], 'workflow.json', { type: 'application/json' }),
+    );
+    expect(callbacks.onImport).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole('button', { name: 'Export Deep work' }));
+    expect(callbacks.onExport).toHaveBeenCalledWith(deepWork.id);
+
+    await user.click(
+      screen.getByRole('button', { name: 'More actions for Deep work' }),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Duplicate Deep work' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Delete Deep work' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Move Deep work up' }),
+    ).toBeVisible();
+  });
+
+  test('renders injected thumbnails with a neutral fallback', () => {
+    const first = workflow('first', 'First');
+    const second = workflow('second', 'Second');
+    const renderThumbnail = vi.fn((value: Workflow) =>
+      value.id === first.id ? (
+        <img
+          src="data:image/gif;base64,R0lGODlhAQABAAAAACw="
+          alt="First preview"
+        />
+      ) : undefined,
+    );
+    render(
+      <WorkflowLibrary
+        workflows={[first, second]}
+        onCreate={() => Promise.resolve()}
+        onOpen={() => undefined}
+        onDuplicate={() => Promise.resolve()}
+        onDelete={() => Promise.resolve()}
+        onReorder={() => Promise.resolve()}
+        onExport={() => Promise.resolve()}
+        onImport={() => Promise.resolve()}
+        renderThumbnail={renderThumbnail}
+      />,
+    );
+
+    expect(screen.getByAltText('First preview')).toBeVisible();
+    expect(screen.getByTestId('workflow-thumbnail-second')).toHaveClass(
+      'workflow-list__thumbnail--fallback',
+    );
+    expect(renderThumbnail).toHaveBeenCalledTimes(2);
   });
 
   test.each([
@@ -170,6 +344,7 @@ describe('WorkflowLibrary', () => {
     const quickOne = quickWorkflow('quick-1', 'Quick one');
     const quickTwo = quickWorkflow('quick-2', 'Quick two');
     const { onReorder } = setup([detailed, quickOne, quickTwo]);
+    await openActions(user, 'Quick one');
     await user.click(
       screen.getByRole('button', { name: 'Move Quick one down' }),
     );
@@ -198,6 +373,7 @@ describe('WorkflowLibrary', () => {
     const deepWork = workflow('workflow-1', 'Deep work');
     const { onDelete } = setup([deepWork]);
 
+    await openActions(user, 'Deep work');
     await user.click(screen.getByRole('button', { name: 'Delete Deep work' }));
     expect(
       screen.getByRole('dialog', { name: 'Delete Deep work?' }),
@@ -205,6 +381,7 @@ describe('WorkflowLibrary', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onDelete).not.toHaveBeenCalled();
 
+    await openActions(user, 'Deep work');
     await user.click(screen.getByRole('button', { name: 'Delete Deep work' }));
     await user.click(screen.getByRole('button', { name: 'Delete workflow' }));
 
@@ -217,6 +394,7 @@ describe('WorkflowLibrary', () => {
     const second = workflow('workflow-2', 'Reading');
     const { onReorder } = setup([first, second]);
 
+    await openActions(user, 'Deep work');
     expect(
       screen.getByRole('button', { name: 'Move Deep work up' }),
     ).toBeDisabled();
@@ -233,7 +411,6 @@ describe('WorkflowLibrary', () => {
     const onDuplicate = vi.fn(() =>
       Promise.reject(new Error('Storage failed.')),
     );
-    setup([deepWork]);
     render(
       <WorkflowLibrary
         workflows={[deepWork]}
@@ -244,6 +421,8 @@ describe('WorkflowLibrary', () => {
         onReorder={() => Promise.resolve()}
       />,
     );
+
+    await openActions(user, 'Deep work');
 
     const duplicateButtons = screen.getAllByRole('button', {
       name: 'Duplicate Deep work',

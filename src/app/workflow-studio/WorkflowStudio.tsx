@@ -10,7 +10,7 @@ import {
   type AssetRoleChangePreview,
   createAssetId,
 } from '@/features/assets';
-import { AssetLibrary } from '@/features/assets/studio';
+import { AssetLibrary, AssetPreview } from '@/features/assets/studio';
 import type { Settings } from '@/features/settings';
 import { SettingsPage } from '@/features/settings/studio';
 import { Button, Dialog, Icon, type IconName } from '@/shared';
@@ -36,6 +36,7 @@ import {
 
 import { WorkflowStudioShell } from './WorkflowStudioShell';
 import type { WorkflowStudioNavigationOrientation } from './WorkflowStudioShell';
+import { resolveWorkflowPreviewAsset } from './resolveWorkflowPreviewAsset';
 
 export type WorkflowStudioSnapshot = Readonly<{
   workflows: readonly Workflow[];
@@ -491,7 +492,8 @@ export function WorkflowStudio({
             {operationError}
           </p>
         )}
-        {editorContext ? null : (
+        {editorContext ||
+        (activeTab === 'workflows' && workflowLibraryOpen) ? null : (
           <header className="workflow-studio-shell__page-header">
             <h1>{managementHeading.title}</h1>
             <p>{managementHeading.detail}</p>
@@ -544,6 +546,25 @@ export function WorkflowStudio({
                 onReorder={async (ids) => {
                   await dependencies.reorderWorkflows(ids);
                   await load(selectedWorkflowId);
+                }}
+                onExport={(id) => dependencies.exportWorkflow(id)}
+                onImport={async (file) => {
+                  await dependencies.importWorkflow(file);
+                  await reloadSnapshot();
+                }}
+                renderThumbnail={(workflow) => {
+                  const asset = resolveWorkflowPreviewAsset(
+                    workflow,
+                    snapshot.assets,
+                  );
+                  return asset === undefined ? undefined : (
+                    <AssetPreview
+                      asset={asset}
+                      loadBlob={dependencies.loadAssetBlob}
+                      createObjectUrl={dependencies.createObjectUrl}
+                      revokeObjectUrl={dependencies.revokeObjectUrl}
+                    />
+                  );
                 }}
               />
             </aside>

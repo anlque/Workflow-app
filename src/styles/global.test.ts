@@ -413,14 +413,29 @@ describe('visual foundation', () => {
       declarationsFor(".settings-page input[type='range']:disabled"),
     ).toContain('opacity: 0.52;');
     expect(declarationsFor('.workflow-list__metadata')).toContain(
-      'display: flex;',
+      'display: grid;',
     );
-    expect(declarationsFor('.workflow-list__open span')).toContain(
-      'color: var(--color-ink-muted);',
+    expect(declarationsFor('.workflow-list__item')).toContain(
+      'grid-template-columns: 3.75rem minmax(20rem, 1fr) auto;',
     );
-    expect(
-      declarationsFor('.workflow-list__open span.workflow-list__open-label'),
-    ).toContain('color: var(--color-primary);');
+    expect(declarationsFor('.workflow-list__thumbnail')).toContain(
+      'height: 3.75rem;',
+    );
+    expect(declarationsFor('.workflow-library__search:focus-within')).toContain(
+      'outline: 3px solid var(--color-focus);',
+    );
+    expect(declarationsFor('.workflow-library__toolbar')).toContain(
+      'grid-template-columns: minmax(0, 19rem) minmax(0, 1fr);',
+    );
+    expect(declarationsFor('.workflow-library__sort > span')).toContain(
+      'flex: 0 0 auto;',
+    );
+    expect(declarationsFor('.workflow-library__sort > span')).toContain(
+      'white-space: nowrap;',
+    );
+    expect(declarationsFor('.workflow-list__overflow')).toContain(
+      'position: absolute;',
+    );
     expect(stylesheet).toMatch(
       /@media \(max-width: 52rem\)[\s\S]*?\.asset-library__workspace\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/u,
     );

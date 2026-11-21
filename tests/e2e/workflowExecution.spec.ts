@@ -121,6 +121,84 @@ test('loads every MVP extension surface in an isolated profile', async ({
   ).toBeVisible();
 });
 
+test('keeps Workflow discovery and primary actions operable at narrow widths', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.goto(extensionUrls.options);
+  const back = options.getByRole('button', { name: 'Back to workflows' });
+  await expect(back).toBeVisible();
+  await back.click();
+
+  await expect(
+    options.getByRole('searchbox', { name: 'Search workflows' }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('combobox', { name: 'Sort workflows' }),
+  ).toHaveValue('manual');
+  const fileChooserPromise = options.waitForEvent('filechooser');
+  await options
+    .getByRole('button', { name: 'Import workflow', exact: true })
+    .click();
+  await fileChooserPromise;
+
+  const rows = options.locator('.workflow-list__item');
+  expect(await rows.count()).toBeGreaterThan(0);
+  const firstRow = rows.first();
+  await expect(firstRow.locator('.workflow-list__thumbnail')).toBeVisible();
+  await expect(firstRow.locator('.workflow-list__metadata')).toContainText(
+    /(?:sec|min|hr)/u,
+  );
+  const name = await firstRow.getAttribute('aria-label');
+  if (name === null) throw new Error('Workflow row name is unavailable.');
+
+  const downloadPromise = options.waitForEvent('download');
+  await options.getByRole('button', { name: `Export ${name}` }).click();
+  await downloadPromise;
+
+  const detailedRows = options
+    .getByRole('group', { name: 'Detailed' })
+    .locator('.workflow-list__item');
+  expect(await detailedRows.count()).toBeGreaterThan(1);
+  const movedName = await detailedRows.nth(1).getAttribute('aria-label');
+  if (movedName === null)
+    throw new Error('Reorder target name is unavailable.');
+  await options
+    .getByRole('button', { name: `More actions for ${movedName}` })
+    .click();
+  await options.getByRole('button', { name: `Move ${movedName} up` }).click();
+  await expect(detailedRows.first()).toHaveAttribute('aria-label', movedName);
+
+  await options
+    .getByRole('searchbox', { name: 'Search workflows' })
+    .fill(name.toUpperCase());
+  await expect(options.locator('.workflow-list__item')).toHaveCount(1);
+  await options.getByRole('searchbox', { name: 'Search workflows' }).fill('');
+  await options
+    .getByRole('combobox', { name: 'Sort workflows' })
+    .selectOption('name-asc');
+  await options
+    .getByRole('button', { name: `More actions for ${name}` })
+    .click();
+  await expect(
+    options.getByRole('button', { name: `Duplicate ${name}` }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('button', { name: `Delete ${name}` }),
+  ).toBeVisible();
+  await expect(
+    options.getByRole('button', { name: `Move ${name} up` }),
+  ).toHaveCount(0);
+
+  await options.setViewportSize({ width: 640, height: 720 });
+  const open = options.getByRole('button', { name: `Open ${name}` });
+  await expect(open).toBeVisible();
+  expect(
+    await options.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(640);
+});
+
 test('creates, reopens and starts a Quick Workflow', async ({
   context,
   extensionUrls,
@@ -148,8 +226,8 @@ test('creates, reopens and starts a Quick Workflow', async ({
     '30',
   );
   await expect(
-    options.getByRole('heading', { name: 'Quick setup' }),
-  ).toBeVisible();
+    options.getByRole('button', { name: 'Convert to detailed' }),
+  ).toHaveText('Quick setup');
   await options.setViewportSize({ width: 640, height: 700 });
   const saveButton = options.getByRole('button', { name: 'Save workflow' });
   expect(
@@ -520,6 +598,9 @@ test('embeds Workflow Studio over idle and active Focus without navigation', asy
   await focus.getByRole('button', { name: 'Save workflow' }).click();
   await expect(focus.getByRole('status')).toHaveText('Workflow saved');
   await focus.getByRole('button', { name: 'Back to workflows' }).click();
+  await focus
+    .getByRole('button', { name: 'More actions for Embedded focus' })
+    .click();
   await focus.getByRole('button', { name: 'Delete Embedded focus' }).click();
   await expect(
     focus.getByRole('dialog', { name: 'Delete Embedded focus?' }),

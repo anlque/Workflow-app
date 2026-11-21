@@ -197,6 +197,55 @@ describe('WorkflowStudio', () => {
     );
   });
 
+  test('connects page import and per-row export to the existing package operations', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'package-workflow',
+      name: 'Package workflow',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    const load = vi.fn(() =>
+      Promise.resolve({
+        workflows: [workflow],
+        assets: [],
+        settings: defaultSettings,
+      }),
+    );
+    const exportWorkflow = vi.fn(() => Promise.resolve());
+    const importWorkflow = vi.fn(() => Promise.resolve());
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load,
+          exportWorkflow,
+          importWorkflow,
+        })}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Back to workflows' }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Export Package workflow' }),
+    );
+    expect(exportWorkflow).toHaveBeenCalledWith(workflow.id);
+
+    const importInput = screen
+      .getAllByLabelText('Import workflow file')
+      .find((input) => input.closest('[hidden]') === null);
+    expect(importInput).toBeDefined();
+    if (importInput === undefined) return;
+    await user.upload(
+      importInput,
+      new File(['{}'], 'workflow.json', { type: 'application/json' }),
+    );
+    expect(importWorkflow).toHaveBeenCalledOnce();
+    await waitFor(() => {
+      expect(load).toHaveBeenCalledTimes(2);
+    });
+  });
+
   test('orders editor status and actions according to the contextual hierarchy', async () => {
     const user = userEvent.setup();
     const workflow = createWorkflow({
@@ -581,12 +630,17 @@ describe('WorkflowStudio', () => {
         if (operation === 'settings update') {
           await user.click(screen.getByRole('radio', { name: 'Dark' }));
         } else {
+          const importLabel =
+            operation === 'settings import'
+              ? 'Import settings file'
+              : 'Import workflow file';
+          const importInput = screen
+            .getAllByLabelText(importLabel)
+            .find((input) => input.closest('[hidden]') === null);
+          expect(importInput).toBeDefined();
+          if (importInput === undefined) return;
           await user.upload(
-            screen.getByLabelText(
-              operation === 'settings import'
-                ? 'Import settings file'
-                : 'Import workflow file',
-            ),
+            importInput,
             new File(['{}'], 'package.json', { type: 'application/json' }),
           );
         }
@@ -1527,6 +1581,52 @@ describe('WorkflowStudio', () => {
     expect(deps.loadAssetBlob).toHaveBeenCalledTimes(2);
     expect(deps.createObjectUrl).toHaveBeenCalledTimes(2);
     expect(deps.revokeObjectUrl).not.toHaveBeenCalled();
+  });
+
+  test('composes Workflow thumbnails and revokes their object URLs when rows disappear', async () => {
+    const user = userEvent.setup();
+    const workflow = createWorkflow({
+      id: 'preview-workflow',
+      name: 'Forest focus',
+      phases: [
+        {
+          type: 'focus',
+          durationSeconds: 60,
+          environment: {
+            backgroundAsset: { type: 'direct', assetId: imageAsset.id },
+          },
+        },
+      ],
+    });
+    const revokeObjectUrl = vi.fn();
+    const deps = dependencies({
+      load: () =>
+        Promise.resolve({
+          workflows: [workflow],
+          assets: [imageAsset],
+          settings: defaultSettings,
+        }),
+      loadAssetBlob: vi.fn(() => Promise.resolve(new Blob(['image']))),
+      createObjectUrl: vi.fn(() => 'blob:workflow-preview'),
+      revokeObjectUrl,
+    });
+
+    render(<WorkflowStudio dependencies={deps} />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Back to workflows' }),
+    );
+    expect(
+      await screen.findByRole('img', { name: 'Preview of Image' }),
+    ).toHaveAttribute('src', 'blob:workflow-preview');
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search workflows' }),
+      'missing',
+    );
+
+    await waitFor(() => {
+      expect(revokeObjectUrl).toHaveBeenCalledWith('blob:workflow-preview');
+    });
   });
 
   test('shows theme and motion changes received from another document', async () => {
