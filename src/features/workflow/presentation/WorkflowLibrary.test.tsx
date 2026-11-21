@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { createWorkflow, type Workflow } from '@/features/workflow';
@@ -368,10 +369,13 @@ describe('WorkflowLibrary', () => {
     expect(onStart).toHaveBeenCalledWith(deepWork.id);
   });
 
-  test('confirms deletion and supports cancellation', async () => {
+  test('returns focus to the closed overflow trigger after cancelling deletion', async () => {
     const user = userEvent.setup();
     const deepWork = workflow('workflow-1', 'Deep work');
     const { onDelete } = setup([deepWork]);
+    const trigger = screen.getByRole('button', {
+      name: 'More actions for Deep work',
+    });
 
     await openActions(user, 'Deep work');
     await user.click(screen.getByRole('button', { name: 'Delete Deep work' }));
@@ -379,13 +383,93 @@ describe('WorkflowLibrary', () => {
       screen.getByRole('dialog', { name: 'Delete Deep work?' }),
     ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
     expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  test('returns focus to the closed overflow trigger after Escape', async () => {
+    const user = userEvent.setup();
+    setup([workflow('workflow-1', 'Deep work')]);
+    const trigger = screen.getByRole('button', {
+      name: 'More actions for Deep work',
+    });
+
+    await openActions(user, 'Deep work');
+    await user.click(screen.getByRole('button', { name: 'Delete Deep work' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Deep work?' });
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
+  });
+
+  test('moves focus to the stable create control after successful deletion', async () => {
+    const user = userEvent.setup();
+    const deepWork = workflow('workflow-1', 'Deep work');
+    const onDelete = vi.fn<(id: Workflow['id']) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    function DeletionHarness() {
+      const [workflows, setWorkflows] = useState<readonly Workflow[]>([
+        deepWork,
+      ]);
+      return (
+        <WorkflowLibrary
+          workflows={workflows}
+          onCreate={() => Promise.resolve()}
+          onOpen={() => undefined}
+          onDuplicate={() => Promise.resolve()}
+          onDelete={async (id) => {
+            await onDelete(id);
+            setWorkflows([]);
+          }}
+          onReorder={() => Promise.resolve()}
+        />
+      );
+    }
+    render(<DeletionHarness />);
 
     await openActions(user, 'Deep work');
     await user.click(screen.getByRole('button', { name: 'Delete Deep work' }));
     await user.click(screen.getByRole('button', { name: 'Delete workflow' }));
 
     expect(onDelete).toHaveBeenCalledWith(deepWork.id);
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Create workflow' }),
+      ).toHaveFocus();
+    });
+  });
+
+  test('keeps a failed deletion open with focus inside the dialog', async () => {
+    const user = userEvent.setup();
+    const deepWork = workflow('workflow-1', 'Deep work');
+    const onDelete = vi.fn(() => Promise.reject(new Error('Delete failed.')));
+    render(
+      <WorkflowLibrary
+        workflows={[deepWork]}
+        onCreate={() => Promise.resolve()}
+        onOpen={() => undefined}
+        onDuplicate={() => Promise.resolve()}
+        onDelete={onDelete}
+        onReorder={() => Promise.resolve()}
+      />,
+    );
+
+    await openActions(user, 'Deep work');
+    await user.click(screen.getByRole('button', { name: 'Delete Deep work' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Deep work?' });
+    await user.click(screen.getByRole('button', { name: 'Delete workflow' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Delete failed.',
+    );
+    expect(dialog).toBeVisible();
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
   });
 
   test('moves Workflows with complete ordered identifiers', async () => {

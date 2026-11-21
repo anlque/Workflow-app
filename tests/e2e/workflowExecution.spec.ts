@@ -609,6 +609,11 @@ test('embeds Workflow Studio over idle and active Focus without navigation', asy
   await expect(
     focus.getByRole('dialog', { name: 'Delete Embedded focus?' }),
   ).toHaveCount(0);
+  await expect(
+    focus.getByRole('button', {
+      name: 'More actions for Embedded focus',
+    }),
+  ).toBeFocused();
   await expect(overlay).toBeVisible();
   await focus.getByRole('button', { name: 'Close Workflow Studio' }).click();
   await expect(

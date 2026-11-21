@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 import { Button, Dialog, Icon, Select } from '@/shared';
 
@@ -60,7 +60,20 @@ export function WorkflowLibrary({
   const [sort, setSort] = useState<WorkflowSort>('manual');
   const [error, setError] = useState<string | null>(null);
   const importInput = useRef<HTMLInputElement>(null);
+  const createWorkflowTrigger = useRef<HTMLButtonElement>(null);
   const overflowTriggers = useRef(new Map<WorkflowId, HTMLButtonElement>());
+  const deleteTrigger = useRef<HTMLButtonElement | null>(null);
+  const pendingDeleteFocus = useRef<
+    { type: 'create' } | { type: 'trigger'; element: HTMLButtonElement } | null
+  >(null);
+
+  useLayoutEffect(() => {
+    if (deleting !== null || pendingDeleteFocus.current === null) return;
+    const target = pendingDeleteFocus.current;
+    pendingDeleteFocus.current = null;
+    if (target.type === 'create') createWorkflowTrigger.current?.focus();
+    else if (target.element.isConnected) target.element.focus();
+  }, [deleting]);
 
   async function perform(key: string, action: () => Promise<void>) {
     setError(null);
@@ -101,6 +114,14 @@ export function WorkflowLibrary({
     return ids;
   }
 
+  function dismissDeleteDialog() {
+    const trigger = deleteTrigger.current;
+    if (trigger !== null) {
+      pendingDeleteFocus.current = { type: 'trigger', element: trigger };
+    }
+    setDeleting(null);
+  }
+
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const groups = (['quick', 'detailed'] as const).flatMap((mode) => {
     const values = workflows
@@ -127,6 +148,7 @@ export function WorkflowLibrary({
 
   const createButton = (label: string) => (
     <Button
+      buttonRef={createWorkflowTrigger}
       variant="primary"
       onClick={() => {
         setChoosingMode(true);
@@ -243,15 +265,7 @@ export function WorkflowLibrary({
           <p>Choose a rhythm or shape a new one.</p>
         </div>
         <div className="workflow-library__page-actions">
-          <Button
-            variant="primary"
-            onClick={() => {
-              setChoosingMode(true);
-            }}
-          >
-            <Icon name="addCircle" size={18} />
-            New workflow
-          </Button>
+          {createButton('New workflow')}
           {importControl}
         </div>
       </div>
@@ -484,6 +498,8 @@ export function WorkflowLibrary({
                           aria-label={`Delete ${workflow.name}`}
                           disabled={externallyBusy}
                           onClick={() => {
+                            deleteTrigger.current =
+                              overflowTriggers.current.get(workflow.id) ?? null;
                             setOpenActionsId(null);
                             setDeleting(workflow);
                           }}
@@ -503,9 +519,7 @@ export function WorkflowLibrary({
       <Dialog
         open={deleting !== null}
         title={`Delete ${deleting?.name ?? 'Workflow'}?`}
-        onCancel={() => {
-          setDeleting(null);
-        }}
+        onCancel={dismissDeleteDialog}
       >
         <p>This removes the Workflow. Shared Assets remain in your library.</p>
         {error === null ? null : (
@@ -514,12 +528,7 @@ export function WorkflowLibrary({
           </p>
         )}
         <div className="dialog__actions">
-          <Button
-            variant="quiet"
-            onClick={() => {
-              setDeleting(null);
-            }}
-          >
+          <Button variant="quiet" onClick={dismissDeleteDialog}>
             Cancel
           </Button>
           <Button
@@ -534,7 +543,10 @@ export function WorkflowLibrary({
               void perform(`delete:${target.id}`, () =>
                 onDelete(target.id),
               ).then((succeeded) => {
-                if (succeeded) setDeleting(null);
+                if (succeeded) {
+                  pendingDeleteFocus.current = { type: 'create' };
+                  setDeleting(null);
+                }
               });
             }}
           >
