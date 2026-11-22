@@ -446,3 +446,106 @@ test('system reduced motion responds without reload', async ({
     'reduce',
   );
 });
+
+test('Settings uses the approved cards and keeps Workflow packages in the library', async ({
+  page,
+  extensionUrls,
+}) => {
+  await page.setViewportSize({ width: 1512, height: 1134 });
+  await page.goto(extensionUrls.options);
+  await page.getByRole('tab', { name: 'Settings' }).click();
+
+  for (const name of ['Appearance', 'Audio', 'Controls', 'Application data']) {
+    await expect(page.getByRole('group', { name })).toBeVisible();
+  }
+  const settingsPanel = page.locator('#panel-settings');
+  await expect(page.getByRole('radiogroup', { name: 'Theme' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Export workflow' }),
+  ).toHaveCount(0);
+  await expect(settingsPanel.getByLabel('Import workflow file')).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Export settings' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Import settings file')).toBeAttached();
+
+  const desktopGeometry = await page.locator('.settings-page').evaluate(() => {
+    const bounds = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (element === null) throw new Error(`Missing ${selector}`);
+      const box = element.getBoundingClientRect();
+      return {
+        top: box.top,
+        right: box.right,
+        bottom: box.bottom,
+        left: box.left,
+      };
+    };
+    return {
+      viewportHeight: innerHeight,
+      appearance: bounds('[aria-labelledby="settings-appearance-title"]'),
+      theme: bounds('.settings-theme-options'),
+      motion: bounds('.settings-motion-control'),
+      application: bounds('[aria-labelledby="settings-data-title"]'),
+      exportAction: bounds('.settings-application-action:first-child'),
+      importAction: bounds('.settings-application-action:last-child'),
+    };
+  });
+  expect(desktopGeometry.theme.top).toBeLessThan(
+    desktopGeometry.appearance.bottom,
+  );
+  expect(desktopGeometry.motion.top).toBe(desktopGeometry.theme.top);
+  expect(desktopGeometry.importAction.left).toBeGreaterThan(
+    desktopGeometry.exportAction.left,
+  );
+  expect(desktopGeometry.application.bottom).toBeLessThanOrEqual(
+    desktopGeometry.viewportHeight,
+  );
+
+  await page.getByRole('tab', { name: 'Workflows' }).click();
+  await page.getByRole('button', { name: 'Back to workflows' }).click();
+  await expect(page.getByLabel('Import workflow file')).toBeAttached();
+
+  await page.setViewportSize({ width: 756, height: 567 });
+  await page.getByRole('tab', { name: 'Settings' }).click();
+  const bounds = await page.locator('.settings-card').evaluateAll((cards) =>
+    cards.map((card) => {
+      const box = card.getBoundingClientRect();
+      return { left: box.left, right: box.right };
+    }),
+  );
+  for (const box of bounds) {
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(756);
+  }
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  const narrowActions = await page
+    .locator('.settings-application-action')
+    .evaluateAll((actions) =>
+      actions.map((action) => {
+        const box = action.getBoundingClientRect();
+        return {
+          top: box.top,
+          right: box.right,
+          bottom: box.bottom,
+          left: box.left,
+        };
+      }),
+    );
+  expect(narrowActions).toHaveLength(2);
+  expect(narrowActions[1]?.top).toBeGreaterThanOrEqual(
+    narrowActions[0]?.bottom ?? 0,
+  );
+  for (const box of narrowActions) {
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(756);
+  }
+  await expect(page.getByRole('checkbox', { name: 'Music on' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Export settings' }),
+  ).toBeVisible();
+});

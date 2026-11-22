@@ -282,6 +282,16 @@ describe('WorkflowStudio', () => {
     await waitFor(() => {
       expect(load).toHaveBeenCalledTimes(2);
     });
+
+    await user.click(screen.getByRole('tab', { name: 'Settings' }));
+    expect(
+      screen.getByRole('button', { name: 'Export settings' }),
+    ).toBeVisible();
+    expect(
+      screen
+        .queryAllByLabelText('Import workflow file')
+        .find((input) => input.closest('[hidden]') === null),
+    ).toBeUndefined();
   });
 
   test('orders editor status and actions according to the contextual hierarchy', async () => {
@@ -601,12 +611,7 @@ describe('WorkflowStudio', () => {
     },
   );
 
-  test.each([
-    'asset import',
-    'settings update',
-    'settings import',
-    'workflow import',
-  ] as const)(
+  test.each(['asset import', 'settings update', 'settings import'] as const)(
     'keeps a new Detailed editor identity across an authoritative %s refresh',
     async (operation) => {
       const user = userEvent.setup();
@@ -668,12 +673,8 @@ describe('WorkflowStudio', () => {
         if (operation === 'settings update') {
           await user.click(screen.getByRole('radio', { name: 'Dark' }));
         } else {
-          const importLabel =
-            operation === 'settings import'
-              ? 'Import settings file'
-              : 'Import workflow file';
           const importInput = screen
-            .getAllByLabelText(importLabel)
+            .getAllByLabelText('Import settings file')
             .find((input) => input.closest('[hidden]') === null);
           expect(importInput).toBeDefined();
           if (importInput === undefined) return;

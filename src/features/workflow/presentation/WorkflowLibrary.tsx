@@ -59,6 +59,7 @@ export function WorkflowLibrary({
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<WorkflowSort>('manual');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const createWorkflowTrigger = useRef<HTMLButtonElement>(null);
   const overflowTriggers = useRef(new Map<WorkflowId, HTMLButtonElement>());
@@ -75,11 +76,17 @@ export function WorkflowLibrary({
     else if (target.element.isConnected) target.element.focus();
   }, [deleting]);
 
-  async function perform(key: string, action: () => Promise<void>) {
+  async function perform(
+    key: string,
+    action: () => Promise<void>,
+    successMessage?: string,
+  ) {
     setError(null);
+    setSuccess(null);
     setPendingAction(key);
     try {
       await action();
+      if (successMessage !== undefined) setSuccess(successMessage);
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The action failed.');
@@ -179,7 +186,11 @@ export function WorkflowLibrary({
           onChange={(event) => {
             const file = event.currentTarget.files?.[0];
             if (file !== undefined) {
-              void perform('import', () => onImport(file));
+              void perform(
+                'import',
+                () => onImport(file),
+                'Workflow imported.',
+              );
             }
             event.currentTarget.value = '';
           }}
@@ -249,6 +260,7 @@ export function WorkflowLibrary({
           </p>
         </div>
         {error === null ? null : <p role="alert">{error}</p>}
+        {success === null ? null : <p role="status">{success}</p>}
         {createDialog}
       </section>
     );
@@ -305,6 +317,11 @@ export function WorkflowLibrary({
       {error === null || deleting !== null ? null : (
         <p className="feedback feedback--error" role="alert">
           {error}
+        </p>
+      )}
+      {success === null ? null : (
+        <p className="feedback feedback--success" role="status">
+          {success}
         </p>
       )}
       {groups.length === 0 ? <p>No Workflows match your search.</p> : null}
@@ -408,8 +425,10 @@ export function WorkflowLibrary({
                         pending={pendingAction === `export:${workflow.id}`}
                         pendingLabel="Exporting…"
                         onClick={() =>
-                          void perform(`export:${workflow.id}`, () =>
-                            onExport(workflow.id),
+                          void perform(
+                            `export:${workflow.id}`,
+                            () => onExport(workflow.id),
+                            'Workflow exported.',
                           )
                         }
                       >

@@ -277,6 +277,29 @@ describe('WorkflowLibrary', () => {
     ).toBeVisible();
   });
 
+  test('announces successful import and export while allowing the same file again', async () => {
+    const user = userEvent.setup();
+    const deepWork = workflow('workflow-1', 'Deep work');
+    const callbacks = setup([deepWork]);
+    const file = new File(['{}'], 'workflow.json', {
+      type: 'application/json',
+    });
+    const input = screen.getByLabelText('Import workflow file');
+
+    await user.upload(input, file);
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Workflow imported.',
+    );
+    await user.upload(input, file);
+    expect(callbacks.onImport).toHaveBeenCalledTimes(2);
+
+    await user.click(screen.getByRole('button', { name: 'Export Deep work' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Workflow exported.',
+    );
+    expect(callbacks.onExport).toHaveBeenCalledWith(deepWork.id);
+  });
+
   test('renders injected thumbnails with a neutral fallback', () => {
     const first = workflow('first', 'First');
     const second = workflow('second', 'Second');

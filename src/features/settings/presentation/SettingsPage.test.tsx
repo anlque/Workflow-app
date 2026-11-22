@@ -23,8 +23,6 @@ function setup(
     onUpdate(settings: Settings): Promise<void>;
     onExportSettings(): Promise<void>;
     onImportSettings(file: File): Promise<void>;
-    onExportWorkflow(): Promise<void>;
-    onImportWorkflow(file: File): Promise<void>;
   }> = {},
 ) {
   const props = {
@@ -36,12 +34,6 @@ function setup(
     ),
     onImportSettings: vi.fn<(file: File) => Promise<void>>(
       overrides.onImportSettings ?? (() => Promise.resolve()),
-    ),
-    onExportWorkflow: vi.fn(
-      overrides.onExportWorkflow ?? (() => Promise.resolve()),
-    ),
-    onImportWorkflow: vi.fn<(file: File) => Promise<void>>(
-      overrides.onImportWorkflow ?? (() => Promise.resolve()),
     ),
   };
   render(<SettingsPage settings={settings} {...props} />);
@@ -184,7 +176,7 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('combobox')).toBeNull();
   });
 
-  test('uses approved management controls without changing existing setting semantics', () => {
+  test('uses four icon-led cards without changing existing setting semantics', () => {
     setup();
 
     expect(
@@ -198,10 +190,43 @@ describe('SettingsPage', () => {
     expect(
       screen.getByRole('checkbox', { name: 'Pause or resume with Space' }),
     ).toBeChecked();
-    expect(screen.getByRole('group', { name: 'Workflow data' })).toBeVisible();
-    expect(
-      screen.getByRole('group', { name: 'Application settings' }),
-    ).toBeVisible();
+    for (const name of [
+      'Appearance',
+      'Audio',
+      'Controls',
+      'Application data',
+    ]) {
+      const card = screen.getByRole('group', { name });
+      expect(card).toHaveClass('settings-card');
+      expect(card.querySelector('.settings-card__icon svg')).not.toBeNull();
+      expect(card.querySelector(':scope > legend')).toBeNull();
+      expect(
+        card.querySelector(':scope > .settings-card__header h3'),
+      ).toHaveTextContent(name);
+      expect(
+        card.querySelector(':scope > .settings-card__divider'),
+      ).not.toBeNull();
+    }
+    expect(screen.queryByRole('group', { name: 'Workflow data' })).toBeNull();
+  });
+
+  test('renders accessible theme preview cards with the approved starter backgrounds', () => {
+    setup();
+
+    const theme = screen.getByRole('radiogroup', { name: 'Theme' });
+    expect(within(theme).getByRole('radio', { name: 'System' })).toBeChecked();
+    expect(theme.querySelectorAll('.settings-theme-option')).toHaveLength(3);
+    expect(theme.querySelector('.settings-theme-option--system')).toHaveStyle({
+      '--settings-theme-preview':
+        "url('/seed/backgrounds/mosswood-canopy.webp')",
+    });
+    expect(theme.querySelector('.settings-theme-option--light')).toHaveStyle({
+      '--settings-theme-preview':
+        "url('/seed/backgrounds/rainlit-window.webp')",
+    });
+    expect(theme.querySelector('.settings-theme-option--dark')).toHaveStyle({
+      '--settings-theme-preview': "url('/seed/backgrounds/deep-tide.webp')",
+    });
   });
 
   test('disables every slider while a preference update is pending', async () => {
@@ -234,6 +259,12 @@ describe('SettingsPage', () => {
     expect(
       appearance.querySelector('.settings-appearance-grid'),
     ).not.toBeNull();
+    expect(
+      appearance.querySelector('.settings-appearance-primary'),
+    ).not.toBeNull();
+    expect(
+      appearance.querySelector('.settings-appearance-ranges'),
+    ).not.toBeNull();
     expect(audioGroup.querySelector('.settings-audio-rows')).not.toBeNull();
     expect(audioGroup.querySelectorAll('.settings-audio-row')).toHaveLength(3);
     expect(audioGroup.querySelector('.form-grid')).toBeNull();
@@ -243,6 +274,7 @@ describe('SettingsPage', () => {
       }),
     ).toHaveAccessibleName('Mute cues with music');
     expect(within(audioGroup).getByText('Off')).toBeVisible();
+    expect(audioGroup).toHaveClass('settings-card--audio');
   });
 
   test('places audio feedback in the neutral preferences status area', async () => {
@@ -259,16 +291,20 @@ describe('SettingsPage', () => {
     ).not.toContainElement(status);
   });
 
-  test('runs separate Workflow and Settings exports with feedback', async () => {
+  test('offers only the Settings package data actions with accurate copy', async () => {
     const user = userEvent.setup();
-    const { onExportWorkflow, onExportSettings } = setup();
+    const { onExportSettings } = setup();
 
-    await user.click(screen.getByRole('button', { name: 'Export workflow' }));
-    expect(await screen.findByText('Workflow exported.')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Export workflow' }),
+    ).toBeNull();
+    expect(screen.queryByLabelText('Import workflow file')).toBeNull();
+    expect(
+      screen.getByText(/Workflows and Assets are not included/u),
+    ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Export settings' }));
     expect(await screen.findByText('Settings exported.')).toBeVisible();
 
-    expect(onExportWorkflow).toHaveBeenCalledOnce();
     expect(onExportSettings).toHaveBeenCalledOnce();
   });
 

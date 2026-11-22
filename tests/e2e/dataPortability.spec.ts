@@ -25,21 +25,22 @@ test('round-trips a selected Workflow package', async ({
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
   await createWorkflow(options, 'Portable focus');
-  await options.getByRole('tab', { name: 'Settings' }).click();
 
   const downloadPromise = options.waitForEvent('download');
-  await options.getByRole('button', { name: 'Export workflow' }).click();
+  await options.getByRole('button', { name: 'Export Portable focus' }).click();
   const download = await downloadPromise;
   const packagePath = await download.path();
+  await expect(options.getByRole('status')).toHaveText('Workflow exported.');
 
-  await options.getByRole('tab', { name: 'Workflows' }).click();
+  await options
+    .getByRole('button', { name: 'More actions for Portable focus' })
+    .click();
   await options.getByRole('button', { name: 'Delete Portable focus' }).click();
   await options.getByRole('button', { name: 'Delete workflow' }).click();
   await expect(
     options.getByRole('button', { name: 'Open Portable focus' }),
   ).toHaveCount(0);
 
-  await options.getByRole('tab', { name: 'Settings' }).click();
   await options.getByLabel('Import workflow file').setInputFiles(packagePath);
   await expect(options.getByText('Workflow imported.')).toBeVisible();
   await options.getByRole('tab', { name: 'Workflows' }).click();
@@ -83,7 +84,14 @@ test('renames imported Role collisions and keeps references inside the package',
       },
     ],
   });
-  await options.getByRole('tab', { name: 'Settings' }).click();
+  const back = options.getByRole('button', { name: 'Back to workflows' });
+  const importAction = options.getByRole('button', {
+    name: 'Import workflow',
+    exact: true,
+  });
+  await back.or(importAction).waitFor();
+  if (await back.isVisible()) await back.click();
+  await expect(importAction).toBeVisible();
   const input = options.getByLabel('Import workflow file');
   const file = {
     name: 'role-package.json',
@@ -95,15 +103,11 @@ test('renames imported Role collisions and keeps references inside the package',
   await input.setInputFiles(file);
   await expect(options.getByText('Workflow imported.')).toBeVisible();
 
-  await options.getByRole('tab', { name: 'Workflows' }).click();
-  await options.getByRole('button', { name: 'Back to workflows' }).click();
+  const downloadPromise = options.waitForEvent('download');
   await options
-    .getByRole('button', { name: 'Open Role package' })
+    .getByRole('button', { name: 'Export Role package' })
     .last()
     .click();
-  await options.getByRole('tab', { name: 'Settings' }).click();
-  const downloadPromise = options.waitForEvent('download');
-  await options.getByRole('button', { name: 'Export workflow' }).click();
   const path = await (await downloadPromise).path();
   const exported = JSON.parse(await readFile(path, 'utf8')) as {
     workflow: { phases: { environment: { backgroundAsset: unknown } }[] };
@@ -146,7 +150,6 @@ test('rejects a corrupt Workflow package without changing existing data', async 
   const options = await context.newPage();
   await options.goto(extensionUrls.options);
   await createWorkflow(options, 'Keep me');
-  await options.getByRole('tab', { name: 'Settings' }).click();
 
   await options.getByLabel('Import workflow file').setInputFiles({
     name: 'corrupt-workflow.json',

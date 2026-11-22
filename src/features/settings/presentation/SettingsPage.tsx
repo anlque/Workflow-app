@@ -1,6 +1,12 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+} from 'react';
 
-import { Button, SegmentedControl, Switch } from '@/shared';
+import { Button, Icon, SegmentedControl, Switch } from '@/shared';
 
 import type { Settings } from '../domain/Settings';
 
@@ -9,24 +15,57 @@ export type SettingsPageProps = Readonly<{
   onUpdate(settings: Settings): Promise<void>;
   onExportSettings(): Promise<void>;
   onImportSettings(file: File): Promise<void>;
-  onExportWorkflow(): Promise<void>;
-  onImportWorkflow(file: File): Promise<void>;
 }>;
 
-type Operation =
-  | 'preferences'
-  | 'export-settings'
-  | 'import-settings'
-  | 'export-workflow'
-  | 'import-workflow';
+type Operation = 'preferences' | 'export-settings' | 'import-settings';
+
+const themeOptions = [
+  {
+    value: 'system',
+    label: 'System',
+    image: '/seed/backgrounds/mosswood-canopy.webp',
+  },
+  {
+    value: 'light',
+    label: 'Light',
+    image: '/seed/backgrounds/rainlit-window.webp',
+  },
+  {
+    value: 'dark',
+    label: 'Dark',
+    image: '/seed/backgrounds/deep-tide.webp',
+  },
+] as const;
+
+function SettingsCardHeader({
+  id,
+  icon,
+  title,
+  description,
+}: Readonly<{
+  id: string;
+  icon: 'appearance' | 'sound' | 'tuning' | 'data';
+  title: string;
+  description: string;
+}>) {
+  return (
+    <header className="settings-card__header">
+      <span className="settings-card__icon" aria-hidden="true">
+        <Icon name={icon} />
+      </span>
+      <span className="settings-card__heading">
+        <h3 id={id}>{title}</h3>
+        <span>{description}</span>
+      </span>
+    </header>
+  );
+}
 
 export function SettingsPage({
   settings,
   onUpdate,
   onExportSettings,
   onImportSettings,
-  onExportWorkflow,
-  onImportWorkflow,
 }: SettingsPageProps) {
   const [pending, setPending] = useState<Operation | null>(null);
   const [ambientVolumeDraft, setAmbientVolumeDraft] = useState(
@@ -151,7 +190,7 @@ export function SettingsPage({
   }
 
   function importFile(
-    operation: 'import-settings' | 'import-workflow',
+    operation: 'import-settings',
     action: (file: File) => Promise<void>,
     success: string,
   ): (event: ChangeEvent<HTMLInputElement>) => void {
@@ -185,44 +224,78 @@ export function SettingsPage({
       </header>
       {status('preferences')}
 
-      <fieldset className="settings-group">
-        <legend>Appearance</legend>
+      <section
+        className="settings-group settings-card"
+        role="group"
+        aria-labelledby="settings-appearance-title"
+      >
+        <SettingsCardHeader
+          id="settings-appearance-title"
+          icon="appearance"
+          title="Appearance"
+          description="Choose a theme and customize interface motion."
+        />
+        <div className="settings-card__divider" />
         <div className="settings-appearance-grid">
-          <div className="settings-appearance-modes">
-            <SegmentedControl
-              label="Theme"
-              value={settings.theme}
-              options={[
-                { value: 'system', label: 'System' },
-                { value: 'light', label: 'Light' },
-                { value: 'dark', label: 'Dark' },
-              ]}
-              disabled={pending === 'preferences'}
-              onChange={(theme) => {
-                void perform(
-                  'preferences',
-                  () => onUpdate({ ...settings, theme }),
-                  'Theme updated.',
-                );
-              }}
-            />
-            <SegmentedControl
-              label="Reduced motion"
-              value={settings.reducedMotion}
-              options={[
-                { value: 'system', label: 'System' },
-                { value: 'reduce', label: 'Reduce motion' },
-                { value: 'no-preference', label: 'Allow motion' },
-              ]}
-              disabled={pending === 'preferences'}
-              onChange={(reducedMotion) => {
-                void perform(
-                  'preferences',
-                  () => onUpdate({ ...settings, reducedMotion }),
-                  'Motion preference updated.',
-                );
-              }}
-            />
+          <div className="settings-appearance-primary">
+            <fieldset className="settings-theme-options" role="radiogroup">
+              <legend>Theme</legend>
+              <div className="settings-theme-options__grid">
+                {themeOptions.map((option) => (
+                  <label
+                    key={option.value}
+                    className={`settings-theme-option settings-theme-option--${option.value}`}
+                    style={
+                      {
+                        '--settings-theme-preview': `url('${option.image}')`,
+                      } as CSSProperties
+                    }
+                  >
+                    <input
+                      type="radio"
+                      name="settings-theme"
+                      value={option.value}
+                      checked={settings.theme === option.value}
+                      disabled={pending === 'preferences'}
+                      onChange={() => {
+                        void perform(
+                          'preferences',
+                          () => onUpdate({ ...settings, theme: option.value }),
+                          'Theme updated.',
+                        );
+                      }}
+                    />
+                    <span
+                      className="settings-theme-option__preview"
+                      aria-hidden="true"
+                    />
+                    <span className="settings-theme-option__label">
+                      {option.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div className="settings-motion-control">
+              <strong>Motion</strong>
+              <SegmentedControl
+                label="Reduced motion"
+                value={settings.reducedMotion}
+                options={[
+                  { value: 'system', label: 'System' },
+                  { value: 'reduce', label: 'Reduce motion' },
+                  { value: 'no-preference', label: 'Allow motion' },
+                ]}
+                disabled={pending === 'preferences'}
+                onChange={(reducedMotion) => {
+                  void perform(
+                    'preferences',
+                    () => onUpdate({ ...settings, reducedMotion }),
+                    'Motion preference updated.',
+                  );
+                }}
+              />
+            </div>
           </div>
           <div className="settings-appearance-ranges">
             <label>
@@ -275,13 +348,25 @@ export function SettingsPage({
             </label>
           </div>
         </div>
-      </fieldset>
+      </section>
 
-      <fieldset className="settings-group">
-        <legend>Audio</legend>
-        <p>Control ambient music and interface cues independently.</p>
+      <section
+        className="settings-group settings-card settings-card--audio"
+        role="group"
+        aria-labelledby="settings-audio-title"
+      >
+        <SettingsCardHeader
+          id="settings-audio-title"
+          icon="sound"
+          title="Audio"
+          description="Control ambient music and interface cues independently."
+        />
+        <div className="settings-card__divider" />
         <div className="settings-audio-rows">
           <div className="settings-audio-row">
+            <span className="settings-audio-row__icon" aria-hidden="true">
+              <Icon name="music" />
+            </span>
             <span className="settings-audio-row__copy">
               <strong>Music</strong>
               <span>Ambient tracks during phases.</span>
@@ -328,6 +413,9 @@ export function SettingsPage({
             />
           </div>
           <div className="settings-audio-row">
+            <span className="settings-audio-row__icon" aria-hidden="true">
+              <Icon name="bell" />
+            </span>
             <span className="settings-audio-row__copy">
               <strong>Cues</strong>
               <span>Bells, rewards and completion sounds.</span>
@@ -374,6 +462,9 @@ export function SettingsPage({
             />
           </div>
           <div className="settings-audio-row settings-audio-row--switch-only">
+            <span className="settings-audio-row__icon" aria-hidden="true">
+              <Icon name="bellOff" />
+            </span>
             <span className="settings-audio-row__copy">
               <strong>Mute cues with music</strong>
               <span>Muting music also silences cues when enabled.</span>
@@ -399,98 +490,100 @@ export function SettingsPage({
             />
           </div>
         </div>
-      </fieldset>
+      </section>
 
-      <fieldset className="settings-group">
-        <legend>Controls</legend>
-        <Switch
-          label="Pause or resume with Space"
-          description="Use the Space key while Focus is active."
-          checked={settings.pauseWithSpace}
-          disabled={pending === 'preferences'}
-          onChange={(pauseWithSpace) => {
-            void perform(
-              'preferences',
-              () => onUpdate({ ...settings, pauseWithSpace }),
-              'Control preferences updated.',
-            );
-          }}
-        />
-      </fieldset>
-
-      <fieldset className="settings-group">
-        <legend>Workflow data</legend>
-        <p>Move the selected Workflow and its referenced local Assets.</p>
-        <div className="settings-actions">
-          <Button
-            variant="secondary"
-            pending={pending === 'export-workflow'}
-            pendingLabel="Exporting…"
-            onClick={() =>
-              void perform(
-                'export-workflow',
-                onExportWorkflow,
-                'Workflow exported.',
-              )
-            }
-          >
-            Export workflow
-          </Button>
-          <label className="button button--secondary asset-upload">
-            {pending === 'import-workflow' ? 'Importing…' : 'Import workflow'}
-            <input
-              type="file"
-              accept="application/json,.json"
-              aria-label="Import workflow file"
-              disabled={pending === 'import-workflow'}
-              onChange={importFile(
-                'import-workflow',
-                onImportWorkflow,
-                'Workflow imported.',
-              )}
+      <div className="settings-bottom-grid">
+        <section
+          className="settings-group settings-card settings-card--controls"
+          role="group"
+          aria-labelledby="settings-controls-title"
+        >
+          <SettingsCardHeader
+            id="settings-controls-title"
+            icon="tuning"
+            title="Controls"
+            description="Choose how keyboard shortcuts behave in Focus."
+          />
+          <div className="settings-card__divider" />
+          <div className="settings-controls-row">
+            <Switch
+              label="Pause or resume with Space"
+              description="Use the Space key while Focus is active."
+              checked={settings.pauseWithSpace}
+              disabled={pending === 'preferences'}
+              onChange={(pauseWithSpace) => {
+                void perform(
+                  'preferences',
+                  () => onUpdate({ ...settings, pauseWithSpace }),
+                  'Control preferences updated.',
+                );
+              }}
             />
-          </label>
-        </div>
-        {status('export-workflow')}
-        {status('import-workflow')}
-      </fieldset>
+          </div>
+        </section>
 
-      <fieldset className="settings-group">
-        <legend>Application settings</legend>
-        <p>Move theme and motion preferences without changing Workflows.</p>
-        <div className="settings-actions">
-          <Button
-            variant="secondary"
-            pending={pending === 'export-settings'}
-            pendingLabel="Exporting…"
-            onClick={() =>
-              void perform(
-                'export-settings',
-                onExportSettings,
-                'Settings exported.',
-              )
-            }
-          >
-            Export settings
-          </Button>
-          <label className="button button--secondary asset-upload">
-            {pending === 'import-settings' ? 'Importing…' : 'Import settings'}
-            <input
-              type="file"
-              accept="application/json,.json"
-              aria-label="Import settings file"
-              disabled={pending === 'import-settings'}
-              onChange={importFile(
-                'import-settings',
-                onImportSettings,
-                'Settings imported.',
-              )}
-            />
-          </label>
-        </div>
-        {status('export-settings')}
-        {status('import-settings')}
-      </fieldset>
+        <section
+          className="settings-group settings-card"
+          role="group"
+          aria-labelledby="settings-data-title"
+        >
+          <SettingsCardHeader
+            id="settings-data-title"
+            icon="data"
+            title="Application data"
+            description="Export or restore appearance, audio and control preferences. Workflows and Assets are not included."
+          />
+          <div className="settings-card__divider" />
+          <div className="settings-application-grid">
+            <div className="settings-application-action">
+              <strong>Export settings</strong>
+              <span>Save the current preferences as a local JSON package.</span>
+              <Button
+                variant="secondary"
+                pending={pending === 'export-settings'}
+                pendingLabel="Exporting…"
+                onClick={() =>
+                  void perform(
+                    'export-settings',
+                    onExportSettings,
+                    'Settings exported.',
+                  )
+                }
+              >
+                <Icon name="export" size={18} />
+                Export settings
+              </Button>
+            </div>
+            <div className="settings-application-action">
+              <strong>Import settings</strong>
+              <span>Restore a validated Locusora Settings package.</span>
+              <label className="button button--secondary asset-upload">
+                <Icon name="chooseFile" size={18} />
+                {pending === 'import-settings'
+                  ? 'Importing…'
+                  : 'Import settings'}
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  aria-label="Import settings file"
+                  disabled={pending === 'import-settings'}
+                  onChange={importFile(
+                    'import-settings',
+                    onImportSettings,
+                    'Settings imported.',
+                  )}
+                />
+              </label>
+            </div>
+          </div>
+          <p className="settings-privacy-note">
+            Settings remain local unless you choose to export them. Imported
+            files are validated before preferences change.
+          </p>
+          {status('export-settings')}
+          {status('import-settings')}
+        </section>
+      </div>
     </section>
   );
 }

@@ -421,11 +421,32 @@ describe('visual foundation', () => {
     expect(declarationsFor('.asset-item--audio')).toContain(
       'min-height: 3.5rem;',
     );
-    expect(declarationsFor('.settings-appearance-grid')).toContain(
-      'grid-template-columns: minmax(0, 1.35fr) minmax(15rem, 1fr);',
+    expect(declarationsFor('.settings-card__header')).toContain(
+      'display: flex;',
+    );
+    expect(declarationsFor('.settings-card__divider')).toContain(
+      'border-top: 1px solid var(--color-border);',
+    );
+    expect(declarationsFor('.settings-appearance-primary')).toContain(
+      'grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);',
+    );
+    expect(declarationsFor('.settings-appearance-ranges')).toContain(
+      'grid-template-columns: repeat(2, minmax(0, 1fr));',
+    );
+    expect(declarationsFor('.settings-theme-options__grid')).toContain(
+      'grid-template-columns: repeat(3, minmax(0, 1fr));',
+    );
+    expect(declarationsFor('.settings-theme-option__preview')).toContain(
+      'background-image:',
     );
     expect(declarationsFor('.settings-audio-row')).toContain(
-      'grid-template-columns: minmax(12rem, 1fr) minmax(15rem, 1.25fr) auto;',
+      'grid-template-columns: auto minmax(10rem, 1fr) minmax(13rem, 1fr) auto;',
+    );
+    expect(declarationsFor('.settings-card--audio')).toContain(
+      'background: var(--color-surface-muted);',
+    );
+    expect(declarationsFor('.settings-application-grid')).toContain(
+      'grid-template-columns: repeat(2, minmax(0, 1fr));',
     );
     expect(declarationsFor('.segmented-control label > span')).toContain(
       'white-space: nowrap;',

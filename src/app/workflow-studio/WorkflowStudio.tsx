@@ -336,7 +336,7 @@ export function WorkflowStudio({
       : activeTab === 'settings'
         ? {
             title: 'Application settings',
-            detail: 'Appearance, audio and data.',
+            detail: 'Appearance, audio, controls and data.',
           }
         : workflowLibraryOpen
           ? {
@@ -363,7 +363,7 @@ export function WorkflowStudio({
     activeTab === 'assets'
       ? { title: 'Asset Library', detail: 'Manage local images and audio.' }
       : activeTab === 'settings'
-        ? { title: 'Settings', detail: 'Appearance, audio and data.' }
+        ? { title: 'Settings', detail: 'Appearance, audio, controls and data.' }
         : {
             title: 'Workflows',
             detail: 'Choose or shape your next focus ritual.',
@@ -828,13 +828,6 @@ export function WorkflowStudio({
             onExportSettings={() => dependencies.exportSettings()}
             onImportSettings={async (file) => {
               await dependencies.importSettings(file);
-              await reloadSnapshot();
-            }}
-            onExportWorkflow={() =>
-              dependencies.exportWorkflow(selectedWorkflowId)
-            }
-            onImportWorkflow={async (file) => {
-              await dependencies.importWorkflow(file);
               await reloadSnapshot();
             }}
           />
