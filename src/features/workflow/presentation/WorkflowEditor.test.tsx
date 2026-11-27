@@ -62,6 +62,17 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+async function openPhaseActions(
+  user: ReturnType<typeof userEvent.setup>,
+  phaseName: string,
+) {
+  const trigger = screen.getByRole('button', {
+    name: `More actions for ${phaseName}`,
+  });
+  await user.click(trigger);
+  return { trigger, menu: screen.getByRole('menu') };
+}
+
 describe('WorkflowEditor', () => {
   test('keeps Add phase outside the ordered sequence and describes Phase metadata', () => {
     render(
@@ -101,6 +112,27 @@ describe('WorkflowEditor', () => {
     const addPhase = screen.getByRole('button', { name: 'Add phase' });
     expect(sequence).not.toContainElement(addPhase);
     expect(within(sequence).getAllByRole('listitem')).toHaveLength(2);
+    const cards = within(sequence).getAllByRole('listitem');
+    for (const card of cards) {
+      expect(card).toHaveClass('phase-sequence__card');
+      expect(card.querySelector('button button')).toBeNull();
+      expect(
+        within(card).getByRole('button', { name: /^Drag Phase/u }),
+      ).toBeVisible();
+      expect(
+        within(card).getByRole('button', { name: /^Select Phase/u }),
+      ).toBeVisible();
+      expect(
+        within(card).getByRole('button', { name: /^More actions for Phase/u }),
+      ).toBeVisible();
+    }
+    expect(addPhase.querySelector('svg')).not.toBeNull();
+    expect(within(sequence).getAllByTestId('phase-thumbnail')).toHaveLength(2);
+    expect(
+      within(sequence)
+        .getAllByLabelText(/^Drag Phase/u)[0]
+        ?.querySelector('svg'),
+    ).not.toBeNull();
     expect(
       screen.getByRole('button', {
         name: 'Select Phase 1: Writing · Focus · 25 min · Reward after this phase',
@@ -111,6 +143,267 @@ describe('WorkflowEditor', () => {
         name: 'Select Phase 2: Tea · Break · 5 min',
       }),
     ).toBeVisible();
+    expect(screen.getByText('Phase 1 of 2')).toBeVisible();
+  });
+
+  test('keeps Workflow name editing in the contextual editor identity', () => {
+    render(
+      <WorkflowEditor
+        workflowId="workflow-context-name"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    expect(
+      screen
+        .getByLabelText('Workflow name')
+        .closest('.workflow-editor-chrome__identity'),
+    ).not.toBeNull();
+    expect(document.querySelector('.workflow-editor > .field')).toBeNull();
+  });
+
+  test('keeps selected Phase actions in an accessible overflow and restores trigger focus', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-phase-actions',
+          name: 'Phase actions',
+          phases: [
+            {
+              name: 'One',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Two',
+              type: 'break',
+              durationSeconds: 60,
+              environment: {},
+            },
+          ],
+          rewardDice: {
+            frequency: 1,
+            sides: [
+              { icon: 'tea', title: 'Tea' },
+              { icon: 'walk', title: 'Walk' },
+            ],
+          },
+        })}
+        workflowId="workflow-phase-actions"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    const trigger = screen.getByRole('button', {
+      name: 'More actions for Phase 1: One',
+    });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.queryByRole('menu', { name: 'Actions for Phase 1: One' }),
+    ).toBeNull();
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    const menu = screen.getByRole('menu', { name: 'Actions for Phase 1: One' });
+    await user.click(
+      within(menu).getByRole('menuitem', { name: 'Duplicate Phase 1' }),
+    );
+    expect(
+      screen.queryByRole('menu', { name: 'Actions for Phase 1: One' }),
+    ).toBeNull();
+    expect(trigger).toHaveFocus();
+    expect(
+      within(screen.getByRole('list', { name: 'Phase sequence' })).getAllByRole(
+        'listitem',
+      ),
+    ).toHaveLength(3);
+  });
+
+  test('offers phase actions from every card without changing selection', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-card-actions',
+          name: 'Card actions',
+          phases: [
+            {
+              name: 'One',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Two',
+              type: 'break',
+              durationSeconds: 60,
+              environment: {},
+            },
+          ],
+        })}
+        workflowId="workflow-card-actions"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    const selected = screen.getByRole('button', {
+      name: /^Select Phase 1: One/u,
+    });
+    await user.click(
+      screen.getByRole('button', { name: 'More actions for Phase 2: Two' }),
+    );
+    const menu = screen.getByRole('menu', { name: 'Actions for Phase 2: Two' });
+    expect(
+      within(menu).getByRole('menuitem', { name: 'Collapse Phase 2' }),
+    ).toBeVisible();
+    expect(
+      within(menu).getByRole('menuitem', { name: 'Move Phase 2 up' }),
+    ).toBeVisible();
+    expect(
+      within(menu).getByRole('menuitem', { name: 'Duplicate Phase 2' }),
+    ).toBeVisible();
+    expect(
+      within(menu).getByRole('menuitem', { name: 'Remove Phase 2' }),
+    ).toBeVisible();
+    expect(selected).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('renders phase actions outside the scrolling sequence and closes on outside click', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-portal-actions',
+          name: 'Portal actions',
+          phases: [
+            {
+              name: 'One',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Two',
+              type: 'break',
+              durationSeconds: 60,
+              environment: {},
+            },
+          ],
+        })}
+        workflowId="workflow-portal-actions"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    const { trigger, menu } = await openPhaseActions(user, 'Phase 2: Two');
+    expect(menu.parentElement).toBe(document.body);
+    expect(menu).toHaveClass('phase-actions-menu--portal');
+
+    await user.click(screen.getByRole('tab', { name: 'Reward Dice' }));
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('duplicates a phase from the portaled lower menu action', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-portal-duplicate',
+          name: 'Portal duplicate',
+          phases: [
+            {
+              name: 'One',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {},
+            },
+            {
+              name: 'Two',
+              type: 'break',
+              durationSeconds: 60,
+              environment: {},
+            },
+          ],
+        })}
+        workflowId="workflow-portal-duplicate"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    const { menu } = await openPhaseActions(user, 'Phase 2: Two');
+    await user.click(
+      within(menu).getByRole('menuitem', { name: 'Duplicate Phase 2' }),
+    );
+
+    expect(
+      screen
+        .getAllByRole('listitem')
+        .filter((item) => item.classList.contains('phase-sequence__card')),
+    ).toHaveLength(3);
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  test('resolves direct and Role image thumbnails through AssetPreview lifecycle', async () => {
+    const roleImage = createAsset({
+      ...image,
+      id: 'image-role',
+      name: 'Canopy',
+      role: 'Focus scene',
+    });
+    const loadBlob = vi.fn(() => Promise.resolve(new Blob(['image'])));
+    let urlIndex = 0;
+    const createObjectUrl = vi.fn(() => `blob:phase-${String(++urlIndex)}`);
+    const revokeObjectUrl = vi.fn();
+    const view = render(
+      <WorkflowEditor
+        workflow={createWorkflow({
+          id: 'workflow-phase-thumbnails',
+          name: 'Thumbnails',
+          phases: [
+            {
+              name: 'Direct',
+              type: 'focus',
+              durationSeconds: 60,
+              environment: {
+                backgroundAsset: { type: 'direct', assetId: image.id },
+              },
+            },
+            {
+              name: 'Role',
+              type: 'break',
+              durationSeconds: 60,
+              environment: {
+                backgroundAsset: {
+                  type: 'role',
+                  role: createAssetRole('Focus scene'),
+                },
+              },
+            },
+          ],
+        })}
+        workflowId="workflow-phase-thumbnails"
+        assets={[image, roleImage]}
+        loadAssetBlob={loadBlob}
+        createObjectUrl={createObjectUrl}
+        revokeObjectUrl={revokeObjectUrl}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    expect(await screen.findByAltText('Preview of Forest')).toBeVisible();
+    expect(await screen.findByAltText('Preview of Canopy')).toBeVisible();
+    expect(loadBlob).toHaveBeenCalledWith(image.id);
+    expect(loadBlob).toHaveBeenCalledWith(roleImage.id);
+
+    view.unmount();
+    expect(revokeObjectUrl).toHaveBeenCalledTimes(3);
   });
 
   test('shows only the selected Phase Basic and Environment settings', async () => {
@@ -134,6 +427,13 @@ describe('WorkflowEditor', () => {
               environment: {},
             },
           ],
+          rewardDice: {
+            frequency: 1,
+            sides: [
+              { icon: 'tea', title: 'Tea' },
+              { icon: 'walk', title: 'Walk' },
+            ],
+          },
         })}
         workflowId="workflow-selected-settings"
         assets={[]}
@@ -156,30 +456,84 @@ describe('WorkflowEditor', () => {
     expect(
       selectedPhase.querySelector('.phase-sequence__duration'),
     ).toHaveTextContent('1 min');
-    expect(screen.getByRole('heading', { name: 'Basic' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Environment' })).toBeVisible();
     expect(
-      screen.getByRole('heading', { name: 'Basic' }).closest('section'),
+      screen.getByRole('heading', { name: 'Basic settings' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Environment settings' }),
+    ).toBeVisible();
+    expect(
+      screen
+        .getByRole('heading', { name: 'Basic settings' })
+        .closest('section'),
     ).toHaveClass('phase-settings__card--basic');
     expect(
-      screen.getByRole('heading', { name: 'Environment' }).closest('section'),
+      screen
+        .getByRole('heading', { name: 'Environment settings' })
+        .closest('section'),
     ).toHaveClass('phase-settings__card--environment');
     expect(screen.getByLabelText('Phase 2 name')).toHaveValue('Two');
     expect(screen.queryByLabelText('Phase 1 name')).toBeNull();
     expect(screen.getByLabelText('Phase 2 type')).toBeVisible();
     expect(screen.getByLabelText('Phase 2 duration in minutes')).toBeVisible();
+    const { menu } = await openPhaseActions(user, 'Phase 2: Two');
     expect(
-      screen.getByRole('button', { name: 'Move Phase 2 up' }),
+      within(menu).getByRole('menuitem', { name: 'Move Phase 2 up' }),
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Duplicate Phase 2' }),
+      within(menu).getByRole('menuitem', { name: 'Duplicate Phase 2' }),
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Remove Phase 2' }),
+      within(menu).getByRole('menuitem', { name: 'Remove Phase 2' }),
     ).toBeVisible();
     expect(screen.getByLabelText('Background image')).toBeVisible();
     expect(screen.getByLabelText('Ambient audio')).toBeVisible();
     expect(screen.getByLabelText('Background color')).toBeVisible();
+    const basic = screen.getByRole('region', { name: 'Basic settings' });
+    const environment = screen.getByRole('region', {
+      name: 'Environment settings',
+    });
+    expect(
+      within(basic).getByText('Name and timing for the selected phase.'),
+    ).toBeVisible();
+    expect(
+      within(environment).getByText(
+        'Choose the visual and ambient mood for this phase.',
+      ),
+    ).toBeVisible();
+    expect(
+      within(basic)
+        .getByLabelText('Phase 2 name')
+        .compareDocumentPosition(
+          within(basic).getByLabelText('Phase 2 duration in minutes'),
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      within(basic)
+        .getByLabelText('Phase 2 duration in minutes')
+        .compareDocumentPosition(within(basic).getByLabelText('Phase 2 type')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      within(environment).getByLabelText('Background image'),
+    ).toBeVisible();
+    expect(
+      within(environment).getByLabelText('Background color'),
+    ).toBeVisible();
+    expect(within(environment).getByLabelText('Ambient audio')).toBeVisible();
+    expect(
+      within(environment).getByLabelText('Reward after Phase 2'),
+    ).toBeVisible();
+    expect(
+      within(environment).getByText(
+        'Roll Reward Dice when this phase completes.',
+      ),
+    ).toBeVisible();
+    expect(
+      within(environment)
+        .getByLabelText('Reward after Phase 2')
+        .closest('.switch-control'),
+    ).not.toBeNull();
   });
 
   test('returns from Reward Dice to the invalid Phase field on save', async () => {
@@ -305,13 +659,21 @@ describe('WorkflowEditor', () => {
     await user.click(
       screen.getByRole('button', { name: /^Select Phase 2: Two ·/u }),
     );
-    await user.click(screen.getByRole('button', { name: 'Move Phase 2 up' }));
+    let actions = await openPhaseActions(user, 'Phase 2: Two');
+    await user.click(
+      within(actions.menu).getByRole('menuitem', {
+        name: 'Move Phase 2 up',
+      }),
+    );
     expect(screen.getByRole('region', { name: 'Two preview' })).toBeVisible();
     expect(
       screen.getByRole('button', { name: /^Select Phase 1: Two ·/u }),
     ).toHaveAttribute('aria-pressed', 'true');
 
-    await user.click(screen.getByRole('button', { name: 'Remove Phase 1' }));
+    actions = await openPhaseActions(user, 'Phase 1: Two');
+    await user.click(
+      within(actions.menu).getByRole('menuitem', { name: 'Remove Phase 1' }),
+    );
     expect(screen.getByRole('region', { name: 'One preview' })).toBeVisible();
   });
 
@@ -456,7 +818,12 @@ describe('WorkflowEditor', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Duplicate Phase 1' }));
+    const actions = await openPhaseActions(user, 'Phase 1: Writing');
+    await user.click(
+      within(actions.menu).getByRole('menuitem', {
+        name: 'Duplicate Phase 1',
+      }),
+    );
 
     expect(
       screen.getByRole('button', { name: /^Select Phase 1: Writing ·/u }),
@@ -467,8 +834,11 @@ describe('WorkflowEditor', () => {
     await user.click(
       screen.getByRole('button', { name: /^Select Phase 2: Writing ·/u }),
     );
+    const duplicatedActions = await openPhaseActions(user, 'Phase 2: Writing');
     expect(
-      screen.getByRole('button', { name: 'Collapse Phase 2: Writing' }),
+      within(duplicatedActions.menu).getByRole('menuitem', {
+        name: 'Collapse Phase 2',
+      }),
     ).toBeVisible();
   });
 
@@ -486,12 +856,12 @@ describe('WorkflowEditor', () => {
     await user.clear(duration);
     await user.type(duration, '1.2');
 
-    const disclosure = screen.getByRole('button', {
+    const phaseActions = await openPhaseActions(user, 'Phase 1');
+    const disclosure = within(phaseActions.menu).getByRole('menuitem', {
       name: 'Collapse Phase 1',
     });
-    await user.click(disclosure);
-    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
     const contentId = disclosure.getAttribute('aria-controls');
+    await user.click(disclosure);
     expect(contentId).not.toBeNull();
     const content = document.getElementById(contentId ?? 'missing');
     expect(content).toBeInTheDocument();
@@ -1084,7 +1454,10 @@ describe('WorkflowEditor', () => {
       screen.getByRole('button', { name: /^Select Phase 2 ·/u }),
     );
     await user.selectOptions(screen.getByLabelText('Phase 2 type'), 'break');
-    await user.click(screen.getByRole('button', { name: 'Move Phase 2 up' }));
+    const actions = await openPhaseActions(user, 'Phase 2');
+    await user.click(
+      within(actions.menu).getByRole('menuitem', { name: 'Move Phase 2 up' }),
+    );
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
 
     const saved = onSave.mock.calls[0]?.[0];
@@ -1126,26 +1499,34 @@ describe('WorkflowEditor', () => {
         onSave={() => Promise.resolve()}
       />,
     );
+    let actions = await openPhaseActions(user, 'Phase 1: Writing');
     await user.click(
-      screen.getByRole('button', { name: 'Collapse Phase 1: Writing' }),
+      within(actions.menu).getByRole('menuitem', { name: 'Collapse Phase 1' }),
     );
-    const move = screen.getByRole('button', { name: 'Move Phase 1 down' });
+    actions = await openPhaseActions(user, 'Phase 1: Writing');
+    const move = within(actions.menu).getByRole('menuitem', {
+      name: 'Move Phase 1 down',
+    });
     move.focus();
     await user.click(move);
     expect(
       screen.getByText('Moved Writing to position 2 of 2.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Move Phase 2 up' }),
+      screen.getByRole('button', {
+        name: 'More actions for Phase 2: Writing',
+      }),
     ).toHaveFocus();
+    actions = await openPhaseActions(user, 'Phase 2: Writing');
     expect(
-      screen.getByRole('button', { name: 'Expand Phase 2: Writing' }),
+      within(actions.menu).getByRole('menuitem', { name: 'Expand Phase 2' }),
     ).toBeVisible();
     await user.click(
       screen.getByRole('button', { name: /^Select Phase 1: Review ·/u }),
     );
+    actions = await openPhaseActions(user, 'Phase 1: Review');
     expect(
-      screen.getByRole('button', { name: 'Move Phase 1 up' }),
+      within(actions.menu).getByRole('menuitem', { name: 'Move Phase 1 up' }),
     ).toBeDisabled();
   });
 
@@ -1272,7 +1653,12 @@ describe('WorkflowEditor', () => {
     fireEvent.pointerMove(handle, { pointerId: 11, clientY: 160 });
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.getByText('Phase move cancelled.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Move Phase 1 down' }));
+    const actions = await openPhaseActions(user, 'Phase 1');
+    await user.click(
+      within(actions.menu).getByRole('menuitem', {
+        name: 'Move Phase 1 down',
+      }),
+    );
     expect(
       screen.getByText('Moved Phase 1 to position 2 of 2.'),
     ).toBeInTheDocument();
@@ -1414,7 +1800,10 @@ describe('WorkflowEditor', () => {
     await user.click(
       screen.getByRole('button', { name: /^Select Phase 2 ·/u }),
     );
-    await user.click(screen.getByRole('button', { name: 'Move Phase 2 up' }));
+    const actions = await openPhaseActions(user, 'Phase 2');
+    await user.click(
+      within(actions.menu).getByRole('menuitem', { name: 'Move Phase 2 up' }),
+    );
     await user.click(screen.getByRole('button', { name: 'Save workflow' }));
     const saved = onSave.mock.calls[0]?.[0];
     if (saved?.mode === 'quick') throw new Error('Expected Detailed input.');

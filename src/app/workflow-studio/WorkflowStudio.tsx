@@ -33,6 +33,7 @@ import {
   QuickWorkflowEditor,
   WorkflowEditor,
   WorkflowEditorChromeModeTarget,
+  WorkflowEditorChromeIdentityTarget,
   WorkflowEditorChromeProvider,
   WorkflowEditorChromeStatusTarget,
   WorkflowEditorChromeTarget,
@@ -401,7 +402,10 @@ export function WorkflowStudio({
                 <span className="workflow-studio-shell__eyebrow">
                   Workflow Studio
                 </span>
-                <h1>{studioContext.title}</h1>
+                <div className="workflow-studio-shell__editor-identity">
+                  <h1>{studioContext.title}</h1>
+                  <WorkflowEditorChromeIdentityTarget />
+                </div>
                 {studioContext.detail === 'Detailed setup' ? (
                   <span className="workflow-studio-shell__mode-indicator">
                     <Icon name="detailed" size={18} />

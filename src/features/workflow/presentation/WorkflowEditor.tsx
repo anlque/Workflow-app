@@ -1,24 +1,29 @@
 import {
   Fragment,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
 
-import type { Asset, AssetId } from '@/features/assets';
+import { assetRoleKey, type Asset, type AssetId } from '@/features/assets';
 import {
+  AssetPreview,
   AssetPicker,
   type AssetPickerUpload,
   type AssetPickerUploadSynchronization,
 } from '@/features/assets/studio';
-import { Button, Field, Select } from '@/shared';
+import { Button, Field, Icon, Select, Switch } from '@/shared';
 
 import type { CreateWorkflowInput, Workflow } from '../domain/Workflow';
+import type { AssetReference } from '../domain/Environment';
 import { RewardDiceEditor } from './RewardDiceEditor';
 import { PhaseEnvironmentPreview } from './PhaseEnvironmentPreview';
 import {
   WorkflowEditorChromeActions,
+  WorkflowEditorChromeIdentity,
   WorkflowEditorChromeStatus,
 } from './WorkflowEditorChrome';
 import {
@@ -45,6 +50,22 @@ export type WorkflowEditorProps = Readonly<{
 const unavailableAssetBlob = () => Promise.resolve(null);
 const unusedObjectUrl = () => '';
 const ignoreObjectUrl = () => undefined;
+
+function resolvePhaseImage(
+  reference: AssetReference | undefined,
+  assets: readonly Asset[],
+): Asset | undefined {
+  if (reference === undefined) return undefined;
+  const asset =
+    reference.type === 'direct'
+      ? assets.find(({ id }) => id === reference.assetId)
+      : assets.find(
+          ({ role }) =>
+            role !== undefined &&
+            assetRoleKey(role) === assetRoleKey(reference.role),
+        );
+  return asset?.kind === 'image' ? asset : undefined;
+}
 
 export function WorkflowEditor({
   workflow,
@@ -77,15 +98,19 @@ export function WorkflowEditor({
   const [selectedPhaseKey, setSelectedPhaseKey] = useState(
     () => editor.draft.phases[0]?.key ?? '',
   );
+  const [openPhaseActionsKey, setOpenPhaseActionsKey] = useState<string | null>(
+    null,
+  );
+  const [phaseActionsPosition, setPhaseActionsPosition] = useState({
+    top: 0,
+    left: 0,
+  });
   const saveStatusTimer = useRef<number | undefined>(undefined);
   const phaseListRef = useRef<HTMLOListElement>(null);
-  const pendingMoveFocus = useRef<{
-    phaseKey: string;
-    direction: 'up' | 'down';
-  } | null>(null);
-  const moveButtons = useRef(new Map<string, HTMLButtonElement>());
   const phaseTabs = useRef(new Map<string, HTMLButtonElement>());
   const phaseDurationInputs = useRef(new Map<string, HTMLInputElement>());
+  const phaseActionTriggers = useRef(new Map<string, HTMLButtonElement>());
+  const phaseActionsMenu = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (
@@ -213,22 +238,78 @@ export function WorkflowEditor({
   }, [editor.draft.phases, selectedPhaseKey]);
 
   useEffect(() => {
-    const pending = pendingMoveFocus.current;
-    if (pending === null) return;
-    pendingMoveFocus.current = null;
-    const index = editor.draft.phases.findIndex(
-      ({ key }) => key === pending.phaseKey,
-    );
-    const preferred =
-      pending.direction === 'up'
-        ? index > 0
-          ? 'up'
-          : 'down'
-        : index < editor.draft.phases.length - 1
-          ? 'down'
-          : 'up';
-    moveButtons.current.get(`${pending.phaseKey}:${preferred}`)?.focus();
-  }, [editor.draft.phases]);
+    setOpenPhaseActionsKey(null);
+  }, [selectedPhaseKey]);
+
+  useEffect(() => {
+    if (openPhaseActionsKey !== null) {
+      queueMicrotask(() =>
+        phaseActionsMenu.current
+          ?.querySelector<HTMLButtonElement>('[role="menuitem"]')
+          ?.focus(),
+      );
+    }
+  }, [openPhaseActionsKey]);
+
+  useLayoutEffect(() => {
+    if (openPhaseActionsKey === null) return;
+    const trigger = phaseActionTriggers.current.get(openPhaseActionsKey);
+    const menu = phaseActionsMenu.current;
+    if (trigger === undefined || menu === null) return;
+
+    const updatePosition = () => {
+      const triggerBounds = trigger.getBoundingClientRect();
+      const menuBounds = menu.getBoundingClientRect();
+      const gap = 4;
+      const inset = 8;
+      const preferredTop = triggerBounds.bottom + gap;
+      const top =
+        preferredTop + menuBounds.height <= window.innerHeight - inset
+          ? preferredTop
+          : Math.max(inset, triggerBounds.top - menuBounds.height - gap);
+      const left = Math.min(
+        Math.max(inset, triggerBounds.right - menuBounds.width),
+        Math.max(inset, window.innerWidth - menuBounds.width - inset),
+      );
+      setPhaseActionsPosition({ top, left });
+    };
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        !menu.contains(target) &&
+        !trigger.contains(target)
+      ) {
+        closePhaseActions(openPhaseActionsKey, false);
+      }
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+    };
+  }, [openPhaseActionsKey]);
+
+  useEffect(() => {
+    if (
+      openPhaseActionsKey !== null &&
+      !editor.draft.phases.some(({ key }) => key === openPhaseActionsKey)
+    ) {
+      setOpenPhaseActionsKey(null);
+    }
+  }, [editor.draft.phases, openPhaseActionsKey]);
+
+  function closePhaseActions(phaseKey: string, restoreFocus = true): void {
+    setOpenPhaseActionsKey(null);
+    if (restoreFocus) {
+      queueMicrotask(() => phaseActionTriggers.current.get(phaseKey)?.focus());
+    }
+  }
 
   useEffect(
     () => () => {
@@ -293,6 +374,156 @@ export function WorkflowEditor({
     }
   }
 
+  function renderPhaseActions(
+    phase: (typeof editor.draft.phases)[number],
+    index: number,
+    fallbackName: string,
+    displayName: string,
+  ) {
+    const collapsed = collapsedPhaseKeys.has(phase.key);
+    const contentId = `phase-${phase.key}-content`;
+    const contextualName = `${fallbackName}${displayName === fallbackName ? '' : `: ${displayName}`}`;
+    return (
+      <div className="phase-card__actions">
+        <Button
+          variant="quiet"
+          buttonRef={(node) => {
+            if (node === null) phaseActionTriggers.current.delete(phase.key);
+            else phaseActionTriggers.current.set(phase.key, node);
+          }}
+          aria-label={`More actions for ${contextualName}`}
+          aria-haspopup="menu"
+          aria-expanded={openPhaseActionsKey === phase.key}
+          onClick={() => {
+            setOpenPhaseActionsKey((current) =>
+              current === phase.key ? null : phase.key,
+            );
+          }}
+        >
+          <Icon name="more" size="1.25rem" />
+        </Button>
+        {openPhaseActionsKey === phase.key
+          ? createPortal(
+              <div
+                ref={phaseActionsMenu}
+                className="phase-actions-menu phase-actions-menu--portal"
+                style={phaseActionsPosition}
+                role="menu"
+                aria-label={`Actions for ${contextualName}`}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closePhaseActions(phase.key);
+                    return;
+                  }
+                  if (
+                    event.key === 'ArrowDown' ||
+                    event.key === 'ArrowUp' ||
+                    event.key === 'Home' ||
+                    event.key === 'End'
+                  ) {
+                    const items = Array.from(
+                      event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                        '[role="menuitem"]:not(:disabled)',
+                      ),
+                    );
+                    const current = items.indexOf(
+                      document.activeElement as HTMLButtonElement,
+                    );
+                    const next =
+                      event.key === 'Home'
+                        ? 0
+                        : event.key === 'End'
+                          ? items.length - 1
+                          : event.key === 'ArrowDown'
+                            ? (current + 1) % items.length
+                            : (current - 1 + items.length) % items.length;
+                    event.preventDefault();
+                    items[next]?.focus();
+                  }
+                }}
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  aria-controls={contentId}
+                  aria-expanded={!collapsed}
+                  onClick={() => {
+                    setCollapsedPhaseKeys((current) => {
+                      const next = new Set(current);
+                      if (next.has(phase.key)) next.delete(phase.key);
+                      else next.add(phase.key);
+                      return next;
+                    });
+                    closePhaseActions(phase.key);
+                  }}
+                >
+                  {collapsed ? 'Expand' : 'Collapse'} {fallbackName}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={index === 0}
+                  onClick={() => {
+                    movePhase(phase.key, index - 1);
+                    closePhaseActions(phase.key);
+                  }}
+                >
+                  Move {fallbackName} up
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={index === editor.draft.phases.length - 1}
+                  onClick={() => {
+                    movePhase(phase.key, index + 1);
+                    closePhaseActions(phase.key);
+                  }}
+                >
+                  Move {fallbackName} down
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={editor.draft.phases.length === 1}
+                  onClick={() => {
+                    const nextFocusKey =
+                      editor.draft.phases[index + 1]?.key ??
+                      editor.draft.phases[index - 1]?.key;
+                    setCollapsedPhaseKeys((current) => {
+                      const next = new Set(current);
+                      next.delete(phase.key);
+                      return next;
+                    });
+                    editor.removePhase(phase.key);
+                    setOpenPhaseActionsKey(null);
+                    if (nextFocusKey !== undefined) {
+                      queueMicrotask(() =>
+                        phaseTabs.current.get(nextFocusKey)?.focus(),
+                      );
+                    }
+                  }}
+                >
+                  Remove {fallbackName}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    editor.duplicatePhase(index);
+                    closePhaseActions(phase.key);
+                  }}
+                >
+                  Duplicate {fallbackName}
+                </button>
+              </div>,
+              document.body,
+            )
+          : null}
+      </div>
+    );
+  }
+
   const selectedPhaseIndex = Math.max(
     0,
     editor.draft.phases.findIndex(({ key }) => key === selectedPhaseKey),
@@ -338,14 +569,24 @@ export function WorkflowEditor({
         </p>
       )}
 
-      <Field label="Workflow name" error={errors['name']}>
-        <input
-          value={editor.draft.name}
-          onChange={(event) => {
-            editor.setName(event.target.value);
-          }}
-        />
-      </Field>
+      <WorkflowEditorChromeIdentity>
+        <div className="workflow-editor-chrome__identity">
+          <Field label="Workflow name" error={errors['name']}>
+            <input
+              form={formId}
+              value={editor.draft.name}
+              onChange={(event) => {
+                editor.setName(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }}
+            />
+          </Field>
+        </div>
+      </WorkflowEditorChromeIdentity>
 
       <div className="editor-section-tabs" role="tablist" aria-label="Editor">
         <button
@@ -423,7 +664,8 @@ export function WorkflowEditor({
                 editor.addPhase();
               }}
             >
-              Add phase
+              <Icon name="plus" size="1.25rem" />
+              <span>Add phase</span>
             </Button>
           </div>
           <ol
@@ -442,6 +684,10 @@ export function WorkflowEditor({
               } · ${phase.type === 'focus' ? 'Focus' : 'Break'} · ${
                 phase.durationMinutes
               } min${hasRewardMarker ? ' · Reward after this phase' : ''}`;
+              const thumbnailAsset = resolvePhaseImage(
+                phase.backgroundAsset,
+                assets,
+              );
               return (
                 <Fragment key={phase.key}>
                   {dropGapIndex === index ? (
@@ -452,7 +698,8 @@ export function WorkflowEditor({
                     />
                   ) : null}
                   <li
-                    className="phase-sequence__entry"
+                    className="phase-sequence__entry phase-sequence__card"
+                    data-selected={phase.key === selectedPhaseKey || undefined}
                     data-dragging={
                       phaseDrag.activePhaseKey === phase.key || undefined
                     }
@@ -468,7 +715,7 @@ export function WorkflowEditor({
                       title={`Drag ${fallbackName}${displayName === fallbackName ? '' : `: ${displayName}`}`}
                       {...phaseDrag.getHandleProps(phase.key)}
                     >
-                      ⠿
+                      <Icon name="dragHandle" size="1.25rem" />
                     </button>
                     <button
                       ref={(node) => {
@@ -487,6 +734,32 @@ export function WorkflowEditor({
                         handlePhaseTabKey(event, phase.key);
                       }}
                     >
+                      <span
+                        className="phase-sequence__thumbnail"
+                        data-testid="phase-thumbnail"
+                        aria-hidden="true"
+                      >
+                        {thumbnailAsset === undefined ? (
+                          <span
+                            className="phase-sequence__thumbnail-fallback"
+                            style={
+                              phase.backgroundColor.trim()
+                                ? {
+                                    backgroundColor:
+                                      phase.backgroundColor.trim(),
+                                  }
+                                : undefined
+                            }
+                          />
+                        ) : (
+                          <AssetPreview
+                            asset={thumbnailAsset}
+                            loadBlob={loadAssetBlob}
+                            createObjectUrl={createObjectUrl}
+                            revokeObjectUrl={revokeObjectUrl}
+                          />
+                        )}
+                      </span>
                       <span className="phase-sequence__type">
                         {String(index + 1).padStart(2, '0')} ·{' '}
                         {phase.type === 'focus' ? 'Focus' : 'Break'}
@@ -501,10 +774,16 @@ export function WorkflowEditor({
                           title="Reward after this phase"
                           aria-label="Reward after this phase"
                         >
-                          ◇
+                          <Icon name="reward" size="1rem" />
                         </span>
                       ) : null}
                     </button>
+                    {renderPhaseActions(
+                      phase,
+                      index,
+                      fallbackName,
+                      displayName,
+                    )}
                   </li>
                 </Fragment>
               );
@@ -522,6 +801,7 @@ export function WorkflowEditor({
           <PhaseEnvironmentPreview
             phaseName={selectedPhase.name}
             phasePosition={selectedPhaseIndex + 1}
+            totalPhases={editor.draft.phases.length}
             phaseType={selectedPhase.type}
             durationMinutes={selectedPhase.durationMinutes}
             backgroundColor={selectedPhase.backgroundColor}
@@ -547,89 +827,6 @@ export function WorkflowEditor({
                   className="phase-settings"
                   aria-label={`${displayName} settings`}
                 >
-                  <div className="phase-item__header">
-                    <h3>{displayName} settings</h3>
-                    <div className="phase-item__actions">
-                      <Button
-                        variant="quiet"
-                        aria-controls={contentId}
-                        aria-expanded={!collapsed}
-                        aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${fallbackName}${displayName === fallbackName ? '' : `: ${displayName}`}`}
-                        onClick={() => {
-                          setCollapsedPhaseKeys((current) => {
-                            const next = new Set(current);
-                            if (next.has(phase.key)) next.delete(phase.key);
-                            else next.add(phase.key);
-                            return next;
-                          });
-                        }}
-                      >
-                        {collapsed ? 'Expand' : 'Collapse'}
-                      </Button>
-                      <Button
-                        variant="quiet"
-                        buttonRef={(node) => {
-                          const key = `${phase.key}:up`;
-                          if (node === null) moveButtons.current.delete(key);
-                          else moveButtons.current.set(key, node);
-                        }}
-                        aria-label={`Move Phase ${String(index + 1)} up`}
-                        disabled={index === 0}
-                        onClick={() => {
-                          pendingMoveFocus.current = {
-                            phaseKey: phase.key,
-                            direction: 'up',
-                          };
-                          movePhase(phase.key, index - 1);
-                        }}
-                      >
-                        Move up
-                      </Button>
-                      <Button
-                        variant="quiet"
-                        buttonRef={(node) => {
-                          const key = `${phase.key}:down`;
-                          if (node === null) moveButtons.current.delete(key);
-                          else moveButtons.current.set(key, node);
-                        }}
-                        aria-label={`Move Phase ${String(index + 1)} down`}
-                        disabled={index === editor.draft.phases.length - 1}
-                        onClick={() => {
-                          pendingMoveFocus.current = {
-                            phaseKey: phase.key,
-                            direction: 'down',
-                          };
-                          movePhase(phase.key, index + 1);
-                        }}
-                      >
-                        Move down
-                      </Button>
-                      <Button
-                        variant="quiet"
-                        aria-label={`Remove Phase ${String(index + 1)}`}
-                        disabled={editor.draft.phases.length === 1}
-                        onClick={() => {
-                          setCollapsedPhaseKeys((current) => {
-                            const next = new Set(current);
-                            next.delete(phase.key);
-                            return next;
-                          });
-                          editor.removePhase(phase.key);
-                        }}
-                      >
-                        Remove
-                      </Button>
-                      <Button
-                        variant="quiet"
-                        aria-label={`Duplicate Phase ${String(index + 1)}`}
-                        onClick={() => {
-                          editor.duplicatePhase(index);
-                        }}
-                      >
-                        Duplicate
-                      </Button>
-                    </div>
-                  </div>
                   <div
                     id={contentId}
                     className="phase-settings__cards"
@@ -639,21 +836,12 @@ export function WorkflowEditor({
                       className="phase-settings__card phase-settings__card--basic"
                       aria-labelledby={`phase-${phase.key}-basic-title`}
                     >
-                      <h3 id={`phase-${phase.key}-basic-title`}>Basic</h3>
-                      {editor.draft.rewardDice.enabled ? (
-                        <label className="check-control">
-                          <input
-                            type="checkbox"
-                            checked={editor.rewardAfterPhaseKeys.includes(
-                              phase.key,
-                            )}
-                            onChange={() => {
-                              editor.toggleRewardAfterPhase(phase.key);
-                            }}
-                          />
-                          Reward after Phase {String(index + 1)}
-                        </label>
-                      ) : null}
+                      <div className="phase-settings__card-heading">
+                        <h3 id={`phase-${phase.key}-basic-title`}>
+                          Basic settings
+                        </h3>
+                        <p>Name and timing for the selected phase.</p>
+                      </div>
                       <div className="form-grid phase-settings__basic">
                         <Field label={`${fallbackName} name`} hint="Optional.">
                           <input
@@ -665,21 +853,6 @@ export function WorkflowEditor({
                             }}
                           />
                         </Field>
-                        <Select
-                          label={`Phase ${String(index + 1)} type`}
-                          value={phase.type}
-                          onChange={(event) => {
-                            editor.updatePhase(phase.key, {
-                              type:
-                                event.target.value === 'break'
-                                  ? 'break'
-                                  : 'focus',
-                            });
-                          }}
-                        >
-                          <option value="focus">Focus</option>
-                          <option value="break">Break</option>
-                        </Select>
                         <Field
                           label={`Phase ${String(index + 1)} duration in minutes`}
                           error={errors[`phase:${phase.key}:duration`]}
@@ -729,16 +902,36 @@ export function WorkflowEditor({
                             }}
                           />
                         </Field>
+                        <Select
+                          label={`Phase ${String(index + 1)} type`}
+                          value={phase.type}
+                          onChange={(event) => {
+                            editor.updatePhase(phase.key, {
+                              type:
+                                event.target.value === 'break'
+                                  ? 'break'
+                                  : 'focus',
+                            });
+                          }}
+                        >
+                          <option value="focus">Focus</option>
+                          <option value="break">Break</option>
+                        </Select>
                       </div>
                     </section>
                     <section
                       className="phase-settings__card phase-settings__card--environment phase-settings__environment"
                       aria-labelledby={`phase-${phase.key}-environment-title`}
                     >
-                      <h3 id={`phase-${phase.key}-environment-title`}>
-                        Environment
-                      </h3>
-                      <div className="form-grid">
+                      <div className="phase-settings__card-heading">
+                        <h3 id={`phase-${phase.key}-environment-title`}>
+                          Environment settings
+                        </h3>
+                        <p>
+                          Choose the visual and ambient mood for this phase.
+                        </p>
+                      </div>
+                      <div className="phase-settings__environment-grid">
                         <AssetPicker
                           label="Background image"
                           kind="image"
@@ -746,17 +939,6 @@ export function WorkflowEditor({
                           value={phase.backgroundAsset}
                           onChange={(backgroundAsset) => {
                             editor.updatePhase(phase.key, { backgroundAsset });
-                          }}
-                          onUpload={onUploadAsset}
-                          onSynchronizeUpload={onSynchronizeAssetUpload}
-                        />
-                        <AssetPicker
-                          label="Ambient audio"
-                          kind="audio"
-                          assets={assets}
-                          value={phase.audioAsset}
-                          onChange={(audioAsset) => {
-                            editor.updatePhase(phase.key, { audioAsset });
                           }}
                           onUpload={onUploadAsset}
                           onSynchronizeUpload={onSynchronizeAssetUpload}
@@ -775,6 +957,32 @@ export function WorkflowEditor({
                             }}
                           />
                         </Field>
+                        <AssetPicker
+                          label="Ambient audio"
+                          kind="audio"
+                          assets={assets}
+                          value={phase.audioAsset}
+                          onChange={(audioAsset) => {
+                            editor.updatePhase(phase.key, { audioAsset });
+                          }}
+                          onUpload={onUploadAsset}
+                          onSynchronizeUpload={onSynchronizeAssetUpload}
+                        />
+                        {editor.draft.rewardDice.enabled ? (
+                          <div className="phase-settings__reward-toggle">
+                            <Switch
+                              label={`Reward after Phase ${String(index + 1)}`}
+                              displayLabel={`Reward after Phase ${String(index + 1)}`}
+                              description="Roll Reward Dice when this phase completes."
+                              checked={editor.rewardAfterPhaseKeys.includes(
+                                phase.key,
+                              )}
+                              onChange={() => {
+                                editor.toggleRewardAfterPhase(phase.key);
+                              }}
+                            />
+                          </div>
+                        ) : null}
                       </div>
                     </section>
                   </div>

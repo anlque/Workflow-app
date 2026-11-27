@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { createAsset, createAssetRole } from '@/features/assets';
@@ -45,6 +45,7 @@ describe('PhaseEnvironmentPreview', () => {
       <PhaseEnvironmentPreview
         phaseName="Writing"
         phasePosition={2}
+        totalPhases={4}
         phaseType="focus"
         durationMinutes="25"
         backgroundColor="#123456"
@@ -60,9 +61,25 @@ describe('PhaseEnvironmentPreview', () => {
     expect(screen.getByRole('region', { name: 'Writing preview' })).toHaveStyle(
       'background-color: rgb(18, 52, 86)',
     );
-    expect(screen.getByText('Phase 2')).toBeVisible();
-    expect(screen.getByText('25 min · Focus')).toBeVisible();
-    expect(screen.getByText('Rain')).toBeVisible();
+    expect(screen.getByText('Phase 2 of 4')).toBeVisible();
+    expect(screen.getByText('Focus')).toHaveClass(
+      'phase-environment-preview__type',
+    );
+    expect(screen.getByText('25 min')).toHaveClass(
+      'phase-environment-preview__duration',
+    );
+    expect(screen.getByText('Ambient: Rain')).toBeVisible();
+    const preview = screen.getByRole('region', { name: 'Writing preview' });
+    expect(
+      within(preview)
+        .getByText('Phase 2 of 4')
+        .compareDocumentPosition(
+          within(preview).getByRole('heading', { name: 'Writing' }),
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(preview.lastElementChild).toHaveClass(
+      'phase-environment-preview__meta',
+    );
     expect(screen.queryByRole('audio')).toBeNull();
     expect(await screen.findByAltText('Forest clearing')).toHaveAttribute(
       'src',
@@ -84,6 +101,7 @@ describe('PhaseEnvironmentPreview', () => {
     const common = {
       phaseName: 'Focus',
       phasePosition: 1,
+      totalPhases: 2,
       phaseType: 'focus' as const,
       durationMinutes: '25',
       backgroundColor: '',
@@ -122,6 +140,7 @@ describe('PhaseEnvironmentPreview', () => {
       <PhaseEnvironmentPreview
         phaseName="Break"
         phasePosition={1}
+        totalPhases={1}
         phaseType="break"
         durationMinutes="5"
         backgroundColor=""

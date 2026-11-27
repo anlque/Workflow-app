@@ -601,14 +601,33 @@ describe('visual foundation', () => {
     expect(sequence).toContain('display: flex;');
     expect(sequence).toContain('overflow-x: auto;');
     expect(sequence).toContain('scroll-snap-type: inline proximity;');
-    expect(entry).toContain('flex: 1 0 14rem;');
+    expect(entry).toContain('flex: 0 0 15.5rem;');
+    expect(entry).toContain('display: block;');
     expect(indicator).toContain('flex: 0 0 0.25rem;');
     expect(indicator).toContain('width: 0.25rem;');
     expect(indicator).toContain('align-self: stretch;');
     expect(dragging).toContain('background: var(--color-accent-soft);');
     expect(dragging).toContain('border-color: var(--color-accent);');
     expect(preview).toContain('overflow: hidden;');
-    expect(preview).toContain('height: clamp(10rem, 18vw, 13rem);');
+    expect(preview).toContain('height: clamp(11rem, 20vw, 17.25rem);');
+    expect(declarationsFor('.phase-sequence__thumbnail')).toContain(
+      'width: 3rem;',
+    );
+    expect(declarationsFor('.phase-sequence__thumbnail')).toContain(
+      'grid-row: 1 / 4;',
+    );
+    expect(declarationsFor('.phase-sequence__duration')).toContain(
+      'grid-column: 2;',
+    );
+    expect(declarationsFor('.phase-sequence__item strong')).toContain(
+      'font-size: var(--font-size-body);',
+    );
+    expect(
+      declarationsFor('.phase-settings__card .phase-settings__basic'),
+    ).toContain('grid-template-columns: minmax(0, 1fr);');
+    expect(declarationsFor('.phase-actions-menu')).toContain(
+      'position: fixed;',
+    );
     expect(declarationsFor('.phase-settings__cards')).toContain(
       'grid-template-columns: repeat(2, minmax(0, 1fr));',
     );
@@ -637,8 +656,8 @@ describe('visual foundation', () => {
       'margin-top: auto;',
     );
     expect(image).toContain('object-fit: cover;');
-    expect(stylesheet).toMatch(
-      /\.phase-sequence__item\[aria-pressed='true'\][\s\S]*?border: 2px solid var\(--color-selected-indicator\);/u,
-    );
+    expect(
+      declarationsFor(".phase-sequence__entry[data-selected='true']"),
+    ).toContain('border-color: var(--color-selected-indicator);');
   });
 });

@@ -429,6 +429,46 @@ describe('WorkflowStudio', () => {
     );
   });
 
+  test('keeps the portaled Workflow name associated with its editor form', async () => {
+    const user = userEvent.setup();
+    const saveWorkflow = vi.fn(() => Promise.resolve());
+    const workflow = createWorkflow({
+      id: 'portaled-name-workflow',
+      name: 'Portaled name',
+      phases: [{ type: 'focus', durationSeconds: 60, environment: {} }],
+    });
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          saveWorkflow,
+          load: () =>
+            Promise.resolve({
+              workflows: [workflow],
+              assets: [],
+              settings: {
+                ...defaultSettings,
+                lastSelectedWorkflowId: workflow.id,
+              },
+            }),
+        })}
+      />,
+    );
+
+    const name =
+      await screen.findByLabelText<HTMLInputElement>('Workflow name');
+    const editorForm = document.querySelector<HTMLFormElement>(
+      'form.workflow-editor',
+    );
+    expect(editorForm).not.toBeNull();
+    expect(name).toHaveAttribute('form', editorForm?.id);
+    expect(name.form).toBe(editorForm);
+
+    await user.type(name, '{Enter}');
+    await waitFor(() => {
+      expect(saveWorkflow).toHaveBeenCalledOnce();
+    });
+  });
+
   test('guards duplicate workflow while pending and keeps the draft on rejection', async () => {
     const user = userEvent.setup();
     const operation = deferred<undefined>();

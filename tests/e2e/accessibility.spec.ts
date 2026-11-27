@@ -653,6 +653,15 @@ test('Detailed Studio preview and phase sequence stay usable across supported wi
   });
 
   await expect(sequence).toBeVisible();
+  await expect(
+    options.getByRole('button', { name: 'Add phase' }),
+  ).toBeVisible();
+  expect(
+    await sequence.locator('.phase-sequence__thumbnail').count(),
+  ).toBeGreaterThanOrEqual(2);
+  await expect(
+    sequence.getByRole('button', { name: /^Drag Phase 1:/u }).locator('svg'),
+  ).toBeVisible();
   await expect(firstPreview).toContainText('Settle in');
   await firstPhase.focus();
   await options.keyboard.press('ArrowRight');
@@ -664,8 +673,10 @@ test('Detailed Studio preview and phase sequence stay usable across supported wi
   await expect(preview).toContainText('Short break');
 
   await options.setViewportSize({ width: 1440, height: 1024 });
-  const basicCard = options.getByRole('region', { name: 'Basic' });
-  const environmentCard = options.getByRole('region', { name: 'Environment' });
+  const basicCard = options.getByRole('region', { name: 'Basic settings' });
+  const environmentCard = options.getByRole('region', {
+    name: 'Environment settings',
+  });
   const [basicBounds, environmentBounds] = await Promise.all([
     basicCard.boundingBox(),
     environmentCard.boundingBox(),
@@ -678,6 +689,73 @@ test('Detailed Studio preview and phase sequence stay usable across supported wi
       1024,
     );
   }
+  const previewBounds = await preview.boundingBox();
+  expect(previewBounds).not.toBeNull();
+  if (previewBounds !== null) {
+    expect(previewBounds.width).toBeGreaterThan(800);
+    expect(previewBounds.height).toBeGreaterThanOrEqual(176);
+  }
+
+  const phaseCard = sequence.locator('.phase-sequence__card').first();
+  const [cardBounds, dragBounds, selectBounds, moreBounds] = await Promise.all([
+    phaseCard.boundingBox(),
+    phaseCard.getByRole('button', { name: /^Drag Phase 1:/u }).boundingBox(),
+    phaseCard.getByRole('button', { name: /^Select Phase 1:/u }).boundingBox(),
+    phaseCard
+      .getByRole('button', { name: /^More actions for Phase 1:/u })
+      .boundingBox(),
+  ]);
+  expect(cardBounds).not.toBeNull();
+  expect(dragBounds).not.toBeNull();
+  expect(selectBounds).not.toBeNull();
+  expect(moreBounds).not.toBeNull();
+  if (
+    cardBounds !== null &&
+    dragBounds !== null &&
+    selectBounds !== null &&
+    moreBounds !== null
+  ) {
+    expect(cardBounds.width).toBeGreaterThanOrEqual(240);
+    expect(cardBounds.width).toBeLessThanOrEqual(260);
+    for (const controlBounds of [dragBounds, selectBounds, moreBounds]) {
+      expect(controlBounds.x).toBeGreaterThanOrEqual(cardBounds.x);
+      expect(controlBounds.x + controlBounds.width).toBeLessThanOrEqual(
+        cardBounds.x + cardBounds.width,
+      );
+    }
+  }
+
+  const duplicatePhaseAtCurrentWidth = async () => {
+    const before = await sequence.locator('.phase-sequence__card').count();
+    const phaseActions = options.getByRole('button', {
+      name: 'More actions for Phase 2: Short break',
+    });
+    await phaseActions.click();
+    const menu = options.getByRole('menu', {
+      name: 'Actions for Phase 2: Short break',
+    });
+    const duplicate = menu.getByRole('menuitem', {
+      name: 'Duplicate Phase 2',
+    });
+    await expect(duplicate).toBeVisible();
+    expect(
+      await duplicate.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          bounds.left + bounds.width / 2,
+          bounds.top + bounds.height / 2,
+        );
+        return hit === element || element.contains(hit);
+      }),
+    ).toBe(true);
+    await duplicate.click();
+    await expect(sequence.locator('.phase-sequence__card')).toHaveCount(
+      before + 1,
+    );
+    await expect(phaseActions).toHaveAttribute('aria-expanded', 'false');
+  };
+
+  await duplicatePhaseAtCurrentWidth();
 
   for (const width of [500, 640]) {
     await options.setViewportSize({ width, height: 800 });
@@ -694,6 +772,10 @@ test('Detailed Studio preview and phase sequence stay usable across supported wi
         (element) => element.scrollWidth >= element.clientWidth,
       ),
     ).toBe(true);
+    await expect(
+      options.getByRole('button', { name: 'Add phase' }),
+    ).toBeVisible();
+    if (width === 500) await duplicatePhaseAtCurrentWidth();
   }
 
   await options.setViewportSize({ width: 1280, height: 800 });

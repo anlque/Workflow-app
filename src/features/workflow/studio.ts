@@ -16,6 +16,8 @@ export {
 } from './presentation/RewardDiceEditor';
 export {
   WorkflowEditorChromeActions,
+  WorkflowEditorChromeIdentity,
+  WorkflowEditorChromeIdentityTarget,
   WorkflowEditorChromeModeAction,
   WorkflowEditorChromeModeTarget,
   WorkflowEditorChromeProvider,

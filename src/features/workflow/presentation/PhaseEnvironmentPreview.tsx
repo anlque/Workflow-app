@@ -7,6 +7,7 @@ import type { AssetReference } from '../domain/Environment';
 export type PhaseEnvironmentPreviewProps = Readonly<{
   phaseName: string;
   phasePosition: number;
+  totalPhases: number;
   phaseType: 'focus' | 'break';
   durationMinutes: string;
   backgroundColor: string;
@@ -38,6 +39,7 @@ function resolveAsset(
 export function PhaseEnvironmentPreview({
   phaseName,
   phasePosition,
+  totalPhases,
   phaseType,
   durationMinutes,
   backgroundColor,
@@ -111,21 +113,28 @@ export function PhaseEnvironmentPreview({
       )}
       <div className="phase-environment-preview__scrim" aria-hidden="true" />
       <div className="phase-environment-preview__content">
-        <span>Phase {String(phasePosition)}</span>
-        <h3>{label}</h3>
-        <p>
-          {minutes} min · {phaseType === 'focus' ? 'Focus' : 'Break'}
-        </p>
-      </div>
-      <div className="phase-environment-preview__meta">
-        <span>{background?.name ?? 'Color background'}</span>
-        <span>{ambient?.name ?? 'No ambient audio'}</span>
+        <span className="phase-environment-preview__position">
+          Phase {String(phasePosition)} of {String(totalPhases)}
+        </span>
+        <h2>{label}</h2>
+        <div className="phase-environment-preview__details">
+          <span className="phase-environment-preview__type">
+            {phaseType === 'focus' ? 'Focus' : 'Break'}
+          </span>
+          <span className="phase-environment-preview__duration">
+            {minutes} min
+          </span>
+        </div>
       </div>
       {unavailable ? (
         <p className="phase-environment-preview__fallback" role="status">
           Background preview unavailable
         </p>
       ) : null}
+      <div className="phase-environment-preview__meta">
+        <span>Background: {background?.name ?? 'Color background'}</span>
+        <span>Ambient: {ambient?.name ?? 'No ambient audio'}</span>
+      </div>
     </section>
   );
 }

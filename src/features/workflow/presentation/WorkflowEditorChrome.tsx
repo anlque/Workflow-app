@@ -12,9 +12,11 @@ type WorkflowEditorChromeContextValue = Readonly<{
   target: HTMLElement | null;
   statusTarget: HTMLElement | null;
   modeTarget: HTMLElement | null;
+  identityTarget: HTMLElement | null;
   setTarget(target: HTMLElement | null): void;
   setStatusTarget(target: HTMLElement | null): void;
   setModeTarget(target: HTMLElement | null): void;
+  setIdentityTarget(target: HTMLElement | null): void;
 }>;
 
 const WorkflowEditorChromeContext =
@@ -26,22 +28,42 @@ export function WorkflowEditorChromeProvider({
   const [target, setTarget] = useState<HTMLElement | null>(null);
   const [statusTarget, setStatusTarget] = useState<HTMLElement | null>(null);
   const [modeTarget, setModeTarget] = useState<HTMLElement | null>(null);
+  const [identityTarget, setIdentityTarget] = useState<HTMLElement | null>(
+    null,
+  );
   const value = useMemo(
     () => ({
       target,
       statusTarget,
       modeTarget,
+      identityTarget,
       setTarget,
       setStatusTarget,
       setModeTarget,
+      setIdentityTarget,
     }),
-    [modeTarget, statusTarget, target],
+    [identityTarget, modeTarget, statusTarget, target],
   );
 
   return (
     <WorkflowEditorChromeContext.Provider value={value}>
       {children}
     </WorkflowEditorChromeContext.Provider>
+  );
+}
+
+export function WorkflowEditorChromeIdentityTarget() {
+  const context = useContext(WorkflowEditorChromeContext);
+  const setIdentityTarget = context?.setIdentityTarget;
+  const targetRef = useCallback(
+    (target: HTMLDivElement | null) => {
+      setIdentityTarget?.(target);
+    },
+    [setIdentityTarget],
+  );
+
+  return (
+    <div className="workflow-editor-chrome__identity-target" ref={targetRef} />
   );
 }
 
@@ -100,6 +122,15 @@ export function WorkflowEditorChromeStatus({
   return context?.statusTarget === null || context === null
     ? children
     : createPortal(children, context.statusTarget);
+}
+
+export function WorkflowEditorChromeIdentity({
+  children,
+}: Readonly<{ children: ReactNode }>) {
+  const context = useContext(WorkflowEditorChromeContext);
+  return context?.identityTarget === null || context === null
+    ? children
+    : createPortal(children, context.identityTarget);
 }
 
 export function WorkflowEditorChromeModeAction({
