@@ -639,7 +639,13 @@ export function WorkflowEditor({
             }
           }}
         >
-          Reward Dice
+          <span>Reward Dice</span>
+          <span
+            className="editor-section-tabs__reward-status"
+            aria-hidden="true"
+          >
+            · {editor.draft.rewardDice.enabled ? 'Enabled' : 'Disabled'}
+          </span>
         </button>
       </div>
 

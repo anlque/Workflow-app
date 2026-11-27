@@ -631,8 +631,17 @@ describe('visual foundation', () => {
     expect(declarationsFor('.phase-settings__cards')).toContain(
       'grid-template-columns: repeat(2, minmax(0, 1fr));',
     );
-    expect(declarationsFor('.reward-editor__configuration')).toContain(
+    expect(declarationsFor('.reward-editor__configuration-fields')).toContain(
       'grid-template-columns: repeat(3, minmax(0, 1fr));',
+    );
+    expect(declarationsFor('.reward-editor__side-layout')).toContain(
+      'grid-template-columns: minmax(18rem, 0.9fr) minmax(22rem, 1.1fr);',
+    );
+    expect(
+      declarationsFor(".reward-side-list__item[aria-pressed='true']"),
+    ).toContain('border-color: var(--color-reward);');
+    expect(declarationsFor('.reward-side__fields')).toContain(
+      'grid-template-columns: minmax(0, 1fr) minmax(7rem, 0.35fr);',
     );
     expect(declarationsFor('.quick-setup__recipe')).toContain(
       'grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);',

@@ -744,6 +744,7 @@ describe('WorkflowEditor', () => {
     await user.type(name, 'Unsaved ritual');
     const phases = screen.getByRole('tab', { name: 'Phases' });
     const reward = screen.getByRole('tab', { name: 'Reward Dice' });
+    expect(within(reward).getByText('· Enabled')).toBeVisible();
     expect(phases).toHaveAttribute('aria-selected', 'true');
 
     phases.focus();

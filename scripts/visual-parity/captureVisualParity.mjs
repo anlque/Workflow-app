@@ -99,6 +99,125 @@ export const captureDefinitions = Object.freeze([
   },
 ]);
 
+const captureIds = Object.freeze(captureDefinitions.map(({ id }) => id));
+
+const stageCaptureIds = Object.freeze({
+  detailed: ['detailed-phases', 'detailed-reward-dice'],
+  quick: ['quick-setup-composite'],
+  workflowLibrary: ['workflows-library'],
+  assetLibrary: ['asset-library'],
+  sidePanelWorkflows: [
+    'side-panel-workflows',
+    'side-panel-workflows-wide',
+    'side-panel-workflows-narrow',
+    'side-panel-workflows-200-percent',
+  ],
+  sidePanel: [
+    'side-panel-workflows',
+    'side-panel-workflows-wide',
+    'side-panel-workflows-narrow',
+    'side-panel-workflows-200-percent',
+    'side-panel-session',
+  ],
+  imageSession: [
+    'focus-image',
+    'focus-narrow',
+    'focus-200-percent',
+    'side-panel-session',
+    'focus-paused',
+    'focus-stop-confirmation',
+  ],
+  colorSession: [
+    'focus-color',
+    'focus-transition',
+    'focus-reward-unlocked',
+    'focus-reward-rolled',
+    'focus-break-color',
+  ],
+  emptyFocus: ['focus-empty'],
+  errorFocus: ['focus-initialization-error'],
+});
+
+function includesAny(selectedIds, candidates) {
+  return candidates.some((id) => selectedIds.includes(id));
+}
+
+export function parseCaptureSelection(requestedIds) {
+  const normalizedIds =
+    requestedIds[0] === '--' ? requestedIds.slice(1) : requestedIds;
+  if (normalizedIds.length === 0) return [...captureIds];
+  const selectedIds = [...new Set(normalizedIds)];
+  for (const id of selectedIds) {
+    if (!captureIds.includes(id)) {
+      throw new Error(
+        `Unknown capture ID: ${id}. Available IDs: ${captureIds.join(', ')}`,
+      );
+    }
+  }
+  return selectedIds;
+}
+
+export function planCaptureRun(requestedIds) {
+  const selectedIds = parseCaptureSelection(requestedIds);
+  const fullCapture =
+    requestedIds.length === 0 ||
+    (requestedIds.length === 1 && requestedIds[0] === '--');
+  const stages = [];
+  const needsDetailed = includesAny(selectedIds, stageCaptureIds.detailed);
+  const needsQuick = includesAny(selectedIds, stageCaptureIds.quick);
+  const needsAssetLibrary = includesAny(
+    selectedIds,
+    stageCaptureIds.assetLibrary,
+  );
+  const needsWorkflowFixtures = includesAny(selectedIds, [
+    ...stageCaptureIds.workflowLibrary,
+    ...stageCaptureIds.sidePanelWorkflows,
+  ]);
+  const needsSidePanel = includesAny(selectedIds, stageCaptureIds.sidePanel);
+  const needsImageSession = includesAny(
+    selectedIds,
+    stageCaptureIds.imageSession,
+  );
+  const needsColorSession = includesAny(
+    selectedIds,
+    stageCaptureIds.colorSession,
+  );
+  const needsEmptyFocus = includesAny(selectedIds, stageCaptureIds.emptyFocus);
+  const needsErrorFocus = includesAny(selectedIds, stageCaptureIds.errorFocus);
+  const needsOptions = selectedIds.some(
+    (id) => !stageCaptureIds.errorFocus.includes(id),
+  );
+
+  if (needsOptions) stages.push('options');
+  if (
+    needsDetailed ||
+    needsAssetLibrary ||
+    needsWorkflowFixtures ||
+    needsImageSession ||
+    needsColorSession
+  ) {
+    stages.push('visual-assets');
+  }
+  if (needsWorkflowFixtures || needsImageSession) {
+    stages.push('detailed-image-workflow');
+  }
+  if (needsDetailed || needsWorkflowFixtures || needsColorSession) {
+    stages.push('detailed-visual-workflow');
+  }
+  if (needsQuick || needsWorkflowFixtures) stages.push('quick-workflow');
+  if (needsSidePanel) stages.push('side-panel');
+  if (needsImageSession) stages.push('image-session');
+  if (needsColorSession) stages.push('color-session');
+  if (needsEmptyFocus) stages.push('empty-focus');
+  if (needsErrorFocus) stages.push('error-focus');
+
+  return Object.freeze({
+    captureIds: Object.freeze(selectedIds),
+    stages: Object.freeze(stages),
+    fullCapture,
+  });
+}
+
 const repositoryRoot = resolve(import.meta.dirname, '../..');
 const extensionPath = resolve(repositoryRoot, '.output/chrome-mv3');
 
@@ -219,12 +338,74 @@ async function createDetailedVisualWorkflow(options) {
   await options
     .getByLabel('Reward side 1 description')
     .fill('Drink a cup of green tea.');
+  await options.getByLabel('Reward side 1 weight').fill('25');
   await options.getByRole('button', { name: /Select reward side 2/u }).click();
   await options.getByLabel('Reward side 2 icon').fill('🧘');
   await options.getByLabel('Reward side 2 title').fill('Stretch');
   await options
     .getByLabel('Reward side 2 description')
     .fill('Move and release tension.');
+  await options.getByLabel('Reward side 2 availability').selectOption('early');
+  await options.getByLabel('Reward side 2 weight').fill('20');
+  const extraSides = [
+    {
+      icon: '🌿',
+      title: 'Fresh air',
+      description: 'Step outside.',
+      availability: 'late',
+      weight: '20',
+    },
+    {
+      icon: '🎧',
+      title: 'One song',
+      description: 'Listen without multitasking.',
+      availability: 'any',
+      weight: '15',
+    },
+    {
+      icon: '✨',
+      title: 'Bonus focus',
+      description: 'Continue with a gentler phase.',
+      availability: 'late',
+      weight: '20',
+    },
+  ];
+  for (const [offset, side] of extraSides.entries()) {
+    const sideNumber = offset + 3;
+    await options.getByRole('button', { name: 'Add reward side' }).click();
+    await options
+      .getByRole('button', {
+        name: `Select reward side ${String(sideNumber)}: Side ${String(sideNumber)}`,
+      })
+      .click();
+    await options
+      .getByLabel(`Reward side ${String(sideNumber)} icon`)
+      .fill(side.icon);
+    await options
+      .getByLabel(`Reward side ${String(sideNumber)} title`)
+      .fill(side.title);
+    await options
+      .getByLabel(`Reward side ${String(sideNumber)} description`)
+      .fill(side.description);
+    await options
+      .getByLabel(`Reward side ${String(sideNumber)} availability`)
+      .selectOption(side.availability);
+    await options
+      .getByLabel(`Reward side ${String(sideNumber)} weight`)
+      .fill(side.weight);
+  }
+  await options.getByLabel('Enable Bonus Phase for side 5').check();
+  await options.getByLabel('Side 5 Bonus Phase name').fill('Gentle reset');
+  await options.getByLabel('Side 5 Bonus Phase duration in minutes').fill('8');
+  await options.getByLabel('Side 5 Bonus Phase background image').selectOption({
+    label: 'visual-parity-image.webp',
+  });
+  await options.getByLabel('Side 5 Bonus Phase ambient audio').selectOption({
+    label: 'visual-parity-audio.ogg',
+  });
+  await options
+    .getByLabel('Side 5 Bonus Phase background color')
+    .fill('#5f806f');
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await options
     .getByRole('status')
@@ -232,7 +413,7 @@ async function createDetailedVisualWorkflow(options) {
     .waitFor();
 }
 
-async function createQuickVisualWorkflow(options) {
+async function createQuickVisualWorkflow(options, captureQuickSetup) {
   await openNewWorkflow(options, 'Quick setup');
   await options.getByLabel('Workflow name').fill('Visual parity quick flow');
   await options.getByLabel('Cycles').fill('4');
@@ -251,8 +432,10 @@ async function createQuickVisualWorkflow(options) {
   await options.getByLabel('Reward side 2 icon').fill('🧘');
   await options.getByLabel('Reward side 2 title').fill('Stretch');
   await options.getByLabel('Reward side 2 weight').fill('40');
-  await options.evaluate(() => window.scrollTo(0, 0));
-  await capture(options, 'quick-setup-composite');
+  if (captureQuickSetup) {
+    await options.evaluate(() => window.scrollTo(0, 0));
+    await capture(options, 'quick-setup-composite');
+  }
   await options.keyboard.press('Escape');
   await options.getByRole('button', { name: 'Save workflow' }).click();
   await options
@@ -338,8 +521,10 @@ async function removeAllWorkflows(options) {
   }
 }
 
-async function verifyCaptureFiles() {
-  for (const item of captureDefinitions) {
+async function verifyCaptureFiles(selectedIds) {
+  for (const item of captureDefinitions.filter(({ id }) =>
+    selectedIds.includes(id),
+  )) {
     const path = resolve(actualCaptureDirectory, item.actualFilename);
     const buffer = await readFile(path);
     if (buffer.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') {
@@ -362,9 +547,15 @@ export async function prepareActualCaptureDirectory(
   await mkdir(directory, { recursive: true });
 }
 
-export async function captureVisualParity() {
+export async function captureVisualParity(requestedIds = []) {
+  const plan = planCaptureRun(requestedIds);
+  const selectedIds = new Set(plan.captureIds);
+  const stages = new Set(plan.stages);
+  const selected = (id) => selectedIds.has(id);
+
   await validateVisualParityManifest(visualParityManifest);
-  await prepareActualCaptureDirectory();
+  if (plan.fullCapture) await prepareActualCaptureDirectory();
+  else await mkdir(actualCaptureDirectory, { recursive: true });
 
   const context = await chromium.launchPersistentContext('', {
     channel: 'chromium',
@@ -384,109 +575,193 @@ export async function captureVisualParity() {
     worker ??= await context.waitForEvent('serviceworker');
     const extensionRoot = `chrome-extension://${new URL(worker.url()).host}`;
 
-    const options = await context.newPage();
-    await options.goto(`${extensionRoot}/options.html`);
-    await options.locator('.workflow-studio-shell__brand-name').waitFor();
+    let options;
+    let sidePanel;
+    let focus;
 
-    await seedVisualAssets(options);
-    await createDetailedImageWorkflow(options);
-    await createDetailedVisualWorkflow(options);
-    await options.evaluate(() => window.scrollTo(0, 0));
-    await capture(options, 'detailed-reward-dice');
-    await options.getByRole('tab', { name: 'Phases' }).click();
-    await options
-      .getByRole('button', { name: 'Select Phase 2: Important Break' })
-      .click();
-    await options.evaluate(() => window.scrollTo(0, 0));
-    await capture(options, 'detailed-phases');
+    if (stages.has('options')) {
+      options = await context.newPage();
+      await options.goto(`${extensionRoot}/options.html`);
+      await options.locator('.workflow-studio-shell__brand-name').waitFor();
+    }
+    if (stages.has('visual-assets')) await seedVisualAssets(options);
+    if (stages.has('detailed-image-workflow')) {
+      await createDetailedImageWorkflow(options);
+    }
+    if (stages.has('detailed-visual-workflow')) {
+      await createDetailedVisualWorkflow(options);
+    }
+    if (selected('detailed-reward-dice')) {
+      await options.evaluate(() => window.scrollTo(0, 0));
+      await capture(options, 'detailed-reward-dice');
+    }
+    if (selected('detailed-phases')) {
+      await options.getByRole('tab', { name: 'Phases' }).click();
+      await options
+        .getByRole('button', { name: 'Select Phase 2: Important Break' })
+        .click();
+      await options.evaluate(() => window.scrollTo(0, 0));
+      await capture(options, 'detailed-phases');
+    }
+    if (stages.has('quick-workflow')) {
+      await createQuickVisualWorkflow(
+        options,
+        selected('quick-setup-composite'),
+      );
+    }
+    if (selected('workflows-library')) {
+      await openWorkflowLibrary(options);
+      await options.evaluate(() => window.scrollTo(0, 0));
+      await capture(options, 'workflows-library');
+    }
+    if (selected('asset-library')) {
+      await options.getByRole('tab', { name: 'Assets' }).click();
+      await options.evaluate(() => window.scrollTo(0, 0));
+      await capture(options, 'asset-library');
+    }
+    if (selected('settings')) {
+      await options.getByRole('tab', { name: 'Settings' }).click();
+      await options.evaluate(() => window.scrollTo(0, 0));
+      await capture(options, 'settings');
+    }
 
-    await createQuickVisualWorkflow(options);
-    await openWorkflowLibrary(options);
-    await options.evaluate(() => window.scrollTo(0, 0));
-    await capture(options, 'workflows-library');
+    if (stages.has('side-panel')) {
+      sidePanel = await context.newPage();
+      await sidePanel.goto(`${extensionRoot}/sidepanel.html`);
+      await sidePanel.getByRole('heading', { name: 'Locusora' }).waitFor();
+      for (const id of stageCaptureIds.sidePanel.slice(0, 4)) {
+        if (selected(id)) await capture(sidePanel, id);
+      }
+    }
 
-    await options.getByRole('tab', { name: 'Assets' }).click();
-    await options.evaluate(() => window.scrollTo(0, 0));
-    await capture(options, 'asset-library');
+    if (stages.has('image-session') || stages.has('color-session')) {
+      focus = await context.newPage();
+      await focus.goto(`${extensionRoot}/focus.html`);
+      await focus.getByRole('heading', { name: 'Choose a Workflow' }).waitFor();
+    }
 
-    await options.getByRole('tab', { name: 'Settings' }).click();
-    await options.evaluate(() => window.scrollTo(0, 0));
-    await capture(options, 'settings');
+    if (stages.has('image-session')) {
+      await focus
+        .getByRole('button', {
+          name: 'Start workflow: Visual parity image flow',
+        })
+        .click();
+      await focus.getByRole('button', { name: 'Pause' }).waitFor();
+      for (const id of ['focus-image', 'focus-narrow', 'focus-200-percent']) {
+        if (selected(id)) await capture(focus, id);
+      }
+      if (selected('side-panel-session')) {
+        await capture(sidePanel, 'side-panel-session');
+      }
 
-    const sidePanel = await context.newPage();
-    await sidePanel.goto(`${extensionRoot}/sidepanel.html`);
-    await sidePanel.getByRole('heading', { name: 'Locusora' }).waitFor();
-    await capture(sidePanel, 'side-panel-workflows');
-    await capture(sidePanel, 'side-panel-workflows-wide');
-    await capture(sidePanel, 'side-panel-workflows-narrow');
-    await capture(sidePanel, 'side-panel-workflows-200-percent');
+      const mustPause =
+        selected('focus-paused') ||
+        selected('focus-stop-confirmation') ||
+        stages.has('color-session') ||
+        stages.has('empty-focus');
+      if (mustPause) {
+        await focus.getByRole('button', { name: 'Pause' }).click();
+        await focus.getByRole('button', { name: 'Resume' }).waitFor();
+        if (selected('focus-paused')) await capture(focus, 'focus-paused');
+        await focus.getByRole('button', { name: 'Resume' }).click();
+      }
+      if (selected('focus-stop-confirmation')) {
+        await focus.getByRole('button', { name: 'Stop' }).click();
+        await focus
+          .getByRole('dialog', { name: 'Stop this session?' })
+          .waitFor();
+        await capture(focus, 'focus-stop-confirmation');
+        await focus.getByRole('button', { name: 'Cancel' }).click();
+      }
+      if (stages.has('color-session') || stages.has('empty-focus')) {
+        await stopSession(focus);
+      }
+    }
 
-    const focus = await context.newPage();
-    await focus.goto(`${extensionRoot}/focus.html`);
-    await focus.getByRole('heading', { name: 'Choose a Workflow' }).waitFor();
-    await focus
-      .getByRole('button', { name: 'Start workflow: Visual parity image flow' })
-      .click();
-    await focus.getByRole('button', { name: 'Pause' }).waitFor();
-    await capture(focus, 'focus-image');
-    await capture(focus, 'focus-narrow');
-    await capture(focus, 'focus-200-percent');
-    await capture(sidePanel, 'side-panel-session');
-    await focus.getByRole('button', { name: 'Pause' }).click();
-    await focus.getByRole('button', { name: 'Resume' }).waitFor();
-    await capture(focus, 'focus-paused');
-    await focus.getByRole('button', { name: 'Resume' }).click();
-    await focus.getByRole('button', { name: 'Stop' }).click();
-    await focus.getByRole('dialog', { name: 'Stop this session?' }).waitFor();
-    await capture(focus, 'focus-stop-confirmation');
-    await focus.getByRole('button', { name: 'Cancel' }).click();
-    await stopSession(focus);
+    if (stages.has('color-session')) {
+      await focus
+        .getByRole('button', {
+          name: 'Start workflow: Visual parity color flow',
+        })
+        .click();
+      await focus.getByRole('button', { name: 'Pause' }).waitFor();
+      if (selected('focus-color')) await capture(focus, 'focus-color');
 
-    await focus
-      .getByRole('button', {
-        name: 'Start workflow: Visual parity color flow',
-      })
-      .click();
-    await focus.getByRole('button', { name: 'Pause' }).waitFor();
-    await capture(focus, 'focus-color');
-    await expireActiveSessionDeadline(focus);
-    await focus.getByText('Transitioning to the next phase…').waitFor({
-      timeout: 15_000,
-    });
-    await capture(focus, 'focus-transition');
-    await expireActiveSessionDeadline(focus);
-    const reward = focus.getByRole('dialog', { name: 'Reward unlocked' });
-    await reward.waitFor({ timeout: 15_000 });
-    await capture(focus, 'focus-reward-unlocked');
-    await reward.getByRole('button', { name: 'Roll dice' }).click();
-    await reward.getByRole('heading', { level: 3 }).waitFor({
-      timeout: 8_000,
-    });
-    await capture(focus, 'focus-reward-rolled');
-    await reward.getByRole('button', { name: 'Continue' }).click();
-    await focus.getByRole('heading', { name: 'Important Break' }).waitFor();
-    await capture(focus, 'focus-break-color');
-    await stopSession(focus);
+      const needsTransition = stageCaptureIds.colorSession
+        .slice(1)
+        .some(selected);
+      if (needsTransition) {
+        await expireActiveSessionDeadline(focus);
+        await focus.getByText('Transitioning to the next phase…').waitFor({
+          timeout: 15_000,
+        });
+        if (selected('focus-transition')) {
+          await capture(focus, 'focus-transition');
+        }
+      }
 
-    await removeAllWorkflows(options);
-    await focus.reload();
-    await focus.getByText('Create a Workflow').waitFor();
-    await capture(focus, 'focus-empty');
+      const needsReward =
+        selected('focus-reward-unlocked') ||
+        selected('focus-reward-rolled') ||
+        selected('focus-break-color') ||
+        stages.has('empty-focus');
+      let reward;
+      if (needsReward) {
+        await expireActiveSessionDeadline(focus);
+        reward = focus.getByRole('dialog', { name: 'Reward unlocked' });
+        await reward.waitFor({ timeout: 15_000 });
+        if (selected('focus-reward-unlocked')) {
+          await capture(focus, 'focus-reward-unlocked');
+        }
+      }
+      const needsRoll =
+        selected('focus-reward-rolled') ||
+        selected('focus-break-color') ||
+        stages.has('empty-focus');
+      if (needsRoll) {
+        await reward.getByRole('button', { name: 'Roll dice' }).click();
+        await reward.getByRole('heading', { level: 3 }).waitFor({
+          timeout: 8_000,
+        });
+        if (selected('focus-reward-rolled')) {
+          await capture(focus, 'focus-reward-rolled');
+        }
+      }
+      if (selected('focus-break-color') || stages.has('empty-focus')) {
+        await reward.getByRole('button', { name: 'Continue' }).click();
+        await focus.getByRole('heading', { name: 'Important Break' }).waitFor();
+        if (selected('focus-break-color')) {
+          await capture(focus, 'focus-break-color');
+        }
+      }
+      if (stages.has('empty-focus')) await stopSession(focus);
+    }
 
-    const errorPage = await context.newPage();
-    await errorPage.addInitScript(() => {
-      Object.defineProperty(chrome.runtime, 'sendMessage', {
-        configurable: true,
-        value: () => Promise.reject(new Error('Visual parity capture error.')),
+    if (stages.has('empty-focus')) {
+      await removeAllWorkflows(options);
+      focus ??= await context.newPage();
+      await focus.goto(`${extensionRoot}/focus.html`);
+      await focus.getByText('Create a Workflow').waitFor();
+      await capture(focus, 'focus-empty');
+    }
+
+    if (stages.has('error-focus')) {
+      const errorPage = await context.newPage();
+      await errorPage.addInitScript(() => {
+        Object.defineProperty(chrome.runtime, 'sendMessage', {
+          configurable: true,
+          value: () =>
+            Promise.reject(new Error('Visual parity capture error.')),
+        });
       });
-    });
-    await errorPage.goto(`${extensionRoot}/focus.html`);
-    await errorPage.getByRole('alert').waitFor();
-    await capture(errorPage, 'focus-initialization-error');
+      await errorPage.goto(`${extensionRoot}/focus.html`);
+      await errorPage.getByRole('alert').waitFor();
+      await capture(errorPage, 'focus-initialization-error');
+    }
 
-    await verifyCaptureFiles();
+    await verifyCaptureFiles(plan.captureIds);
     console.log(
-      `Visual parity capture complete: ${String(captureDefinitions.length)} PNGs.`,
+      `Visual parity capture complete: ${String(plan.captureIds.length)} PNGs.`,
     );
   } finally {
     await context.close();
@@ -497,5 +772,10 @@ if (
   process.argv[1] !== undefined &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
-  await captureVisualParity();
+  try {
+    await captureVisualParity(process.argv.slice(2));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 }

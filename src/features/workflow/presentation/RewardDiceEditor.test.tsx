@@ -8,6 +8,145 @@ import { RewardDiceEditor } from './RewardDiceEditor';
 import type { RewardSideDraft } from './useWorkflowEditor';
 
 describe('RewardDiceEditor', () => {
+  test('composes configuration, side list, selected editor and Bonus Phase as distinct cards', () => {
+    render(
+      <RewardDiceEditor
+        assets={[]}
+        draft={{
+          enabled: true,
+          scheduleMode: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: '5',
+          customPhaseKeys: [],
+          rerolls: '2',
+          sides: [
+            {
+              key: 'tea',
+              icon: '☕',
+              title: 'Tea',
+              description: 'Make a warm drink.',
+              weight: '1',
+              availability: 'any',
+              bonusPhase: {
+                enabled: true,
+                name: 'Tea break',
+                durationMinutes: '5',
+                backgroundAsset: undefined,
+                audioAsset: undefined,
+                backgroundColor: '',
+              },
+            },
+            {
+              key: 'walk',
+              icon: '🚶',
+              title: 'Walk',
+              description: 'Move for a while.',
+              weight: '3',
+              availability: 'late',
+            },
+          ],
+        }}
+        errors={{}}
+        onEnabledChange={() => undefined}
+        onScheduleModeChange={() => undefined}
+        onTriggerPhaseTypeChange={() => undefined}
+        onFrequencyChange={() => undefined}
+        onRerollsChange={() => undefined}
+        onSideChange={() => undefined}
+        onBonusDurationChange={() => undefined}
+        onBonusDurationCommit={() => undefined}
+        onBonusDurationStep={() => undefined}
+        onAddSide={() => undefined}
+        onRemoveSide={() => undefined}
+      />,
+    );
+
+    const configuration = screen.getByRole('group', {
+      name: 'Reward configuration',
+    });
+    expect(configuration).toHaveClass('reward-editor__configuration');
+    expect(
+      within(configuration).getByLabelText('Enable Reward Dice'),
+    ).toBeVisible();
+    expect(within(configuration).getByLabelText('Reward after')).toBeVisible();
+    expect(
+      within(configuration).getByLabelText('Reward frequency'),
+    ).toHaveValue('5');
+    expect(
+      within(configuration).getByLabelText('Available rerolls'),
+    ).toHaveValue('2');
+
+    const sideList = screen.getByRole('region', { name: 'Dice sides' });
+    const selected = screen.getByRole('region', {
+      name: 'Selected reward side',
+    });
+    expect(sideList).toHaveClass('reward-editor__sides-card');
+    expect(selected).toHaveClass('reward-side-editor');
+    expect(within(sideList).getByText('Total chance 100%')).toBeVisible();
+    expect(
+      within(sideList).getByRole('button', { name: 'Add reward side' }),
+    ).toBeVisible();
+    expect(
+      within(selected).getByLabelText('Side 1 Bonus Phase name'),
+    ).toHaveValue('Tea break');
+    expect(
+      within(selected).getByRole('group', { name: 'Side 1 Bonus Phase' }),
+    ).toBeVisible();
+  });
+
+  test('presents raw weights and normalized chances separately in dense side rows', () => {
+    render(
+      <RewardDiceEditor
+        assets={[]}
+        draft={{
+          enabled: true,
+          scheduleMode: 'frequency',
+          triggerPhaseType: 'focus',
+          frequency: '1',
+          customPhaseKeys: [],
+          rerolls: '0',
+          sides: [
+            {
+              key: 'one',
+              icon: '1',
+              title: 'One',
+              description: 'First',
+              weight: '1',
+              availability: 'early',
+            },
+            {
+              key: 'two',
+              icon: '2',
+              title: 'Two',
+              description: 'Second',
+              weight: '3',
+              availability: 'late',
+            },
+          ],
+        }}
+        errors={{}}
+        onEnabledChange={() => undefined}
+        onScheduleModeChange={() => undefined}
+        onTriggerPhaseTypeChange={() => undefined}
+        onFrequencyChange={() => undefined}
+        onRerollsChange={() => undefined}
+        onSideChange={() => undefined}
+        onBonusDurationChange={() => undefined}
+        onBonusDurationCommit={() => undefined}
+        onBonusDurationStep={() => undefined}
+        onAddSide={() => undefined}
+        onRemoveSide={() => undefined}
+      />,
+    );
+
+    const firstRow = screen.getByRole('listitem', { name: 'Reward side 1' });
+    expect(within(firstRow).getByText('First')).toBeVisible();
+    expect(within(firstRow).getByText('Early')).toBeVisible();
+    expect(within(firstRow).getByText('Weight 1')).toBeVisible();
+    expect(within(firstRow).getByText('25% chance')).toBeVisible();
+    expect(within(firstRow).queryByText('Weight 1 · 25% chance')).toBeNull();
+  });
+
   test('separates the Side list from the selected Side editor and supports keyboard selection', async () => {
     const user = userEvent.setup();
     const props = {
@@ -177,6 +316,8 @@ describe('RewardDiceEditor', () => {
 
     expect(screen.getByRole('region', { name: 'Reward Dice' })).toBeVisible();
     expect(screen.queryByLabelText('Reward frequency')).toBeNull();
+    expect(screen.getByRole('radio', { name: 'Frequency' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'Custom' })).toBeDisabled();
     const enabled = screen.getByLabelText('Enable Reward Dice');
     expect(enabled.closest('label')).toHaveClass('switch-control');
     await user.click(enabled);
