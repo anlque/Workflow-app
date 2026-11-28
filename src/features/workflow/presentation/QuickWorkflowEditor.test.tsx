@@ -166,6 +166,43 @@ describe('QuickWorkflowEditor', () => {
     );
   });
 
+  test('composes the approved recipe, optional sections and conversion guidance', () => {
+    render(
+      <QuickWorkflowEditor
+        workflowId="quick-composition"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+
+    const recipe = screen.getByRole('region', { name: 'Session recipe' });
+    expect(recipe).toHaveClass('quick-setup__recipe');
+    expect(within(recipe).getByText('+')).toBeVisible();
+    expect(within(recipe).getByText('×')).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Focus assets' })).toHaveClass(
+      'quick-setup__asset-card--focus',
+    );
+    const focusAssets = screen.getByRole('region', { name: 'Focus assets' });
+    expect(within(focusAssets).getByText('Image')).toBeVisible();
+    expect(within(focusAssets).getByText('Audio')).toBeVisible();
+    expect(within(focusAssets).getByText('Color')).toBeVisible();
+    expect(screen.getByLabelText('Focus background image')).toBeVisible();
+    expect(screen.getByLabelText('Focus ambient audio')).toBeVisible();
+    expect(screen.getByLabelText('Focus background color')).toBeVisible();
+    expect(
+      screen.getByRole('region', { name: 'Short Break assets' }),
+    ).toHaveClass('quick-setup__asset-card--break');
+    expect(screen.getByRole('region', { name: 'Long Break' })).toHaveClass(
+      'quick-setup__optional-section',
+    );
+    expect(screen.getByRole('region', { name: 'Reward Dice' })).toHaveClass(
+      'quick-setup__optional-section',
+    );
+    expect(screen.getByText(/Need more control\?/iu)).toHaveTextContent(
+      /Detailed setup/iu,
+    );
+  });
+
   test('withholds the generated rhythm for cadence outside the cycle count', async () => {
     const user = userEvent.setup();
     render(
@@ -227,14 +264,51 @@ describe('QuickWorkflowEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Configure sides' }));
     const drawer = screen.getByRole('dialog', { name: 'Reward sides drawer' });
     expect(drawer).toHaveClass('quick-reward-drawer');
+    expect(drawer).toHaveAttribute('data-presentation', 'side-sheet');
+    expect(drawer).toHaveAttribute('data-modal', 'false');
+    expect(drawer.closest('form')).toHaveAttribute(
+      'data-reward-drawer-open',
+      'true',
+    );
     expect(within(drawer).getByText('2 sides')).toBeVisible();
     expect(within(drawer).getByText('Total chance 100%')).toBeVisible();
     expect(drawer.querySelector('.quick-reward-drawer__footer')).not.toBeNull();
+    expect(drawer.querySelector('.quick-reward-drawer__sides')).toHaveClass(
+      'quick-reward-drawer__sides--scrollable',
+    );
+    expect(
+      within(drawer).getByRole('button', { name: 'Cancel' }),
+    ).toBeVisible();
+    expect(
+      within(drawer).getByRole('button', { name: 'Apply changes' }),
+    ).toBeVisible();
     expect(screen.getAllByLabelText(/Reward side \d icon/u)).toHaveLength(2);
     await user.click(
       screen.getByRole('button', { name: 'Remove Reward side 1' }),
     );
     expect(screen.getAllByLabelText(/Reward side \d icon/u)).toHaveLength(2);
+  });
+
+  test('preserves Reward side draft after closing and reopening the drawer', async () => {
+    const user = userEvent.setup();
+    render(
+      <QuickWorkflowEditor
+        workflowId="quick-drawer-draft"
+        assets={[]}
+        onSave={() => Promise.resolve()}
+      />,
+    );
+    await user.click(screen.getByRole('checkbox', { name: 'Use Reward Dice' }));
+    await user.click(screen.getByRole('button', { name: 'Configure sides' }));
+    await user.type(screen.getByLabelText('Reward side 1 title'), 'Tea break');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(
+      screen.getByRole('button', { name: 'Configure sides' }),
+    ).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Configure sides' }));
+    expect(screen.getByLabelText('Reward side 1 title')).toHaveValue(
+      'Tea break',
+    );
   });
 
   test('does not show a probability summary for an incomplete Reward weight draft', async () => {

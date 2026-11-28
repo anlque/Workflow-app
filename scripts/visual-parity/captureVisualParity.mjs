@@ -428,11 +428,34 @@ async function createQuickVisualWorkflow(options, captureQuickSetup) {
   await options.getByRole('dialog', { name: 'Reward sides drawer' }).waitFor();
   await options.getByLabel('Reward side 1 icon').fill('☕');
   await options.getByLabel('Reward side 1 title').fill('Tea break');
-  await options.getByLabel('Reward side 1 weight').fill('60');
+  await options.getByLabel('Reward side 1 weight').fill('25');
   await options.getByLabel('Reward side 2 icon').fill('🧘');
   await options.getByLabel('Reward side 2 title').fill('Stretch');
-  await options.getByLabel('Reward side 2 weight').fill('40');
+  await options.getByLabel('Reward side 2 weight').fill('20');
+  for (let index = 0; index < 3; index += 1) {
+    await options.getByRole('button', { name: 'Add side' }).click();
+  }
+  const additionalSides = [
+    { icon: '🌀', title: 'Fresh air', weight: '20' },
+    { icon: '🎵', title: 'Favourite song', weight: '15' },
+    { icon: '🍬', title: 'Sweet treat', weight: '20' },
+  ];
+  for (const [index, side] of additionalSides.entries()) {
+    const sideNumber = index + 3;
+    await options
+      .getByLabel(`Reward side ${String(sideNumber)} icon`)
+      .fill(side.icon);
+    await options
+      .getByLabel(`Reward side ${String(sideNumber)} title`)
+      .fill(side.title);
+    await options
+      .getByLabel(`Reward side ${String(sideNumber)} weight`)
+      .fill(side.weight);
+  }
   if (captureQuickSetup) {
+    await options
+      .locator('.quick-reward-drawer__sides')
+      .evaluate((element) => element.scrollTo(0, 0));
     await options.evaluate(() => window.scrollTo(0, 0));
     await capture(options, 'quick-setup-composite');
   }

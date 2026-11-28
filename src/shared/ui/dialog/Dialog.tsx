@@ -7,6 +7,8 @@ export type DialogProps = Readonly<{
   className?: string;
   describedBy?: string;
   surface?: 'glass';
+  modal?: boolean;
+  presentation?: 'side-sheet';
   onCancel(): void;
 }>;
 
@@ -17,6 +19,8 @@ export function Dialog({
   className,
   describedBy,
   surface,
+  modal = true,
+  presentation,
   onCancel,
 }: DialogProps) {
   const titleId = useId();
@@ -25,12 +29,31 @@ export function Dialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     if (dialog === null || !open) return;
-    if (typeof dialog.showModal === 'function') dialog.showModal();
+    if (modal && typeof dialog.showModal === 'function') dialog.showModal();
+    else if (!modal && typeof dialog.show === 'function') dialog.show();
     else dialog.setAttribute('open', '');
+    if (!modal) {
+      dialog
+        .querySelector<HTMLElement>(
+          'button, input, select, textarea, [tabindex]',
+        )
+        ?.focus();
+    }
     return () => {
       if (dialog.open && typeof dialog.close === 'function') dialog.close();
     };
-  }, [open]);
+  }, [modal, open]);
+
+  useEffect(() => {
+    if (!open || modal) return;
+    const cancelOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onCancel();
+    };
+    document.addEventListener('keydown', cancelOnEscape);
+    return () => document.removeEventListener('keydown', cancelOnEscape);
+  }, [modal, onCancel, open]);
 
   if (!open) return null;
 
@@ -40,6 +63,8 @@ export function Dialog({
       className={['dialog', className].filter(Boolean).join(' ')}
       data-position="viewport-center"
       data-surface={surface}
+      data-modal={String(modal)}
+      data-presentation={presentation}
       aria-labelledby={titleId}
       aria-describedby={describedBy}
       onCancel={(event) => {

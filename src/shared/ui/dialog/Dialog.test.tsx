@@ -49,4 +49,30 @@ describe('Dialog', () => {
       'role-help',
     );
   });
+
+  test('cancels a non-modal side sheet on document Escape while focus is outside', () => {
+    const onCancel = vi.fn();
+    render(
+      <>
+        <button type="button">Main form control</button>
+        <Dialog open modal={false} title="Reward sides" onCancel={onCancel}>
+          <button type="button">Drawer control</button>
+        </Dialog>
+      </>,
+    );
+    screen.getByRole('button', { name: 'Main form control' }).focus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  test('does not synthesize document Escape for modal dialogs', () => {
+    const onCancel = vi.fn();
+    render(
+      <Dialog open title="Modal" onCancel={onCancel}>
+        <button type="button">Modal control</button>
+      </Dialog>,
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCancel).not.toHaveBeenCalled();
+  });
 });

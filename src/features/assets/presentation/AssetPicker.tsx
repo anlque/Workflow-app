@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 
 import { Button, Select } from '@/shared';
 
@@ -19,6 +19,7 @@ export type AssetPickerUploadSynchronization = () => Promise<void>;
 
 export type AssetPickerProps = Readonly<{
   label: string;
+  visibleLabel?: ReactNode;
   kind: AssetKind;
   assets: readonly Asset[];
   value?: AssetPickerValue | undefined;
@@ -29,6 +30,7 @@ export type AssetPickerProps = Readonly<{
 
 export function AssetPicker({
   label,
+  visibleLabel,
   kind,
   assets,
   value,
@@ -109,7 +111,8 @@ export function AssetPicker({
   return (
     <div className="asset-picker">
       <Select
-        label={label}
+        label={visibleLabel ?? label}
+        aria-label={label}
         value={selectedToken}
         onChange={(event) => {
           onChange(

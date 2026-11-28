@@ -1333,6 +1333,60 @@ describe('WorkflowStudio', () => {
     expect(screen.getByRole('heading', { name: 'Local Assets' })).toBeVisible();
   });
 
+  test('preserves an existing Quick name and Reward side draft across Studio tabs', async () => {
+    const user = userEvent.setup();
+    const quick = createWorkflow({
+      mode: 'quick',
+      id: 'quick-tab-draft',
+      name: 'Quick tab draft',
+      configuration: {
+        cycleCount: 4,
+        focus: { durationSeconds: 1_500, environment: {} },
+        shortBreak: { durationSeconds: 300, environment: {} },
+        rewardDice: {
+          frequency: 2,
+          sides: [
+            { icon: '☕', title: 'Tea' },
+            { icon: '🌿', title: 'Fresh air' },
+          ],
+        },
+      },
+    });
+    render(
+      <WorkflowStudio
+        dependencies={dependencies({
+          load: () =>
+            Promise.resolve({
+              workflows: [quick],
+              assets: [],
+              settings: defaultSettings,
+            }),
+        })}
+      />,
+    );
+
+    const name = await screen.findByLabelText('Workflow name');
+    await user.clear(name);
+    await user.type(name, 'Unsaved quick name');
+    await user.click(screen.getByRole('button', { name: 'Configure sides' }));
+    const sideTitle = screen.getByLabelText('Reward side 1 title');
+    await user.clear(sideTitle);
+    await user.type(sideTitle, 'Unsaved tea');
+    await user.click(screen.getByRole('button', { name: 'Apply changes' }));
+
+    await user.click(screen.getByRole('tab', { name: 'Assets' }));
+    await user.click(screen.getByRole('tab', { name: 'Settings' }));
+    await user.click(screen.getByRole('tab', { name: 'Workflows' }));
+
+    expect(screen.getByLabelText('Workflow name')).toHaveValue(
+      'Unsaved quick name',
+    );
+    await user.click(screen.getByRole('button', { name: 'Configure sides' }));
+    expect(screen.getByLabelText('Reward side 1 title')).toHaveValue(
+      'Unsaved tea',
+    );
+  });
+
   test.each(['publication', 'load'] as const)(
     'preserves the draft and retries only synchronization after an inline upload %s failure',
     async (failure) => {

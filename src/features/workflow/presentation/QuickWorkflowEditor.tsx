@@ -13,6 +13,7 @@ import type { CreateWorkflowInput } from '../domain/Workflow';
 import { createQuickRhythmPresentation } from './quickRhythmPresentation';
 import {
   WorkflowEditorChromeActions,
+  WorkflowEditorChromeIdentity,
   WorkflowEditorChromeStatus,
   WorkflowEditorChromeModeAction,
 } from './WorkflowEditorChrome';
@@ -56,6 +57,9 @@ export function QuickWorkflowEditor({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerModal, setDrawerModal] = useState(
+    () => window.matchMedia?.('(max-width: 64rem)').matches ?? false,
+  );
   const [saved, setSaved] = useState(false);
   const [conversionOpen, setConversionOpen] = useState(false);
   const [keepQuickCopy, setKeepQuickCopy] = useState(false);
@@ -63,6 +67,7 @@ export function QuickWorkflowEditor({
   const [conversionCommitted, setConversionCommitted] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
   const saveStatusTimer = useRef<number | undefined>(undefined);
+  const configureSidesButton = useRef<HTMLButtonElement>(null);
   const rewardInputs = useRef(new Map<string, HTMLInputElement>());
   const [pendingRewardFocusKey, setPendingRewardFocusKey] = useState<
     string | null
@@ -83,6 +88,15 @@ export function QuickWorkflowEditor({
   });
 
   useEffect(() => onDirtyChange?.(editor.dirty), [editor.dirty, onDirtyChange]);
+
+  useEffect(() => {
+    const query = window.matchMedia?.('(max-width: 64rem)');
+    if (query === undefined) return;
+    const synchronize = () => setDrawerModal(query.matches);
+    synchronize();
+    query.addEventListener('change', synchronize);
+    return () => query.removeEventListener('change', synchronize);
+  }, []);
 
   function clearSavedStatus(): void {
     setSaved(false);
@@ -118,6 +132,11 @@ export function QuickWorkflowEditor({
         Object.entries(current).filter(([currentKey]) => currentKey !== key),
       );
     });
+  }
+
+  function closeRewardDrawer(): void {
+    setDrawerOpen(false);
+    queueMicrotask(() => configureSidesButton.current?.focus());
   }
 
   function updatePhase(phase: PhaseKey, patch: Partial<QuickEnvironmentDraft>) {
@@ -180,6 +199,7 @@ export function QuickWorkflowEditor({
       <div className="quick-setup__section-fields">
         <AssetPicker
           label={`${label} background image`}
+          visibleLabel="Image"
           kind="image"
           assets={assets}
           value={value.backgroundAsset}
@@ -191,6 +211,7 @@ export function QuickWorkflowEditor({
         />
         <AssetPicker
           label={`${label} ambient audio`}
+          visibleLabel="Audio"
           kind="audio"
           assets={assets}
           value={value.audioAsset}
@@ -200,8 +221,9 @@ export function QuickWorkflowEditor({
           onUpload={onUploadAsset}
           onSynchronizeUpload={onSynchronizeAssetUpload}
         />
-        <Field label={`${label} background color`} hint="Optional CSS color.">
+        <Field label="Color">
           <input
+            aria-label={`${label} background color`}
             value={value.backgroundColor}
             onChange={(event) => {
               updatePhase(phase, { backgroundColor: event.target.value });
@@ -283,6 +305,7 @@ export function QuickWorkflowEditor({
     <form
       id={formId}
       className="quick-setup"
+      data-reward-drawer-open={drawerOpen ? 'true' : 'false'}
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
@@ -330,10 +353,6 @@ export function QuickWorkflowEditor({
           </Button>
         )}
       </WorkflowEditorChromeModeAction>
-      <p className="editor-introduction">
-        Individual Phases and advanced Reward settings are available after
-        conversion to Detailed setup.
-      </p>
       {Object.keys(errors).length === 0 ? null : (
         <p className="feedback feedback--error" role="alert">
           Review the highlighted fields before saving.
@@ -344,16 +363,24 @@ export function QuickWorkflowEditor({
           {saveError}
         </p>
       )}
-      <div className="quick-setup__identity">
-        <Field label="Workflow name" error={errors['name']}>
-          <input
-            value={editor.draft.name}
-            onChange={(event) => {
-              editor.setName(event.target.value);
-            }}
-          />
-        </Field>
-      </div>
+      <WorkflowEditorChromeIdentity>
+        <div className="workflow-editor-chrome__identity quick-setup__identity">
+          <Field label="Workflow name" error={errors['name']}>
+            <input
+              form={formId}
+              value={editor.draft.name}
+              onChange={(event) => {
+                editor.setName(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }}
+            />
+          </Field>
+        </div>
+      </WorkflowEditorChromeIdentity>
 
       <section
         className="quick-setup__recipe"
@@ -390,39 +417,47 @@ export function QuickWorkflowEditor({
         </div>
       </section>
 
+      <div className="quick-setup__asset-cards">
+        <section
+          className="quick-setup__section quick-setup__section--focus quick-setup__asset-card quick-setup__asset-card--focus"
+          aria-labelledby="quick-focus-title"
+          aria-label="Focus assets"
+        >
+          <h3 id="quick-focus-title">Focus assets</h3>
+          {phaseFields('focus', 'Focus')}
+        </section>
+        <section
+          className="quick-setup__section quick-setup__section--break quick-setup__asset-card quick-setup__asset-card--break"
+          aria-labelledby="quick-short-break-title"
+          aria-label="Short Break assets"
+        >
+          <h3 id="quick-short-break-title">Short Break assets</h3>
+          {phaseFields('shortBreak', 'Short Break')}
+        </section>
+      </div>
       <section
-        className="quick-setup__section quick-setup__section--focus"
-        aria-labelledby="quick-focus-title"
-        aria-label="Focus assets"
-      >
-        <h3 id="quick-focus-title">Focus assets</h3>
-        {phaseFields('focus', 'Focus')}
-      </section>
-      <section
-        className="quick-setup__section quick-setup__section--break"
-        aria-labelledby="quick-short-break-title"
-        aria-label="Short Break assets"
-      >
-        <h3 id="quick-short-break-title">Short Break assets</h3>
-        {phaseFields('shortBreak', 'Short Break')}
-      </section>
-      <section
-        className="quick-setup__section"
+        className="quick-setup__section quick-setup__optional-section"
         aria-labelledby="quick-long-break-title"
+        aria-label="Long Break settings"
       >
-        <h3 id="quick-long-break-title">Long Break</h3>
-        <Switch
-          label="Use Long Break"
-          checked={editor.draft.longBreak.enabled}
-          onChange={(enabled) => {
-            editor.setDraft((current) => ({
-              ...current,
-              longBreak: { ...current.longBreak, enabled },
-            }));
-          }}
-        />
+        <div className="quick-setup__optional-header">
+          <div>
+            <h3 id="quick-long-break-title">Long Break</h3>
+            <p>Replace the Short Break after a selected number of cycles.</p>
+          </div>
+          <Switch
+            label="Use Long Break"
+            checked={editor.draft.longBreak.enabled}
+            onChange={(enabled) => {
+              editor.setDraft((current) => ({
+                ...current,
+                longBreak: { ...current.longBreak, enabled },
+              }));
+            }}
+          />
+        </div>
         {editor.draft.longBreak.enabled ? (
-          <>
+          <div className="quick-setup__optional-controls">
             <Field
               label="Long Break every N cycles"
               error={errors['longBreak:frequency']}
@@ -444,26 +479,35 @@ export function QuickWorkflowEditor({
               />
             </Field>
             {durationField('longBreak', 'Long Break')}
-            {phaseFields('longBreak', 'Long Break')}
-          </>
+            <details className="quick-setup__advanced-assets">
+              <summary>Long Break assets</summary>
+              {phaseFields('longBreak', 'Long Break')}
+            </details>
+          </div>
         ) : null}
       </section>
 
       <section
-        className="quick-setup__section"
+        className="quick-setup__section quick-setup__optional-section"
         aria-labelledby="quick-reward-title"
+        aria-label="Reward Dice settings"
       >
-        <h3 id="quick-reward-title">Reward Dice</h3>
-        <Switch
-          label="Use Reward Dice"
-          checked={editor.draft.rewardDice.enabled}
-          onChange={(enabled) => {
-            editor.setDraft((current) => ({
-              ...current,
-              rewardDice: { ...current.rewardDice, enabled },
-            }));
-          }}
-        />
+        <div className="quick-setup__optional-header">
+          <div>
+            <h3 id="quick-reward-title">Reward Dice</h3>
+            <p>Show a Reward after a selected number of completed cycles.</p>
+          </div>
+          <Switch
+            label="Use Reward Dice"
+            checked={editor.draft.rewardDice.enabled}
+            onChange={(enabled) => {
+              editor.setDraft((current) => ({
+                ...current,
+                rewardDice: { ...current.rewardDice, enabled },
+              }));
+            }}
+          />
+        </div>
         {editor.draft.rewardDice.enabled ? (
           <div className="quick-setup__reward-controls">
             <Field
@@ -487,6 +531,7 @@ export function QuickWorkflowEditor({
               />
             </Field>
             <Button
+              buttonRef={configureSidesButton}
               type="button"
               variant="secondary"
               onClick={() => {
@@ -546,21 +591,36 @@ export function QuickWorkflowEditor({
         )}
       </section>
 
+      <aside className="quick-setup__guidance">
+        <Icon name="info" size={20} />
+        <p>
+          The sequence updates automatically when you change these settings.
+          Need more control? Individual Phases and advanced Reward settings are
+          available after conversion to <strong>Detailed setup</strong>.
+          Conversion cannot be reversed.
+        </p>
+      </aside>
+
       <Dialog
         open={drawerOpen}
         className="quick-reward-drawer"
+        modal={drawerModal}
+        presentation="side-sheet"
         title="Reward sides drawer"
         onCancel={() => {
-          setDrawerOpen(false);
+          closeRewardDrawer();
         }}
       >
+        <p className="quick-reward-drawer__description">
+          Choose what can appear after a completed cycle.
+        </p>
         <div className="quick-reward-drawer__summary">
           <strong>{String(editor.draft.rewardDice.sides.length)} sides</strong>
           {rewardWeightPresentation.summary === null ? null : (
             <span>{rewardWeightPresentation.summary}</span>
           )}
         </div>
-        <div className="quick-reward-drawer__sides">
+        <div className="quick-reward-drawer__sides quick-reward-drawer__sides--scrollable">
           {editor.draft.rewardDice.sides.map((side, index) => (
             <fieldset className="quick-reward-side" key={side.key}>
               <legend>Reward side {String(index + 1)}</legend>
@@ -668,8 +728,6 @@ export function QuickWorkflowEditor({
               </Button>
             </fieldset>
           ))}
-        </div>
-        <div className="dialog__actions quick-reward-drawer__footer">
           <Button
             type="button"
             variant="secondary"
@@ -693,14 +751,25 @@ export function QuickWorkflowEditor({
           >
             Add side
           </Button>
+        </div>
+        <div className="dialog__actions quick-reward-drawer__footer">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              closeRewardDrawer();
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             type="button"
             variant="primary"
             onClick={() => {
-              setDrawerOpen(false);
+              closeRewardDrawer();
             }}
           >
-            Done
+            Apply changes
           </Button>
         </div>
       </Dialog>

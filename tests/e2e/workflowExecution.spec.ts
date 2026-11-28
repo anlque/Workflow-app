@@ -253,6 +253,89 @@ test('creates, reopens and starts a Quick Workflow', async ({
   ).toBeVisible();
 });
 
+test('keeps the Quick recipe readable beside the desktop Reward side sheet', async ({
+  context,
+  extensionUrls,
+}) => {
+  const options = await context.newPage();
+  await options.setViewportSize({ width: 1601, height: 1200 });
+  await options.goto(extensionUrls.options);
+  await openNewWorkflow(options);
+  await options.getByRole('button', { name: 'Quick setup' }).click();
+  await options.getByRole('checkbox', { name: 'Use Reward Dice' }).check();
+  await options.getByRole('button', { name: 'Configure sides' }).click();
+  for (let index = 0; index < 3; index += 1) {
+    await options.getByRole('button', { name: 'Add side' }).click();
+  }
+
+  const recipe = options.getByRole('region', { name: 'Session recipe' });
+  const cycles = options.getByRole('spinbutton', {
+    name: 'Cycles',
+    exact: true,
+  });
+  const drawer = options.getByRole('dialog', { name: 'Reward sides drawer' });
+  const topBar = options.locator('.workflow-studio-shell__top-bar');
+  const footer = drawer.locator('.quick-reward-drawer__footer');
+  const body = drawer.locator('.quick-reward-drawer__sides');
+  const [recipeBox, cyclesBox, drawerBox, footerBox, topBarBox] =
+    await Promise.all([
+      recipe.boundingBox(),
+      cycles.boundingBox(),
+      drawer.boundingBox(),
+      footer.boundingBox(),
+      topBar.boundingBox(),
+    ]);
+  expect(recipeBox).not.toBeNull();
+  expect(cyclesBox).not.toBeNull();
+  expect(drawerBox).not.toBeNull();
+  expect(footerBox).not.toBeNull();
+  expect(topBarBox).not.toBeNull();
+  expect((recipeBox?.x ?? 0) + (recipeBox?.width ?? 0)).toBeLessThanOrEqual(
+    drawerBox?.x ?? 0,
+  );
+  expect((cyclesBox?.x ?? 0) + (cyclesBox?.width ?? 0)).toBeLessThanOrEqual(
+    drawerBox?.x ?? 0,
+  );
+  expect(drawerBox?.x ?? 0).toBeGreaterThan(800);
+  expect(drawerBox?.y ?? 0).toBeGreaterThanOrEqual(
+    (topBarBox?.y ?? 0) + (topBarBox?.height ?? 0),
+  );
+  expect((footerBox?.y ?? 0) + (footerBox?.height ?? 0)).toBeLessThanOrEqual(
+    1200,
+  );
+  await expect(body).toHaveCSS('overflow-y', 'auto');
+  for (const label of ['Image', 'Audio', 'Color']) {
+    const labelBox = await options
+      .getByRole('region', { name: 'Focus assets' })
+      .getByText(label, { exact: true })
+      .boundingBox();
+    expect(labelBox).not.toBeNull();
+    expect(labelBox?.height ?? 0).toBeLessThanOrEqual(24);
+  }
+  await expect(
+    options.getByRole('region', { name: 'Generated rhythm preview' }),
+  ).toBeInViewport();
+  const guidance = options.locator('.quick-setup__guidance');
+  await expect(guidance).toBeInViewport();
+  const guidanceBox = await guidance.boundingBox();
+  expect(guidanceBox).not.toBeNull();
+  expect(
+    (guidanceBox?.y ?? 0) + (guidanceBox?.height ?? 0),
+  ).toBeLessThanOrEqual(1200);
+
+  await options.setViewportSize({ width: 1024, height: 720 });
+  await expect(drawer).toHaveAttribute('data-modal', 'true');
+  const narrowDrawerBox = await drawer.boundingBox();
+  expect(narrowDrawerBox).not.toBeNull();
+  expect(narrowDrawerBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect(
+    (narrowDrawerBox?.x ?? 0) + (narrowDrawerBox?.width ?? 0),
+  ).toBeLessThanOrEqual(1024);
+  expect(
+    (narrowDrawerBox?.y ?? 0) + (narrowDrawerBox?.height ?? 0),
+  ).toBeLessThanOrEqual(720);
+});
+
 test('save-and-converts a Quick draft with an equivalent retained copy', async ({
   context,
   extensionUrls,
